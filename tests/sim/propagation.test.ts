@@ -3,6 +3,7 @@ import { juiciness, relevance, freshness, tellability, chooseTelling, ingest,
 import { applyInject } from '../../src/sim/actions';
 import { buildWorld } from '../../src/sim/world';
 import { TESTFORD } from '../../src/content/fixtures/testford';
+import { STANDARD_RULES } from '../../src/content/rules';
 import { at } from '../../src/core/time';
 import { SOMEONE } from '../../src/sim/rumors/claim';
 import type { Circle } from '../../src/sim/agents';
@@ -17,8 +18,8 @@ describe('scoring', () => {
   const injected = applyInject(world, 'mara', spec);
 
   it('juiciness blends predicate weight and severity', () => {
-    expect(juiciness(injected)).toBeCloseTo(0.8); // stole 0.8, severity 3 -> +0
-    expect(juiciness({ ...injected, severity: 5 })).toBeCloseTo(0.96);
+    expect(juiciness(injected, STANDARD_RULES)).toBeCloseTo(0.8); // stole 0.8, severity 3 -> +0
+    expect(juiciness({ ...injected, severity: 5 }, STANDARD_RULES)).toBeCloseTo(0.96);
   });
 
   it('relevance: 1.0 when hearer knows the subject, 0.6 otherwise', () => {
@@ -36,7 +37,7 @@ describe('scoring', () => {
 
   it('a fresh juicy belief clears the tell threshold for a trusted hearer', () => {
     const b = world.beliefs['mara']!['f0']!;
-    expect(tellability(b, world.npcs['mara']!, world.npcs['tomas']!, world, at(0, 9)))
+    expect(tellability(b, world.npcs['mara']!, world.npcs['tomas']!, world, at(0, 9), STANDARD_RULES))
       .toBeGreaterThan(TELL_THRESHOLD);
   });
 });
@@ -46,7 +47,7 @@ describe('chooseTelling and gates', () => {
     const world = buildWorld(TESTFORD, 'prop-seed-2');
     const injected = applyInject(world, 'mara', spec);
     const circle: Circle = { venue: 'market', members: ['mara', 'rafe'] };
-    const u = chooseTelling(world, 'mara', circle, at(0, 9))!;
+    const u = chooseTelling(world, 'mara', circle, at(0, 9), STANDARD_RULES)!;
     expect(u).not.toBeNull();
     expect(u.addressedTo).toBe('rafe');
     const out = u.claim;
@@ -63,17 +64,17 @@ describe('chooseTelling and gates', () => {
     const world = buildWorld(TESTFORD, 'prop-seed-3');
     applyInject(world, 'hew', spec); // hew is the skeptic
     const circle: Circle = { venue: 'tavern', members: ['hew', 'osric'] };
-    expect(chooseTelling(world, 'hew', circle, at(0, 20))).toBeNull();
+    expect(chooseTelling(world, 'hew', circle, at(0, 20), STANDARD_RULES)).toBeNull();
   });
 
   it('cooldown: no immediate re-tell of the same family', () => {
     const world = buildWorld(TESTFORD, 'prop-seed-4');
     applyInject(world, 'mara', spec);
     const circle: Circle = { venue: 'market', members: ['mara', 'rafe'] };
-    expect(chooseTelling(world, 'mara', circle, at(0, 9))).not.toBeNull();
+    expect(chooseTelling(world, 'mara', circle, at(0, 9), STANDARD_RULES)).not.toBeNull();
     world.lastTold[`mara:f0`] = at(0, 9);
-    expect(chooseTelling(world, 'mara', circle, at(0, 10))).toBeNull();
-    expect(chooseTelling(world, 'mara', circle, at(0, 13, 30))).not.toBeNull();
+    expect(chooseTelling(world, 'mara', circle, at(0, 10), STANDARD_RULES)).toBeNull();
+    expect(chooseTelling(world, 'mara', circle, at(0, 13, 30), STANDARD_RULES)).not.toBeNull();
   });
 
   it('ingest: addressed > overheard credence; first version sticks; sources accumulate', () => {

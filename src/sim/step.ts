@@ -2,10 +2,11 @@ import { minuteOfDay } from '../core/time';
 import { circlesAt, venueAt } from './agents';
 import type { TickEvents, Utterance } from './perception';
 import { chooseTelling, ingest, CONVERSATION_BEAT } from './rumors/propagation';
+import type { Rules } from './rules';
 import type { WorldState } from './types';
 
 /** Advance one tick. Movement -> circles -> tellings -> ingestion. Deterministic order. */
-export function step(world: WorldState): TickEvents {
+export function step(world: WorldState, rules: Rules): TickEvents {
   const t = world.tick;
   const positions = Object.fromEntries(
     Object.values(world.npcs).map((n) => [n.id, venueAt(n, t)]),
@@ -16,7 +17,7 @@ export function step(world: WorldState): TickEvents {
     for (const circle of circlesAt(world, t)) {
       if (circle.members.length < 2) continue;
       for (const member of circle.members) {
-        const u = chooseTelling(world, member, circle, t);
+        const u = chooseTelling(world, member, circle, t, rules);
         if (u) utterances.push(u);
       }
     }
@@ -32,6 +33,6 @@ export function step(world: WorldState): TickEvents {
   return { tick: t, positions, utterances };
 }
 
-export function runUntil(world: WorldState, endTick: number): void {
-  while (world.tick < endTick) step(world);
+export function runUntil(world: WorldState, endTick: number, rules: Rules): void {
+  while (world.tick < endTick) step(world, rules);
 }

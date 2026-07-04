@@ -1,14 +1,5 @@
 import type { PredicateId } from '../sim/rumors/claim';
-
-export interface PredicateDef {
-  id: PredicateId;
-  /** 0..1 — how tellable the story is on its own. */
-  juiciness: number;
-  /** Moralizer target: the sin-register version of this predicate. */
-  sinVersion: PredicateId | null;
-  /** Partisan only fires on faction-relevant claims. */
-  factionRelevant: boolean;
-}
+import type { PredicateDef } from '../sim/rules';
 
 export const PREDICATES: Record<PredicateId, PredicateDef> = {
   'met-secretly-with':      { id: 'met-secretly-with',      juiciness: 0.7,  sinVersion: 'is-having-an-affair-with', factionRelevant: true },

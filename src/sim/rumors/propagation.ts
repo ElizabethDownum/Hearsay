@@ -1,11 +1,10 @@
 import { type Tick, TICKS_PER_DAY } from '../../core/time';
 import type { Circle } from '../agents';
 import type { Utterance } from '../perception';
+import type { Rules } from '../rules';
 import type { Belief, Npc, WorldState } from '../types';
 import { mintClaim, type Claim, type EntityId } from './claim';
 import { applyTraits, type TraitContext } from './traits';
-import { PREDICATES } from '../../content/predicates';
-import { TRAITS } from '../../content/traits';
 import { trustBetween } from '../world';
 
 export const TELL_THRESHOLD = 0.25;
@@ -15,8 +14,8 @@ export const CONVERSATION_BEAT = 15;      // tellings evaluated every 15 sim-min
 
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
 
-export function juiciness(claim: Claim): number {
-  const base = PREDICATES[claim.predicate]?.juiciness ?? 0.3;
+export function juiciness(claim: Claim, rules: Rules): number {
+  const base = rules.predicates[claim.predicate]?.juiciness ?? 0.3;
   return clamp01(base + (claim.severity - 3) * 0.08);
 }
 
@@ -33,10 +32,10 @@ export function freshness(belief: Belief, t: Tick): number {
 }
 
 export function tellability(
-  belief: Belief, teller: Npc, hearer: Npc, world: WorldState, t: Tick,
+  belief: Belief, teller: Npc, hearer: Npc, world: WorldState, t: Tick, rules: Rules,
 ): number {
   void teller; void world; // symmetric signature; teller factors arrive in Plan 2
-  return juiciness(belief.claim) * relevance(hearer, belief.claim) * belief.credence * freshness(belief, t);
+  return juiciness(belief.claim, rules) * relevance(hearer, belief.claim) * belief.credence * freshness(belief, t);
 }
 
 function traitContext(npc: Npc, world: WorldState): TraitContext {
@@ -48,13 +47,13 @@ function traitContext(npc: Npc, world: WorldState): TraitContext {
   };
 }
 
-function passesGates(teller: Npc, belief: Belief, world: WorldState, t: Tick): boolean {
+function passesGates(teller: Npc, belief: Belief, world: WorldState, t: Tick, rules: Rules): boolean {
   if (belief.credence < MIN_RETELL_CREDENCE) return false;
   if (freshness(belief, t) <= 0) return false;
   const last = world.lastTold[`${teller.id}:${belief.claim.family}`];
   if (last !== undefined && t - last < RETELL_COOLDOWN) return false;
   const needsCorroboration = teller.traits.some(
-    (id) => TRAITS[id]?.retellGate === 'requires-corroboration',
+    (id) => rules.traits[id]?.retellGate === 'requires-corroboration',
   );
   if (needsCorroboration && belief.distinctSources.length < 2) return false;
   return true;
@@ -62,7 +61,7 @@ function passesGates(teller: Npc, belief: Belief, world: WorldState, t: Tick): b
 
 /** Best (belief, addressee) above threshold; deterministic lexicographic tie-break. */
 export function chooseTelling(
-  world: WorldState, tellerId: EntityId, circle: Circle, t: Tick,
+  world: WorldState, tellerId: EntityId, circle: Circle, t: Tick, rules: Rules,
 ): Utterance | null {
   const teller = world.npcs[tellerId]!;
   const store = world.beliefs[tellerId] ?? {};
@@ -70,10 +69,10 @@ export function chooseTelling(
 
   for (const family of Object.keys(store).sort()) {
     const belief = store[family]!;
-    if (!passesGates(teller, belief, world, t)) continue;
+    if (!passesGates(teller, belief, world, t, rules)) continue;
     for (const addressee of [...circle.members].sort()) {
       if (addressee === tellerId || trustBetween(world, tellerId, addressee) <= 0) continue;
-      const score = tellability(belief, teller, world.npcs[addressee]!, world, t);
+      const score = tellability(belief, teller, world.npcs[addressee]!, world, t, rules);
       if (score > TELL_THRESHOLD && (best === null || score > best.score)) {
         best = { score, family, addressee, belief };
       }
@@ -81,7 +80,7 @@ export function chooseTelling(
   }
   if (!best) return null;
 
-  const tellerTraits = teller.traits.flatMap((id) => (TRAITS[id] ? [TRAITS[id]!] : []));
+  const tellerTraits = teller.traits.flatMap((id) => (rules.traits[id] ? [rules.traits[id]!] : []));
   const delta = applyTraits(tellerTraits, best.belief.claim, traitContext(teller, world));
   const outgoing = mintClaim(world, {
     ...best.belief.claim, ...delta,

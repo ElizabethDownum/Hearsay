@@ -1,5 +1,6 @@
 import { buildWorld } from '../../src/sim/world';
 import { TESTFORD } from '../../src/content/fixtures/testford';
+import { STANDARD_RULES } from '../../src/content/rules';
 import { applyInject } from '../../src/sim/actions';
 import { runUntil } from '../../src/sim/step';
 import { at } from '../../src/core/time';
@@ -25,12 +26,12 @@ const hopChain = (w: WorldState, c: Claim): number => {
 
 describe("Ellie's day: told at 8am in the market, across the city by evening", () => {
   const world = buildWorld(TESTFORD, 'acceptance-1');
-  runUntil(world, at(0, 8));
+  runUntil(world, at(0, 8), STANDARD_RULES);
   const injected = applyInject(world, 'mara', spec);
   const family = injected.family;
 
   it('by 22:00 day 0: family at home, work buddy at market, the tavern has heard', () => {
-    runUntil(world, at(0, 22));
+    runUntil(world, at(0, 22), STANDARD_RULES);
     expect(knows(world, 'tomas', family)).toBe(true);  // her family, told at home
     expect(knows(world, 'pia', family)).toBe(true);
     expect(knows(world, 'rafe', family)).toBe(true);   // work buddy, same morning
@@ -38,7 +39,7 @@ describe("Ellie's day: told at 8am in the market, across the city by evening", (
   });
 
   it('by day 1 night the patrons hold it too — multi-hop, not broadcast', () => {
-    runUntil(world, at(1, 23));
+    runUntil(world, at(1, 23), STANDARD_RULES);
     const patrons = ['hew', 'jonet', 'seth'].filter((p) => knows(world, p, family));
     expect(patrons.length).toBeGreaterThanOrEqual(2);
     const secondHand = ['tomas', 'pia', 'rafe', 'osric', ...patrons]
@@ -59,18 +60,18 @@ describe("Ellie's day: told at 8am in the market, across the city by evening", (
 
 describe('firebreak and bridge: Northside hears only through Anselm', () => {
   const world = buildWorld(TESTFORD, 'acceptance-2');
-  runUntil(world, at(0, 8));
+  runUntil(world, at(0, 8), STANDARD_RULES);
   const { family } = applyInject(world, 'mara', spec);
 
   it('firebreak holds until the bridge physically crosses (17:00 day 0)', () => {
     // Anselm hears it at the noon market; his first Northside contact is the
     // 17:00 chapel service. One tick before that, Northside must still be dark.
-    runUntil(world, at(0, 17));
+    runUntil(world, at(0, 17), STANDARD_RULES);
     for (const n of ['brigid', 'cole', 'dara']) expect(knows(world, n, family)).toBe(false);
   });
 
   it('by day 2 evening the story crossed — and only via the bridge', () => {
-    runUntil(world, at(2, 23));
+    runUntil(world, at(2, 23), STANDARD_RULES);
     const northsiders = ['brigid', 'cole', 'dara'].filter((n) => knows(world, n, family));
     expect(northsiders.length).toBeGreaterThanOrEqual(1);
     for (const n of northsiders) {

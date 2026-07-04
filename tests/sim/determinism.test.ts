@@ -1,6 +1,7 @@
 import { stableStringify, hashWorld } from '../../src/sim/hash';
 import { buildWorld } from '../../src/sim/world';
 import { TESTFORD } from '../../src/content/fixtures/testford';
+import { STANDARD_RULES } from '../../src/content/rules';
 import { applyInject } from '../../src/sim/actions';
 import { runUntil } from '../../src/sim/step';
 import { at } from '../../src/core/time';
@@ -15,9 +16,9 @@ const spec = {
 /** One scripted campaign: inject at day0 08:00, run to endDay 00:00. */
 const campaign = (seed: string, endDay: number, injectAt = at(0, 8)): WorldState => {
   const world = buildWorld(TESTFORD, seed);
-  runUntil(world, injectAt);
+  runUntil(world, injectAt, STANDARD_RULES);
   applyInject(world, 'mara', spec);
-  runUntil(world, at(endDay, 0));
+  runUntil(world, at(endDay, 0), STANDARD_RULES);
   return world;
 };
 

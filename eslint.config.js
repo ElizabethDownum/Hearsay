@@ -15,4 +15,10 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ['src/sim/**/*.ts', 'src/core/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{ group: ['**/content/**'], message: 'Engine/content split: sim and core must not import content — inject via Rules.' }] }],
+    },
+  },
 );
