@@ -52,8 +52,10 @@ export interface SketchFeature {
 }
 
 export interface InquiryOrder { asker: EntityId; about: InquiryKeyData; expiresDay: number }
-export interface WatchOrder { district: string; guards: EntityId[]; startDay: number }
-export interface InterrogationOrder { target: EntityId; guard: EntityId; day: number; about: InquiryKeyData }
+/** A guard posted to a specific venue for a district watch. */
+export interface WatchPost { guard: EntityId; venue: VenueId }
+export interface WatchOrder { district: string; posts: WatchPost[]; startDay: number }
+export interface InterrogationOrder { target: EntityId; guard: EntityId; day: number; about: InquiryKeyData; venue: VenueId }
 
 export interface EnemyDecision {
   day: number;
