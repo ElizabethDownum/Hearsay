@@ -4,7 +4,8 @@ import type { TraitId } from './rumors/traits';
 
 export interface Venue {
   id: VenueId;
-  district: 'town' | 'northside';
+  /** Procgen district id (e.g. 'd0'). Firebreak terrain, not sim behavior — the sim reads venues, not districts. */
+  district: string;
   access: 'public' | 'invitational' | 'private';
 }
 

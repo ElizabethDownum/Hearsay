@@ -43,6 +43,7 @@ describe('determinism law — glob coverage', () => {
     'src/content/rules.ts',
     'src/bots/archetypes.ts',   // live≡replay depends on bot entropy-freedom
     'src/harness/metrics.ts',   // and on harness entropy-freedom
+    'src/world/types.ts',
   ];
   it.each(covered)('%s carries the determinism rules', async (file) => {
     const cfg = await new ESLint().calculateConfigForFile(file);
@@ -50,7 +51,7 @@ describe('determinism law — glob coverage', () => {
     expect(isOn(cfg.rules?.['no-restricted-syntax'])).toBe(true);
   });
 
-  const banned = ['src/sim/step.ts', 'src/bots/archetypes.ts', 'src/harness/metrics.ts'];
+  const banned = ['src/sim/step.ts', 'src/bots/archetypes.ts', 'src/harness/metrics.ts', 'src/world/types.ts'];
   it.each(banned)('%s is banned from importing content', async (file) => {
     const cfg = await new ESLint().calculateConfigForFile(file);
     expect(isOn(cfg.rules?.['no-restricted-imports'])).toBe(true);
