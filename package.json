@@ -6,7 +6,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "mc": "vitest run tests/harness/montecarlo.report.test.ts",
+    "mc": "vitest run tests/harness",
     "soak": "vitest run tests/world/soak.report.test.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
