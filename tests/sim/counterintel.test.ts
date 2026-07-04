@@ -1,21 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildWorld, buildTownMap } from '../../src/sim/world';
 import { captureEvidence } from '../../src/sim/counterintel';
 import { runUntil } from '../../src/sim/step';
 import { applyInject } from '../../src/sim/actions';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { SOMEONE, type Claim } from '../../src/sim/rumors/claim';
-import { WATCHFORD, WATCHFORD_GUARDS } from '../../src/content/fixtures/watchford';
 import { at } from '../../src/core/time';
 import type { TickEvents } from '../../src/sim/perception';
 import { stableStringify } from '../../src/sim/hash';
-
-function watchfordWorld(seed: string) {
-  const world = buildWorld(WATCHFORD, seed);
-  world.enemy.observers = WATCHFORD_GUARDS.map((g) => ({ ...g }));
-  world.enemy.map = buildTownMap(WATCHFORD);
-  return world;
-}
+import { watchfordWorld } from './helpers/watchford-world';
 
 function claimOf(world: ReturnType<typeof watchfordWorld>, predicate: string, severity: 1|2|3|4|5): Claim {
   // helper: mint via applyInject to keep ids replay-stable, then read it back

@@ -1,8 +1,10 @@
+import { dayOf } from '../core/time';
 import { observationsFor, type TickEvents } from './perception';
 import { juiciness } from './rumors/propagation';
 import { applyTraits, type TraitContext } from './rumors/traits';
+import { enemyDigest } from './enemy/digest';
 import type { Rules } from './rules';
-import type { ReportedClaim } from './enemy/state';
+import type { EnemyDecision, ReportedClaim } from './enemy/state';
 import type { Npc, WorldState } from './types';
 import type { Claim } from './rumors/claim';
 
@@ -50,4 +52,49 @@ export function captureEvidence(world: WorldState, events: TickEvents, rules: Ru
       }
     }
   }
+}
+
+// 15-alignment (spec): interrogations 900–1020, watches 1080–1200. Held exactly.
+export const INTERROGATION = { from: 900, to: 1020 } as const;
+export const WATCH = { from: 1080, to: 1200 } as const;
+
+function addOverride(world: WorldState, id: string, o: WorldState['scheduleOverrides'][string][number]): void {
+  world.scheduleOverrides[id] = [...(world.scheduleOverrides[id] ?? []), o];
+}
+
+/** Decisions become world facts — all of them observable through ordinary perception. */
+export function applyEnemyDecision(world: WorldState, decision: EnemyDecision): void {
+  const enemy = world.enemy;
+  enemy.decisions.push(decision);
+  enemy.sketch.push(...decision.features);
+  enemy.featureCounter += decision.features.length;
+  enemy.digestedThrough = enemy.evidence.length;
+
+  for (const q of decision.inquiries) {
+    world.inquiries[q.asker] = [...(world.inquiries[q.asker] ?? []),
+      { about: q.about, from: 'enemy', expiresDay: q.expiresDay, asked: [], answersHeard: 0 }];
+    enemy.inquiriesIssued.push('family' in q.about ? `f:${q.about.family}` : `s:${q.about.subject}`);
+  }
+  for (const order of decision.interrogations) {
+    enemy.interrogated.push(`${order.target}:${'family' in order.about ? `f:${order.about.family}` : `s:${order.about.subject}`}`);
+    for (const id of [order.guard, order.target]) {
+      addOverride(world, id, { fromDay: order.day, toDay: order.day + 1,
+        from: INTERROGATION.from, to: INTERROGATION.to, venue: order.venue });
+    }
+    world.inquiries[order.guard] = [...(world.inquiries[order.guard] ?? []),
+      { about: order.about, from: 'enemy', expiresDay: order.day + 2, asked: [], answersHeard: 0 }];
+  }
+  for (const w of decision.watches) {
+    enemy.watchedDistricts.push(w.district);
+    for (const post of w.posts) {
+      addOverride(world, post.guard, { fromDay: w.startDay, toDay: null,
+        from: WATCH.from, to: WATCH.to, venue: post.venue });
+    }
+  }
+}
+
+/** The nightly beat: digest what the network sampled today, act on it. */
+export function runEnemyDay(world: WorldState, rules: Rules): void {
+  if (world.enemy.observers.length === 0) return;
+  applyEnemyDecision(world, enemyDigest(world.enemy, dayOf(world.tick), rules));
 }

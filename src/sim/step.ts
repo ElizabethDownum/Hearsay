@@ -3,7 +3,7 @@ import { circlesAt, venueAt } from './agents';
 import { expireInquiries, runAskPhase } from './inquiry';
 import { observationsFor, type Asking, type TickEvents, type Utterance } from './perception';
 import { chooseTelling, ingest, CONVERSATION_BEAT } from './rumors/propagation';
-import { captureEvidence } from './counterintel';
+import { captureEvidence, runEnemyDay } from './counterintel';
 import { reactToSelfRumor } from './reactions';
 import type { Rules } from './rules';
 import type { WorldState } from './types';
@@ -74,7 +74,12 @@ export function step(world: WorldState, rules: Rules): TickEvents {
     }
   }
 
-  if (minuteOfDay(t) === 1439) expireInquiries(world, dayOf(t));
+  // The nightly beat: digest today's evidence into countermeasures (world facts),
+  // THEN sweep spent inquiries. No-op on rosters with no observers (old suites untouched).
+  if (minuteOfDay(t) === 1439) {
+    runEnemyDay(world, rules);
+    expireInquiries(world, dayOf(t));
+  }
 
   world.tick = t + 1;
   return events;
