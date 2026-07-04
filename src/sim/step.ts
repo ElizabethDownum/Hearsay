@@ -3,6 +3,7 @@ import { circlesAt, venueAt } from './agents';
 import { expireInquiries, runAskPhase } from './inquiry';
 import { observationsFor, type Asking, type TickEvents, type Utterance } from './perception';
 import { chooseTelling, ingest, CONVERSATION_BEAT } from './rumors/propagation';
+import { captureEvidence } from './counterintel';
 import { reactToSelfRumor } from './reactions';
 import type { Rules } from './rules';
 import type { WorldState } from './types';
@@ -51,6 +52,11 @@ export function step(world: WorldState, rules: Rules): TickEvents {
         .map((id) => ({ id, addressed: id === a.addressedTo })),
     });
   }
+
+  // The enemy hears only what its people heard: capture reads the same feeds, gated by
+  // vigilance, filtered through observer traits. Independent of ingestion — no-op when
+  // there are no observers (Testford/miniTown), so old suites are untouched.
+  if (utterances.length > 0 || askings.length > 0) captureEvidence(world, events, rules);
 
   // Ingestion flows through the one perception path: every NPC hears exactly what
   // observationsFor grants them (same-circle utterances they did not speak). This is
