@@ -1,4 +1,4 @@
-import { runCampaign, applyAction, type Save } from '../../src/sim/campaign';
+import { runCampaign, applyAction, type Save, type Action } from '../../src/sim/campaign';
 import { buildWorld } from '../../src/sim/world';
 import { TESTFORD } from '../../src/content/fixtures/testford';
 import { STANDARD_RULES } from '../../src/content/rules';
@@ -68,5 +68,13 @@ describe('runCampaign — Save = seed + action log', () => {
     expect(Object.keys(world.beliefs['mara']!)).toHaveLength(0);
     expect(() => applyAction(world, { tick: 0, kind: 'inject', target: 'mara', spec }))
       .toThrow(/tick/);
+  });
+});
+
+describe('applyAction rejects unknown kinds (untrusted JSON saves)', () => {
+  it('throws loudly instead of silently ignoring', () => {
+    const world = buildWorld(TESTFORD, 'unknown-kind');
+    const bogus = { tick: 0, kind: 'teleport', target: 'mara' } as unknown as Action;
+    expect(() => applyAction(world, bogus)).toThrow(/unknown action kind 'teleport'/);
   });
 });

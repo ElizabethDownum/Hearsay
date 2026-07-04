@@ -31,6 +31,11 @@ export function applyAction(world: WorldState, action: Action): void {
     case 'inject':
       applyInject(world, action.target, action.spec);
       break;
+    default: {
+      // Saves are untrusted JSON — an unknown kind must fail loudly, never silently no-op.
+      const kind = (action as { kind: string }).kind;
+      throw new Error(`applyAction: unknown action kind '${kind}'`);
+    }
   }
 }
 

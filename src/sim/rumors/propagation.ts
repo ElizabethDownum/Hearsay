@@ -11,6 +11,9 @@ export const TELL_THRESHOLD = 0.25;
 export const RETELL_COOLDOWN = 240;       // ticks (4h) per (teller, family)
 export const CONVERSATION_BEAT = 15;      // tellings evaluated every 15 sim-minutes
 
+/** Hearsay alone never yields certainty — only evidence (artifacts, later plans) exceeds it. */
+export const HEARSAY_CEILING = 0.95;
+
 /** Credence bands that drive behavior: dismiss → repeat → believe → act (act arrives later). */
 export const STANCE = { DISMISS: 0.2, REPEAT: 0.5, BELIEVE: 0.75 } as const;
 export const MIN_RETELL_CREDENCE = STANCE.REPEAT;   // "repeat" belief threshold
@@ -150,7 +153,7 @@ export function ingest(
     // Nobody is their own corroborator — a story citing YOU as its origin proves nothing to you.
     if (source !== hearerId && !existing.apparentSources.includes(source)) {
       existing.apparentSources.push(source);
-      existing.credence = Math.min(0.95, existing.credence + 0.15);
+      existing.credence = Math.min(HEARSAY_CEILING, existing.credence + 0.15);
       // Spec: stale news revives with new corroboration — a fresh APPARENT source
       // resets the freshness clock. A repeat origin refreshes nothing.
       existing.heardAt = hearing.tick;
@@ -160,7 +163,7 @@ export function ingest(
   const trust = trustBetween(world, hearerId, hearing.speaker);
   store[hearing.claim.family] = {
     claim: hearing.claim,
-    credence: clamp01((0.35 + 0.45 * trust * (addressed ? 1 : 0.5)) * plausibility(world.npcs[hearerId]!, hearing.claim, rules)),
+    credence: Math.min(HEARSAY_CEILING, clamp01((0.35 + 0.45 * trust * (addressed ? 1 : 0.5)) * plausibility(world.npcs[hearerId]!, hearing.claim, rules))),
     heardFrom: hearing.speaker,
     heardAt: hearing.tick,
     firstHeardAt: hearing.tick,

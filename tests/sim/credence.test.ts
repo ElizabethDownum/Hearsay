@@ -1,4 +1,4 @@
-import { plausibility, ingest, stanceOf, STANCE, chooseTelling } from '../../src/sim/rumors/propagation';
+import { plausibility, ingest, stanceOf, STANCE, chooseTelling, HEARSAY_CEILING } from '../../src/sim/rumors/propagation';
 import { applyInject } from '../../src/sim/actions';
 import { buildWorld } from '../../src/sim/world';
 import { TESTFORD } from '../../src/content/fixtures/testford';
@@ -108,5 +108,25 @@ describe('plausibility precedence — dislike beats affection (frenemies resent 
     const hearer = { ...world.npcs['seth']!, rivals: [], edges: [{ to: 'mara', kind: 'lover' as const, trust: 0.9 }] };
     expect(plausibility(hearer, { subject: 'mara', predicate: 'stole' } as Claim, STANDARD_RULES)).toBe(0.7);
     expect(plausibility(hearer, { subject: 'mara', predicate: 'blessed-the-harvest' } as Claim, STANDARD_RULES)).toBe(1.3);
+  });
+});
+
+describe('the hearsay ceiling — hearsay alone never yields certainty', () => {
+  it('first-hearing credence caps at HEARSAY_CEILING even for a disliker told by trusted kin', () => {
+    // jonet hears from a maximally-trusted mouth about her rival mara:
+    // raw = (0.35 + 0.45×0.9×1) × 1.3 ≈ 0.982 — pre-fix this clamped at 1.0, ABOVE
+    // the 0.95 corroboration cap (the Plan-2 asymmetry). Now both share one ceiling.
+    const w = buildWorld(TESTFORD, 'ceiling-1');
+    w.npcs['jonet']!.edges.push({ to: 'pia', kind: 'kin', trust: 0.9 });
+    const injected = applyInject(w, 'pia', {
+      subject: 'mara', predicate: 'stole', object: null,
+      count: null, severity: 4 as const, place: null, attribution: SOMEONE,
+    });
+    ingest(w, 'jonet', { tick: at(0, 9), speaker: 'pia', claim: injected }, true, STANDARD_RULES);
+    expect(w.beliefs['jonet']![injected.family]!.credence).toBe(HEARSAY_CEILING);
+  });
+
+  it('corroboration uses the same constant', () => {
+    expect(HEARSAY_CEILING).toBe(0.95);
   });
 });
