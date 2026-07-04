@@ -76,4 +76,16 @@ describe('no-omniscience law — the enemy never imports WorldState', () => {
     expect(violations("import { WorldState } from '../types';", rules)).toBeGreaterThan(0);
     expect(violations("import { Rules } from '../rules';", rules)).toBe(0);
   });
+
+  // Flat config merges rules per matching block by REPLACING a repeated rule key wholesale,
+  // not deep-merging its `patterns` array. src/sim/enemy/** matches both the engine/content-split
+  // block and this block, so the content-ban pattern group must survive alongside the
+  // no-omniscience group in the SAME rule config, or the engine/content-split law goes silently
+  // dark for the whole src/sim/enemy/** subtree.
+  it('still bans content imports under src/sim/enemy/** (engine/content split survives the merge)', async () => {
+    const cfg = await new ESLint().calculateConfigForFile('src/sim/enemy/digest.ts');
+    const cfgRules = cfg.rules ?? {};
+    const rules = { 'no-restricted-imports': cfgRules['no-restricted-imports']! } as Linter.RulesRecord;
+    expect(violations("import { PREDICATES } from '../../content/predicates';", rules)).toBeGreaterThan(0);
+  });
 });

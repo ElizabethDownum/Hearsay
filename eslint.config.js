@@ -30,13 +30,24 @@ export default tseslint.config(
   {
     files: ['src/sim/enemy/**/*.ts'],
     rules: {
-      'no-restricted-imports': ['error', { patterns: [{
-        group: [
-          '../types', '../world', '../step', '../agents', '../campaign',
-          '**/sim/types', '**/sim/world', '**/sim/step', '**/sim/agents', '**/sim/campaign',
-        ],
-        message: 'No-omniscience law: the enemy consumes evidence + TownMap + Rules, never WorldState.',
-      }] }],
+      // NOTE: flat config's per-file rule merge REPLACES a rule key wholesale when the
+      // same key appears in multiple matching blocks — it does not deep-merge the
+      // `patterns` array. This block's glob also matches the earlier engine/content-split
+      // block (both cover src/sim/**), so the content-ban pattern group MUST be repeated
+      // here alongside the no-omniscience group, or it is silently dropped for this subtree.
+      'no-restricted-imports': ['error', { patterns: [
+        {
+          group: [
+            '../types', '../world', '../step', '../agents', '../campaign',
+            '**/sim/types', '**/sim/world', '**/sim/step', '**/sim/agents', '**/sim/campaign',
+          ],
+          message: 'No-omniscience law: the enemy consumes evidence + TownMap + Rules, never WorldState.',
+        },
+        {
+          group: ['**/content/**'],
+          message: 'Engine/content split: engine code must not import content — inject via Rules/GenContent.',
+        },
+      ] }],
     },
   },
 );
