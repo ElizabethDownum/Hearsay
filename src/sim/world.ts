@@ -23,6 +23,7 @@ export function buildWorld(fixture: TownFixture, seed: string): WorldState {
     npcs,
     venues,
     beliefs: Object.fromEntries(fixture.npcs.map((n) => [n.id, {}])),
+    claims: {},
     lastTold: {},
   };
 }

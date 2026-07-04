@@ -52,6 +52,8 @@ export interface WorldState {
   npcs: Record<EntityId, Npc>;
   venues: Record<VenueId, Venue>;
   beliefs: Record<EntityId, BeliefStore>;
+  /** Every claim ever minted — lineage walks and the future debrief substrate. */
+  claims: Record<string, Claim>;
   /** `${tellerId}:${family}` → tick of last retell (cooldown; no spam). */
   lastTold: Record<string, Tick>;
 }
