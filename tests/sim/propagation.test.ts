@@ -81,10 +81,10 @@ describe('chooseTelling and gates', () => {
     const world = buildWorld(TESTFORD, 'prop-seed-5');
     const injected = applyInject(world, 'mara', spec);
     const u = { tick: at(0, 9), speaker: 'mara', claim: { ...injected, id: 'c9', parent: injected.id } };
-    ingest(world, 'rafe', u, true);
+    ingest(world, 'rafe', u, true, STANDARD_RULES);
     const b = world.beliefs['rafe']![injected.family]!;
     expect(b.credence).toBeCloseTo(0.35 + 0.45 * 0.6); // trust rafe->mara = 0.6
-    ingest(world, 'rafe', { ...u, speaker: 'osric' }, false);
+    ingest(world, 'rafe', { ...u, speaker: 'osric' }, false, STANDARD_RULES);
     expect(b.timesHeard).toBe(2);
     expect(b.apparentSources).toEqual(['mara', 'osric']);
     expect(b.claim.id).toBe('c9'); // first version stuck
@@ -99,11 +99,11 @@ describe('chooseTelling and gates', () => {
     const world = buildWorld(TESTFORD, 'prop-seed-6');
     const injected = applyInject(world, 'rafe', spec);
     const heard = { tick: at(0, 9), speaker: 'mara', claim: { ...injected, id: 'c9', parent: injected.id } };
-    ingest(world, 'rafe', heard, true);
+    ingest(world, 'rafe', heard, true, STANDARD_RULES);
     const b = world.beliefs['rafe']![injected.family]!;
-    ingest(world, 'rafe', { ...heard, tick: at(2, 9) }, true);      // same source, later
+    ingest(world, 'rafe', { ...heard, tick: at(2, 9) }, true, STANDARD_RULES);      // same source, later
     expect(b.heardAt).toBe(at(0, 9));                               // no refresh
-    ingest(world, 'rafe', { ...heard, speaker: 'osric', tick: at(2, 12) }, true); // new source
+    ingest(world, 'rafe', { ...heard, speaker: 'osric', tick: at(2, 12) }, true, STANDARD_RULES); // new source
     expect(b.heardAt).toBe(at(2, 12));                              // refreshed
     expect(freshness(b, at(2, 12))).toBeCloseTo(1);
   });

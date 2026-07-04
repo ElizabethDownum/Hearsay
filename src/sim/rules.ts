@@ -9,6 +9,8 @@ export interface PredicateDef {
   sinVersion: PredicateId | null;
   /** Partisan only fires on faction-relevant claims. */
   factionRelevant: boolean;
+  /** Who the claim helps or harms — confirmation bias reads this. */
+  valence: 'damaging' | 'neutral' | 'flattering';
 }
 
 /**

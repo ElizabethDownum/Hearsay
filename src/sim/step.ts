@@ -32,7 +32,7 @@ export function step(world: WorldState, rules: Rules): TickEvents {
     const feed = observationsFor(hearerId, events);
     for (const obs of feed.observations) {
       if (obs.kind !== 'utterance') continue;
-      ingest(world, hearerId, { tick: obs.tick, speaker: obs.speaker, claim: obs.claim }, !obs.overheard);
+      ingest(world, hearerId, { tick: obs.tick, speaker: obs.speaker, claim: obs.claim }, !obs.overheard, rules);
     }
   }
 

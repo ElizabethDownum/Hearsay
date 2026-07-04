@@ -2,6 +2,7 @@ import { ingest, freshness, apparentSourceOf } from '../../src/sim/rumors/propag
 import { applyInject } from '../../src/sim/actions';
 import { buildWorld } from '../../src/sim/world';
 import { TESTFORD } from '../../src/content/fixtures/testford';
+import { STANDARD_RULES } from '../../src/content/rules';
 import { at } from '../../src/core/time';
 import { SOMEONE, type Claim } from '../../src/sim/rumors/claim';
 
@@ -28,10 +29,10 @@ describe('apparent sources ("B only knows what attribution survived")', () => {
     const world = buildWorld(TESTFORD, 'prov-1');
     const injected = applyInject(world, 'rafe', spec);
     const b = world.beliefs['rafe']![injected.family]!;
-    ingest(world, 'rafe', { tick: at(0, 9), speaker: 'mara', claim: claimWith(injected, 'jonet', 'c8') }, true);
+    ingest(world, 'rafe', { tick: at(0, 9), speaker: 'mara', claim: claimWith(injected, 'jonet', 'c8') }, true, STANDARD_RULES);
     const after1 = b.credence;
     expect(b.apparentSources).toEqual(['jonet']);
-    ingest(world, 'rafe', { tick: at(0, 10), speaker: 'osric', claim: claimWith(injected, 'jonet', 'c9') }, true);
+    ingest(world, 'rafe', { tick: at(0, 10), speaker: 'osric', claim: claimWith(injected, 'jonet', 'c9') }, true, STANDARD_RULES);
     expect(b.apparentSources).toEqual(['jonet']);   // same apparent origin — no stack
     expect(b.credence).toBe(after1);                 // no bump
     expect(b.heardAt).toBe(at(0, 9));                // no freshness refresh
@@ -42,8 +43,8 @@ describe('apparent sources ("B only knows what attribution survived")', () => {
     const world = buildWorld(TESTFORD, 'prov-2');
     const injected = applyInject(world, 'rafe', spec);
     const b = world.beliefs['rafe']![injected.family]!;
-    ingest(world, 'rafe', { tick: at(0, 9), speaker: 'mara', claim: claimWith(injected, 'jonet', 'c8') }, true);
-    ingest(world, 'rafe', { tick: at(1, 9), speaker: 'osric', claim: claimWith(injected, SOMEONE, 'c9') }, true);
+    ingest(world, 'rafe', { tick: at(0, 9), speaker: 'mara', claim: claimWith(injected, 'jonet', 'c8') }, true, STANDARD_RULES);
+    ingest(world, 'rafe', { tick: at(1, 9), speaker: 'osric', claim: claimWith(injected, SOMEONE, 'c9') }, true, STANDARD_RULES);
     expect(b.apparentSources).toEqual(['jonet', 'osric']); // two apparent origins
     expect(b.heardAt).toBe(at(1, 9));                      // freshness refreshed
     expect(freshness(b, at(1, 9))).toBeCloseTo(1);
@@ -55,7 +56,7 @@ describe('apparent sources ("B only knows what attribution survived")', () => {
     const b = world.beliefs['rafe']![injected.family]!;
     expect(b.firstHeardAt).toBe(0);
     expect(b.apparentSources).toEqual([]);
-    ingest(world, 'rafe', { tick: at(1, 9), speaker: 'mara', claim: claimWith(injected, SOMEONE, 'c8') }, true);
+    ingest(world, 'rafe', { tick: at(1, 9), speaker: 'mara', claim: claimWith(injected, SOMEONE, 'c8') }, true, STANDARD_RULES);
     expect(b.firstHeardAt).toBe(0);      // unchanged
     expect(b.heardAt).toBe(at(1, 9));    // corroboration moved the freshness clock
   });
@@ -63,7 +64,7 @@ describe('apparent sources ("B only knows what attribution survived")', () => {
   it('first hearing records firstHeardAt = heardAt and one apparent source', () => {
     const world = buildWorld(TESTFORD, 'prov-4');
     const injected = applyInject(world, 'mara', spec);
-    ingest(world, 'rafe', { tick: at(0, 9), speaker: 'mara', claim: claimWith(injected, SOMEONE, 'c8') }, true);
+    ingest(world, 'rafe', { tick: at(0, 9), speaker: 'mara', claim: claimWith(injected, SOMEONE, 'c8') }, true, STANDARD_RULES);
     const b = world.beliefs['rafe']![injected.family]!;
     expect(b.firstHeardAt).toBe(at(0, 9));
     expect(b.heardAt).toBe(at(0, 9));

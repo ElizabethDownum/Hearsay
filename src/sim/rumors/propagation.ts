@@ -9,8 +9,19 @@ import { trustBetween } from '../world';
 
 export const TELL_THRESHOLD = 0.25;
 export const RETELL_COOLDOWN = 240;       // ticks (4h) per (teller, family)
-export const MIN_RETELL_CREDENCE = 0.5;   // "repeat" belief threshold
 export const CONVERSATION_BEAT = 15;      // tellings evaluated every 15 sim-minutes
+
+/** Credence bands that drive behavior: dismiss → repeat → believe → act (act arrives later). */
+export const STANCE = { DISMISS: 0.2, REPEAT: 0.5, BELIEVE: 0.75 } as const;
+export const MIN_RETELL_CREDENCE = STANCE.REPEAT;   // "repeat" belief threshold
+
+export type Stance = 'dismissed' | 'heard' | 'repeating' | 'believing';
+export function stanceOf(belief: Belief): Stance {
+  if (belief.credence < STANCE.DISMISS) return 'dismissed';
+  if (belief.credence < STANCE.REPEAT) return 'heard';
+  if (belief.credence < STANCE.BELIEVE) return 'repeating';
+  return 'believing';
+}
 
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
 
@@ -31,10 +42,24 @@ export function freshness(belief: Belief, t: Tick): number {
   return Math.max(0, 1 - ageDays / 3);
 }
 
+/** Confirmation bias: claims against people you dislike land soft; kin/friends resist. */
+export function plausibility(hearer: Npc, claim: Claim, rules: Rules): number {
+  if (claim.subject === SOMEONE) return 1;
+  const valence = rules.predicates[claim.predicate]?.valence ?? 'neutral';
+  if (valence === 'neutral') return 1;
+  const dislikes = hearer.rivals.includes(claim.subject) ||
+    hearer.edges.some((e) => e.to === claim.subject && e.kind === 'rival');
+  const edge = hearer.edges.find((e) => e.to === claim.subject);
+  const close = edge !== undefined && (edge.kind === 'kin' || edge.kind === 'lover');
+  const friendly = edge !== undefined && edge.kind === 'friend';
+  if (valence === 'damaging') return dislikes ? 1.3 : close ? 0.7 : friendly ? 0.85 : 1;
+  return dislikes ? 0.7 : close ? 1.3 : friendly ? 1.15 : 1; // flattering
+}
+
 export function tellability(
   belief: Belief, teller: Npc, hearer: Npc, world: WorldState, t: Tick, rules: Rules,
 ): number {
-  void teller; void world; // symmetric signature; teller factors arrive in Plan 2
+  void teller; void world; // spec formula: juiciness × relevance × A's-confidence × freshness — no trust term by design
   return juiciness(belief.claim, rules) * relevance(hearer, belief.claim) * belief.credence * freshness(belief, t);
 }
 
@@ -48,6 +73,9 @@ function traitContext(npc: Npc, world: WorldState): TraitContext {
 }
 
 function passesGates(teller: Npc, belief: Belief, world: WorldState, t: Tick, rules: Rules): boolean {
+  // Nobody spreads their own scandal (provisional gate; the real self-reaction
+  // system — contradiction → corroboration-seeking — arrives with the enemy AI).
+  if (belief.claim.subject === teller.id) return false;
   if (belief.credence < MIN_RETELL_CREDENCE) return false;
   if (freshness(belief, t) <= 0) return false;
   const last = world.lastTold[`${teller.id}:${belief.claim.family}`];
@@ -108,7 +136,7 @@ export function apparentSourceOf(hearing: Hearing): EntityId {
 }
 
 export function ingest(
-  world: WorldState, hearerId: EntityId, hearing: Hearing, addressed: boolean,
+  world: WorldState, hearerId: EntityId, hearing: Hearing, addressed: boolean, rules: Rules,
 ): void {
   const store = world.beliefs[hearerId]!; // invariant: buildWorld seeds a store for every NPC
   const existing = store[hearing.claim.family];
@@ -127,7 +155,7 @@ export function ingest(
   const trust = trustBetween(world, hearerId, hearing.speaker);
   store[hearing.claim.family] = {
     claim: hearing.claim,
-    credence: clamp01(0.35 + 0.45 * trust * (addressed ? 1 : 0.5)),
+    credence: clamp01((0.35 + 0.45 * trust * (addressed ? 1 : 0.5)) * plausibility(world.npcs[hearerId]!, hearing.claim, rules)),
     heardFrom: hearing.speaker,
     heardAt: hearing.tick,
     firstHeardAt: hearing.tick,
