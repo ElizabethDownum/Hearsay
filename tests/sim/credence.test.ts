@@ -67,7 +67,7 @@ describe('belief stances', () => {
   });
 });
 
-describe('self-gossip gate', () => {
+describe('self-gossip gate (interim: damaging only — spec amendment #3)', () => {
   it('an NPC never retells a claim about themselves', () => {
     const w = buildWorld(TESTFORD, 'cred-4');
     const injected = applyInject(w, 'jonet', {
@@ -77,6 +77,18 @@ describe('self-gossip gate', () => {
     void injected;
     const circle = { venue: 'workshop', members: ['jonet', 'hew'] };
     expect(chooseTelling(w, 'jonet', circle, at(0, 9), STANDARD_RULES)).toBeNull();
+  });
+
+  it('flattering self-rumors flow freely (people spread their own flattery)', () => {
+    const w = buildWorld(TESTFORD, 'cred-5');
+    applyInject(w, 'jonet', {
+      subject: 'jonet', predicate: 'blessed-the-harvest', object: null,
+      count: null, severity: 5 as const, place: null, attribution: SOMEONE,
+    });
+    const circle = { venue: 'workshop', members: ['jonet', 'hew'] };
+    const telling = chooseTelling(w, 'jonet', circle, at(0, 0), STANDARD_RULES);
+    expect(telling).not.toBeNull();
+    expect(telling!.claim.subject).toBe('jonet');
   });
 });
 

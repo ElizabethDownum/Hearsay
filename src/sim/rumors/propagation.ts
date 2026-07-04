@@ -73,9 +73,13 @@ function traitContext(npc: Npc, world: WorldState): TraitContext {
 }
 
 function passesGates(teller: Npc, belief: Belief, world: WorldState, t: Tick, rules: Rules): boolean {
-  // Nobody spreads their own scandal (provisional gate; the real self-reaction
-  // system — contradiction → corroboration-seeking — arrives with the enemy AI).
-  if (belief.claim.subject === teller.id) return false;
+  // A rumor about you is bait, not a script (spec amendment #3): until the full
+  // reaction system lands with the enemy AI, NPCs won't parrot DAMAGING claims
+  // about themselves — flattery and neutral news flow freely.
+  if (
+    belief.claim.subject === teller.id &&
+    (rules.predicates[belief.claim.predicate]?.valence ?? 'neutral') === 'damaging'
+  ) return false;
   if (belief.credence < MIN_RETELL_CREDENCE) return false;
   if (freshness(belief, t) <= 0) return false;
   const last = world.lastTold[`${teller.id}:${belief.claim.family}`];
