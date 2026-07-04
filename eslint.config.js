@@ -4,7 +4,10 @@ export default tseslint.config(
   { ignores: ['node_modules', 'dist', 'coverage'] },
   ...tseslint.configs.recommended,
   {
-    files: ['src/core/**/*.ts', 'src/sim/**/*.ts', 'src/content/**/*.ts'],
+    files: [
+      'src/core/**/*.ts', 'src/sim/**/*.ts', 'src/content/**/*.ts',
+      'src/world/**/*.ts', 'src/bots/**/*.ts', 'src/harness/**/*.ts',
+    ],
     rules: {
       'no-restricted-properties': ['error',
         { object: 'Math', property: 'random', message: 'Determinism law: use core/rng streams.' },
@@ -16,9 +19,12 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/sim/**/*.ts', 'src/core/**/*.ts'],
+    files: [
+      'src/sim/**/*.ts', 'src/core/**/*.ts',
+      'src/world/**/*.ts', 'src/bots/**/*.ts', 'src/harness/**/*.ts',
+    ],
     rules: {
-      'no-restricted-imports': ['error', { patterns: [{ group: ['**/content/**'], message: 'Engine/content split: sim and core must not import content — inject via Rules.' }] }],
+      'no-restricted-imports': ['error', { patterns: [{ group: ['**/content/**'], message: 'Engine/content split: engine code must not import content — inject via Rules/GenContent.' }] }],
     },
   },
 );
