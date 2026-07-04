@@ -89,4 +89,17 @@ describe('chooseTelling and gates', () => {
     expect(b.distinctSources).toEqual(['mara', 'osric']);
     expect(b.claim.id).toBe('c9'); // first version stuck
   });
+
+  it('new corroboration refreshes freshness; a repeat source does not', () => {
+    const world = buildWorld(TESTFORD, 'prop-seed-6');
+    const injected = applyInject(world, 'rafe', spec);
+    const heard = { tick: at(0, 9), speaker: 'mara', claim: { ...injected, id: 'c9', parent: injected.id } };
+    ingest(world, 'rafe', heard, true);
+    const b = world.beliefs['rafe']![injected.family]!;
+    ingest(world, 'rafe', { ...heard, tick: at(2, 9) }, true);      // same source, later
+    expect(b.heardAt).toBe(at(0, 9));                               // no refresh
+    ingest(world, 'rafe', { ...heard, speaker: 'osric', tick: at(2, 12) }, true); // new source
+    expect(b.heardAt).toBe(at(2, 12));                              // refreshed
+    expect(freshness(b, at(2, 12))).toBeCloseTo(1);
+  });
 });

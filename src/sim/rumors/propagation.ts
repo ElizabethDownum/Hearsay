@@ -112,6 +112,9 @@ export function ingest(
     if (!existing.distinctSources.includes(hearing.speaker)) {
       existing.distinctSources.push(hearing.speaker);
       existing.credence = Math.min(0.95, existing.credence + 0.15);
+      // Spec: stale news revives with new corroboration — a fresh distinct source
+      // resets the freshness clock. Re-hearing a known source refreshes nothing.
+      existing.heardAt = hearing.tick;
     }
     return; // first version sticks
   }
