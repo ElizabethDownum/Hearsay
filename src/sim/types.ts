@@ -52,6 +52,23 @@ export interface Belief {
 
 export type BeliefStore = Record<RumorId, Belief>;
 
+export interface TellingRecord {
+  kind: 'telling';
+  tick: Tick;
+  venue: VenueId;
+  speaker: EntityId;
+  addressedTo: EntityId;
+  claimId: string;
+  heardBy: { id: EntityId; addressed: boolean }[];
+}
+export interface InjectRecord {
+  kind: 'inject';
+  tick: Tick;
+  target: EntityId;
+  claimId: string;
+}
+export type ChronicleEntry = TellingRecord | InjectRecord;
+
 export interface WorldState {
   seed: string;
   tick: Tick;
@@ -63,6 +80,8 @@ export interface WorldState {
   claims: Record<string, Claim>;
   /** `${tellerId}:${family}` → tick of last retell (cooldown; no spam). */
   lastTold: Record<string, Tick>;
+  /** Every injection and telling ever recorded — the causal-chain debrief substrate. */
+  chronicle: ChronicleEntry[];
 }
 
 export interface TownFixture {

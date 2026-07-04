@@ -25,14 +25,25 @@ export function step(world: WorldState, rules: Rules): TickEvents {
 
   const events: TickEvents = { tick: t, positions, utterances };
 
+  for (const u of utterances) {
+    world.chronicle.push({
+      kind: 'telling', tick: u.tick, venue: u.venue, speaker: u.speaker,
+      addressedTo: u.addressedTo, claimId: u.claim.id,
+      heardBy: u.circleMembers.filter((m) => m !== u.speaker)
+        .map((id) => ({ id, addressed: id === u.addressedTo })),
+    });
+  }
+
   // Ingestion flows through the one perception path: every NPC hears exactly what
   // observationsFor grants them (same-circle utterances they did not speak). This is
   // the single encoding of the co-presence law — hearing is never re-derived here.
-  for (const hearerId of Object.keys(world.npcs).sort()) {
-    const feed = observationsFor(hearerId, events);
-    for (const obs of feed.observations) {
-      if (obs.kind !== 'utterance') continue;
-      ingest(world, hearerId, { tick: obs.tick, speaker: obs.speaker, claim: obs.claim }, !obs.overheard, rules);
+  if (utterances.length > 0) {
+    for (const hearerId of Object.keys(world.npcs).sort()) {
+      const feed = observationsFor(hearerId, events);
+      for (const obs of feed.observations) {
+        if (obs.kind !== 'utterance') continue;
+        ingest(world, hearerId, { tick: obs.tick, speaker: obs.speaker, claim: obs.claim }, !obs.overheard, rules);
+      }
     }
   }
 

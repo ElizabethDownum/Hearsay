@@ -27,5 +27,6 @@ export function applyInject(world: WorldState, targetId: EntityId, spec: InjectS
     timesHeard: 1,
     apparentSources: [],
   };
+  world.chronicle.push({ kind: 'inject', tick: world.tick, target: targetId, claimId: claim.id });
   return claim;
 }
