@@ -1,5 +1,6 @@
 import { generateTown } from '../../src/world/gen';
 import { STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT } from '../../src/content/gen/standard';
+import type { GenContent } from '../../src/world/types';
 import { buildWorld } from '../../src/sim/world';
 import { stableStringify } from '../../src/sim/hash';
 
@@ -48,6 +49,11 @@ describe('generateTown — one seed string determines the whole world', () => {
     for (let i = 0; i < 10; i++) {
       expect(() => buildWorld(gen(`batch-${i}`).fixture, `batch-${i}`)).not.toThrow();
     }
+  });
+
+  it('weightedPick throws rather than returning undefined when a custom trait pool runs dry', () => {
+    const thinContent: GenContent = { ...STANDARD_GEN_CONTENT, traitPool: [{ id: 'literalist', weight: 1 }] };
+    expect(() => generateTown('thin-traits', STANDARD_GEN_CONFIG, thinContent)).toThrow(/weightedPick: empty pool/);
   });
 
   it('designated bridges exist: some NPC schedules an all-days block at another district tavern', () => {

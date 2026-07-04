@@ -45,5 +45,7 @@ describe('generator content tables', () => {
     expect(STANDARD_GEN_CONFIG.npcCount).toBeLessThanOrEqual(90);
     expect(STANDARD_GEN_CONFIG.districtCount).toBeGreaterThanOrEqual(1);
     expect(STANDARD_GEN_CONFIG.maxAttempts).toBeGreaterThanOrEqual(1);
+    expect(STANDARD_GEN_CONFIG.keystoneCount).toBeGreaterThan(0);
+    expect(STANDARD_GEN_CONFIG.bridgesPerAdjacentPair).toBeGreaterThan(0);
   });
 });

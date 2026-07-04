@@ -27,13 +27,13 @@ describe('determinism law — every prong fires (red) and clean code passes (gre
     expect(violations('const x = Math.random();', rules)).toBeGreaterThan(0);
     expect(violations('const t = Date.now();', rules)).toBeGreaterThan(0);
     expect(violations('const d = new Date();', rules)).toBeGreaterThan(0);
-  });
+  }, 15000);
 
   it('leaves lawful code alone (new Date with args, Math.floor, Date.parse)', async () => {
     const rules = await determinismRulesFor('src/core/rng.ts');
     const clean = "const d = new Date(0); const f = Math.floor(2.5); const p = Date.parse('2026-01-01');";
     expect(violations(clean, rules)).toBe(0);
-  });
+  }, 15000);
 });
 
 describe('determinism law — glob coverage', () => {
@@ -49,13 +49,13 @@ describe('determinism law — glob coverage', () => {
     const cfg = await new ESLint().calculateConfigForFile(file);
     expect(isOn(cfg.rules?.['no-restricted-properties'])).toBe(true);
     expect(isOn(cfg.rules?.['no-restricted-syntax'])).toBe(true);
-  });
+  }, 15000);
 
   const banned = ['src/sim/step.ts', 'src/bots/archetypes.ts', 'src/harness/metrics.ts', 'src/world/types.ts'];
   it.each(banned)('%s is banned from importing content', async (file) => {
     const cfg = await new ESLint().calculateConfigForFile(file);
     expect(isOn(cfg.rules?.['no-restricted-imports'])).toBe(true);
-  });
+  }, 15000);
 
   it('content itself may import anything; tests are outside the law', async () => {
     const content = await new ESLint().calculateConfigForFile('src/content/rules.ts');

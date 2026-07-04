@@ -8,6 +8,7 @@ const r2 = (n: number): number => Math.round(n * 100) / 100;
 
 /** Deterministic weighted pick. */
 function weightedPick<T extends { weight: number }>(rng: Rng, items: readonly T[]): T {
+  if (items.length === 0) throw new Error('weightedPick: empty pool');
   const total = items.reduce((sum, i) => sum + i.weight, 0);
   let roll = rng.float() * total;
   for (const item of items) {

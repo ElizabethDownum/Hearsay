@@ -117,7 +117,8 @@ describe('the hearsay ceiling — hearsay alone never yields certainty', () => {
     // raw = (0.35 + 0.45×0.9×1) × 1.3 ≈ 0.982 — pre-fix this clamped at 1.0, ABOVE
     // the 0.95 corroboration cap (the Plan-2 asymmetry). Now both share one ceiling.
     const w = buildWorld(TESTFORD, 'ceiling-1');
-    w.npcs['jonet']!.edges.push({ to: 'pia', kind: 'kin', trust: 0.9 });
+    const jonet = w.npcs['jonet']!;
+    w.npcs['jonet'] = { ...jonet, edges: [...jonet.edges, { to: 'pia', kind: 'kin', trust: 0.9 }] };
     const injected = applyInject(w, 'pia', {
       subject: 'mara', predicate: 'stole', object: null,
       count: null, severity: 4 as const, place: null, attribution: SOMEONE,
@@ -126,7 +127,20 @@ describe('the hearsay ceiling — hearsay alone never yields certainty', () => {
     expect(w.beliefs['jonet']![injected.family]!.credence).toBe(HEARSAY_CEILING);
   });
 
-  it('corroboration uses the same constant', () => {
-    expect(HEARSAY_CEILING).toBe(0.95);
+  it('repeated corroboration from independent apparent sources lands on the ceiling, never above', () => {
+    const w = buildWorld(TESTFORD, 'ceiling-2');
+    const injected = applyInject(w, 'osric', {
+      subject: 'mara', predicate: 'stole', object: null,
+      count: null, severity: 4 as const, place: null, attribution: SOMEONE,
+    });
+    // jonet first hears from osric (trust 0.6, dislikes mara): credence ≈ 0.806
+    ingest(w, 'jonet', { tick: at(0, 9), speaker: 'osric', claim: injected }, true, STANDARD_RULES);
+    // then two more tellings with distinct apparent sources (attribution SOMEONE → speaker is the source)
+    ingest(w, 'jonet', { tick: at(0, 10), speaker: 'hew', claim: injected }, true, STANDARD_RULES);
+    const b = w.beliefs['jonet']![injected.family]!;
+    expect(b.credence).toBe(HEARSAY_CEILING); // 0.806 + 0.15 = 0.956 → capped
+    ingest(w, 'jonet', { tick: at(0, 11), speaker: 'seth', claim: injected }, true, STANDARD_RULES);
+    expect(w.beliefs['jonet']![injected.family]!.credence).toBe(HEARSAY_CEILING); // stays capped
+    expect(w.beliefs['jonet']![injected.family]!.apparentSources).toHaveLength(3);
   });
 });
