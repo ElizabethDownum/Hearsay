@@ -1,8 +1,9 @@
-import { patientWhisperer, blitzCrier, bestConnected } from '../../src/bots/archetypes';
+import { patientWhisperer, blitzCrier, cannyWhisperer, bestConnected, bestConnectedAvoiding } from '../../src/bots/archetypes';
 import { runBotCampaign } from '../../src/bots/runner';
 import { runCampaign } from '../../src/sim/campaign';
 import { buildWorld } from '../../src/sim/world';
 import { TESTFORD } from '../../src/content/fixtures/testford';
+import { miniTown } from '../sim/helpers/minitown';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { hashWorld } from '../../src/sim/hash';
 import { TICKS_PER_DAY } from '../../src/core/time';
@@ -11,6 +12,24 @@ describe('bots', () => {
   it('bestConnected: edge count desc, lexicographic tie-break', () => {
     const world = buildWorld(TESTFORD, 'bot-0');
     expect(bestConnected(world).slice(0, 3)).toEqual(['anselm', 'mara', 'osric']);
+  });
+
+  it('the canny whisperer never hands hop zero to a gatekeeper', () => {
+    // miniTown: ada tops the graph (3 edges) but is a skeptic — retellGate
+    // 'requires-corroboration', the hub where uncorroborated whispers die. bez/cyn/dov
+    // each hold one edge and gate nothing (lexicographic tie-break orders them).
+    const world = buildWorld(miniTown(), 'canny-0');
+    expect(bestConnected(world)[0]).toBe('ada');
+
+    const avoiding = bestConnectedAvoiding(world, STANDARD_RULES);
+    expect(avoiding[0]).toBe('bez');                        // best NON-gatekeeper mind
+    expect(avoiding.at(-1)).toBe('ada');                    // the skeptic sinks to the back...
+    expect([...avoiding].sort()).toEqual([...bestConnected(world)].sort()); // ...never dropped
+
+    const day0 = cannyWhisperer.decide(world, STANDARD_RULES, 0);
+    expect(day0).toHaveLength(1);
+    expect(day0[0]).toMatchObject({ kind: 'inject', target: 'bez' });
+    expect(cannyWhisperer.decide(world, STANDARD_RULES, 1)).toEqual([]); // day 0 only, then silence
   });
 
   it('patientWhisperer speaks once on day 0; blitzCrier seeds three stories', () => {

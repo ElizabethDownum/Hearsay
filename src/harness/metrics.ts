@@ -20,6 +20,21 @@ export function familiesOf(world: WorldState): RumorId[] {
     .sort();
 }
 
+/**
+ * Families the PLAYER (or a bot standing in for them) injected — the only families bot
+ * pacing metrics may count. Genesis secrets and NPC counter-spin are ALSO parentless roots
+ * (familiesOf sees them), but they are minted with `by: 'genesis'` / `by: <npcId>`; counting
+ * them would dilute the campaign's reach with dirt the player never planted. Injects default
+ * to `by: 'player'` (applyInject), so this reads exactly the campaign's own stories.
+ */
+export function playerFamiliesOf(world: WorldState): RumorId[] {
+  const families = new Set<RumorId>();
+  for (const e of world.chronicle) {
+    if (e.kind === 'inject' && e.by === 'player') families.add(world.claims[e.claimId]!.family);
+  }
+  return [...families].sort();
+}
+
 export function campaignMetrics(world: WorldState, family: RumorId): CampaignMetrics {
   const root = Object.values(world.claims).find((c) => c.family === family && c.parent === null);
   if (!root) throw new Error(`campaignMetrics: unknown family '${family}'`);

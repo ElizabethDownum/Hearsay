@@ -1,9 +1,11 @@
-import { campaignMetrics, familiesOf } from '../../src/harness/metrics';
+import { campaignMetrics, familiesOf, playerFamiliesOf } from '../../src/harness/metrics';
 import { runCampaign, type Save } from '../../src/sim/campaign';
+import { buildWorld } from '../../src/sim/world';
+import { applyInject } from '../../src/sim/actions';
 import { TESTFORD } from '../../src/content/fixtures/testford';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { at } from '../../src/core/time';
-import { SOMEONE } from '../../src/sim/rumors/claim';
+import { SOMEONE, mintClaim } from '../../src/sim/rumors/claim';
 
 const save: Save = {
   seed: 'met-1',
@@ -48,5 +50,32 @@ describe('campaignMetrics', () => {
 
   it('unknown family throws loudly', () => {
     expect(() => campaignMetrics(world, 'f99')).toThrow(/f99/);
+  });
+});
+
+describe('playerFamiliesOf', () => {
+  const SPEC = {
+    subject: SOMEONE, predicate: 'stole' as const, object: null,
+    count: 2, severity: 4 as const, place: 'market', attribution: SOMEONE,
+  };
+
+  it('keeps player injections and drops genesis + counter-spin root families', () => {
+    const w = buildWorld(TESTFORD, 'pf-1');
+    const player = applyInject(w, 'mara', SPEC); // by 'player' (default) — the bot's hand
+
+    // Genesis secret, mimicking worldFromTown: a real parentless root, chronicled as 'genesis'.
+    const genesis = mintClaim(w, { family: 'sekret', parent: null, ...SPEC });
+    w.claims[genesis.id] = genesis;
+    w.chronicle.push({ kind: 'inject', tick: 0, target: 'mara', claimId: genesis.id, by: 'genesis' });
+
+    // Counter-spin self-inject, mimicking reactToSelfRumor: a real root chronicled as the NPC.
+    const spun = mintClaim(w, { family: 'spun', parent: null, ...SPEC });
+    w.claims[spun.id] = spun;
+    w.chronicle.push({ kind: 'inject', tick: 0, target: 'osric', claimId: spun.id, by: 'osric' });
+
+    // familiesOf sees all three real roots; playerFamiliesOf sees only the player's story —
+    // secrets and counter-spin never dilute the bot's pacing numbers.
+    expect(familiesOf(w)).toEqual(expect.arrayContaining([player.family, 'sekret', 'spun']));
+    expect(playerFamiliesOf(w)).toEqual([player.family]);
   });
 });

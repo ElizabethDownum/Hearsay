@@ -19,6 +19,20 @@ export function bestConnected(world: WorldState): EntityId[] {
     .map((n) => n.id);
 }
 
+/**
+ * Best-connected order, but every gatekeeper sinks behind the minds that actually pass
+ * rumors on — "read the town before you whisper." A gatekeeper is any NPC carrying a trait
+ * whose retellGate demands corroboration (the skeptic): the hub where an uncorroborated
+ * hop-zero whisper simply dies. Stable partition — relative order is preserved inside each
+ * group — so the result is a permutation of bestConnected, never a truncation.
+ */
+export function bestConnectedAvoiding(world: WorldState, rules: Rules): EntityId[] {
+  const gated = (id: EntityId): boolean =>
+    world.npcs[id]!.traits.some((t) => rules.traits[t]?.retellGate === 'requires-corroboration');
+  const ranked = bestConnected(world);
+  return [...ranked.filter((id) => !gated(id)), ...ranked.filter(gated)];
+}
+
 const CANON: InjectSpec = {
   subject: SOMEONE, predicate: 'stole', object: null,
   count: 2, severity: 4, place: 'market', attribution: SOMEONE,
@@ -30,6 +44,15 @@ export const patientWhisperer: Bot = {
   decide(world, _rules, day) {
     if (day !== 0) return [];
     return [{ tick: at(0, 8), kind: 'inject', target: bestConnected(world)[0]!, spec: CANON }];
+  },
+};
+
+/** One well-read morning whisper to the best-connected NON-gatekeeper mind, then silence. */
+export const cannyWhisperer: Bot = {
+  name: 'canny-whisperer',
+  decide(world, rules, day) {
+    if (day !== 0) return [];
+    return [{ tick: at(0, 8), kind: 'inject', target: bestConnectedAvoiding(world, rules)[0]!, spec: CANON }];
   },
 };
 
