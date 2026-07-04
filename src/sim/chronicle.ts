@@ -3,7 +3,7 @@ import type { ChronicleEntry, WorldState } from './types';
 
 /** Every recorded event belonging to one story family, in recorded (tick) order. */
 export function threadOf(world: WorldState, family: RumorId): ChronicleEntry[] {
-  return world.chronicle.filter((e) => world.claims[e.claimId]?.family === family);
+  return world.chronicle.filter((e) => 'claimId' in e && world.claims[e.claimId]?.family === family);
 }
 
 /**
@@ -15,7 +15,7 @@ export function explainBelief(
 ): ChronicleEntry | null {
   const belief = world.beliefs[npcId]?.[family];
   if (!belief) return null;
-  if (belief.heardFrom === 'injected') {
+  if (belief.heardFrom === 'injected' || belief.heardFrom === 'witnessed') {
     return world.chronicle.find(
       (e) => e.kind === 'inject' && e.target === npcId && e.claimId === belief.claim.id,
     ) ?? null;

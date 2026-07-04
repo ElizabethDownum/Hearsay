@@ -126,7 +126,7 @@ export function chooseTelling(
 
   return {
     tick: t, venue: circle.venue, circleMembers: [...circle.members],
-    speaker: tellerId, addressedTo: best.addressee, claim: outgoing,
+    speaker: tellerId, addressedTo: best.addressee, claim: outgoing, mode: 'telling',
   };
 }
 
@@ -169,5 +169,7 @@ export function ingest(
     firstHeardAt: hearing.tick,
     timesHeard: 1,
     apparentSources: source === hearerId ? [] : [source],
+    discretion: false,
+    counterSpun: false,
   };
 }

@@ -1,5 +1,7 @@
 import type { EntityId } from './rumors/claim';
 import type { TownFixture, WorldState } from './types';
+import { emptyEnemyState } from './enemy/state';
+import type { TownMap } from './enemy/state';
 
 /** First id that appears twice, or null — dup detection before records collapse duplicates. */
 function firstDuplicate(ids: readonly string[]): string | null {
@@ -41,10 +43,24 @@ export function buildWorld(fixture: TownFixture, seed: string): WorldState {
     claims: {},
     lastTold: {},
     chronicle: [],
+    inquiries: {},
+    scheduleOverrides: {},
+    enemy: emptyEnemyState(),
   };
 }
 
 export function trustBetween(world: WorldState, from: EntityId, to: EntityId): number {
   const edge = world.npcs[from]?.edges.find((e) => e.to === to);
   return edge ? edge.trust : 0;
+}
+
+/** Street knowledge only: what any resident could tell you about who is who. */
+export function buildTownMap(fixture: TownFixture): TownMap {
+  const districtOf = Object.fromEntries(fixture.venues.map((v) => [v.id, v.district]));
+  return {
+    venues: fixture.venues.map((v) => ({ id: v.id, district: v.district, access: v.access })),
+    directory: fixture.npcs.map((n) => ({
+      id: n.id, occupation: n.occupation, district: districtOf[n.home] ?? 'unknown',
+    })),
+  };
 }

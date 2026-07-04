@@ -11,8 +11,9 @@ const events: TickEvents = {
   tick: 1200,
   positions: { mara: 'tavern', osric: 'tavern', hew: 'tavern', brigid: 'northside-well' },
   utterances: [
-    { tick: 1200, venue: 'tavern', circleMembers: ['mara', 'osric'], speaker: 'mara', addressedTo: 'osric', claim },
+    { tick: 1200, venue: 'tavern', circleMembers: ['mara', 'osric'], speaker: 'mara', addressedTo: 'osric', claim, mode: 'telling' },
   ],
+  askings: [],
 };
 
 describe('observationsFor', () => {
@@ -21,7 +22,7 @@ describe('observationsFor', () => {
     expect(feed.observations).toContainEqual({ kind: 'presence', tick: 1200, venue: 'tavern', actor: 'mara' });
     expect(feed.observations).toContainEqual({ kind: 'presence', tick: 1200, venue: 'tavern', actor: 'hew' });
     expect(feed.observations).toContainEqual(
-      { kind: 'utterance', tick: 1200, venue: 'tavern', speaker: 'mara', addressedTo: 'osric', claim, overheard: false },
+      { kind: 'utterance', tick: 1200, venue: 'tavern', speaker: 'mara', addressedTo: 'osric', claim, overheard: false, mode: 'telling' },
     );
   });
 
@@ -52,7 +53,7 @@ describe('observationsFor', () => {
     const perturbed: TickEvents = {
       ...events,
       utterances: [...events.utterances,
-        { tick: 1200, venue: 'tavern', circleMembers: ['osric', 'hew'], speaker: 'osric', addressedTo: 'hew', claim }],
+        { tick: 1200, venue: 'tavern', circleMembers: ['osric', 'hew'], speaker: 'osric', addressedTo: 'hew', claim, mode: 'telling' }],
     };
     expect(observationsFor('brigid', perturbed)).toEqual(before);
   });

@@ -27,4 +27,16 @@ export default tseslint.config(
       'no-restricted-imports': ['error', { patterns: [{ group: ['**/content/**'], message: 'Engine/content split: engine code must not import content — inject via Rules/GenContent.' }] }],
     },
   },
+  {
+    files: ['src/sim/enemy/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{
+        group: [
+          '../types', '../world', '../step', '../agents', '../campaign',
+          '**/sim/types', '**/sim/world', '**/sim/step', '**/sim/agents', '**/sim/campaign',
+        ],
+        message: 'No-omniscience law: the enemy consumes evidence + TownMap + Rules, never WorldState.',
+      }] }],
+    },
+  },
 );

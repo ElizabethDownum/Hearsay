@@ -64,3 +64,16 @@ describe('determinism law — glob coverage', () => {
     expect(isOn(test.rules?.['no-restricted-properties'] ?? 'off')).toBe(false);
   });
 });
+
+describe('no-omniscience law — the enemy never imports WorldState', () => {
+  // Note: the bare Linter() here (like the rest of this file) has no TS parser, so these
+  // probes use plain import syntax over the same paths `import type` would use in real code —
+  // no-restricted-imports keys off the module specifier, not the `type` modifier.
+  it('flags an import of WorldState (../types) but not Rules (../rules)', async () => {
+    const cfg = await new ESLint().calculateConfigForFile('src/sim/enemy/digest.ts');
+    const cfgRules = cfg.rules ?? {};
+    const rules = { 'no-restricted-imports': cfgRules['no-restricted-imports']! } as Linter.RulesRecord;
+    expect(violations("import { WorldState } from '../types';", rules)).toBeGreaterThan(0);
+    expect(violations("import { Rules } from '../rules';", rules)).toBe(0);
+  });
+});
