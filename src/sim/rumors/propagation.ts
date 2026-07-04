@@ -143,7 +143,8 @@ export function ingest(
   const source = apparentSourceOf(hearing);
   if (existing) {
     existing.timesHeard += 1;
-    if (!existing.apparentSources.includes(source)) {
+    // Nobody is their own corroborator — a story citing YOU as its origin proves nothing to you.
+    if (source !== hearerId && !existing.apparentSources.includes(source)) {
       existing.apparentSources.push(source);
       existing.credence = Math.min(0.95, existing.credence + 0.15);
       // Spec: stale news revives with new corroboration — a fresh APPARENT source
@@ -160,6 +161,6 @@ export function ingest(
     heardAt: hearing.tick,
     firstHeardAt: hearing.tick,
     timesHeard: 1,
-    apparentSources: [source],
+    apparentSources: source === hearerId ? [] : [source],
   };
 }

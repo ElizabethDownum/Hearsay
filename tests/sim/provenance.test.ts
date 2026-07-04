@@ -1,6 +1,7 @@
 import { ingest, freshness, apparentSourceOf } from '../../src/sim/rumors/propagation';
 import { applyInject } from '../../src/sim/actions';
 import { buildWorld } from '../../src/sim/world';
+import { runUntil } from '../../src/sim/step';
 import { TESTFORD } from '../../src/content/fixtures/testford';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { at } from '../../src/core/time';
@@ -69,5 +70,34 @@ describe('apparent sources ("B only knows what attribution survived")', () => {
     expect(b.firstHeardAt).toBe(at(0, 9));
     expect(b.heardAt).toBe(at(0, 9));
     expect(b.apparentSources).toEqual(['mara']);
+  });
+});
+
+describe('nobody is their own corroborator', () => {
+  it('a claim citing the hearer as its origin counts for nothing', () => {
+    const world = buildWorld(TESTFORD, 'prov-5');
+    const injected = applyInject(world, 'mara', spec);
+    ingest(world, 'rafe', { tick: at(0, 9), speaker: 'osric', claim: claimWith(injected, 'rafe', 'c8') }, true, STANDARD_RULES);
+    const b = world.beliefs['rafe']![injected.family]!;
+    expect(b.apparentSources).toEqual([]);          // self-source not seeded
+    const c0 = b.credence;
+    ingest(world, 'rafe', { tick: at(1, 9), speaker: 'mara', claim: claimWith(injected, 'rafe', 'c9') }, true, STANDARD_RULES);
+    expect(b.apparentSources).toEqual([]);          // self-source never corroborates
+    expect(b.credence).toBe(c0);
+    expect(b.heardAt).toBe(at(0, 9));               // no freshness refresh
+    ingest(world, 'rafe', { tick: at(1, 12), speaker: 'osric', claim: claimWith(injected, SOMEONE, 'c10') }, true, STANDARD_RULES);
+    expect(b.apparentSources).toEqual(['osric']);   // real origins still count
+  });
+
+  it('PROPERTY: no mind lists itself as an apparent source over a 2-day town run', () => {
+    const world = buildWorld(TESTFORD, 'prov-6');
+    runUntil(world, at(0, 8), STANDARD_RULES);
+    applyInject(world, 'mara', spec);
+    runUntil(world, at(2, 0), STANDARD_RULES);
+    for (const npcId of Object.keys(world.npcs)) {
+      for (const family of Object.keys(world.beliefs[npcId]!)) {
+        expect(world.beliefs[npcId]![family]!.apparentSources).not.toContain(npcId);
+      }
+    }
   });
 });
