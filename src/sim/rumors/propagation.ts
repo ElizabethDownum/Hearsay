@@ -95,26 +95,33 @@ export function chooseTelling(
   };
 }
 
+/** The minimal slice of a heard utterance a mind ingests — what perception hands over. */
+export interface Hearing {
+  tick: Tick;
+  speaker: EntityId;
+  claim: Claim;
+}
+
 export function ingest(
-  world: WorldState, hearerId: EntityId, u: Utterance, addressed: boolean,
+  world: WorldState, hearerId: EntityId, hearing: Hearing, addressed: boolean,
 ): void {
   const store = world.beliefs[hearerId]!;
-  const existing = store[u.claim.family];
+  const existing = store[hearing.claim.family];
   if (existing) {
     existing.timesHeard += 1;
-    if (!existing.distinctSources.includes(u.speaker)) {
-      existing.distinctSources.push(u.speaker);
+    if (!existing.distinctSources.includes(hearing.speaker)) {
+      existing.distinctSources.push(hearing.speaker);
       existing.credence = Math.min(0.95, existing.credence + 0.15);
     }
     return; // first version sticks
   }
-  const trust = trustBetween(world, hearerId, u.speaker);
-  store[u.claim.family] = {
-    claim: u.claim,
+  const trust = trustBetween(world, hearerId, hearing.speaker);
+  store[hearing.claim.family] = {
+    claim: hearing.claim,
     credence: clamp01(0.35 + 0.45 * trust * (addressed ? 1 : 0.5)),
-    heardFrom: u.speaker,
-    heardAt: u.tick,
+    heardFrom: hearing.speaker,
+    heardAt: hearing.tick,
     timesHeard: 1,
-    distinctSources: [u.speaker],
+    distinctSources: [hearing.speaker],
   };
 }

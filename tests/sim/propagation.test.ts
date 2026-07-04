@@ -80,8 +80,7 @@ describe('chooseTelling and gates', () => {
   it('ingest: addressed > overheard credence; first version sticks; sources accumulate', () => {
     const world = buildWorld(TESTFORD, 'prop-seed-5');
     const injected = applyInject(world, 'mara', spec);
-    const u = { tick: at(0, 9), venue: 'market', circleMembers: ['mara', 'rafe'],
-      speaker: 'mara', addressedTo: 'rafe', claim: { ...injected, id: 'c9', parent: injected.id } };
+    const u = { tick: at(0, 9), speaker: 'mara', claim: { ...injected, id: 'c9', parent: injected.id } };
     ingest(world, 'rafe', u, true);
     const b = world.beliefs['rafe']![injected.family]!;
     expect(b.credence).toBeCloseTo(0.35 + 0.45 * 0.6); // trust rafe->mara = 0.6

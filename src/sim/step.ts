@@ -1,6 +1,6 @@
 import { minuteOfDay } from '../core/time';
 import { circlesAt, venueAt } from './agents';
-import type { TickEvents, Utterance } from './perception';
+import { observationsFor, type TickEvents, type Utterance } from './perception';
 import { chooseTelling, ingest, CONVERSATION_BEAT } from './rumors/propagation';
 import type { Rules } from './rules';
 import type { WorldState } from './types';
@@ -21,16 +21,23 @@ export function step(world: WorldState, rules: Rules): TickEvents {
         if (u) utterances.push(u);
       }
     }
-    for (const u of utterances) {
-      for (const hearer of u.circleMembers) {
-        if (hearer === u.speaker) continue;
-        ingest(world, hearer, u, hearer === u.addressedTo);
-      }
+  }
+
+  const events: TickEvents = { tick: t, positions, utterances };
+
+  // Ingestion flows through the one perception path: every NPC hears exactly what
+  // observationsFor grants them (same-circle utterances they did not speak). This is
+  // the single encoding of the co-presence law — hearing is never re-derived here.
+  for (const hearerId of Object.keys(world.npcs).sort()) {
+    const feed = observationsFor(hearerId, events);
+    for (const obs of feed.observations) {
+      if (obs.kind !== 'utterance') continue;
+      ingest(world, hearerId, { tick: obs.tick, speaker: obs.speaker, claim: obs.claim }, !obs.overheard);
     }
   }
 
   world.tick = t + 1;
-  return { tick: t, positions, utterances };
+  return events;
 }
 
 export function runUntil(world: WorldState, endTick: number, rules: Rules): void {
