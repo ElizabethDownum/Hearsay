@@ -26,6 +26,12 @@ describe('stableStringify', () => {
     expect(stableStringify({ a: 1, b: [{ y: 2, x: 3 }] }))
       .toBe(stableStringify({ b: [{ x: 3, y: 2 }], a: 1 }));
   });
+
+  it('throws on undefined anywhere — self-revealing, never a silent hash skew', () => {
+    expect(() => stableStringify(undefined)).toThrow(/undefined/);
+    expect(() => stableStringify([1, undefined])).toThrow(/undefined/);
+    expect(() => stableStringify({ a: undefined })).toThrow(/undefined/);
+  });
 });
 
 describe('PILLAR: same seed + same actions => identical state hash', () => {
