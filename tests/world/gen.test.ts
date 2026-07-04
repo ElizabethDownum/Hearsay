@@ -72,3 +72,51 @@ describe('generateTown — one seed string determines the whole world', () => {
     }
   });
 });
+
+describe('designated guards', () => {
+  const town = generateTown('guards-seed', STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT);
+  const byId = new Map(town.fixture.npcs.map((n) => [n.id, n]));
+
+  it('exactly guardsPerDistrict guards per district, deterministic, occupation=guard', () => {
+    expect(town.guards).toHaveLength(STANDARD_GEN_CONFIG.districtCount * STANDARD_GEN_CONFIG.guardsPerDistrict);
+    const again = generateTown('guards-seed', STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT);
+    expect(again.guards).toEqual(town.guards);
+    for (const g of town.guards) expect(byId.get(g.id)!.occupation).toBe('guard');
+    for (const d of town.districts) {
+      const homed = town.guards.filter((g) => d.npcIds.includes(g.id));
+      expect(homed).toHaveLength(STANDARD_GEN_CONFIG.guardsPerDistrict);
+    }
+  });
+
+  it('guard schedules follow the patrol contract and stay 15-aligned', () => {
+    for (const g of town.guards) {
+      const npc = byId.get(g.id)!;
+      const venuesOf = (from: number, to: number) =>
+        npc.schedule.filter((s) => s.from === from && s.to === to).map((s) => s.venue);
+      expect(venuesOf(480, 600).some((v) => v.startsWith('guard-post'))).toBe(true);
+      expect(venuesOf(600, 840).some((v) => v.startsWith('market'))).toBe(true);
+      expect(venuesOf(1080, 1230).some((v) => v.startsWith('tavern'))).toBe(true);
+      for (const s of npc.schedule) { expect(s.from % 15).toBe(0); expect(s.to === 1439 || s.to % 15 === 0).toBe(true); }
+    }
+  });
+
+  it('vigilance is in (0,1] and bridges are never conscripted', () => {
+    for (const g of town.guards) { expect(g.vigilance).toBeGreaterThan(0); expect(g.vigilance).toBeLessThanOrEqual(1); }
+    // bridges keep their far-tavern evening block 1080–1200; guards use 1080–1230 —
+    // structural non-overlap is only guaranteed if designation excluded bridges.
+    for (const g of town.guards) {
+      const npc = byId.get(g.id)!;
+      const eveningBlocks = npc.schedule.filter((s) => s.days === 'all' && s.from >= 1080);
+      expect(eveningBlocks).toHaveLength(1);
+    }
+  });
+
+  it('eveningTavern ⇒ to ≤ 1080 is asserted as a content invariant', () => {
+    const bad = {
+      ...STANDARD_GEN_CONTENT,
+      occupations: [...STANDARD_GEN_CONTENT.occupations,
+        { id: 'night-owl', workplace: 'tavern', from: 960, to: 1200, eveningTavern: true, weight: 1 }],
+    };
+    expect(() => generateTown('x', STANDARD_GEN_CONFIG, bad)).toThrow(/eveningTavern/);
+  });
+});

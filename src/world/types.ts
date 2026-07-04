@@ -1,5 +1,6 @@
 import type { EntityId, VenueId } from '../sim/rumors/claim';
 import type { Npc, TownFixture, Venue } from '../sim/types';
+import type { ObserverSpec } from '../sim/enemy/state';
 
 /** Everything the generator is allowed to randomize, per town. */
 export interface GenConfig {
@@ -11,6 +12,8 @@ export interface GenConfig {
   keystoneCount: number;
   /** Designated cross-district regulars per adjacent district pair. */
   bridgesPerAdjacentPair: number;
+  /** Designated guards converted per district — the enemy's organic coverage. */
+  guardsPerDistrict: number;
   /** Serve-loop reroll budget before generateValidTown throws. */
   maxAttempts: number;
 }
@@ -45,6 +48,8 @@ export interface GenContent {
   occupations: OccupationDef[];
   traitPool: { id: string; weight: number }[];
   factions: { id: Npc['faction']; weight: number }[];
+  /** The occupation designated guards are converted to (workplace must be an archetype id). */
+  guardOccupation: OccupationDef;
 }
 
 export interface DistrictInfo {
@@ -58,6 +63,7 @@ export interface GeneratedTown {
   fixture: TownFixture;
   districts: DistrictInfo[];
   keystones: EntityId[];
+  guards: ObserverSpec[];
 }
 
 export interface InvariantFailure { invariant: string; detail: string }

@@ -1,6 +1,7 @@
 import { Rng } from '../core/rng';
 import type { EntityId, VenueId } from '../sim/rumors/claim';
 import type { Npc, ScheduleEntry, Venue } from '../sim/types';
+import type { ObserverSpec } from '../sim/enemy/state';
 import type { DistrictInfo, GenConfig, GenContent, GeneratedTown, OccupationDef } from './types';
 
 /** Round to 2 decimals — keeps generated trust values readable and JSON-stable. */
@@ -33,6 +34,11 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
   if (content.names.length < config.npcCount) {
     throw new Error(`generateTown: name pool ${content.names.length} < npcCount ${config.npcCount}`);
   }
+  for (const occ of content.occupations) {
+    if (occ.eveningTavern && occ.to > 1080) {
+      throw new Error(`generateTown: occupation '${occ.id}' has eveningTavern but works past 1080 (${occ.to})`);
+    }
+  }
 
   // Per-subsystem streams (spec: adding a feature never reshuffles another system's draws).
   const namesRng = new Rng(seed, 'gen:names');
@@ -40,6 +46,7 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
   const castRng = new Rng(seed, 'gen:cast');
   const schedulesRng = new Rng(seed, 'gen:schedules');
   const bridgesRng = new Rng(seed, 'gen:bridges');
+  const guardsRng = new Rng(seed, 'gen:guards');
   const edgesRng = new Rng(seed, 'gen:edges');
   const rivalsRng = new Rng(seed, 'gen:rivals');
   const keystonesRng = new Rng(seed, 'gen:keystones');
@@ -154,6 +161,30 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
     }
   }
 
+  // ── 5b. Designated guards: quality + placement (enemy coverage terrain) ──
+  const GUARD_PATROL = { from: 600, to: 840 };   // market patrol — where gossip flows
+  const GUARD_EVENING = { from: 1080, to: 1230 } // tavern presence
+  const guards: ObserverSpec[] = [];
+  for (const d of districtIds) {
+    for (let k = 0; k < config.guardsPerDistrict; k++) {
+      const eligible = cast
+        .filter((m) => m.district === d && !bridgeIds.has(m.npc.id) && m.npc.occupation !== content.guardOccupation.id)
+        .sort((x, y) => x.npc.id.localeCompare(y.npc.id));
+      if (eligible.length === 0) continue; // the validator judges the town that results
+      const chosen = eligible[guardsRng.int(0, eligible.length)]!;
+      chosen.occupation = content.guardOccupation;
+      chosen.npc.occupation = content.guardOccupation.id;
+      chosen.npc.schedule = chosen.npc.schedule.filter((s) =>
+        !(s.days === 'weekday') && !(s.days === 'all' && s.venue === `tavern-${d}`));
+      chosen.npc.schedule.push(
+        { days: 'weekday', from: content.guardOccupation.from, to: content.guardOccupation.to, venue: workplaceOf(chosen) },
+        { days: 'weekday', from: GUARD_PATROL.from, to: GUARD_PATROL.to, venue: `market-${d}` },
+        { days: 'all', from: GUARD_EVENING.from, to: GUARD_EVENING.to, venue: `tavern-${d}` },
+      );
+      guards.push({ id: chosen.npc.id, vigilance: r2(0.3 + guardsRng.float() * 0.6) });
+    }
+  }
+
   // ── 6. Edges: kin cliques, workplace colleagues, venue-sharing friends ──
   for (const hh of households) {
     const ids = hh.memberNames.map((n) => n.toLowerCase());
@@ -237,5 +268,5 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
     npcIds: cast.filter((m) => m.district === d).map((m) => m.npc.id),
   }));
 
-  return { fixture: { venues, npcs: cast.map((m) => m.npc) }, districts, keystones };
+  return { fixture: { venues, npcs: cast.map((m) => m.npc) }, districts, keystones, guards };
 }

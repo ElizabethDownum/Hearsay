@@ -6,6 +6,7 @@ export const STANDARD_GEN_CONFIG: GenConfig = {
   districtCount: 3,
   keystoneCount: 3,
   bridgesPerAdjacentPair: 2,  // two designated bridges = two independent routes across each firebreak
+  guardsPerDistrict: 2,       // enemy's organic coverage terrain
   maxAttempts: 8,
 };
 
@@ -34,6 +35,10 @@ export const OCCUPATIONS: OccupationDef[] = [
   { id: 'priest',      workplace: 'cathedral', from: 420, to: 720,  eveningTavern: false, weight: 1 },
 ];
 
+/** Guards are DESIGNATED (converted from cast), never weighted-drawn — weight: 0 excludes it from castRng picks. */
+export const GUARD_OCCUPATION: OccupationDef =
+  { id: 'guard', workplace: 'guard-post', from: 480, to: 600, eveningTavern: false, weight: 0 };
+
 export const STANDARD_GEN_CONTENT: GenContent = {
   names: NAMES,
   venueArchetypes: VENUE_ARCHETYPES,
@@ -46,4 +51,5 @@ export const STANDARD_GEN_CONTENT: GenContent = {
   factions: [
     { id: 'guild', weight: 7 }, { id: 'crown', weight: 6 }, { id: 'none', weight: 7 },
   ],
+  guardOccupation: GUARD_OCCUPATION,
 };

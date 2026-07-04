@@ -48,4 +48,16 @@ describe('generator content tables', () => {
     expect(STANDARD_GEN_CONFIG.keystoneCount).toBeGreaterThan(0);
     expect(STANDARD_GEN_CONFIG.bridgesPerAdjacentPair).toBeGreaterThan(0);
   });
+
+  it('guardsPerDistrict is a positive integer', () => {
+    expect(Number.isInteger(STANDARD_GEN_CONFIG.guardsPerDistrict)).toBe(true);
+    expect(STANDARD_GEN_CONFIG.guardsPerDistrict).toBeGreaterThan(0);
+  });
+
+  it("guardOccupation is id 'guard' with a real workplace archetype", () => {
+    const archIds = new Set(VENUE_ARCHETYPES.map((a) => a.id));
+    expect(STANDARD_GEN_CONTENT.guardOccupation.id).toBe('guard');
+    expect(archIds.has(STANDARD_GEN_CONTENT.guardOccupation.workplace)).toBe(true);
+    expect(STANDARD_GEN_CONTENT.guardOccupation.workplace).toBe('guard-post');
+  });
 });

@@ -123,6 +123,15 @@ export function validateTown(town: GeneratedTown, config: GenConfig, opts: Valid
   if (new Set(town.keystones).size !== town.keystones.length) fail('keystones-valid', 'duplicate keystone');
   for (const k of town.keystones) if (!npcIds.has(k)) fail('keystones-valid', `unknown keystone '${k}'`);
 
+  const expectedGuards = config.districtCount * config.guardsPerDistrict;
+  if (town.guards.length !== expectedGuards) {
+    fail('guards-staffed', `${town.guards.length} guards !== configured ${expectedGuards}`);
+  }
+  for (const g of town.guards) {
+    if (!npcIds.has(g.id)) fail('guards-staffed', `unknown guard '${g.id}'`);
+    if (!(g.vigilance > 0 && g.vigilance <= 1)) fail('guards-staffed', `guard ${g.id}: vigilance ${g.vigilance} out of (0,1]`);
+  }
+
   // Graph invariants only mean something on a structurally sound town.
   if (failures.length > 0) return { ok: false, failures };
 
