@@ -38,4 +38,11 @@ describe('Testford fixture', () => {
     const broken = { ...TESTFORD, npcs: [{ ...TESTFORD.npcs[0]!, home: 'nowhere' }] };
     expect(() => buildWorld(broken, 's')).toThrow(/nowhere/);
   });
+
+  it('buildWorld throws on duplicate npc or venue ids', () => {
+    const dupNpc = { ...TESTFORD, npcs: [...TESTFORD.npcs, TESTFORD.npcs[0]!] };
+    expect(() => buildWorld(dupNpc, 's')).toThrow(/mara/); // npcs[0] is mara
+    const dupVenue = { ...TESTFORD, venues: [...TESTFORD.venues, TESTFORD.venues[0]!] };
+    expect(() => buildWorld(dupVenue, 's')).toThrow(new RegExp(TESTFORD.venues[0]!.id));
+  });
 });

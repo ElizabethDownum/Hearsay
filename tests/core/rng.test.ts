@@ -23,6 +23,14 @@ describe('Rng', () => {
     expect(draws.some(([x, y]) => x !== y)).toBe(true);
   });
 
+  it('two streams from one seed rarely agree positionally', () => {
+    const a = new Rng('seed-1', 'circles');
+    const b = new Rng('seed-1', 'world-gen');
+    let equal = 0;
+    for (let i = 0; i < 1000; i++) if (a.nextU32() === b.nextU32()) equal++;
+    expect(equal).toBeLessThan(10);
+  });
+
   it('int stays in [min, max) across 5000 draws and hits both edges', () => {
     const r = new Rng('seed-2', 'test');
     const seen = new Set<number>();

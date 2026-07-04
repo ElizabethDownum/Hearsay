@@ -90,6 +90,11 @@ describe('chooseTelling and gates', () => {
     expect(b.claim.id).toBe('c9'); // first version stuck
   });
 
+  it('applyInject throws on an unknown npc', () => {
+    const world = buildWorld(TESTFORD, 'prop-seed-inject');
+    expect(() => applyInject(world, 'nobody', spec)).toThrow(/nobody/);
+  });
+
   it('new corroboration refreshes freshness; a repeat source does not', () => {
     const world = buildWorld(TESTFORD, 'prop-seed-6');
     const injected = applyInject(world, 'rafe', spec);

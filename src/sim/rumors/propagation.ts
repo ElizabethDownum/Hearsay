@@ -3,7 +3,7 @@ import type { Circle } from '../agents';
 import type { Utterance } from '../perception';
 import type { Rules } from '../rules';
 import type { Belief, Npc, WorldState } from '../types';
-import { mintClaim, type Claim, type EntityId } from './claim';
+import { mintClaim, SOMEONE, type Claim, type EntityId } from './claim';
 import { applyTraits, type TraitContext } from './traits';
 import { trustBetween } from '../world';
 
@@ -21,8 +21,8 @@ export function juiciness(claim: Claim, rules: Rules): number {
 
 export function relevance(hearer: Npc, claim: Claim): number {
   const known = new Set([hearer.id, ...hearer.edges.map((e) => e.to)]);
-  const subjectKnown = claim.subject !== 'someone' && known.has(claim.subject);
-  const objectKnown = claim.object !== null && claim.object !== 'someone' && known.has(claim.object);
+  const subjectKnown = claim.subject !== SOMEONE && known.has(claim.subject);
+  const objectKnown = claim.object !== null && claim.object !== SOMEONE && known.has(claim.object);
   return subjectKnown || objectKnown ? 1 : 0.6;
 }
 
@@ -64,7 +64,7 @@ export function chooseTelling(
   world: WorldState, tellerId: EntityId, circle: Circle, t: Tick, rules: Rules,
 ): Utterance | null {
   const teller = world.npcs[tellerId]!;
-  const store = world.beliefs[tellerId] ?? {};
+  const store = world.beliefs[tellerId] ?? {}; // invariant: buildWorld seeds a store for every NPC
   let best: { score: number; family: string; addressee: EntityId; belief: Belief } | null = null;
 
   for (const family of Object.keys(store).sort()) {
@@ -105,7 +105,7 @@ export interface Hearing {
 export function ingest(
   world: WorldState, hearerId: EntityId, hearing: Hearing, addressed: boolean,
 ): void {
-  const store = world.beliefs[hearerId]!;
+  const store = world.beliefs[hearerId]!; // invariant: buildWorld seeds a store for every NPC
   const existing = store[hearing.claim.family];
   if (existing) {
     existing.timesHeard += 1;

@@ -13,7 +13,7 @@ const clampSeverity = (n: number): Claim['severity'] =>
 const grudgePick = (claim: Claim, ctx: TraitContext): string | null =>
   ctx.rivals.length === 0
     ? null
-    : (ctx.rivals[fnv1a32(`${claim.family}:${ctx.ownerId}`) % ctx.rivals.length] as string);
+    : ctx.rivals[fnv1a32(`${claim.family}:${ctx.ownerId}`) % ctx.rivals.length]!;
 
 export const TRAITS: Record<TraitId, TraitDef> = {
   exaggerator: {
@@ -23,8 +23,7 @@ export const TRAITS: Record<TraitId, TraitDef> = {
     transform: (c) => {
       const d: ClaimDelta = {};
       if (c.count !== null) d.count = c.count * 2;
-      if (c.severity < 5) d.severity = clampSeverity(c.severity + 1);
-      else d.severity = 5;
+      d.severity = clampSeverity(c.severity + 1); // clamp keeps 5 at 5
       return d;
     },
   },

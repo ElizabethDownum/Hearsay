@@ -42,6 +42,11 @@ describe('observationsFor', () => {
     expect(brigid.observations).toHaveLength(0);
   });
 
+  it('a speaker never observes their own utterance', () => {
+    const feed = observationsFor('mara', events);
+    expect(feed.observations.filter((o) => o.kind === 'utterance')).toHaveLength(0);
+  });
+
   it('NO-LEAK: events elsewhere never alter a feed (mini no-omniscience)', () => {
     const before = observationsFor('brigid', events);
     const perturbed: TickEvents = {

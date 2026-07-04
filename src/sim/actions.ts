@@ -13,10 +13,12 @@ export interface InjectSpec {
 
 /** Player tells a rumor to one NPC. Hop zero — the town owns the rest. */
 export function applyInject(world: WorldState, targetId: EntityId, spec: InjectSpec): Claim {
+  const store = world.beliefs[targetId];
+  if (!store) throw new Error(`applyInject: unknown npc '${targetId}'`);
   const family = `f${world.claimCounter}`;
   const claim = mintClaim(world, { ...spec, family, parent: null });
   world.claims[claim.id] = claim;
-  world.beliefs[targetId]![family] = {
+  store[family] = {
     claim,
     credence: 0.85,
     heardFrom: 'injected',
