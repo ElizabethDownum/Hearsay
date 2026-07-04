@@ -86,7 +86,7 @@ describe('chooseTelling and gates', () => {
     expect(b.credence).toBeCloseTo(0.35 + 0.45 * 0.6); // trust rafe->mara = 0.6
     ingest(world, 'rafe', { ...u, speaker: 'osric' }, false);
     expect(b.timesHeard).toBe(2);
-    expect(b.distinctSources).toEqual(['mara', 'osric']);
+    expect(b.apparentSources).toEqual(['mara', 'osric']);
     expect(b.claim.id).toBe('c9'); // first version stuck
   });
 

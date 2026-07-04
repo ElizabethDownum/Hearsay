@@ -23,8 +23,9 @@ export function applyInject(world: WorldState, targetId: EntityId, spec: InjectS
     credence: 0.85,
     heardFrom: 'injected',
     heardAt: world.tick,
+    firstHeardAt: world.tick,
     timesHeard: 1,
-    distinctSources: [],
+    apparentSources: [],
   };
   return claim;
 }

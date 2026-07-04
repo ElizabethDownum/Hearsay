@@ -55,7 +55,7 @@ function passesGates(teller: Npc, belief: Belief, world: WorldState, t: Tick, ru
   const needsCorroboration = teller.traits.some(
     (id) => rules.traits[id]?.retellGate === 'requires-corroboration',
   );
-  if (needsCorroboration && belief.distinctSources.length < 2) return false;
+  if (needsCorroboration && belief.apparentSources.length < 2) return false;
   return true;
 }
 
@@ -102,18 +102,24 @@ export interface Hearing {
   claim: Claim;
 }
 
+/** The origin this hearing APPEARS to come from — named attribution wins over the teller. */
+export function apparentSourceOf(hearing: Hearing): EntityId {
+  return hearing.claim.attribution !== SOMEONE ? hearing.claim.attribution : hearing.speaker;
+}
+
 export function ingest(
   world: WorldState, hearerId: EntityId, hearing: Hearing, addressed: boolean,
 ): void {
   const store = world.beliefs[hearerId]!; // invariant: buildWorld seeds a store for every NPC
   const existing = store[hearing.claim.family];
+  const source = apparentSourceOf(hearing);
   if (existing) {
     existing.timesHeard += 1;
-    if (!existing.distinctSources.includes(hearing.speaker)) {
-      existing.distinctSources.push(hearing.speaker);
+    if (!existing.apparentSources.includes(source)) {
+      existing.apparentSources.push(source);
       existing.credence = Math.min(0.95, existing.credence + 0.15);
-      // Spec: stale news revives with new corroboration — a fresh distinct source
-      // resets the freshness clock. Re-hearing a known source refreshes nothing.
+      // Spec: stale news revives with new corroboration — a fresh APPARENT source
+      // resets the freshness clock. A repeat origin refreshes nothing.
       existing.heardAt = hearing.tick;
     }
     return; // first version sticks
@@ -124,7 +130,8 @@ export function ingest(
     credence: clamp01(0.35 + 0.45 * trust * (addressed ? 1 : 0.5)),
     heardFrom: hearing.speaker,
     heardAt: hearing.tick,
+    firstHeardAt: hearing.tick,
     timesHeard: 1,
-    distinctSources: [hearing.speaker],
+    apparentSources: [source],
   };
 }

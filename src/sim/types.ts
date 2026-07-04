@@ -35,12 +35,19 @@ export interface Npc {
 }
 
 export interface Belief {
-  claim: Claim;            // the version THIS mind holds
+  claim: Claim;            // the version THIS mind holds (first version sticks)
   credence: number;        // 0..1
   heardFrom: EntityId | 'injected';
+  /** Last NEW-corroboration tick — drives freshness (spec: corroboration revives stale news). */
   heardAt: Tick;
+  /** Set once at first hearing; never moves. The debrief timeline reads this. */
+  firstHeardAt: Tick;
   timesHeard: number;
-  distinctSources: EntityId[]; // apparent independence — corroboration for skeptic gates
+  /**
+   * Apparent independence — "B only knows what attribution survived": the claim's
+   * attribution if named, else the teller. Two tellers citing one origin = one source.
+   */
+  apparentSources: EntityId[];
 }
 
 export type BeliefStore = Record<RumorId, Belief>;
