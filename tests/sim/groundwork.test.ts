@@ -59,7 +59,7 @@ describe('groundwork: askings in perception', () => {
     utterances: [],
     askings: [{
       tick: at(0, 12), venue: 'tavern', circleMembers: ['asker', 'target', 'bystander'],
-      speaker: 'asker', addressedTo: 'target', about: { family: 'f0' },
+      speaker: 'asker', addressedTo: 'target', about: { family: 'f0' }, authority: false,
     }],
   };
 

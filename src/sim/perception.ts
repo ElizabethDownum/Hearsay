@@ -21,6 +21,8 @@ export interface Asking {
   speaker: EntityId;
   addressedTo: EntityId;
   about: InquiryKey;
+  /** true iff the task's `from === 'enemy'` — a question asked with the watch's authority. */
+  authority: boolean;
 }
 
 /** Everything that happened in one tick — the ONLY raw material observation is built from. */
@@ -36,7 +38,7 @@ export type Observation =
   | { kind: 'utterance'; tick: Tick; venue: VenueId; speaker: EntityId;
       addressedTo: EntityId; claim: Claim; overheard: boolean; mode: 'telling' | 'answer' }
   | { kind: 'asking'; tick: Tick; venue: VenueId; speaker: EntityId;
-      addressedTo: EntityId; about: InquiryKey; overheard: boolean };
+      addressedTo: EntityId; about: InquiryKey; overheard: boolean; authority: boolean };
 
 export interface ObservationFeed {
   observer: EntityId;
@@ -75,7 +77,7 @@ export function observationsFor(observer: EntityId, events: TickEvents): Observa
       observations.push({
         kind: 'asking', tick: a.tick, venue: a.venue,
         speaker: a.speaker, addressedTo: a.addressedTo, about: a.about,
-        overheard: a.addressedTo !== observer,
+        overheard: a.addressedTo !== observer, authority: a.authority,
       });
     }
   }

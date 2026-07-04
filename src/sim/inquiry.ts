@@ -1,0 +1,134 @@
+import type { Tick } from '../core/time';
+import { dayOf } from '../core/time';
+import type { Circle } from './agents';
+import type { Asking, InquiryKey, Utterance } from './perception';
+import { mintClaim, SOMEONE, type EntityId } from './rumors/claim';
+import { STANCE } from './rumors/propagation';
+import type { Rules } from './rules';
+import { applyTraits, type TraitContext } from './rumors/traits';
+import type { Belief, InquiryTask, Npc, WorldState } from './types';
+import { trustBetween } from './world';
+
+/** The belief an answerer would produce for a key, or null. */
+export function matchBelief(store: Record<string, Belief>, about: InquiryKey): Belief | null {
+  if ('family' in about) return store[about.family] ?? null;
+  let best: Belief | null = null;
+  let bestFamily = '';
+  for (const family of Object.keys(store).sort()) {
+    const b = store[family]!;
+    if (b.claim.subject !== about.subject) continue;
+    if (best === null || b.credence > best.credence || (b.credence === best.credence && family < bestFamily)) {
+      best = b; bestFamily = family;
+    }
+  }
+  return best;
+}
+
+function traitContext(npc: Npc, world: WorldState): TraitContext {
+  return {
+    ownerId: npc.id, faction: npc.faction, rivals: npc.rivals,
+    factionOf: (e) => world.npcs[e]?.faction ?? null,
+  };
+}
+
+export function chooseAnswer(
+  world: WorldState, answererId: EntityId, asking: Asking, t: Tick, rules: Rules,
+): Utterance | null {
+  const answerer = world.npcs[answererId]!;
+  const belief = matchBelief(world.beliefs[answererId] ?? {}, asking.about);
+  if (!belief || belief.credence < STANCE.DISMISS) return null;
+
+  const compelled = asking.authority && world.venues[asking.venue]?.access === 'invitational';
+  const valence = rules.predicates[belief.claim.predicate]?.valence ?? 'neutral';
+  // You never confirm dirt on yourself — not even behind closed doors.
+  if (belief.claim.subject === answererId && valence === 'damaging') return null;
+  const trust = trustBetween(world, answererId, asking.speaker);
+  if (!compelled && trust <= 0) return null;
+  // Held-close knowledge: extracted by authority, or confided to the very trusted.
+  if (belief.discretion && !compelled && trust < 0.7) return null;
+
+  // Disclosure: attribution names the answerer's actual source — then their traits
+  // get their say (testimony rides the same firmware as gossip; it can lie, deterministically).
+  const disclosed = {
+    ...belief.claim,
+    attribution: belief.heardFrom === 'injected' || belief.heardFrom === 'witnessed'
+      ? SOMEONE : belief.heardFrom,
+  };
+  const tellerTraits = answerer.traits.flatMap((id) => (rules.traits[id] ? [rules.traits[id]!] : []));
+  const delta = applyTraits(tellerTraits, disclosed, traitContext(answerer, world));
+  const outgoing = mintClaim(world, {
+    ...disclosed, ...delta,
+    family: belief.claim.family, parent: belief.claim.id,
+  });
+  world.claims[outgoing.id] = outgoing;
+  return {
+    tick: t, venue: asking.venue, circleMembers: [...asking.circleMembers],
+    speaker: answererId, addressedTo: asking.speaker, claim: outgoing, mode: 'answer',
+  };
+}
+
+/** First usable task for an asker, or null. */
+function usableTask(world: WorldState, askerId: EntityId, day: number): InquiryTask | null {
+  for (const task of world.inquiries[askerId] ?? []) {
+    if (day < task.expiresDay && task.answersHeard < 2) return task;
+  }
+  return null;
+}
+
+/**
+ * The ask/answer phase for one circle. One speech per beat: returns who spoke so
+ * the tell phase can skip them. Bookkeeping (asked, answersHeard, retirement) happens here.
+ */
+export function runAskPhase(
+  world: WorldState, circle: Circle, t: Tick, rules: Rules,
+): { askings: Asking[]; answers: Utterance[]; spoke: EntityId[] } {
+  const day = dayOf(t);
+  const askings: Asking[] = [];
+  const answers: Utterance[] = [];
+  const spoke = new Set<EntityId>();
+
+  for (const member of circle.members) {
+    if (spoke.has(member)) continue;
+    const task = usableTask(world, member, day);
+    if (!task) continue;
+    const eligible = circle.members
+      .filter((m) => m !== member && !task.asked.includes(m) && !spoke.has(m))
+      .filter((m) => task.from === 'enemy' || trustBetween(world, member, m) > 0)
+      .sort((a, b) =>
+        trustBetween(world, member, b) - trustBetween(world, member, a) || (a < b ? -1 : 1));
+    if (eligible.length === 0) continue;
+    const addressee = eligible[0]!;
+    const asking: Asking = {
+      tick: t, venue: circle.venue, circleMembers: [...circle.members],
+      speaker: member, addressedTo: addressee, about: task.about,
+      authority: task.from === 'enemy',
+    };
+    askings.push(asking);
+    spoke.add(member);
+    task.asked.push(addressee);
+
+    const answer = chooseAnswer(world, addressee, asking, t, rules);
+    if (answer) {
+      answers.push(answer);
+      spoke.add(addressee);
+      task.answersHeard += 1;
+    }
+    if (task.answersHeard >= 2) retireTask(world, member, task);
+  }
+  return { askings, answers, spoke: [...spoke] };
+}
+
+function retireTask(world: WorldState, askerId: EntityId, task: InquiryTask): void {
+  const remaining = (world.inquiries[askerId] ?? []).filter((x) => x !== task);
+  if (remaining.length === 0) delete world.inquiries[askerId];
+  else world.inquiries[askerId] = remaining;
+}
+
+/** End-of-day sweep: drop tasks that cannot fire tomorrow. */
+export function expireInquiries(world: WorldState, day: number): void {
+  for (const id of Object.keys(world.inquiries)) {
+    const keep = world.inquiries[id]!.filter((x) => x.expiresDay > day + 1 && x.answersHeard < 2);
+    if (keep.length === 0) delete world.inquiries[id];
+    else world.inquiries[id] = keep;
+  }
+}

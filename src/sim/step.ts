@@ -1,6 +1,7 @@
-import { minuteOfDay } from '../core/time';
+import { dayOf, minuteOfDay } from '../core/time';
 import { circlesAt, venueAt } from './agents';
-import { observationsFor, type TickEvents, type Utterance } from './perception';
+import { expireInquiries, runAskPhase } from './inquiry';
+import { observationsFor, type Asking, type TickEvents, type Utterance } from './perception';
 import { chooseTelling, ingest, CONVERSATION_BEAT } from './rumors/propagation';
 import type { Rules } from './rules';
 import type { WorldState } from './types';
@@ -13,17 +14,23 @@ export function step(world: WorldState, rules: Rules): TickEvents {
   );
 
   const utterances: Utterance[] = [];
+  const askings: Asking[] = [];
   if (minuteOfDay(t) % CONVERSATION_BEAT === 0) {
     for (const circle of circlesAt(world, t)) {
       if (circle.members.length < 2) continue;
+      const phase = runAskPhase(world, circle, t, rules);
+      askings.push(...phase.askings);
+      utterances.push(...phase.answers);
+      const spoke = new Set(phase.spoke);
       for (const member of circle.members) {
+        if (spoke.has(member)) continue;
         const u = chooseTelling(world, member, circle, t, rules);
         if (u) utterances.push(u);
       }
     }
   }
 
-  const events: TickEvents = { tick: t, positions, utterances, askings: [] };
+  const events: TickEvents = { tick: t, positions, utterances, askings };
 
   for (const u of utterances) {
     world.chronicle.push({
@@ -32,6 +39,15 @@ export function step(world: WorldState, rules: Rules): TickEvents {
       heardBy: u.circleMembers.filter((m) => m !== u.speaker)
         .map((id) => ({ id, addressed: id === u.addressedTo })),
       mode: u.mode,
+    });
+  }
+
+  for (const a of askings) {
+    world.chronicle.push({
+      kind: 'asking', tick: a.tick, venue: a.venue, speaker: a.speaker,
+      addressedTo: a.addressedTo, about: a.about, authority: a.authority,
+      heardBy: a.circleMembers.filter((m) => m !== a.speaker)
+        .map((id) => ({ id, addressed: id === a.addressedTo })),
     });
   }
 
@@ -47,6 +63,8 @@ export function step(world: WorldState, rules: Rules): TickEvents {
       }
     }
   }
+
+  if (minuteOfDay(t) === 1439) expireInquiries(world, dayOf(t));
 
   world.tick = t + 1;
   return events;

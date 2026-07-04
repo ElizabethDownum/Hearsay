@@ -85,6 +85,8 @@ export interface AskingRecord {
   speaker: EntityId;
   addressedTo: EntityId;
   about: InquiryKey;
+  /** true iff the question carried the watch's authority (`InquiryTask.from === 'enemy'`). */
+  authority: boolean;
   heardBy: { id: EntityId; addressed: boolean }[];
 }
 export type ChronicleEntry = TellingRecord | InjectRecord | AskingRecord;
