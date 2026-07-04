@@ -8,7 +8,7 @@ import { at } from '../../src/core/time';
 import { SOMEONE } from '../../src/sim/rumors/claim';
 
 const OPTS = { knownTraitIds: Object.keys(TRAITS) };
-const serve = (seed: string) => generateValidTown(seed, STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT, OPTS);
+const serve = (seed: string) => generateValidTown(seed, STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT, STANDARD_RULES, OPTS);
 
 describe('generateValidTown — fail → reroll, deterministically', () => {
   it('same seed → byte-identical served town and attempt count', () => {
@@ -26,8 +26,28 @@ describe('generateValidTown — fail → reroll, deterministically', () => {
   it('throws with the last failure report when the reroll budget is exhausted', () => {
     // an impossible contract: more keystones than NPCs can never validate
     const impossible = { ...STANDARD_GEN_CONFIG, npcCount: 8, keystoneCount: 9, maxAttempts: 2 };
-    expect(() => generateValidTown('serve-3', impossible, STANDARD_GEN_CONTENT, OPTS))
+    expect(() => generateValidTown('serve-3', impossible, STANDARD_GEN_CONTENT, STANDARD_RULES, OPTS))
       .toThrow(/exhausted 2 attempts[\s\S]*keystones-valid/);
+  });
+});
+
+describe('the serve boundary derives known ids from Rules — never optional', () => {
+  it('an alien trait can no longer slip through', () => {
+    const alienContent = {
+      ...STANDARD_GEN_CONTENT,
+      traitPool: [...STANDARD_GEN_CONTENT.traitPool, { id: 'mesmerist', weight: 100 }],
+    };
+    expect(() => generateValidTown('alien', STANDARD_GEN_CONFIG, alienContent, STANDARD_RULES))
+      .toThrow(/traits-in-range/);
+  });
+
+  it('secrets with a predicate unknown to Rules fail validation at the serve boundary', () => {
+    const alienShapes = {
+      ...STANDARD_GEN_CONTENT,
+      secretShapes: [{ predicate: 'consorts-with-spirits', needsObject: false, needsPlace: false, severity: 3 as const, weight: 1 }],
+    };
+    expect(() => generateValidTown('alien-2', STANDARD_GEN_CONFIG, alienShapes, STANDARD_RULES))
+      .toThrow(/secrets-valid/);
   });
 });
 

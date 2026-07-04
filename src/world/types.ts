@@ -99,4 +99,6 @@ export interface ValidationReport { ok: boolean; failures: InvariantFailure[] }
 export interface ValidateOptions {
   /** When provided, every NPC trait must be one of these (pass Object.keys(rules.traits)). */
   knownTraitIds?: string[];
+  /** When provided, every secret predicate must be one of these (serve passes Object.keys(rules.predicates)). */
+  knownPredicateIds?: string[];
 }

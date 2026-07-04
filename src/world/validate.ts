@@ -140,6 +140,9 @@ export function validateTown(town: GeneratedTown, config: GenConfig, opts: Valid
     if (s.object !== null && !npcIds.has(s.object)) fail('secrets-valid', `secret ${s.id}: unknown object '${s.object}'`);
     if (s.place !== null && !venueIds.has(s.place)) fail('secrets-valid', `secret ${s.id}: unknown place '${s.place}'`);
     if (s.witnesses.length < 1) fail('secrets-valid', `secret ${s.id}: no witnesses`);
+    if (opts.knownPredicateIds && !opts.knownPredicateIds.includes(s.predicate)) {
+      fail('secrets-valid', `secret ${s.id}: unknown predicate '${s.predicate}'`);
+    }
     for (const w of s.witnesses) {
       if (!npcIds.has(w)) fail('secrets-valid', `secret ${s.id}: unknown witness '${w}'`);
       if (w === s.subject || w === s.object) fail('secrets-valid', `secret ${s.id}: witness '${w}' is a participant`);

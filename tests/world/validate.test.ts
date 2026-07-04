@@ -1,6 +1,7 @@
 import { meetingGraph, validateTown } from '../../src/world/validate';
 import { generateValidTown } from '../../src/world/serve';
 import { STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT } from '../../src/content/gen/standard';
+import { STANDARD_RULES } from '../../src/content/rules';
 import { TESTFORD } from '../../src/content/fixtures/testford';
 import { TRAITS } from '../../src/content/traits';
 import type { Npc, Venue } from '../../src/sim/types';
@@ -65,7 +66,7 @@ describe('structural invariants (red, one each)', () => {
 
 describe('guards-staffed invariant', () => {
   const validOpts = { knownTraitIds: Object.keys(TRAITS) };
-  const built = generateValidTown('guards-invariant-seed', STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT, validOpts);
+  const built = generateValidTown('guards-invariant-seed', STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT, STANDARD_RULES, validOpts);
 
   it('a valid generated town passes', () => {
     expect(validateTown(built.town, STANDARD_GEN_CONFIG, validOpts).ok).toBe(true);
@@ -95,7 +96,7 @@ describe('guards-staffed invariant', () => {
 
 describe('secrets-valid invariant', () => {
   const validOpts = { knownTraitIds: Object.keys(TRAITS) };
-  const built = generateValidTown('secrets-invariant-seed', STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT, validOpts);
+  const built = generateValidTown('secrets-invariant-seed', STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT, STANDARD_RULES, validOpts);
 
   it('a valid generated town passes (real dirt, real witnesses)', () => {
     expect(validateTown(built.town, STANDARD_GEN_CONFIG, validOpts).ok).toBe(true);

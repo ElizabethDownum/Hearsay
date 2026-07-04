@@ -19,7 +19,7 @@ describe('procgen pacing probe (npm run mc)', () => {
   // same pre-existing naivety the blitz-crier-over-patient-whisperer choice already worked
   // around, see below). Not a structural collapse of the gossip system: swapped the pinned
   // probe seed for one where the reshaped town isn't a skeptic pile-up.
-  const { town } = generateValidTown('probe-town-2', STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT,
+  const { town } = generateValidTown('probe-town-2', STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT, STANDARD_RULES,
     { knownTraitIds: Object.keys(TRAITS) });
 
   it('runs both archetypes on a generated town; world-seed variance is visible in MC min/max', () => {

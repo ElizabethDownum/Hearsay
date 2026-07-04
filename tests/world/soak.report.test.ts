@@ -5,6 +5,7 @@ import { generateTown } from '../../src/world/gen';
 import { validateTown } from '../../src/world/validate';
 import { generateValidTown } from '../../src/world/serve';
 import { STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT } from '../../src/content/gen/standard';
+import { STANDARD_RULES } from '../../src/content/rules';
 import { TRAITS } from '../../src/content/traits';
 
 // No @types/node in this repo (types: ["vitest/globals"]) — reach process.env
@@ -30,7 +31,7 @@ describe(`validator soak — ${COUNT} seeds`, () => {
         firstTryFails += 1;
         for (const f of first.failures) failCounts.set(f.invariant, (failCounts.get(f.invariant) ?? 0) + 1);
       }
-      const served = generateValidTown(seed, STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT, OPTS);
+      const served = generateValidTown(seed, STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT, STANDARD_RULES, OPTS);
       attempts.push(served.attempts);
       expect(validateTown(served.town, STANDARD_GEN_CONFIG, OPTS).ok).toBe(true); // belt and braces
     }
