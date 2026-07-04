@@ -14,8 +14,33 @@ export interface GenConfig {
   bridgesPerAdjacentPair: number;
   /** Designated guards converted per district — the enemy's organic coverage. */
   guardsPerDistrict: number;
+  /** True hidden histories seeded per town — dormant dirt the player must extract. */
+  secretCount: number;
   /** Serve-loop reroll budget before generateValidTown throws. */
   maxAttempts: number;
+}
+
+/**
+ * A TRUE claim under the gossip — family = secret id; witnesses hold it with discretion.
+ * The seed generates real dirt with real witnesses; it never leaks by itself.
+ */
+export interface Secret {
+  id: string;
+  subject: EntityId;
+  predicate: string;
+  object: EntityId | null;
+  place: VenueId | null;
+  severity: 1 | 2 | 3 | 4 | 5;
+  witnesses: EntityId[];
+}
+
+/** A secret template: what the dirt looks like and how likely the generator is to draw it. */
+export interface SecretShapeDef {
+  predicate: string;
+  needsObject: boolean;
+  needsPlace: boolean;
+  severity: 1 | 2 | 3 | 4 | 5;
+  weight: number;
 }
 
 /** Fixed grammar: institutional archetypes. Instances are stamped per district (or once, in d0). */
@@ -50,6 +75,8 @@ export interface GenContent {
   factions: { id: Npc['faction']; weight: number }[];
   /** The occupation designated guards are converted to (workplace must be an archetype id). */
   guardOccupation: OccupationDef;
+  /** Secret templates drawn (weighted) to seed the town's true hidden history. */
+  secretShapes: SecretShapeDef[];
 }
 
 export interface DistrictInfo {
@@ -64,6 +91,7 @@ export interface GeneratedTown {
   districts: DistrictInfo[];
   keystones: EntityId[];
   guards: ObserverSpec[];
+  secrets: Secret[];
 }
 
 export interface InvariantFailure { invariant: string; detail: string }

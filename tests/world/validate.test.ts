@@ -16,9 +16,11 @@ const town = (npcs: Npc[], extraVenues: Venue[] = [], keystones: string[] = []):
   districts: [],
   keystones,
   guards: [],
+  secrets: [],
 });
 const cfg = (over: Partial<GenConfig> = {}): GenConfig => ({
-  npcCount: 2, districtCount: 1, keystoneCount: 0, bridgesPerAdjacentPair: 0, guardsPerDistrict: 0, maxAttempts: 1, ...over,
+  npcCount: 2, districtCount: 1, keystoneCount: 0, bridgesPerAdjacentPair: 0, guardsPerDistrict: 0,
+  secretCount: 0, maxAttempts: 1, ...over,
 });
 const block = (venueId: string, from = 480, to = 600): Npc['schedule'][number] =>
   ({ days: 'all', from, to, venue: venueId });
@@ -91,6 +93,37 @@ describe('guards-staffed invariant', () => {
   });
 });
 
+describe('secrets-valid invariant', () => {
+  const validOpts = { knownTraitIds: Object.keys(TRAITS) };
+  const built = generateValidTown('secrets-invariant-seed', STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT, validOpts);
+
+  it('a valid generated town passes (real dirt, real witnesses)', () => {
+    expect(validateTown(built.town, STANDARD_GEN_CONFIG, validOpts).ok).toBe(true);
+    expect(built.town.secrets).toHaveLength(STANDARD_GEN_CONFIG.secretCount);
+  });
+
+  it('the wrong number of secrets fails', () => {
+    const bad: GeneratedTown = { ...built.town, secrets: built.town.secrets.slice(0, -1) };
+    expect(failuresOf(bad, STANDARD_GEN_CONFIG, Object.keys(TRAITS))).toContain('secrets-valid');
+  });
+
+  it('a secret naming an unknown witness fails', () => {
+    const bad: GeneratedTown = {
+      ...built.town,
+      secrets: built.town.secrets.map((s, i) => (i === 0 ? { ...s, witnesses: ['ghost-witness'] } : s)),
+    };
+    expect(failuresOf(bad, STANDARD_GEN_CONFIG, Object.keys(TRAITS))).toContain('secrets-valid');
+  });
+
+  it('a witness who is the secret’s own subject fails (participants never witness themselves)', () => {
+    const bad: GeneratedTown = {
+      ...built.town,
+      secrets: built.town.secrets.map((s, i) => (i === 0 ? { ...s, witnesses: [s.subject] } : s)),
+    };
+    expect(failuresOf(bad, STANDARD_GEN_CONFIG, Object.keys(TRAITS))).toContain('secrets-valid');
+  });
+});
+
 describe('graph invariants', () => {
   it('meetingGraph: co-scheduled NPCs meet; households meet at home via the venueAt fallback', () => {
     const shared = venue('v');
@@ -132,9 +165,9 @@ describe('acceptance: the validator reads Testford correctly', () => {
   // Static-graph hand-checks (see plan): Northside hangs on anselm alone.
   // ESCALATION LICENSE: if either fails, verify the meeting graph by hand before touching
   // the assertion — a failure here means either a validator bug or a misread of Testford.
-  const asTown = (keystones: string[]): GeneratedTown => ({ fixture: TESTFORD, districts: [], keystones, guards: [] });
+  const asTown = (keystones: string[]): GeneratedTown => ({ fixture: TESTFORD, districts: [], keystones, guards: [], secrets: [] });
   const tfCfg = (k: number): GenConfig =>
-    ({ npcCount: 12, districtCount: 2, keystoneCount: k, bridgesPerAdjacentPair: 1, guardsPerDistrict: 0, maxAttempts: 1 });
+    ({ npcCount: 12, districtCount: 2, keystoneCount: k, bridgesPerAdjacentPair: 1, guardsPerDistrict: 0, secretCount: 0, maxAttempts: 1 });
 
   it('Testford with no keystones is a valid town', () => {
     expect(validateTown(asTown([]), tfCfg(0), { knownTraitIds: Object.keys(TRAITS) }).ok).toBe(true);

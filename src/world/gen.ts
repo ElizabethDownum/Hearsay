@@ -2,7 +2,7 @@ import { Rng } from '../core/rng';
 import type { EntityId, VenueId } from '../sim/rumors/claim';
 import type { Npc, ScheduleEntry, Venue } from '../sim/types';
 import type { ObserverSpec } from '../sim/enemy/state';
-import type { DistrictInfo, GenConfig, GenContent, GeneratedTown, OccupationDef } from './types';
+import type { DistrictInfo, GenConfig, GenContent, GeneratedTown, OccupationDef, Secret } from './types';
 
 /** Round to 2 decimals — keeps generated trust values readable and JSON-stable. */
 const r2 = (n: number): number => Math.round(n * 100) / 100;
@@ -50,6 +50,7 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
   const edgesRng = new Rng(seed, 'gen:edges');
   const rivalsRng = new Rng(seed, 'gen:rivals');
   const keystonesRng = new Rng(seed, 'gen:keystones');
+  const secretsRng = new Rng(seed, 'gen:secrets');
 
   // ── 1. Districts + institutional venues (fixed grammar) ─────────────────
   const districtIds = Array.from({ length: config.districtCount }, (_, i) => `d${i}`);
@@ -262,11 +263,47 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
     if (!keystones.includes(id)) keystones.push(id);
   }
 
+  // ── 9. Secrets: the true hidden history — real dirt with real witnesses ──
+  const secrets: Secret[] = [];
+  const secretSubjects = new Set<EntityId>();
+  const sharesVenueWith = (a: Npc, b: Npc): boolean => {
+    const av = new Set(a.schedule.map((s) => s.venue));
+    return b.schedule.some((s) => av.has(s.venue));
+  };
+  for (let i = 0; i < config.secretCount; i++) {
+    const candidates = cast.filter((m) => !secretSubjects.has(m.npc.id))
+      .sort((x, y) => x.npc.id.localeCompare(y.npc.id));
+    if (candidates.length === 0) break;
+    const subjectMeta = candidates[secretsRng.int(0, candidates.length)]!;
+    const shape = weightedPick(secretsRng, content.secretShapes);
+    let object: EntityId | null = null;
+    if (shape.needsObject) {
+      const others = cast.filter((m) => m.district === subjectMeta.district && m.npc.id !== subjectMeta.npc.id)
+        .map((m) => m.npc.id).sort();
+      if (others.length === 0) continue;
+      object = others[secretsRng.int(0, others.length)]!;
+    }
+    let place: VenueId | null = null;
+    if (shape.needsPlace) {
+      const venuesOfSubject = [...new Set(subjectMeta.npc.schedule.map((s) => s.venue))].sort();
+      if (venuesOfSubject.length === 0) continue;
+      place = venuesOfSubject[secretsRng.int(0, venuesOfSubject.length)]!;
+    }
+    const witnessPool = cast.filter((m) =>
+      m.npc.id !== subjectMeta.npc.id && m.npc.id !== object && sharesVenueWith(m.npc, subjectMeta.npc))
+      .map((m) => m.npc.id).sort();
+    if (witnessPool.length === 0) continue;
+    const witnesses = secretsRng.shuffle(witnessPool).slice(0, secretsRng.int(1, 3));
+    secretSubjects.add(subjectMeta.npc.id);
+    secrets.push({ id: `s${secrets.length}`, subject: subjectMeta.npc.id, predicate: shape.predicate,
+      object, place, severity: shape.severity, witnesses });
+  }
+
   const districts: DistrictInfo[] = districtIds.map((d) => ({
     id: d,
     venueIds: venuesByDistrict.get(d)!,
     npcIds: cast.filter((m) => m.district === d).map((m) => m.npc.id),
   }));
 
-  return { fixture: { venues, npcs: cast.map((m) => m.npc) }, districts, keystones, guards };
+  return { fixture: { venues, npcs: cast.map((m) => m.npc) }, districts, keystones, guards, secrets };
 }

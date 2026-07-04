@@ -50,20 +50,26 @@ function validateLog(log: ActionLog): void {
 
 /**
  * Deterministic replay: actions with tick === world.tick apply immediately
- * before that tick steps, in log order. Same save + same untilTick = same world.
+ * before that tick steps, in log order. Same world + same log + same untilTick = same world.
+ * The seam enemy-attached worlds (worldFromTown) replay through.
  */
-export function runCampaign(
-  fixture: TownFixture, rules: Rules, save: Save, untilTick: Tick,
+export function runLogOn(
+  world: WorldState, rules: Rules, log: ActionLog, untilTick: Tick,
 ): WorldState {
-  validateLog(save.log);
-  const world = buildWorld(fixture, save.seed);
+  validateLog(log);
   let i = 0;
   while (world.tick < untilTick) {
-    while (i < save.log.length && save.log[i]!.tick === world.tick) {
-      applyAction(world, save.log[i]!);
+    while (i < log.length && log[i]!.tick === world.tick) {
+      applyAction(world, log[i]!);
       i += 1;
     }
     step(world, rules);
   }
   return world;
+}
+
+export function runCampaign(
+  fixture: TownFixture, rules: Rules, save: Save, untilTick: Tick,
+): WorldState {
+  return runLogOn(buildWorld(fixture, save.seed), rules, save.log, untilTick);
 }

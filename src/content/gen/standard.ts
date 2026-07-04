@@ -1,4 +1,4 @@
-import type { GenConfig, GenContent, OccupationDef, VenueArchetypeDef } from '../../world/types';
+import type { GenConfig, GenContent, OccupationDef, SecretShapeDef, VenueArchetypeDef } from '../../world/types';
 import { NAMES } from './names';
 
 export const STANDARD_GEN_CONFIG: GenConfig = {
@@ -7,6 +7,7 @@ export const STANDARD_GEN_CONFIG: GenConfig = {
   keystoneCount: 3,
   bridgesPerAdjacentPair: 2,  // two designated bridges = two independent routes across each firebreak
   guardsPerDistrict: 2,       // enemy's organic coverage terrain
+  secretCount: 6,             // true hidden history — dormant dirt the player must dig out
   maxAttempts: 8,
 };
 
@@ -39,6 +40,13 @@ export const OCCUPATIONS: OccupationDef[] = [
 export const GUARD_OCCUPATION: OccupationDef =
   { id: 'guard', workplace: 'guard-post', from: 480, to: 600, eveningTavern: false, weight: 0 };
 
+/** The true hidden histories the generator seeds — real dirt, drawn by weight. */
+export const SECRET_SHAPES: SecretShapeDef[] = [
+  { predicate: 'is-having-an-affair-with', needsObject: true,  needsPlace: false, severity: 4, weight: 3 },
+  { predicate: 'stole',                    needsObject: false, needsPlace: true,  severity: 4, weight: 2 },
+  { predicate: 'is-bankrupt',              needsObject: false, needsPlace: false, severity: 3, weight: 2 },
+];
+
 export const STANDARD_GEN_CONTENT: GenContent = {
   names: NAMES,
   venueArchetypes: VENUE_ARCHETYPES,
@@ -52,4 +60,5 @@ export const STANDARD_GEN_CONTENT: GenContent = {
     { id: 'guild', weight: 7 }, { id: 'crown', weight: 6 }, { id: 'none', weight: 7 },
   ],
   guardOccupation: GUARD_OCCUPATION,
+  secretShapes: SECRET_SHAPES,
 };

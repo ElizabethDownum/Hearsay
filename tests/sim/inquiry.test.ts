@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { buildWorld } from '../../src/sim/world';
 import { step, runUntil } from '../../src/sim/step';
 import { applyInject } from '../../src/sim/actions';
+import { chooseAnswer } from '../../src/sim/inquiry';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { SOMEONE } from '../../src/sim/rumors/claim';
+import type { Asking } from '../../src/sim/perception';
+import type { WorldState } from '../../src/sim/types';
 import { hashWorld } from '../../src/sim/hash';
 import { miniTown } from './helpers/minitown';
 
@@ -106,6 +109,58 @@ describe('answering', () => {
     world2.inquiries['bez'] = [{ about: { family: 'f0' }, from: 'self', expiresDay: 2, asked: [], answersHeard: 0 }];
     step(world2, RULES);
     expect(world2.chronicle.some((e) => e.kind === 'telling' && e.mode === 'answer' && e.speaker === 'ada')).toBe(true);
+  });
+});
+
+describe('discretion — held-close knowledge is extracted, never volunteered', () => {
+  /** Seed the holder with a TRUE secret held under discretion (as worldFromTown would). */
+  function seedSecret(world: WorldState, holder: string): void {
+    const claim = {
+      id: 'sc0', family: 'sec0', parent: null, subject: 'cyn', predicate: 'stole',
+      object: null, count: null, severity: 4 as const, place: null, attribution: SOMEONE,
+    };
+    world.claims['sc0'] = claim;
+    world.beliefs[holder]!['sec0'] = {
+      claim, credence: 0.95, heardFrom: 'witnessed', heardAt: 0, firstHeardAt: 0,
+      timesHeard: 1, apparentSources: [], discretion: true, counterSpun: false,
+    };
+  }
+  const asking = (speaker: string): Asking => ({
+    tick: 0, venue: 'square', circleMembers: ['ada', speaker], speaker,
+    addressedTo: 'ada', about: { family: 'sec0' }, authority: false,
+  });
+
+  it('(a) a confidant trusted below 0.7 gets silence', () => {
+    const world = buildWorld(miniTown(), 'disc-a');
+    seedSecret(world, 'ada'); // ada→dov trust is 0.4 (< 0.7)
+    expect(chooseAnswer(world, 'ada', asking('dov'), 0, RULES)).toBeNull();
+  });
+
+  it('(b) a confidant trusted at 0.7+ gets the answer, disclosed as SOMEONE', () => {
+    const world = buildWorld(miniTown(), 'disc-b');
+    seedSecret(world, 'ada'); // ada→bez trust is 0.8 (>= 0.7)
+    const answer = chooseAnswer(world, 'ada', asking('bez'), 0, RULES);
+    expect(answer).not.toBeNull();
+    expect(answer!.claim.family).toBe('sec0');
+    expect(answer!.claim.attribution).toBe(SOMEONE); // witnessed origin never names a source
+  });
+
+  it('(c) authority at an invitational venue compels the answer regardless of trust', () => {
+    const world = buildWorld(miniTown(), 'disc-c');
+    seedSecret(world, 'ada'); // holder ada; interrogator dov, trusted only 0.4
+    world.inquiries['dov'] = [{ about: { family: 'sec0' }, from: 'enemy', expiresDay: 2, asked: [], answersHeard: 0 }];
+    // stage ada + dov alone in the invitational backroom for day 0 → a circle of exactly 2
+    const backroom = [{ fromDay: 0, toDay: 1, from: 0, to: 1440, venue: 'backroom' }];
+    world.scheduleOverrides['ada'] = backroom;
+    world.scheduleOverrides['dov'] = backroom;
+    step(world, RULES); // t=0 is a conversation beat
+    const answer = world.chronicle.find(
+      (e) => e.kind === 'telling' && e.mode === 'answer' && e.speaker === 'ada',
+    );
+    expect(answer).toBeDefined();
+    if (answer?.kind === 'telling') {
+      expect(world.claims[answer.claimId]!.family).toBe('sec0');
+    }
   });
 });
 

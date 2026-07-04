@@ -132,6 +132,20 @@ export function validateTown(town: GeneratedTown, config: GenConfig, opts: Valid
     if (!(g.vigilance > 0 && g.vigilance <= 1)) fail('guards-staffed', `guard ${g.id}: vigilance ${g.vigilance} out of (0,1]`);
   }
 
+  if (town.secrets.length !== config.secretCount) {
+    fail('secrets-valid', `${town.secrets.length} secrets !== configured ${config.secretCount}`);
+  }
+  for (const s of town.secrets) {
+    if (!npcIds.has(s.subject)) fail('secrets-valid', `secret ${s.id}: unknown subject '${s.subject}'`);
+    if (s.object !== null && !npcIds.has(s.object)) fail('secrets-valid', `secret ${s.id}: unknown object '${s.object}'`);
+    if (s.place !== null && !venueIds.has(s.place)) fail('secrets-valid', `secret ${s.id}: unknown place '${s.place}'`);
+    if (s.witnesses.length < 1) fail('secrets-valid', `secret ${s.id}: no witnesses`);
+    for (const w of s.witnesses) {
+      if (!npcIds.has(w)) fail('secrets-valid', `secret ${s.id}: unknown witness '${w}'`);
+      if (w === s.subject || w === s.object) fail('secrets-valid', `secret ${s.id}: witness '${w}' is a participant`);
+    }
+  }
+
   // Graph invariants only mean something on a structurally sound town.
   if (failures.length > 0) return { ok: false, failures };
 

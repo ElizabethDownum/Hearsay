@@ -83,6 +83,8 @@ function passesGates(teller: Npc, belief: Belief, world: WorldState, t: Tick, ru
     belief.claim.subject === teller.id &&
     (rules.predicates[belief.claim.predicate]?.valence ?? 'neutral') === 'damaging'
   ) return false;
+  // Held-close knowledge is never volunteered — only direct questions extract it (inquiry.ts).
+  if (belief.discretion) return false;
   if (belief.credence < MIN_RETELL_CREDENCE) return false;
   if (freshness(belief, t) <= 0) return false;
   const last = world.lastTold[`${teller.id}:${belief.claim.family}`];

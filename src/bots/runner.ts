@@ -11,11 +11,10 @@ export interface BotRun {
   world: WorldState;
 }
 
-/** Live-drive a bot day by day; the emitted save must replay to the same world. */
-export function runBotCampaign(
-  fixture: TownFixture, rules: Rules, seed: string, bot: Bot, days: number,
+/** Live-drive a bot day by day over an EXISTING world; the emitted save replays to the same world. */
+export function runBotCampaignOn(
+  world: WorldState, rules: Rules, bot: Bot, days: number,
 ): BotRun {
-  const world = buildWorld(fixture, seed);
   const log: Action[] = [];
   for (let day = 0; day < days; day++) {
     const dayEnd = (day + 1) * TICKS_PER_DAY;
@@ -40,5 +39,12 @@ export function runBotCampaign(
       step(world, rules);
     }
   }
-  return { save: { seed, log }, world };
+  return { save: { seed: world.seed, log }, world };
+}
+
+/** Live-drive a bot from a fresh world built off `fixture` + `seed`. */
+export function runBotCampaign(
+  fixture: TownFixture, rules: Rules, seed: string, bot: Bot, days: number,
+): BotRun {
+  return runBotCampaignOn(buildWorld(fixture, seed), rules, bot, days);
 }
