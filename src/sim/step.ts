@@ -3,6 +3,7 @@ import { circlesAt, venueAt } from './agents';
 import { expireInquiries, runAskPhase } from './inquiry';
 import { observationsFor, type Asking, type TickEvents, type Utterance } from './perception';
 import { chooseTelling, ingest, CONVERSATION_BEAT } from './rumors/propagation';
+import { reactToSelfRumor } from './reactions';
 import type { Rules } from './rules';
 import type { WorldState } from './types';
 
@@ -60,6 +61,9 @@ export function step(world: WorldState, rules: Rules): TickEvents {
       for (const obs of feed.observations) {
         if (obs.kind !== 'utterance') continue;
         ingest(world, hearerId, { tick: obs.tick, speaker: obs.speaker, claim: obs.claim }, !obs.overheard, rules);
+        if (obs.claim.subject === hearerId) {
+          reactToSelfRumor(world, hearerId, obs.claim.family, obs.tick, rules);
+        }
       }
     }
   }

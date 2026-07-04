@@ -16,7 +16,11 @@ const world = runCampaign(TESTFORD, STANDARD_RULES, save, at(3, 0));
 
 describe('campaignMetrics', () => {
   it('familiesOf finds the injected story', () => {
-    expect(familiesOf(world)).toEqual(['f0']);
+    // Amended in Plan 4 Task 3 (amendment #3): counter-spin self-injects mint real root
+    // families, so exact equality over-pinned a single-root world. The intent — the
+    // injected story is among the roots — is what's asserted; counter-spin families
+    // are NOT excluded from familiesOf (they are real roots).
+    expect(familiesOf(world)).toContain('f0');
   });
 
   it('reach matches an independent count of holders', () => {

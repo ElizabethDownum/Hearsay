@@ -8,4 +8,5 @@ export const PREDICATES: Record<PredicateId, PredicateDef> = {
   'is-bankrupt':            { id: 'is-bankrupt',            juiciness: 0.6,  sinVersion: null, factionRelevant: true, valence: 'damaging' },
   'owes-money-to':          { id: 'owes-money-to',          juiciness: 0.35, sinVersion: 'stole', factionRelevant: false, valence: 'damaging' },
   'blessed-the-harvest':    { id: 'blessed-the-harvest',    juiciness: 0.15, sinVersion: null, factionRelevant: false, valence: 'flattering' },
+  'rescued-the-drowning-child': { id: 'rescued-the-drowning-child', juiciness: 0.65, sinVersion: null, factionRelevant: false, valence: 'flattering' },
 };

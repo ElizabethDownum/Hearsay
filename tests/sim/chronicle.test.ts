@@ -37,7 +37,12 @@ describe('the chronicle records the causal chain', () => {
     }
   });
 
-  it('FAIR-COP LAW (lineage): every held claim walks to a parentless root in world.claims', () => {
+  it('FAIR-COP LAW (lineage): every held claim walks to a recorded root inject for its family', () => {
+    // Amended in Plan 4 Task 3 (amendment #3): the old pin asserted every walk lands on
+    // THE player injection, assuming the world has a unique root. Self-rumor reactions
+    // legitimately mint counter-spin roots (NPC self-injects), so the route-agnostic
+    // intent is pinned instead: each family's root is parentless, same-family, and
+    // explained by a recorded inject. The player's family still roots at the injection.
     for (const npcId of Object.keys(world.npcs)) {
       for (const family of Object.keys(world.beliefs[npcId]!)) {
         let cur: Claim | undefined = world.beliefs[npcId]![family]!.claim;
@@ -47,7 +52,11 @@ describe('the chronicle records the causal chain', () => {
           expect(cur, `${npcId}/${family}: broken lineage`).toBeDefined();
           expect(++hops).toBeLessThan(1000);
         }
-        expect(cur?.id).toBe(injected.id);
+        expect(cur, `${npcId}/${family}: no root`).toBeDefined();
+        expect(cur!.family).toBe(family);
+        const rootInject = world.chronicle.find((e) => e.kind === 'inject' && e.claimId === cur!.id);
+        expect(rootInject, `${npcId}/${family}: root ${cur!.id} has no inject record`).toBeDefined();
+        if (family === injected.family) expect(cur!.id).toBe(injected.id);
       }
     }
   });
