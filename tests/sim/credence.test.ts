@@ -79,3 +79,22 @@ describe('self-gossip gate', () => {
     expect(chooseTelling(w, 'jonet', circle, at(0, 9), STANDARD_RULES)).toBeNull();
   });
 });
+
+describe('plausibility precedence — dislike beats affection (frenemies resent first)', () => {
+  it('rival-listed AND friend-edged to the subject: dislike wins', () => {
+    // Live in the fixture: brigid rivals cole yet drinks with him at the well.
+    const damagingCole = { subject: 'cole', predicate: 'stole' } as Claim;
+    expect(plausibility(world.npcs['brigid']!, damagingCole, STANDARD_RULES)).toBe(1.3);
+  });
+
+  it('a rival-KIND edge counts as dislike even with no rivals-list entry', () => {
+    const hearer = { ...world.npcs['seth']!, rivals: [], edges: [{ to: 'mara', kind: 'rival' as const, trust: 0.2 }] };
+    expect(plausibility(hearer, { subject: 'mara', predicate: 'stole' } as Claim, STANDARD_RULES)).toBe(1.3);
+  });
+
+  it('a lover edge is close: resists damage, amplifies flattery', () => {
+    const hearer = { ...world.npcs['seth']!, rivals: [], edges: [{ to: 'mara', kind: 'lover' as const, trust: 0.9 }] };
+    expect(plausibility(hearer, { subject: 'mara', predicate: 'stole' } as Claim, STANDARD_RULES)).toBe(0.7);
+    expect(plausibility(hearer, { subject: 'mara', predicate: 'blessed-the-harvest' } as Claim, STANDARD_RULES)).toBe(1.3);
+  });
+});
