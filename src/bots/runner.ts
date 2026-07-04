@@ -20,11 +20,16 @@ export function runBotCampaign(
   for (let day = 0; day < days; day++) {
     const dayEnd = (day + 1) * TICKS_PER_DAY;
     const actions = bot.decide(world, rules, day);
-    for (const a of actions) {
+    actions.forEach((a, idx) => {
       if (a.tick < world.tick || a.tick >= dayEnd) {
         throw new Error(`bot '${bot.name}': action tick ${a.tick} outside day ${day}`);
       }
-    }
+      if (idx > 0 && a.tick < actions[idx - 1]!.tick) {
+        // Unsorted actions would be silently dropped live but throw on replay —
+        // enforce the live==replay invariant loudly, mirroring validateLog.
+        throw new Error(`bot '${bot.name}': day ${day} actions out of order at index ${idx}`);
+      }
+    });
     log.push(...actions);
     let i = 0;
     while (world.tick < dayEnd) {

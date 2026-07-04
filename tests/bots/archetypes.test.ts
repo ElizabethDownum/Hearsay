@@ -43,4 +43,15 @@ describe('bots', () => {
     }] };
     expect(() => runBotCampaign(TESTFORD, STANDARD_RULES, 'bot-4', rogue, 2)).toThrow(/day/);
   });
+
+  it('a bot returning out-of-order actions within a day is rejected loudly', () => {
+    const spec = { subject: 'someone' as const, predicate: 'stole', object: null,
+      count: null, severity: 3 as const, place: null, attribution: 'someone' as const };
+    const scrambled = { name: 'scrambled', decide: (_w: unknown, _r: unknown, day: number) =>
+      day !== 0 ? [] : [
+        { tick: 720, kind: 'inject' as const, target: 'mara', spec },
+        { tick: 480, kind: 'inject' as const, target: 'osric', spec },
+      ] };
+    expect(() => runBotCampaign(TESTFORD, STANDARD_RULES, 'bot-5', scrambled, 1)).toThrow(/order/);
+  });
 });
