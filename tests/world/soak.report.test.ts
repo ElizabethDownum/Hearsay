@@ -7,7 +7,13 @@ import { generateValidTown } from '../../src/world/serve';
 import { STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT } from '../../src/content/gen/standard';
 import { TRAITS } from '../../src/content/traits';
 
-const COUNT = Number(process.env.SOAK_SEEDS ?? 150);
+// No @types/node in this repo (types: ["vitest/globals"]) — reach process.env
+// through globalThis so the soak stays self-contained without a global ambient shim.
+const soakEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
+const COUNT = Number(soakEnv['SOAK_SEEDS'] ?? 150);
+if (!Number.isInteger(COUNT) || COUNT <= 0) {
+  throw new Error(`soak: SOAK_SEEDS must be a positive integer (got '${soakEnv['SOAK_SEEDS']}')`);
+}
 const OPTS = { knownTraitIds: Object.keys(TRAITS) };
 
 describe(`validator soak — ${COUNT} seeds`, () => {
@@ -36,7 +42,7 @@ describe(`validator soak — ${COUNT} seeds`, () => {
     console.log(`first-try validity: ${(firstTryRate * 100).toFixed(1)}%`);
     console.log(`attempts histogram: ${[...histogram.entries()].sort(([x], [y]) => x - y).map(([k, v]) => `${k}→${v}`).join('  ')}`);
     if (failCounts.size > 0) {
-      console.log(`first-try failures by invariant: ${[...failCounts.entries()].map(([k, v]) => `${k}:${v}`).join('  ')}`);
+      console.log(`first-try failures by invariant: ${[...failCounts.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}:${v}`).join('  ')}`);
     }
 
     // HYPOTHESIS (escalation license applies): the standard config should mostly
