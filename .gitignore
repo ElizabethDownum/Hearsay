@@ -1,3 +1,7 @@
 node_modules/
 dist/
 coverage/
+
+# Licensed asset binaries — GDM Pro Licence forbids raw redistribution; docs only
+assets/**
+!assets/*.md
