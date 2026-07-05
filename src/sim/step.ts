@@ -4,6 +4,7 @@ import { expireInquiries, runAskPhase } from './inquiry';
 import { observationsFor, type Asking, type TickEvents, type Utterance } from './perception';
 import { chooseTelling, ingest, CONVERSATION_BEAT } from './rumors/propagation';
 import { captureEvidence, runEnemyDay } from './counterintel';
+import { captureIntel } from './fieldwork';
 import { reactToSelfRumor } from './reactions';
 import type { Rules } from './rules';
 import type { WorldState } from './types';
@@ -60,6 +61,12 @@ export function step(world: WorldState, rules: Rules): TickEvents {
   // vigilance, filtered through observer traits. Independent of ingestion — no-op when
   // there are no observers (Testford/miniTown), so old suites are untouched.
   if (utterances.length > 0 || askings.length > 0) captureEvidence(world, events, rules);
+
+  // The player's mirror of capture: the avatar (unfiltered) and informants (trait-filtered)
+  // sense through the SAME feeds. Runs UNCONDITIONALLY — presence capture needs event-less
+  // ticks too, and positions are always in `events`. Self-guards to a no-op with no sources,
+  // so player-free worlds (all prior suites) are untouched.
+  captureIntel(world, events, rules);
 
   // Ingestion flows through the one perception path: every NPC hears exactly what
   // observationsFor grants them (same-circle utterances they did not speak). This is
