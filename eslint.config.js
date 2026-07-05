@@ -36,8 +36,9 @@ export default tseslint.config(
       // NOTE: flat config's per-file rule merge REPLACES a rule key wholesale when the
       // same key appears in multiple matching blocks — it does not deep-merge the
       // `patterns` array. This block's glob also matches the earlier engine/content-split
-      // block (both cover src/sim/**), so the content-ban pattern group MUST be repeated
-      // here alongside the no-omniscience group, or it is silently dropped for this subtree.
+      // block (both cover src/sim/**), so the content-ban AND app-ban pattern groups MUST be
+      // repeated here alongside the no-omniscience group, or they are silently dropped for
+      // this subtree.
       'no-restricted-imports': ['error', { patterns: [
         {
           group: [
@@ -50,14 +51,18 @@ export default tseslint.config(
           group: ['**/content/**'],
           message: 'Engine/content split: engine code must not import content — inject via Rules/GenContent.',
         },
+        {
+          group: ['**/app/**'],
+          message: 'Headless-sim law: the engine must never import app/UI code.',
+        },
       ] }],
     },
   },
   {
     // Board-side intel code is a consumer of captured feeds + Rules — never WorldState.
     // src/intel/** is NOT covered by the engine/content-split block above, so (per the same
-    // flat-config replacement lesson) the content-ban group must be repeated in THIS rule
-    // value alongside the no-world group, or it never applies to this subtree.
+    // flat-config replacement lesson) the content-ban AND app-ban groups must be repeated in
+    // THIS rule value alongside the no-world group, or they never apply to this subtree.
     files: ['src/intel/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', { patterns: [
@@ -71,6 +76,10 @@ export default tseslint.config(
         {
           group: ['**/content/**'],
           message: 'Engine/content split: engine code must not import content — inject via Rules/GenContent.',
+        },
+        {
+          group: ['**/app/**'],
+          message: 'Headless-sim law: the engine must never import app/UI code.',
         },
       ] }],
     },

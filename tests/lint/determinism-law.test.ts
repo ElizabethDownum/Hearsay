@@ -88,6 +88,16 @@ describe('no-omniscience law — the enemy never imports WorldState', () => {
     const rules = { 'no-restricted-imports': cfgRules['no-restricted-imports']! } as Linter.RulesRecord;
     expect(violations("import { PREDICATES } from '../../content/predicates';", rules)).toBeGreaterThan(0);
   });
+
+  // Same flat-config replacement lesson applies to the app-ban: src/sim/enemy/** matches both
+  // the engine-wide headless-sim block and this block, so the app-ban group must be repeated
+  // here too, or it silently goes dark for this subtree.
+  it('still bans app imports under src/sim/enemy/** (headless-sim law survives the merge)', async () => {
+    const cfg = await new ESLint().calculateConfigForFile('src/sim/enemy/digest.ts');
+    const cfgRules = cfg.rules ?? {};
+    const rules = { 'no-restricted-imports': cfgRules['no-restricted-imports']! } as Linter.RulesRecord;
+    expect(violations("import main from '../../../app/src/main';", rules)).toBeGreaterThan(0);
+  });
 });
 
 // These three laws are PRE-REGISTERED before any src/intel/ or app/ file exists (Plan-3/4
@@ -111,6 +121,14 @@ describe('intel law — board-side intel never imports WorldState', () => {
   it('still bans content imports under src/intel/** (the flat-config merge lesson holds)', async () => {
     const rules = await importRulesFor('src/intel/board.ts');
     expect(violations("import { predicates } from '../content/predicates';", rules)).toBeGreaterThan(0);
+  });
+
+  // src/intel/** is NOT covered by the engine-wide headless-sim block, so (per the same
+  // flat-config replacement lesson) the app-ban group must be repeated in the intel block's
+  // own rule value, or it never applies to this subtree.
+  it('still bans app imports under src/intel/** (headless-sim law reaches board-side intel too)', async () => {
+    const rules = await importRulesFor('src/intel/board.ts');
+    expect(violations("import main from '../../app/src/main';", rules)).toBeGreaterThan(0);
   });
 });
 
