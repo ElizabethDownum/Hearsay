@@ -1,5 +1,6 @@
 import { SOMEONE, mintClaim } from '../sim/rumors/claim';
-import { buildTownMap, buildWorld } from '../sim/world';
+import { blankIntel } from '../sim/fieldwork';
+import { buildTownMap, buildWorld, enrollPlayer } from '../sim/world';
 import type { WorldState } from '../sim/types';
 import type { GeneratedTown } from './types';
 
@@ -24,4 +25,43 @@ export function worldFromTown(town: GeneratedTown, seed: string): WorldState {
     }
   }
   return world;
+}
+
+/**
+ * Attach the avatar to a live world: its own private `safehouse` venue (first district), the two
+ * dossier informants wired into the intel state, and the day-0 dossier seeded into the intel log
+ * — `via: 'dossier'`, tick 0, in traitReads → edgeReads → hint order. Station-neutral: no enemy
+ * wiring. Throws if the town has no dossier, a safehouse venue already exists, or a player is
+ * already enrolled (so a second attach throws).
+ */
+export function attachPlayer(world: WorldState, town: GeneratedTown): void {
+  const dossier = town.dossier;
+  if (!dossier) throw new Error('attachPlayer: town has no dossier');
+  if (world.venues['safehouse']) throw new Error('attachPlayer: a safehouse venue already exists');
+
+  world.venues['safehouse'] = { id: 'safehouse', district: town.districts[0]!.id, access: 'private' };
+  enrollPlayer(world, { home: 'safehouse' });
+
+  for (const id of dossier.informants) {
+    world.intel.informants.push({ id, assignedVenue: null });
+  }
+
+  for (const tr of dossier.traitReads) {
+    world.intel.log.push({
+      ...blankIntel(), tick: 0, venue: 'safehouse', via: 'dossier',
+      kind: 'trait-read', overheard: false, npc: tr.npc, trait: tr.trait,
+    });
+  }
+  for (const er of dossier.edgeReads) {
+    world.intel.log.push({
+      ...blankIntel(), tick: 0, venue: 'safehouse', via: 'dossier',
+      kind: 'edge-read', overheard: false, edgeFrom: er.from, edgeTo: er.to, edgeKind: er.kind,
+    });
+  }
+  if (dossier.secretHint) {
+    world.intel.log.push({
+      ...blankIntel(), tick: 0, venue: 'safehouse', via: 'dossier',
+      kind: 'hint', overheard: false, hintAbout: dossier.secretHint.about, hintWitness: dossier.secretHint.witness,
+    });
+  }
 }

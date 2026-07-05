@@ -149,6 +149,53 @@ export function validateTown(town: GeneratedTown, config: GenConfig, opts: Valid
     }
   }
 
+  // Day-0 dossier: truthful, capped starting intelligence. Checked only when present — gen always
+  // sets it; hand-built and enemy-only towns without one skip this (like the knownTraitIds gate).
+  if (town.dossier) {
+    const d = town.dossier;
+    const byId = new Map(fixture.npcs.map((n) => [n.id, n]));
+    const guardIds = new Set(town.guards.map((g) => g.id));
+
+    if (d.informants.length !== config.dossierInformants) {
+      fail('dossier-capped', `${d.informants.length} informants !== configured ${config.dossierInformants}`);
+    }
+    if (new Set(d.informants).size !== d.informants.length) fail('dossier-capped', 'duplicate informant');
+    for (const id of d.informants) {
+      if (!npcIds.has(id)) fail('dossier-capped', `unknown informant '${id}'`);
+      else if (guardIds.has(id)) fail('dossier-capped', `informant '${id}' is a guard`);
+    }
+
+    if (d.traitReads.length < 1 || d.traitReads.length > config.dossierTraitReadMax) {
+      fail('dossier-capped', `${d.traitReads.length} trait reads out of [1, ${config.dossierTraitReadMax}]`);
+    }
+    const readNpcs = d.traitReads.map((t) => t.npc);
+    if (new Set(readNpcs).size !== readNpcs.length) fail('dossier-capped', 'duplicate trait-read npc');
+    for (const tr of d.traitReads) {
+      const npc = byId.get(tr.npc);
+      if (!npc) fail('dossier-capped', `trait read: unknown npc '${tr.npc}'`);
+      else if (!npc.traits.includes(tr.trait)) fail('dossier-capped', `trait read: '${tr.npc}' has no trait '${tr.trait}' (fabricated)`);
+    }
+
+    if (d.edgeReads.length > config.dossierEdgeReadMax) {
+      fail('dossier-capped', `${d.edgeReads.length} edge reads > cap ${config.dossierEdgeReadMax}`);
+    }
+    for (const er of d.edgeReads) {
+      const npc = byId.get(er.from);
+      if (!npc) fail('dossier-capped', `edge read: unknown source '${er.from}'`);
+      else if (!npc.edges.some((e) => e.to === er.to && e.kind === er.kind)) {
+        fail('dossier-capped', `edge read: '${er.from}'→'${er.to}' (${er.kind}) is not a real edge (fabricated)`);
+      }
+    }
+
+    if (d.secretHint) {
+      const secret = town.secrets.find((sec) => sec.subject === d.secretHint!.about);
+      if (!secret) fail('dossier-capped', `hint: no secret about '${d.secretHint.about}'`);
+      else if (!secret.witnesses.includes(d.secretHint.witness)) {
+        fail('dossier-capped', `hint: '${d.secretHint.witness}' never witnessed the secret about '${d.secretHint.about}'`);
+      }
+    }
+  }
+
   // Graph invariants only mean something on a structurally sound town.
   if (failures.length > 0) return { ok: false, failures };
 

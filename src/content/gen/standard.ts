@@ -8,6 +8,9 @@ export const STANDARD_GEN_CONFIG: GenConfig = {
   bridgesPerAdjacentPair: 2,  // two designated bridges = two independent routes across each firebreak
   guardsPerDistrict: 2,       // enemy's organic coverage terrain
   secretCount: 6,             // true hidden history — dormant dirt the player must dig out
+  dossierInformants: 2,       // day-0 informants handed to the avatar (never guards)
+  dossierTraitReadMax: 6,     // cap on truthful trait reads in the dossier
+  dossierEdgeReadMax: 8,      // cap on truthful edge reads in the dossier
   maxAttempts: 8,
 };
 

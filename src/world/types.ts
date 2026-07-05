@@ -16,8 +16,31 @@ export interface GenConfig {
   guardsPerDistrict: number;
   /** True hidden histories seeded per town — dormant dirt the player must extract. */
   secretCount: number;
+  /** Day-0 dossier: informants handed to the avatar (never guards). */
+  dossierInformants: number;
+  /** Day-0 dossier: cap on truthful trait reads seeded. */
+  dossierTraitReadMax: number;
+  /** Day-0 dossier: cap on truthful edge reads seeded. */
+  dossierEdgeReadMax: number;
   /** Serve-loop reroll budget before generateValidTown throws. */
   maxAttempts: number;
+}
+
+/**
+ * The day-0 dossier: truthful, validator-capped starting intelligence handed to the avatar.
+ * Every read is REAL — a trait the NPC carries, an edge that exists, a hint that names a real
+ * secret's real witness. Seeded from a fresh 'gen:dossier' stream so adding it never reshuffles
+ * another subsystem's draws.
+ */
+export interface Dossier {
+  /** Exactly config.dossierInformants NPCs, distinct, never guards. */
+  informants: EntityId[];
+  /** 1..config.dossierTraitReadMax reads over distinct NPCs; each trait is one the NPC carries. */
+  traitReads: { npc: EntityId; trait: string }[];
+  /** ≤ config.dossierEdgeReadMax reads; each is a real (from, to, kind) edge triple. */
+  edgeReads: { from: EntityId; to: EntityId; kind: string }[];
+  /** Points at a real secret's subject + one real witness, or null (~half of towns). */
+  secretHint: { about: EntityId; witness: EntityId } | null;
 }
 
 /**
@@ -92,6 +115,8 @@ export interface GeneratedTown {
   keystones: EntityId[];
   guards: ObserverSpec[];
   secrets: Secret[];
+  /** Day-0 starting intelligence for the avatar. Gen always sets it; enemy-only paths ignore it. */
+  dossier?: Dossier;
 }
 
 export interface InvariantFailure { invariant: string; detail: string }

@@ -2,7 +2,7 @@ import { Rng } from '../core/rng';
 import type { EntityId, VenueId } from '../sim/rumors/claim';
 import type { Npc, ScheduleEntry, Venue } from '../sim/types';
 import type { ObserverSpec } from '../sim/enemy/state';
-import type { DistrictInfo, GenConfig, GenContent, GeneratedTown, OccupationDef, Secret } from './types';
+import type { DistrictInfo, Dossier, GenConfig, GenContent, GeneratedTown, OccupationDef, Secret } from './types';
 
 /** Round to 2 decimals — keeps generated trust values readable and JSON-stable. */
 const r2 = (n: number): number => Math.round(n * 100) / 100;
@@ -51,6 +51,7 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
   const rivalsRng = new Rng(seed, 'gen:rivals');
   const keystonesRng = new Rng(seed, 'gen:keystones');
   const secretsRng = new Rng(seed, 'gen:secrets');
+  const dossierRng = new Rng(seed, 'gen:dossier');
 
   // ── 1. Districts + institutional venues (fixed grammar) ─────────────────
   const districtIds = Array.from({ length: config.districtCount }, (_, i) => `d${i}`);
@@ -299,11 +300,34 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
       object, place, severity: shape.severity, witnesses });
   }
 
+  // ── 10. Day-0 dossier: truthful, capped starting intelligence ───────────
+  // References the finished cast + secrets; a fresh 'gen:dossier' stream keeps every earlier draw
+  // byte-identical, so adding the dossier never reshuffles another subsystem.
+  const nonGuardIds = cast.filter((m) => m.npc.occupation !== content.guardOccupation.id)
+    .map((m) => m.npc.id).sort();
+  const informantIds = dossierRng.shuffle(nonGuardIds).slice(0, config.dossierInformants);
+  const readPool = dossierRng.shuffle(cast.map((m) => m.npc.id).sort());
+  const traitReads: Dossier['traitReads'] = [];
+  const readCount = dossierRng.int(1, config.dossierTraitReadMax + 1);
+  for (const id of readPool.slice(0, readCount)) {
+    const npc = byId.get(id)!.npc;
+    traitReads.push({ npc: id, trait: npc.traits[dossierRng.int(0, npc.traits.length)]! });
+  }
+  const allEdges = cast.flatMap((m) => m.npc.edges.map((e) => ({ from: m.npc.id, to: e.to, kind: e.kind })))
+    .sort((a, b) => `${a.from}:${a.to}:${a.kind}`.localeCompare(`${b.from}:${b.to}:${b.kind}`));
+  const edgeReads = dossierRng.shuffle(allEdges).slice(0, dossierRng.int(2, config.dossierEdgeReadMax + 1));
+  const hintedSecret = secrets.length > 0 && dossierRng.float() < 0.5
+    ? secrets[dossierRng.int(0, secrets.length)]! : null;
+  const dossier: Dossier = {
+    informants: informantIds, traitReads, edgeReads,
+    secretHint: hintedSecret ? { about: hintedSecret.subject, witness: hintedSecret.witnesses[0]! } : null,
+  };
+
   const districts: DistrictInfo[] = districtIds.map((d) => ({
     id: d,
     venueIds: venuesByDistrict.get(d)!,
     npcIds: cast.filter((m) => m.district === d).map((m) => m.npc.id),
   }));
 
-  return { fixture: { venues, npcs: cast.map((m) => m.npc) }, districts, keystones, guards, secrets };
+  return { fixture: { venues, npcs: cast.map((m) => m.npc) }, districts, keystones, guards, secrets, dossier };
 }

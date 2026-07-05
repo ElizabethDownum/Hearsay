@@ -21,7 +21,7 @@ const town = (npcs: Npc[], extraVenues: Venue[] = [], keystones: string[] = []):
 });
 const cfg = (over: Partial<GenConfig> = {}): GenConfig => ({
   npcCount: 2, districtCount: 1, keystoneCount: 0, bridgesPerAdjacentPair: 0, guardsPerDistrict: 0,
-  secretCount: 0, maxAttempts: 1, ...over,
+  secretCount: 0, dossierInformants: 2, dossierTraitReadMax: 6, dossierEdgeReadMax: 8, maxAttempts: 1, ...over,
 });
 const block = (venueId: string, from = 480, to = 600): Npc['schedule'][number] =>
   ({ days: 'all', from, to, venue: venueId });
@@ -168,7 +168,8 @@ describe('acceptance: the validator reads Testford correctly', () => {
   // the assertion — a failure here means either a validator bug or a misread of Testford.
   const asTown = (keystones: string[]): GeneratedTown => ({ fixture: TESTFORD, districts: [], keystones, guards: [], secrets: [] });
   const tfCfg = (k: number): GenConfig =>
-    ({ npcCount: 12, districtCount: 2, keystoneCount: k, bridgesPerAdjacentPair: 1, guardsPerDistrict: 0, secretCount: 0, maxAttempts: 1 });
+    ({ npcCount: 12, districtCount: 2, keystoneCount: k, bridgesPerAdjacentPair: 1, guardsPerDistrict: 0, secretCount: 0,
+       dossierInformants: 2, dossierTraitReadMax: 6, dossierEdgeReadMax: 8, maxAttempts: 1 });
 
   it('Testford with no keystones is a valid town', () => {
     expect(validateTown(asTown([]), tfCfg(0), { knownTraitIds: Object.keys(TRAITS) }).ok).toBe(true);
