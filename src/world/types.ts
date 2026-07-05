@@ -116,7 +116,7 @@ export interface GeneratedTown {
   guards: ObserverSpec[];
   secrets: Secret[];
   /** Day-0 starting intelligence for the avatar. Gen always sets it; enemy-only paths ignore it. */
-  dossier?: Dossier;
+  dossier: Dossier | null;
 }
 
 export interface InvariantFailure { invariant: string; detail: string }

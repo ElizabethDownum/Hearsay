@@ -151,7 +151,7 @@ export function validateTown(town: GeneratedTown, config: GenConfig, opts: Valid
 
   // Day-0 dossier: truthful, capped starting intelligence. Checked only when present — gen always
   // sets it; hand-built and enemy-only towns without one skip this (like the knownTraitIds gate).
-  if (town.dossier) {
+  if (town.dossier !== null) {
     const d = town.dossier;
     const byId = new Map(fixture.npcs.map((n) => [n.id, n]));
     const guardIds = new Set(town.guards.map((g) => g.id));

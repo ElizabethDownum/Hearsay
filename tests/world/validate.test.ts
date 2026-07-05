@@ -18,6 +18,7 @@ const town = (npcs: Npc[], extraVenues: Venue[] = [], keystones: string[] = []):
   keystones,
   guards: [],
   secrets: [],
+  dossier: null,
 });
 const cfg = (over: Partial<GenConfig> = {}): GenConfig => ({
   npcCount: 2, districtCount: 1, keystoneCount: 0, bridgesPerAdjacentPair: 0, guardsPerDistrict: 0,
@@ -166,7 +167,8 @@ describe('acceptance: the validator reads Testford correctly', () => {
   // Static-graph hand-checks (see plan): Northside hangs on anselm alone.
   // ESCALATION LICENSE: if either fails, verify the meeting graph by hand before touching
   // the assertion — a failure here means either a validator bug or a misread of Testford.
-  const asTown = (keystones: string[]): GeneratedTown => ({ fixture: TESTFORD, districts: [], keystones, guards: [], secrets: [] });
+  const asTown = (keystones: string[]): GeneratedTown =>
+    ({ fixture: TESTFORD, districts: [], keystones, guards: [], secrets: [], dossier: null });
   const tfCfg = (k: number): GenConfig =>
     ({ npcCount: 12, districtCount: 2, keystoneCount: k, bridgesPerAdjacentPair: 1, guardsPerDistrict: 0, secretCount: 0,
        dossierInformants: 2, dossierTraitReadMax: 6, dossierEdgeReadMax: 8, maxAttempts: 1 });
