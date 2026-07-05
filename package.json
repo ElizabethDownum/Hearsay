@@ -9,12 +9,20 @@
     "mc": "vitest run tests/harness",
     "soak": "vitest run tests/world/soak.report.test.ts",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.app.json",
+    "app:dev": "vite",
+    "app:build": "vite build"
   },
   "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.7.0",
     "eslint": "^9.39.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.62.1",
+    "vite": "^7.3.6",
     "vitest": "^3.2.6"
   }
 }
