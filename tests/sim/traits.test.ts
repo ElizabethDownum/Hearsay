@@ -1,6 +1,7 @@
 import { applyTraits, type TraitContext } from '../../src/sim/rumors/traits';
 import { TRAITS } from '../../src/content/traits';
-import { SOMEONE, type Claim, CLAIM_FIELDS } from '../../src/sim/rumors/claim';
+import { SOMEONE, type Claim, type FieldChange, CLAIM_FIELDS } from '../../src/sim/rumors/claim';
+import type { ReportedClaim } from '../../src/sim/enemy/state';
 
 const ctx = (over: Partial<TraitContext> = {}): TraitContext => ({
   ownerId: 'osric',
@@ -62,6 +63,49 @@ describe('composition', () => {
     const d = applyTraits([TRAITS['moralizer']!, TRAITS['exaggerator']!], probe, ctx());
     // moralizer first: met-secretly-with -> affair; exaggerator then bumps the mutated claim
     expect(d).toEqual({ predicate: 'is-having-an-affair-with', count: 6, severity: 3 });
+  });
+});
+
+describe('codex fingerprints — the dev-time glossary the Evidence Board deduces against', () => {
+  const reportedOf = (c: Claim): ReportedClaim => {
+    const { subject, predicate, object, count, severity, place, attribution } = c;
+    return { subject, predicate, object, count, severity, place, attribution };
+  };
+  const diff = (before: ReportedClaim, after: ReportedClaim): FieldChange[] =>
+    CLAIM_FIELDS.filter((f) => before[f] !== after[f]).map((f) => ({ field: f, from: before[f], to: after[f] }));
+
+  it('every standard trait exposes a fingerprint predicate', () => {
+    for (const id of Object.keys(TRAITS)) {
+      expect(typeof TRAITS[id]!.fingerprint, id).toBe('function');
+    }
+  });
+
+  it("each field-changing trait's own canonical transform output satisfies its own fingerprint", () => {
+    // One canonical claim per field-changing trait; its own transform must leave the very
+    // signature its fingerprint hunts for. (skeptic/literalist transform nothing — excluded.)
+    const canonical: Record<string, Claim> = {
+      exaggerator: probe,                    // count 3 → 6, severity 2 → 3
+      attributor: probe,                     // vague subject/attribution → a named rival
+      moralizer: probe,                      // met-secretly-with → the sin register
+      partisan: { ...probe, subject: 'wat' },// crown subject, guild owner → severity +1
+    };
+    for (const [id, claim] of Object.entries(canonical)) {
+      const trait = TRAITS[id]!;
+      const before = reportedOf(claim);
+      const after = reportedOf({ ...claim, ...trait.transform(claim, ctx()) });
+      const changes = diff(before, after);
+      expect(changes.length, `${id} should change a field`).toBeGreaterThan(0);
+      expect(trait.fingerprint(before, changes), `${id} fingerprint`).toBe(true);
+    }
+  });
+
+  it('skeptic and literalist fingerprints never fire — no field evidence to read', () => {
+    const changes: FieldChange[] = [
+      { field: 'count', from: 2, to: 4 },
+      { field: 'predicate', from: 'met-secretly-with', to: 'is-having-an-affair-with' },
+    ];
+    expect(TRAITS['skeptic']!.fingerprint(reportedOf(probe), changes)).toBe(false);
+    expect(TRAITS['literalist']!.fingerprint(reportedOf(probe), changes)).toBe(false);
   });
 });
 

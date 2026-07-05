@@ -1,4 +1,5 @@
-import type { Claim, EntityId } from './claim';
+import type { Claim, EntityId, FieldChange } from './claim';
+import type { ReportedClaim } from '../enemy/state';
 
 export type TraitId = string;
 
@@ -17,6 +18,14 @@ export interface TraitDef {
   transform(claim: Claim, ctx: TraitContext): Partial<Claim>;
   /** Behavioral fingerprint for identity-transform traits. */
   retellGate: 'none' | 'requires-corroboration';
+  /**
+   * The codex glossary: does an observed receive→emit differ the way THIS trait would leave it?
+   * Read against a captured pair (the version the npc was told, and the diff to the version they
+   * later emitted). Pure content — the Evidence Board deduces traits by matching these, never by
+   * reading world state. Identity-transform traits (skeptic/literalist) leave no field evidence,
+   * so their fingerprint is a constant `false` (deduced behaviorally, not codex-lockable in v1).
+   */
+  fingerprint(before: ReportedClaim, changes: FieldChange[]): boolean;
 }
 
 /**

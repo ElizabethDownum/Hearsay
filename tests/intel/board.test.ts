@@ -132,7 +132,7 @@ describe('boardView — assist gating over the whole feed', () => {
   ];
 
   it('level 0 reveals nothing but the raw feed', () => {
-    const v = boardView(log, 0);
+    const v = boardView(log, 0, STANDARD_RULES);
     expect(v.level).toBe(0);
     expect(v.entries).toHaveLength(2);
     expect(v.clusters).toBeNull();
@@ -142,7 +142,7 @@ describe('boardView — assist gating over the whole feed', () => {
   });
 
   it('level 1 reveals clusters and diffs but not suggestions or routes', () => {
-    const v = boardView(log, 1);
+    const v = boardView(log, 1, STANDARD_RULES);
     expect(v.clusters).not.toBeNull();
     expect(v.clusters!.map((c) => c.family)).toEqual(['r1']);
     expect(v.diffs).not.toBeNull();
@@ -153,18 +153,21 @@ describe('boardView — assist gating over the whole feed', () => {
     expect(v.routes).toBeNull();
   });
 
-  it('level 2 still leaves suggestions null this task (Task 5 wires it) and routes null', () => {
-    const v = boardView(log, 2);
+  it('level 2 wires suggestions (a candidate map per cluster family) and still leaves routes null', () => {
+    const v = boardView(log, 2, STANDARD_RULES);
     expect(v.clusters).not.toBeNull();
-    expect(v.suggestions).toBeNull();
+    expect(v.suggestions).not.toBeNull();
+    expect(Object.keys(v.suggestions!)).toEqual(['r1']);
+    // These rows are two mira→otto tellings with no receive addressed to mira — no pair, no candidates.
+    expect(v.suggestions!['r1']).toEqual([]);
     expect(v.routes).toBeNull();
   });
 
-  it('level 3 adds routes, keyed by family', () => {
-    const v = boardView(log, 3);
+  it('level 3 adds routes, keyed by family, with suggestions still wired', () => {
+    const v = boardView(log, 3, STANDARD_RULES);
     expect(v.routes).not.toBeNull();
     expect(v.routes!['r1']!.map((h) => h.tick)).toEqual([10, 11]);
-    expect(v.suggestions).toBeNull();
+    expect(v.suggestions).not.toBeNull();
   });
 });
 
@@ -177,7 +180,8 @@ describe('boardView — determinism and purity', () => {
 
   it('same log twice yields byte-identical views at every level', () => {
     for (const level of [0, 1, 2, 3] as const) {
-      expect(stableStringify(boardView(log, level))).toBe(stableStringify(boardView(log, level)));
+      expect(stableStringify(boardView(log, level, STANDARD_RULES)))
+        .toBe(stableStringify(boardView(log, level, STANDARD_RULES)));
     }
   });
 
@@ -185,7 +189,7 @@ describe('boardView — determinism and purity', () => {
     const before = stableStringify(log);
     clustersOf(log);
     routeOf(log, 'r1');
-    boardView(log, 3);
+    boardView(log, 3, STANDARD_RULES);
     expect(stableStringify(log)).toBe(before);
   });
 });
@@ -210,7 +214,7 @@ describe('boardView — integration over a real Watchford field day', () => {
 
   it('surfaces at least one cluster, and a non-empty diff once two distinct versions are sampled', () => {
     const world = runLogOn(build(), STANDARD_RULES, log, at(1, 0));
-    const view = boardView(world.intel.log, 1);
+    const view = boardView(world.intel.log, 1, STANDARD_RULES);
 
     // A cluster exists — the day captured claimful utterances of a rumor family.
     expect(view.clusters).not.toBeNull();
@@ -231,12 +235,12 @@ describe('boardView — integration over a real Watchford field day', () => {
   it('gates the real feed by assist level: 0 hides all, 3 adds routes with observed hops', () => {
     const world = runLogOn(build(), STANDARD_RULES, log, at(1, 0));
 
-    const l0 = boardView(world.intel.log, 0);
+    const l0 = boardView(world.intel.log, 0, STANDARD_RULES);
     expect(l0.clusters).toBeNull();
     expect(l0.routes).toBeNull();
     expect(l0.entries.length).toBe(world.intel.log.length);
 
-    const l3 = boardView(world.intel.log, 3);
+    const l3 = boardView(world.intel.log, 3, STANDARD_RULES);
     expect(l3.routes).not.toBeNull();
     const family = l3.clusters![0]!.family;
     const route = l3.routes![family]!;

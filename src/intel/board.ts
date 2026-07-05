@@ -1,6 +1,9 @@
 import { CLAIM_FIELDS, type FieldChange, type RumorId } from '../sim/rumors/claim';
+import type { TraitId } from '../sim/rumors/traits';
+import type { Rules } from '../sim/rules';
 import type { ReportedClaim } from '../sim/enemy/state';
 import { stableStringify } from '../sim/hash';
+import { suggestTraits } from './codex';
 import type { IntelEntry } from './entry';
 import type { AssistLevel, BoardView, Cluster, RouteHop, Version, VersionDiff } from './types';
 
@@ -78,12 +81,16 @@ export function routeOf(log: readonly IntelEntry[], family: RumorId): RouteHop[]
 
 /**
  * The whole board as one serializable, deterministic snapshot. Each pane is revealed only at or
- * above its assist level; suggestions stay null this task (Task 5 wires the fingerprint call).
+ * above its assist level; `suggestions` (per-family trait candidates from the codex fingerprints)
+ * unlocks at level >= 2, so it needs the Rules glossary to deduce against.
  */
-export function boardView(log: readonly IntelEntry[], level: AssistLevel): BoardView {
+export function boardView(log: readonly IntelEntry[], level: AssistLevel, rules: Rules): BoardView {
   const clusters = level >= 1 ? clustersOf(log) : null;
   const diffs = clusters
     ? Object.fromEntries(clusters.map((c): [RumorId, VersionDiff[]] => [c.family, versionDiffs(c)]))
+    : null;
+  const suggestions = level >= 2 && clusters
+    ? Object.fromEntries(clusters.map((c): [RumorId, TraitId[]] => [c.family, suggestTraits(log, c.family, rules)]))
     : null;
   const routes = level >= 3 && clusters
     ? Object.fromEntries(clusters.map((c): [RumorId, RouteHop[]] => [c.family, routeOf(log, c.family)]))
@@ -93,7 +100,7 @@ export function boardView(log: readonly IntelEntry[], level: AssistLevel): Board
     entries: [...log],
     clusters,
     diffs,
-    suggestions: null,
+    suggestions,
     routes,
   };
 }

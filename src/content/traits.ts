@@ -26,6 +26,10 @@ export const TRAITS: Record<TraitId, TraitDef> = {
       d.severity = clampSeverity(c.severity + 1); // clamp keeps 5 at 5
       return d;
     },
+    // Doubled a count, or bumped severity by exactly one — the inflation signature.
+    fingerprint: (before, changes) =>
+      changes.some((c) => c.field === 'count' && typeof before.count === 'number' && c.to === before.count * 2) ||
+      changes.some((c) => c.field === 'severity' && typeof c.to === 'number' && typeof c.from === 'number' && c.to === c.from + 1),
   },
 
   attributor: {
@@ -40,6 +44,9 @@ export const TRAITS: Record<TraitId, TraitDef> = {
       if (name && c.attribution === SOMEONE) d.attribution = name;
       return d;
     },
+    // Pinned a vague 'someone' (subject or attribution) onto a named party.
+    fingerprint: (before, changes) =>
+      changes.some((c) => (c.field === 'subject' || c.field === 'attribution') && c.from === SOMEONE && c.to !== SOMEONE),
   },
 
   moralizer: {
@@ -47,6 +54,9 @@ export const TRAITS: Record<TraitId, TraitDef> = {
     retellGate: 'none',
     appliesTo: (c) => PREDICATES[c.predicate]?.sinVersion != null,
     transform: (c) => ({ predicate: PREDICATES[c.predicate]!.sinVersion! }),
+    // Rewrote the predicate into exactly the sin register its neutral form maps to.
+    fingerprint: (before, changes) =>
+      changes.some((c) => c.field === 'predicate' && PREDICATES[before.predicate]?.sinVersion === c.to),
   },
 
   partisan: {
@@ -62,6 +72,10 @@ export const TRAITS: Record<TraitId, TraitDef> = {
         ? { severity: clampSeverity(c.severity - 1) }   // soften own side
         : { severity: clampSeverity(c.severity + 1) };  // sharpen the rival's sins
     },
+    // Nudged severity by one on a faction-relevant claim (direction depends on the side).
+    fingerprint: (before, changes) =>
+      PREDICATES[before.predicate]?.factionRelevant === true &&
+      changes.some((c) => c.field === 'severity' && typeof c.to === 'number' && typeof c.from === 'number' && Math.abs(c.to - c.from) === 1),
   },
 
   skeptic: {
@@ -69,6 +83,7 @@ export const TRAITS: Record<TraitId, TraitDef> = {
     retellGate: 'requires-corroboration',
     appliesTo: () => false,   // transforms nothing — gatekeeper node where rumors die
     transform: () => ({}),
+    fingerprint: () => false, // no field evidence — deduced behaviorally, not codex-lockable v1
   },
 
   literalist: {
@@ -76,5 +91,6 @@ export const TRAITS: Record<TraitId, TraitDef> = {
     retellGate: 'none',
     appliesTo: () => false,   // passes unchanged — rare routing infrastructure
     transform: () => ({}),
+    fingerprint: () => false, // identity transform leaves no trace to fingerprint
   },
 };
