@@ -60,6 +60,26 @@ describe('chooseTelling and gates', () => {
     expect(world.claims[out.id]).toEqual(out);
   });
 
+  it('attributor passes a fully-named claim through unchanged (only the exaggerator fires)', () => {
+    const world = buildWorld(TESTFORD, 'prop-seed-named');
+    const named = { ...spec, subject: 'tomas', attribution: 'osric' }; // both already named — nothing vague to pin
+    const injected = applyInject(world, 'mara', named);
+    const circle: Circle = { venue: 'market', members: ['mara', 'rafe'] };
+    const u = chooseTelling(world, 'mara', circle, at(0, 9), STANDARD_RULES)!;
+    expect(u).not.toBeNull();
+    expect(u.addressedTo).toBe('rafe');
+    const out = u.claim;
+    expect(out.family).toBe(injected.family);
+    expect(out.parent).toBe(injected.id);
+    // attributor abstains: a named subject/attribution is NOT overwritten with her rival jonet
+    expect(out.subject).toBe('tomas');
+    expect(out.attribution).toBe('osric');
+    // ...yet her exaggerator still transforms — only the attributor holds back on named claims
+    expect(out.count).toBe(4);
+    expect(out.severity).toBe(4);
+    expect(world.claims[out.id]).toEqual(out);
+  });
+
   it('skeptic will not retell on a single source', () => {
     const world = buildWorld(TESTFORD, 'prop-seed-3');
     applyInject(world, 'hew', spec); // hew is the skeptic
