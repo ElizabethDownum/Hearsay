@@ -24,7 +24,10 @@ export default tseslint.config(
       'src/world/**/*.ts', 'src/bots/**/*.ts', 'src/harness/**/*.ts',
     ],
     rules: {
-      'no-restricted-imports': ['error', { patterns: [{ group: ['**/content/**'], message: 'Engine/content split: engine code must not import content — inject via Rules/GenContent.' }] }],
+      'no-restricted-imports': ['error', { patterns: [
+        { group: ['**/content/**'], message: 'Engine/content split: engine code must not import content — inject via Rules/GenContent.' },
+        { group: ['**/app/**'], message: 'Headless-sim law: the engine must never import app/UI code.' },
+      ] }],
     },
   },
   {
@@ -46,6 +49,40 @@ export default tseslint.config(
         {
           group: ['**/content/**'],
           message: 'Engine/content split: engine code must not import content — inject via Rules/GenContent.',
+        },
+      ] }],
+    },
+  },
+  {
+    // Board-side intel code is a consumer of captured feeds + Rules — never WorldState.
+    // src/intel/** is NOT covered by the engine/content-split block above, so (per the same
+    // flat-config replacement lesson) the content-ban group must be repeated in THIS rule
+    // value alongside the no-world group, or it never applies to this subtree.
+    files: ['src/intel/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [
+        {
+          group: [
+            '../sim/types', '../sim/world', '../sim/step', '../sim/agents', '../sim/campaign',
+            '**/sim/types', '**/sim/world', '**/sim/step', '**/sim/agents', '**/sim/campaign',
+          ],
+          message: 'Intel is board-side: it consumes captured feeds + Rules, never WorldState.',
+        },
+        {
+          group: ['**/content/**'],
+          message: 'Engine/content split: engine code must not import content — inject via Rules/GenContent.',
+        },
+      ] }],
+    },
+  },
+  {
+    // Panels are pure presentation: they receive props, never reach into the sim/world/bots.
+    files: ['app/src/panels/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [
+        {
+          group: ['**/sim/**', '**/world/**', '**/bots/**', '**/harness/**'],
+          message: 'Panels receive props — epistemic honesty is a lint law.',
         },
       ] }],
     },

@@ -79,7 +79,7 @@ export function applyEnemyDecision(world: WorldState, decision: EnemyDecision): 
     enemy.interrogated.push(`${order.target}:${'family' in order.about ? `f:${order.about.family}` : `s:${order.about.subject}`}`);
     for (const id of [order.guard, order.target]) {
       addOverride(world, id, { fromDay: order.day, toDay: order.day + 1,
-        from: INTERROGATION.from, to: INTERROGATION.to, venue: order.venue });
+        from: INTERROGATION.from, to: INTERROGATION.to, venue: order.venue, source: 'enemy' });
     }
     world.inquiries[order.guard] = [...(world.inquiries[order.guard] ?? []),
       { about: order.about, from: 'enemy', expiresDay: order.day + 2, asked: [], answersHeard: 0 }];
@@ -88,7 +88,7 @@ export function applyEnemyDecision(world: WorldState, decision: EnemyDecision): 
     enemy.watchedDistricts.push(w.district);
     for (const post of w.posts) {
       addOverride(world, post.guard, { fromDay: w.startDay, toDay: null,
-        from: WATCH.from, to: WATCH.to, venue: post.venue });
+        from: WATCH.from, to: WATCH.to, venue: post.venue, source: 'enemy' });
     }
   }
 }

@@ -1,5 +1,5 @@
 import { dayOf, minuteOfDay } from '../core/time';
-import { circlesAt, venueAt } from './agents';
+import { circlesAt, positionOf } from './agents';
 import { expireInquiries, runAskPhase } from './inquiry';
 import { observationsFor, type Asking, type TickEvents, type Utterance } from './perception';
 import { chooseTelling, ingest, CONVERSATION_BEAT } from './rumors/propagation';
@@ -12,7 +12,7 @@ import type { WorldState } from './types';
 export function step(world: WorldState, rules: Rules): TickEvents {
   const t = world.tick;
   const positions = Object.fromEntries(
-    Object.values(world.npcs).map((n) => [n.id, venueAt(n, t, world.scheduleOverrides[n.id] ?? [])]),
+    Object.values(world.npcs).map((n) => [n.id, positionOf(world, n, t)]),
   );
 
   const utterances: Utterance[] = [];
@@ -26,6 +26,9 @@ export function step(world: WorldState, rules: Rules): TickEvents {
       const spoke = new Set(phase.spoke);
       for (const member of circle.members) {
         if (spoke.has(member)) continue;
+        // The avatar never auto-tells — the human speaks (or doesn't). Bystander physics
+        // (being heard, being addressed) are untouched; only volition is skipped.
+        if (member === world.playerId) continue;
         const u = chooseTelling(world, member, circle, t, rules);
         if (u) utterances.push(u);
       }
@@ -63,6 +66,10 @@ export function step(world: WorldState, rules: Rules): TickEvents {
   // the single encoding of the co-presence law — hearing is never re-derived here.
   if (utterances.length > 0 || events.askings.length > 0) {
     for (const hearerId of Object.keys(world.npcs).sort()) {
+      // The avatar's mind is not modelled by the sim: it neither ingests gossip nor reacts to
+      // rumors about itself (so reactToSelfRumor can never fire for it). Task 2's capture, not
+      // this loop, builds the player's feed. Skip BEFORE observationsFor — cheap and total.
+      if (hearerId === world.playerId) continue;
       const feed = observationsFor(hearerId, events);
       for (const obs of feed.observations) {
         if (obs.kind !== 'utterance') continue;

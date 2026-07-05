@@ -38,7 +38,7 @@ describe('bots', () => {
     expect(patient.save.log[0]).toMatchObject({ kind: 'inject', target: 'anselm' });
     const blitz = runBotCampaign(TESTFORD, STANDARD_RULES, 'bot-1', blitzCrier, 2);
     expect(blitz.save.log).toHaveLength(3);
-    expect(blitz.save.log.map((a) => a.target)).toEqual(['anselm', 'mara', 'osric']);
+    expect(blitz.save.log.map((a) => (a.kind === 'inject' ? a.target : null))).toEqual(['anselm', 'mara', 'osric']);
   });
 
   it('same seed + same bot = identical save and identical world', () => {

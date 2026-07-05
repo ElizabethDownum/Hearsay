@@ -1,9 +1,12 @@
 import type { Tick } from '../core/time';
-import { applyInject, type InjectSpec } from './actions';
+import {
+  applyAssignInformant, applyCard, applyCodex, applyGoTo, applyInject, type InjectSpec,
+} from './actions';
 import type { Rules } from './rules';
 import { step } from './step';
 import type { TownFixture, WorldState } from './types';
-import type { EntityId } from './rumors/claim';
+import type { EntityId, VenueId } from './rumors/claim';
+import type { TraitId } from './rumors/traits';
 import { buildWorld } from './world';
 
 export interface InjectAction {
@@ -13,8 +16,40 @@ export interface InjectAction {
   spec: InjectSpec;
 }
 
-/** The player's recorded verbs. Union grows in later plans (assign informant, …). */
-export type Action = InjectAction;
+export interface GoToAction {
+  tick: Tick;
+  kind: 'goTo';
+  venue: VenueId;
+}
+
+export interface AssignInformantAction {
+  tick: Tick;
+  kind: 'assignInformant';
+  informant: EntityId;
+  venue: VenueId | null;
+}
+
+export interface CodexAction {
+  tick: Tick;
+  kind: 'codex';
+  op: 'propose' | 'retract';
+  npc: EntityId;
+  trait: TraitId;
+}
+
+export interface CardAction {
+  tick: Tick;
+  kind: 'card';
+  op: 'add' | 'update' | 'remove';
+  id: string;
+  text: string | null;
+  confidence: number | null;
+  links: string[] | null;
+}
+
+/** The player's recorded verbs — the entire save-relevant intent surface. */
+export type Action =
+  | InjectAction | GoToAction | AssignInformantAction | CodexAction | CardAction;
 export type ActionLog = Action[];
 
 /** A complete campaign: the world regrows from these two values alone. */
@@ -30,6 +65,18 @@ export function applyAction(world: WorldState, action: Action): void {
   switch (action.kind) {
     case 'inject':
       applyInject(world, action.target, action.spec);
+      break;
+    case 'goTo':
+      applyGoTo(world, action.venue);
+      break;
+    case 'assignInformant':
+      applyAssignInformant(world, action.informant, action.venue, action.tick);
+      break;
+    case 'codex':
+      applyCodex(world, action.op, action.npc, action.trait, action.tick);
+      break;
+    case 'card':
+      applyCard(world, action.op, action.id, action.text, action.confidence, action.links, action.tick);
       break;
     default: {
       // Saves are untrusted JSON — an unknown kind must fail loudly, never silently no-op.

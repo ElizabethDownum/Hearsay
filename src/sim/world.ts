@@ -1,5 +1,5 @@
-import type { EntityId } from './rumors/claim';
-import type { TownFixture, WorldState } from './types';
+import type { EntityId, VenueId } from './rumors/claim';
+import type { Npc, TownFixture, WorldState } from './types';
 import { emptyEnemyState } from './enemy/state';
 import type { TownMap } from './enemy/state';
 
@@ -37,6 +37,9 @@ export function buildWorld(fixture: TownFixture, seed: string): WorldState {
     seed,
     tick: 0,
     claimCounter: 0,
+    playerId: null,
+    playerVenue: null,
+    intel: { informants: [], log: [], cards: [], codex: [] },
     npcs,
     venues,
     beliefs: Object.fromEntries(fixture.npcs.map((n) => [n.id, {}])),
@@ -47,6 +50,29 @@ export function buildWorld(fixture: TownFixture, seed: string): WorldState {
     scheduleOverrides: {},
     enemy: emptyEnemyState(),
   };
+}
+
+/**
+ * Attach the avatar to a built world: a real Npc under physics (observable, circle-joining)
+ * that never carries a schedule — its venue is driven by `playerVenue` (rule 2). Seeds an
+ * empty belief store and records `playerId`/`playerVenue`. Throws on an unknown home venue,
+ * a double enrollment, or an id already taken by an NPC.
+ */
+export function enrollPlayer(
+  world: WorldState, opts: { id?: string; name?: string; home: VenueId },
+): void {
+  if (world.playerId !== null) throw new Error('enrollPlayer: a player is already enrolled');
+  if (!world.venues[opts.home]) throw new Error(`enrollPlayer: unknown home venue '${opts.home}'`);
+  const id = opts.id ?? 'you';
+  if (world.npcs[id]) throw new Error(`enrollPlayer: id '${id}' is already an npc`);
+  const avatar: Npc = {
+    id, name: opts.name ?? id, home: opts.home, occupation: 'none', faction: 'none',
+    traits: [], rivals: [], schedule: [], edges: [],
+  };
+  world.npcs[id] = avatar;
+  world.beliefs[id] = {};
+  world.playerId = id;
+  world.playerVenue = opts.home;
 }
 
 export function trustBetween(world: WorldState, from: EntityId, to: EntityId): number {

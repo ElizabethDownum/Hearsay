@@ -20,6 +20,16 @@ export function venueAt(npc: Npc, t: Tick, overrides: readonly ScheduleOverride[
   return npc.home;
 }
 
+/**
+ * Where an NPC is right now (rule 2): the avatar stands at `world.playerVenue` when set;
+ * everyone else (and the avatar in a headless world) follows the schedule via `venueAt`.
+ * The single encoding of player positioning — step's positions map and circlesAt both call it.
+ */
+export function positionOf(world: WorldState, npc: Npc, t: Tick): VenueId {
+  if (npc.id === world.playerId && world.playerVenue !== null) return world.playerVenue;
+  return venueAt(npc, t, world.scheduleOverrides[npc.id] ?? []);
+}
+
 export interface Circle {
   venue: VenueId;
   members: EntityId[];
@@ -34,7 +44,7 @@ export interface Circle {
 export function circlesAt(world: WorldState, t: Tick): Circle[] {
   const occupants = new Map<VenueId, EntityId[]>();
   for (const npc of Object.values(world.npcs)) {
-    const v = venueAt(npc, t, world.scheduleOverrides[npc.id] ?? []);
+    const v = positionOf(world, npc, t);
     (occupants.get(v) ?? occupants.set(v, []).get(v)!).push(npc.id);
   }
 

@@ -40,14 +40,14 @@ describe('groundwork: schedule overrides', () => {
     const world = buildWorld(TESTFORD, 'gw-3');
     const npc = Object.values(world.npcs).sort((a, b) => (a.id < b.id ? -1 : 1))[0]!;
     const base = venueAt(npc, at(1, 9));
-    const overrides = [{ fromDay: 1, toDay: 2, from: 540, to: 660, venue: npc.home }];
+    const overrides = [{ fromDay: 1, toDay: 2, from: 540, to: 660, venue: npc.home, source: 'enemy' as const }];
     // inside the window: override wins
     expect(venueAt(npc, at(1, 9), overrides)).toBe(npc.home);
     // outside the minute window and outside the day window: base schedule
     expect(venueAt(npc, at(1, 11), overrides)).toBe(venueAt(npc, at(1, 11)));
     expect(venueAt(npc, at(2, 9), overrides)).toBe(base === npc.home ? base : venueAt(npc, at(2, 9)));
     // open-ended override (toDay null) applies on any later day
-    const open = [{ fromDay: 1, toDay: null, from: 540, to: 660, venue: npc.home }];
+    const open = [{ fromDay: 1, toDay: null, from: 540, to: 660, venue: npc.home, source: 'enemy' as const }];
     expect(venueAt(npc, at(5, 9), open)).toBe(npc.home);
   });
 });

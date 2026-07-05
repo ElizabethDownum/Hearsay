@@ -34,6 +34,9 @@ function traitContext(npc: Npc, world: WorldState): TraitContext {
 export function chooseAnswer(
   world: WorldState, answererId: EntityId, asking: Asking, t: Tick, rules: Rules,
 ): Utterance | null {
+  // The avatar answers for itself, through the UI — never automatically. v1: silence,
+  // even when compelled at an invitational venue. The human's testimony is not sim-driven.
+  if (answererId === world.playerId) return null;
   const answerer = world.npcs[answererId]!;
   const belief = matchBelief(world.beliefs[answererId] ?? {}, asking.about);
   if (!belief || belief.credence < STANCE.DISMISS) return null;
@@ -89,6 +92,8 @@ export function runAskPhase(
 
   for (const member of circle.members) {
     if (spoke.has(member)) continue;
+    // The avatar is never auto-selected as an asker — the human decides who to question.
+    if (member === world.playerId) continue;
     const task = usableTask(world, member, day);
     if (!task) continue;
     const eligible = circle.members

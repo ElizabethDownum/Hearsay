@@ -22,4 +22,6 @@ export interface PredicateDef {
 export interface Rules {
   predicates: Record<PredicateId, PredicateDef>;
   traits: Record<TraitId, TraitDef>;
+  /** Player/intel tuning: which occupations the enemy's watch profiles read as suspicious. */
+  intel: { watchOccupations: string[] };
 }

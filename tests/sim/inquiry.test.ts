@@ -150,7 +150,7 @@ describe('discretion — held-close knowledge is extracted, never volunteered', 
     seedSecret(world, 'ada'); // holder ada; interrogator dov, trusted only 0.4
     world.inquiries['dov'] = [{ about: { family: 'sec0' }, from: 'enemy', expiresDay: 2, asked: [], answersHeard: 0 }];
     // stage ada + dov alone in the invitational backroom for day 0 → a circle of exactly 2
-    const backroom = [{ fromDay: 0, toDay: 1, from: 0, to: 1440, venue: 'backroom' }];
+    const backroom = [{ fromDay: 0, toDay: 1, from: 0, to: 1440, venue: 'backroom', source: 'enemy' as const }];
     world.scheduleOverrides['ada'] = backroom;
     world.scheduleOverrides['dov'] = backroom;
     step(world, RULES); // t=0 is a conversation beat

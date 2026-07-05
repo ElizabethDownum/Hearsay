@@ -89,3 +89,43 @@ describe('no-omniscience law — the enemy never imports WorldState', () => {
     expect(violations("import { PREDICATES } from '../../content/predicates';", rules)).toBeGreaterThan(0);
   });
 });
+
+// These three laws are PRE-REGISTERED before any src/intel/ or app/ file exists (Plan-3/4
+// precedent): calculateConfigForFile computes config from the PATH's glob match alone, so the
+// probe fires even against hypothetical files. As above, snippets use plain value-import
+// syntax — the bare Linter() has no TS parser, so `import type` would be a parse error, not a
+// rule hit; no-restricted-imports keys off the module specifier regardless of the `type` modifier.
+async function importRulesFor(file: string): Promise<Linter.RulesRecord> {
+  const cfg = await new ESLint().calculateConfigForFile(file);
+  return { 'no-restricted-imports': (cfg.rules ?? {})['no-restricted-imports']! } as Linter.RulesRecord;
+}
+
+describe('intel law — board-side intel never imports WorldState', () => {
+  it('flags a WorldState import (relative and glob forms) but leaves Rules alone', async () => {
+    const rules = await importRulesFor('src/intel/board.ts');
+    expect(violations("import { WorldState } from '../sim/types';", rules)).toBeGreaterThan(0);
+    expect(violations("import { WorldState } from '../../src/sim/world';", rules)).toBeGreaterThan(0);
+    expect(violations("import { Rules } from '../sim/rules';", rules)).toBe(0);
+  });
+
+  it('still bans content imports under src/intel/** (the flat-config merge lesson holds)', async () => {
+    const rules = await importRulesFor('src/intel/board.ts');
+    expect(violations("import { predicates } from '../content/predicates';", rules)).toBeGreaterThan(0);
+  });
+});
+
+describe('panels law — presentation code receives props, never reaches into the sim', () => {
+  it('flags a sim import for app/src/panels/**', async () => {
+    const rules = await importRulesFor('app/src/panels/Board.tsx');
+    expect(violations("import { step } from '../../../src/sim/step';", rules)).toBeGreaterThan(0);
+    expect(violations("import { Row } from './parts';", rules)).toBe(0);
+  });
+});
+
+describe('headless-sim law — the engine never imports app/UI code', () => {
+  it('flags an app import from a src engine file; the content ban survives alongside it', async () => {
+    const rules = await importRulesFor('src/sim/step.ts');
+    expect(violations("import main from '../../app/src/main';", rules)).toBeGreaterThan(0);
+    expect(violations("import { predicates } from '../content/predicates';", rules)).toBeGreaterThan(0);
+  });
+});
