@@ -302,34 +302,12 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
       object, place, severity: shape.severity, witnesses });
   }
 
-  // ── 10. Day-0 dossier: truthful, capped starting intelligence ───────────
-  // References the finished cast + secrets; a fresh 'gen:dossier' stream keeps every earlier draw
-  // byte-identical, so adding the dossier never reshuffles another subsystem.
-  const nonGuardIds = cast.filter((m) => m.npc.occupation !== content.guardOccupation.id)
-    .map((m) => m.npc.id).sort();
-  const informantIds = dossierRng.shuffle(nonGuardIds).slice(0, config.dossierInformants);
-  const readPool = dossierRng.shuffle(cast.map((m) => m.npc.id).sort());
-  const traitReads: Dossier['traitReads'] = [];
-  const readCount = dossierRng.int(1, config.dossierTraitReadMax + 1);
-  for (const id of readPool.slice(0, readCount)) {
-    const npc = byId.get(id)!.npc;
-    traitReads.push({ npc: id, trait: npc.traits[dossierRng.int(0, npc.traits.length)]! });
-  }
-  const allEdges = cast.flatMap((m) => m.npc.edges.map((e) => ({ from: m.npc.id, to: e.to, kind: e.kind })))
-    .sort((a, b) => `${a.from}:${a.to}:${a.kind}`.localeCompare(`${b.from}:${b.to}:${b.kind}`));
-  const edgeReads = dossierRng.shuffle(allEdges).slice(0, dossierRng.int(2, config.dossierEdgeReadMax + 1));
-  const hintedSecret = secrets.length > 0 && dossierRng.float() < 0.5
-    ? secrets[dossierRng.int(0, secrets.length)]! : null;
-  const dossier: Dossier = {
-    informants: informantIds, traitReads, edgeReads,
-    secretHint: hintedSecret ? { about: hintedSecret.subject, witness: hintedSecret.witnesses[0]! } : null,
-  };
-
-  // ── 11. Scenario casting: a crown usurper + the council (keystones wear the robes) ──
+  // ── 10. Scenario casting: a crown usurper + the council (keystones wear the robes) ──
   // The council IS the keystone set — GenConfig already calls keystones "scenario-cast
   // placeholders the validator must protect", and keystone-2routes is exactly the
   // objective-reachability guarantee the cast needs. NEVER reuse the `cast: CastMeta[]` local
-  // from section 3 here — the scenario cast is `scenarioCast`.
+  // from section 3 here — the scenario cast is `scenarioCast`. Runs BEFORE the dossier so the
+  // dossier's secretHint reads POST-retarget secrets and never dangles on a retargeted donor.
   let scenarioCast: ScenarioCast | null = null;
   {
     const guardIds = new Set(guards.map((g) => g.id));
@@ -371,6 +349,29 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
       }
     }
   }
+
+  // ── 11. Day-0 dossier: truthful, capped starting intelligence ───────────
+  // References the finished cast + post-retarget secrets; a fresh 'gen:dossier' stream keeps every
+  // earlier draw byte-identical, so adding the dossier never reshuffles another subsystem.
+  const nonGuardIds = cast.filter((m) => m.npc.occupation !== content.guardOccupation.id)
+    .map((m) => m.npc.id).sort();
+  const informantIds = dossierRng.shuffle(nonGuardIds).slice(0, config.dossierInformants);
+  const readPool = dossierRng.shuffle(cast.map((m) => m.npc.id).sort());
+  const traitReads: Dossier['traitReads'] = [];
+  const readCount = dossierRng.int(1, config.dossierTraitReadMax + 1);
+  for (const id of readPool.slice(0, readCount)) {
+    const npc = byId.get(id)!.npc;
+    traitReads.push({ npc: id, trait: npc.traits[dossierRng.int(0, npc.traits.length)]! });
+  }
+  const allEdges = cast.flatMap((m) => m.npc.edges.map((e) => ({ from: m.npc.id, to: e.to, kind: e.kind })))
+    .sort((a, b) => `${a.from}:${a.to}:${a.kind}`.localeCompare(`${b.from}:${b.to}:${b.kind}`));
+  const edgeReads = dossierRng.shuffle(allEdges).slice(0, dossierRng.int(2, config.dossierEdgeReadMax + 1));
+  const hintedSecret = secrets.length > 0 && dossierRng.float() < 0.5
+    ? secrets[dossierRng.int(0, secrets.length)]! : null;
+  const dossier: Dossier = {
+    informants: informantIds, traitReads, edgeReads,
+    secretHint: hintedSecret ? { about: hintedSecret.subject, witness: hintedSecret.witnesses[0]! } : null,
+  };
 
   const districts: DistrictInfo[] = districtIds.map((d) => ({
     id: d,
