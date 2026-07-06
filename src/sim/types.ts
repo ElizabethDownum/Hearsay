@@ -97,8 +97,11 @@ export interface AskingRecord {
 export interface InstitutionRecord {
   kind: 'institution';
   tick: Tick;
-  /** 'denounce' = the council turns on the usurper (win) · 'coronation' = the clock expired (loss). */
-  action: 'denounce' | 'coronation';
+  /**
+   * 'denounce' = the council turns on the usurper (win) · 'coronation' = the clock expired
+   * (loss) · 'unmasking' = the enemy's sketch identified the avatar (loss).
+   */
+  action: 'denounce' | 'coronation' | 'unmasking';
   subject: EntityId;
   actors: EntityId[];
   claimIds: string[];

@@ -3,6 +3,7 @@ import { STANCE } from '../rumors/propagation';
 import type { Rules } from '../rules';
 import type { WorldState } from '../types';
 import type { GeneratedTown } from '../../world/types';
+import { exposureStatus } from './exposure';
 import type { ScenarioDef, TurnEvidence, WinCondition } from './types';
 
 /** Enroll the campaign: copies the def's DATA into WorldState (defs are injected, never stored). */
@@ -52,7 +53,7 @@ export function councilTurns(world: WorldState, rules: Rules): TurnEvidence[] {
   return turned;
 }
 
-/** Nightly referee: win first (ties go to the player), then the clock. Latches on any ending. */
+/** Nightly referee: win first (ties go to the player), then exposure, then the clock. Latches on any ending. */
 export function scenarioNightly(world: WorldState, rules: Rules): void {
   const s = world.scenario;
   if (!s || s.status !== 'running') return;
@@ -66,6 +67,17 @@ export function scenarioNightly(world: WorldState, rules: Rules): void {
       kind: 'institution', tick: world.tick, action: 'denounce',
       subject: s.cast.usurper, actors: turned.map((t) => t.npc),
       claimIds: turned.map((t) => t.claimId),
+    });
+    return;
+  }
+
+  const exp = exposureStatus(world);
+  if (exp.identified) {
+    s.status = 'lost-exposed';
+    s.resolution = { kind: 'lost-exposed', day, features: exp.features };
+    world.chronicle.push({
+      kind: 'institution', tick: world.tick, action: 'unmasking',
+      subject: world.playerId ?? s.cast.usurper, actors: [], claimIds: [],
     });
     return;
   }
