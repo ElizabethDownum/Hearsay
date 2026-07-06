@@ -18,7 +18,9 @@ if (!Number.isInteger(COUNT) || COUNT <= 0) {
 const OPTS = { knownTraitIds: Object.keys(TRAITS) };
 
 describe(`validator soak — ${COUNT} seeds`, () => {
-  it('every seed serves a valid town within budget; prints the distribution', () => {
+  // Generous timeout (P6-T8 rider): this report test flaked on vitest's 5s default under
+  // full-suite parallel load (passes isolated). The bump is scheduling headroom, not a perf claim.
+  it('every seed serves a valid town within budget; prints the distribution', { timeout: 30000 }, () => {
     const attempts: number[] = [];
     let firstTryFails = 0;
     const failCounts = new Map<string, number>();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyEnemyDecision } from '../../src/sim/counterintel';
+import { applyEnemyDecision, WATCH } from '../../src/sim/counterintel';
 import { step, runUntil } from '../../src/sim/step';
 import { applyInject } from '../../src/sim/actions';
 import { STANDARD_RULES } from '../../src/content/rules';
@@ -131,7 +131,7 @@ describe('watches are visible — the Counter-Sketch feed', () => {
     let hugoSampledW0 = 0;
     driveCollecting(world, at(5, 0), (events) => {
       const min = minuteOfDay(events.tick);
-      if (dayOf(events.tick) === 1 && min >= 1080 && min < 1200) {
+      if (dayOf(events.tick) === 1 && min >= WATCH.from && min < WATCH.to) {
         // the countermeasure IS an ordinary observation: mira sees hugo at square-w0.
         if (observationsFor('mira', events).observations.some(
           (o) => o.kind === 'presence' && o.actor === 'hugo' && o.venue === 'square-w0')) miraSawHugo++;
@@ -141,9 +141,12 @@ describe('watches are visible — the Counter-Sketch feed', () => {
           (o.actor === 'mira' || o.actor === 'otto'))) hugoSampledW0++;
       }
     });
-    // 120 window-ticks (1080..1199), every one of them — the watch is standing there.
-    expect(miraSawHugo).toBe(120);
-    expect(hugoSampledW0).toBe(120);
+    // Re-encoded by mechanism (P6-T8): the guard stands at square-w0 for every window-tick, and
+    // mira/otto are at square-w0 [480,1230) across the whole retuned window — so both presence
+    // counts equal the window width, whatever WATCH is. (Presence is venue-level co-location; the
+    // 4-person cap is on conversation circles, not who stands in the square.)
+    expect(miraSawHugo).toBe(WATCH.to - WATCH.from);
+    expect(hugoSampledW0).toBe(WATCH.to - WATCH.from);
 
     // CONTROL: identical world, no watch applied. hugo never reaches square-w0.
     const control = watchfordWorld(seed);
@@ -151,7 +154,7 @@ describe('watches are visible — the Counter-Sketch feed', () => {
     let controlSawHugo = 0;
     driveCollecting(control, at(5, 0), (events) => {
       const min = minuteOfDay(events.tick);
-      if (dayOf(events.tick) === 1 && min >= 1080 && min < 1200 &&
+      if (dayOf(events.tick) === 1 && min >= WATCH.from && min < WATCH.to &&
         observationsFor('mira', events).observations.some(
           (o) => o.kind === 'presence' && o.actor === 'hugo' && o.venue === 'square-w0')) controlSawHugo++;
     });
@@ -159,9 +162,9 @@ describe('watches are visible — the Counter-Sketch feed', () => {
 
     // Coverage actually increased: WITH the watch hugo's evidence now includes captures
     // from square-w0 (territory his w1 schedule never reached); WITHOUT it, zero.
-    // (The day-1 window itself falls in a gossip lull — w0 tellings cluster in
-    // cooldown-synced bursts at 480/720/960/1200 — so the first capture lands on a
-    // later day's window; the coverage gain is nonetheless real and permanent.)
+    // (The retuned window {960,1140} now spans the 960 cooldown-burst that the old {1080,1200}
+    // missed — w0 tellings cluster at 480/720/960/1200 — so the coverage gain lands from day 1's
+    // window onward, not a day late. The delta assertion below stays a pure existence check.)
     const hugoW0 = (w: ReturnType<typeof watchfordWorld>): number =>
       w.enemy.evidence.filter((e) => e.observer === 'hugo' && e.venue === 'square-w0').length;
     expect(hugoW0(world)).toBeGreaterThanOrEqual(1);

@@ -38,9 +38,14 @@ export function captureEvidence(world: WorldState, events: TickEvents, rules: Ru
   }
 }
 
-// 15-alignment (spec): interrogations 900–1020, watches 1080–1200. Held exactly.
+// 15-alignment (spec): interrogations 900–1020. Watches retuned to 960–1140 (P6-T8): measured
+// against evening gossip flow — the old {1080,1200} sat in a retell-cooldown lull and caught none
+// of the 480/720/960/1200 bursts (1200 exclusive), so a watch's first capture arrived a day late.
+// {960,1140} straddles the 960 cooldown-burst shoulder: +49% total public-venue utterance exposure
+// over 5 procgen seeds, winning on every seed (tests/harness/watch-window.report.test.ts). Both
+// bounds 15-aligned. INTERROGATION unchanged.
 export const INTERROGATION = { from: 900, to: 1020 } as const;
-export const WATCH = { from: 1080, to: 1200 } as const;
+export const WATCH = { from: 960, to: 1140 } as const;
 
 function addOverride(world: WorldState, id: string, o: WorldState['scheduleOverrides'][string][number]): void {
   world.scheduleOverrides[id] = [...(world.scheduleOverrides[id] ?? []), o];
