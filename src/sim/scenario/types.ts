@@ -1,4 +1,4 @@
-import type { ClaimId, EntityId, RumorId } from '../rumors/claim';
+import type { ClaimId, EntityId, RumorId, VenueId } from '../rumors/claim';
 
 /** The seed-dealt principals. Council = the town's keystones wearing robes (gen §11). */
 export interface ScenarioCast { usurper: EntityId; council: EntityId[] }
@@ -26,9 +26,12 @@ export interface SketchEvidence { featureId: string; subject: EntityId }
 export type Resolution =
   | { kind: 'won'; day: number; turned: TurnEvidence[] }
   | { kind: 'lost-clock'; day: number; turned: TurnEvidence[] }      // partial progress — debrief material
-  | { kind: 'lost-exposed'; day: number; features: SketchEvidence[] };
+  | { kind: 'lost-exposed'; day: number; features: SketchEvidence[] }
+  // Caught in the act: a guard's feed captured the avatar as the speaker of an utterance. `heardBy`
+  // is that guard, `venue` where the words were spoken — the fair-cop evidence for the arrest.
+  | { kind: 'lost-caught'; day: number; heardBy: EntityId; venue: VenueId };
 
-export type ScenarioStatus = 'running' | 'won' | 'lost-clock' | 'lost-exposed';
+export type ScenarioStatus = 'running' | 'won' | 'lost-clock' | 'lost-exposed' | 'lost-caught';
 
 /** Pure data (WinCondition is data): serializable, hashWorld-covered, replay-stable. */
 export interface ScenarioState {

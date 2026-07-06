@@ -1,5 +1,6 @@
 import { stableStringify, hashWorld } from '../../src/sim/hash';
-import { buildWorld } from '../../src/sim/world';
+import { buildWorld, enrollPlayer } from '../../src/sim/world';
+import { miniTown } from './helpers/minitown';
 import { TESTFORD } from '../../src/content/fixtures/testford';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT } from '../../src/content/gen/standard';
@@ -139,5 +140,43 @@ describe('PILLAR: live ≡ replay with scenario + vignettes + enemy + intel ALL 
     expect(a.chronicle.some((e) => e.kind === 'vignette')).toBe(true); // a vignette fired
     expect(a.playerId).not.toBeNull();                               // intel/avatar attached
     expect(a.enemy.observers.length).toBeGreaterThan(0);             // enemy roster wired
+  });
+});
+
+describe('PILLAR: live ≡ replay with the player speech verbs (goTo/tell/ask) + assign/codex/card', () => {
+  const SEED = 'verbs-replay-1';
+  // ada is pinned into the avatar's backroom circle so the tell/ask targets are always in earshot;
+  // both directions of trust let the avatar ask ada and ada answer. Staged identically per build.
+  const build = (): WorldState => {
+    const world = buildWorld(miniTown(), SEED);
+    enrollPlayer(world, { home: 'backroom' });
+    world.npcs['you']!.edges = [{ to: 'ada', kind: 'friend', trust: 0.8 }];
+    world.npcs['ada']!.edges.push({ to: 'you', kind: 'friend', trust: 0.8 });
+    world.intel.informants = [{ id: 'bez', assignedVenue: null }];
+    world.scheduleOverrides['ada'] = [
+      { fromDay: 0, toDay: null, from: 0, to: 1440, venue: 'backroom', source: 'enemy' },
+    ];
+    applyInject(world, 'ada', {
+      subject: 'cyn', predicate: 'stole', object: null, count: 1, severity: 3, place: null, attribution: SOMEONE,
+    });
+    return world;
+  };
+  const log: ActionLog = [
+    { tick: 0, kind: 'goTo', venue: 'backroom' },
+    { tick: 0, kind: 'card', op: 'add', id: 'k1', text: 'note', confidence: 0.5, links: [] },
+    { tick: 0, kind: 'codex', op: 'propose', npc: 'ada', trait: 'skeptic' },
+    { tick: 0, kind: 'assignInformant', informant: 'bez', venue: 'square' },
+    { tick: 0, kind: 'tell', to: 'ada', spec: {
+      subject: 'cyn', predicate: 'stole', object: null, count: 1, severity: 4, place: null, attribution: SOMEONE } },
+    { tick: 15, kind: 'ask', to: 'ada', about: { subject: 'cyn' } },
+  ];
+
+  it('two runs hash-identical over 2 days, with the tell and ask actually fired', () => {
+    const a = runLogOn(build(), STANDARD_RULES, log, at(2, 0));
+    const b = runLogOn(build(), STANDARD_RULES, log, at(2, 0));
+    expect(hashWorld(a)).toBe(hashWorld(b));
+    // The new verbs really engaged — otherwise the replay proves nothing about them.
+    expect(a.chronicle.some((e) => e.kind === 'telling' && e.speaker === 'you')).toBe(true);
+    expect(a.chronicle.some((e) => e.kind === 'asking' && e.speaker === 'you')).toBe(true);
   });
 });

@@ -39,6 +39,7 @@ export function buildWorld(fixture: TownFixture, seed: string): WorldState {
     claimCounter: 0,
     playerId: null,
     playerVenue: null,
+    pendingTell: null,
     intel: { informants: [], log: [], cards: [], codex: [] },
     scenario: null,
     npcs,

@@ -158,4 +158,21 @@ describe('player groundwork — the avatar under physics', () => {
     step(world, STANDARD_RULES);
     expect(world.chronicle.some((e) => e.kind === 'asking' && e.speaker === 'you')).toBe(false);
   });
+
+  // Skip-law refinement (Plan 7): the avatar still never auto-asks and is never conscripted by the
+  // enemy — but a SELF task (volition the human logged via the ask verb) IS consumed by runAskPhase.
+  it('a logged self-inquiry IS consumed — the avatar asks the human’s question', () => {
+    const world = buildWorld(miniTown(), 'asker-self');
+    enrollPlayer(world, { home: 'backroom' });
+    world.npcs['you']!.edges = [{ to: 'ada', kind: 'friend', trust: 0.8 }]; // the avatar must trust to ask
+    world.scheduleOverrides['ada'] = [
+      { fromDay: 0, toDay: null, from: 0, to: 1440, venue: 'backroom', source: 'enemy' },
+    ];
+    // A 'self' task, as the logged ask verb enqueues it — the avatar's word opens the beat.
+    world.inquiries['you'] = [
+      { about: { subject: 'cyn' }, from: 'self', expiresDay: 5, asked: [], answersHeard: 0 },
+    ];
+    step(world, STANDARD_RULES);
+    expect(world.chronicle.some((e) => e.kind === 'asking' && e.speaker === 'you')).toBe(true);
+  });
 });

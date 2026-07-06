@@ -92,10 +92,12 @@ export function runAskPhase(
 
   for (const member of circle.members) {
     if (spoke.has(member)) continue;
-    // The avatar is never auto-selected as an asker — the human decides who to question.
-    if (member === world.playerId) continue;
     const task = usableTask(world, member, day);
     if (!task) continue;
+    // The avatar asks ONLY the questions the human logged (a 'self' task placed by the ask verb) —
+    // it is never auto-selected, and never conscripted into the enemy's interrogations even if one
+    // is queued against it. With an empty queue this is byte-identical to the old unconditional skip.
+    if (member === world.playerId && task.from !== 'self') continue;
     const eligible = circle.members
       .filter((m) => m !== member && !task.asked.includes(m) && !spoke.has(m))
       .filter((m) => task.from === 'enemy' || trustBetween(world, member, m) > 0)

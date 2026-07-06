@@ -1,7 +1,9 @@
 import type { Tick } from '../core/time';
 import {
-  applyAssignInformant, applyCard, applyCodex, applyGoTo, applyInject, type InjectSpec,
+  applyAsk, applyAssignInformant, applyCard, applyCodex, applyGoTo, applyInject, applyTell,
+  type InjectSpec,
 } from './actions';
+import type { InquiryKey } from './perception';
 import type { Rules } from './rules';
 import { step } from './step';
 import type { TownFixture, WorldState } from './types';
@@ -20,6 +22,21 @@ export interface GoToAction {
   tick: Tick;
   kind: 'goTo';
   venue: VenueId;
+}
+
+export interface TellAction {
+  tick: Tick;
+  kind: 'tell';
+  /** Must be in the avatar's circle at this beat — the UI offers circle-mates only. */
+  to: EntityId;
+  spec: InjectSpec;
+}
+
+export interface AskAction {
+  tick: Tick;
+  kind: 'ask';
+  to: EntityId;
+  about: InquiryKey;
 }
 
 export interface AssignInformantAction {
@@ -49,7 +66,7 @@ export interface CardAction {
 
 /** The player's recorded verbs — the entire save-relevant intent surface. */
 export type Action =
-  | InjectAction | GoToAction | AssignInformantAction | CodexAction | CardAction;
+  | InjectAction | GoToAction | TellAction | AskAction | AssignInformantAction | CodexAction | CardAction;
 export type ActionLog = Action[];
 
 /** A complete campaign: the world regrows from these two values alone. */
@@ -68,6 +85,12 @@ export function applyAction(world: WorldState, action: Action): void {
       break;
     case 'goTo':
       applyGoTo(world, action.venue);
+      break;
+    case 'tell':
+      applyTell(world, action.to, action.spec, action.tick);
+      break;
+    case 'ask':
+      applyAsk(world, action.to, action.about, action.tick);
       break;
     case 'assignInformant':
       applyAssignInformant(world, action.informant, action.venue, action.tick);

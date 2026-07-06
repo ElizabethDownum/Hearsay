@@ -1,4 +1,7 @@
-import { dayOf, type Tick } from '../core/time';
+import { dayOf, minuteOfDay, type Tick } from '../core/time';
+import { circlesAt } from './agents';
+import type { InquiryKey } from './perception';
+import { CONVERSATION_BEAT } from './rumors/propagation';
 import { mintClaim, type Claim, type EntityId, type VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
 import type { WorldState } from './types';
@@ -30,6 +33,36 @@ export function applyInject(
   };
   world.chronicle.push({ kind: 'inject', tick: world.tick, target: targetId, claimId: claim.id, by });
   return claim;
+}
+
+/** The avatar speaks: hop zero made flesh. Valid only on a beat, to a circle-mate. Records the
+ *  pending telling; the same tick's step mints the claim and emits the utterance (replay-exact). */
+export function applyTell(world: WorldState, to: EntityId, spec: InjectSpec, tick: Tick): void {
+  if (world.playerId === null) throw new Error('tell: no player is enrolled');
+  if (world.playerVenue === null) throw new Error('tell: the avatar is nowhere');
+  if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) throw new Error('tell: speech happens on conversation beats');
+  if (!world.npcs[to]) throw new Error(`tell: unknown npc '${to}'`);
+  if (world.pendingTell) throw new Error('tell: one telling per beat');
+  const circle = circlesAt(world, tick).find((c) => c.members.includes(world.playerId!));
+  if (!circle || !circle.members.includes(to)) {
+    throw new Error(`tell: '${to}' is not in the avatar's circle this beat`);
+  }
+  world.pendingTell = { to, spec };
+}
+
+/** The avatar asks a circle-mate about a family/subject. Enqueues a 'self' inquiry task — the one
+ *  place the avatar is a volitional asker (runAskPhase consumes it; it still never auto-answers). */
+export function applyAsk(world: WorldState, to: EntityId, about: InquiryKey, tick: Tick): void {
+  if (world.playerId === null) throw new Error('ask: no player is enrolled');
+  if (world.playerVenue === null) throw new Error('ask: the avatar is nowhere');
+  if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) throw new Error('ask: speech happens on conversation beats');
+  if (!world.npcs[to]) throw new Error(`ask: unknown npc '${to}'`);
+  const circle = circlesAt(world, tick).find((c) => c.members.includes(world.playerId!));
+  if (!circle || !circle.members.includes(to)) {
+    throw new Error(`ask: '${to}' is not in the avatar's circle this beat`);
+  }
+  const tasks = world.inquiries[world.playerId] ?? (world.inquiries[world.playerId] = []);
+  tasks.push({ about, from: 'self', expiresDay: dayOf(tick) + 2, asked: [], answersHeard: 0 });
 }
 
 /** Informant posting window (spec: 15-aligned, mid-day). Exported for the assign law + tests. */

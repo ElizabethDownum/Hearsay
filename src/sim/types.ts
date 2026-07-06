@@ -1,4 +1,5 @@
 import type { Tick } from '../core/time';
+import type { InjectSpec } from './actions';
 import type { Claim, EntityId, RumorId, VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
 import type { EnemyState } from './enemy/state';
@@ -99,9 +100,10 @@ export interface InstitutionRecord {
   tick: Tick;
   /**
    * 'denounce' = the council turns on the usurper (win) · 'coronation' = the clock expired
-   * (loss) · 'unmasking' = the enemy's sketch identified the avatar (loss).
+   * (loss) · 'unmasking' = the enemy's sketch identified the avatar (loss) · 'arrest' = a guard
+   * caught the avatar speaking an utterance in earshot (loss — caught in the act).
    */
-  action: 'denounce' | 'coronation' | 'unmasking';
+  action: 'denounce' | 'coronation' | 'unmasking' | 'arrest';
   subject: EntityId;
   actors: EntityId[];
   claimIds: string[];
@@ -143,6 +145,11 @@ export interface WorldState {
   playerId: EntityId | null;
   /** The avatar's current venue — overrides schedule/venueAt when set. */
   playerVenue: VenueId | null;
+  /**
+   * A telling the avatar logged this beat, awaiting the same tick's step (applyTell sets it,
+   * step consumes it — the apply-then-step order makes the handoff replay-exact). Null otherwise.
+   */
+  pendingTell: { to: EntityId; spec: InjectSpec } | null;
   /** The player's private knowledge substrate (informants, captured feed, board notes). */
   intel: IntelState;
   /** The campaign referee's state, or null in a scenario-free (headless/probe) world. */

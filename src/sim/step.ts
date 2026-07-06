@@ -3,6 +3,7 @@ import { circlesAt, positionOf } from './agents';
 import { expireInquiries, runAskPhase } from './inquiry';
 import { observationsFor, type Asking, type TickEvents, type Utterance } from './perception';
 import { chooseTelling, ingest, CONVERSATION_BEAT } from './rumors/propagation';
+import { mintClaim } from './rumors/claim';
 import { captureEvidence, runEnemyDay } from './counterintel';
 import { captureIntel } from './fieldwork';
 import { reactToSelfRumor } from './reactions';
@@ -21,6 +22,22 @@ export function step(world: WorldState, rules: Rules): TickEvents {
   const utterances: Utterance[] = [];
   const askings: Asking[] = [];
   if (minuteOfDay(t) % CONVERSATION_BEAT === 0) {
+    // The player's word opens the beat, in pinned deterministic order (before any NPC ask/tell).
+    // Validated at apply-time this same tick; the circle is the same deterministic computation. The
+    // claim mints EXACTLY as applyInject's hop-zero inject does, so tells and injects are alike.
+    if (world.pendingTell && world.playerId !== null) {
+      const pc = circlesAt(world, t).find((c) => c.members.includes(world.playerId!));
+      if (pc) {
+        const family = `f${world.claimCounter}`;
+        const claim = mintClaim(world, { ...world.pendingTell.spec, family, parent: null });
+        world.claims[claim.id] = claim;
+        utterances.push({
+          tick: t, venue: world.playerVenue!, circleMembers: pc.members,
+          speaker: world.playerId, addressedTo: world.pendingTell.to, claim, mode: 'telling',
+        });
+      }
+      world.pendingTell = null;
+    }
     for (const circle of circlesAt(world, t)) {
       if (circle.members.length < 2) continue;
       const phase = runAskPhase(world, circle, t, rules);
@@ -62,7 +79,26 @@ export function step(world: WorldState, rules: Rules): TickEvents {
   // The enemy hears only what its people heard: capture reads the same feeds, gated by
   // vigilance, filtered through observer traits. Independent of ingestion — no-op when
   // there are no observers (Testford/miniTown), so old suites are untouched.
+  const preLen = world.enemy.evidence.length;
   if (utterances.length > 0 || askings.length > 0) captureEvidence(world, events, rules);
+  // Caught in the act: if THIS tick's capture logged the avatar as the speaker of an utterance, a
+  // guard heard you say it — the campaign ends now. Status is data (P6 latch discipline): the world
+  // keeps stepping if the driver steps it; we only latch, never short-circuit the rest of the tick.
+  if (world.scenario?.status === 'running' && world.playerId !== null) {
+    const pid = world.playerId;
+    const caught = world.enemy.evidence
+      .slice(preLen)
+      .find((e) => e.kind === 'utterance' && e.speaker === pid);
+    if (caught) {
+      const s = world.scenario;
+      s.status = 'lost-caught';
+      s.resolution = { kind: 'lost-caught', day: dayOf(t), heardBy: caught.observer, venue: caught.venue };
+      world.chronicle.push({
+        kind: 'institution', tick: t, action: 'arrest',
+        subject: pid, actors: [caught.observer], claimIds: caught.claimId ? [caught.claimId] : [],
+      });
+    }
+  }
 
   // The player's mirror of capture: the avatar (unfiltered) and informants (trait-filtered)
   // sense through the SAME feeds. Runs UNCONDITIONALLY — presence capture needs event-less
