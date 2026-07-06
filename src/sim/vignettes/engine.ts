@@ -8,6 +8,15 @@ type Binding = { a: string; b: string | null };
 
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
 
+// Pair defs whose conditions are ALL symmetric enumerate UNORDERED pairs (a<b only) so an unordered
+// pair fires ONCE, not once per ordering.
+// GUARD: symmetric enumeration also requires SYMMETRIC CONSEQUENCES — a future all-symmetric-condition
+// def with a directional consequence (a trust-delta or edge-rekind that fires one way but not the
+// other) must NOT rely on this path, because dropping the (b,a) binding would silently drop that
+// direction. runVignettes throws (see assertSymmetricConsequences) if it detects one — loud beats
+// silent misdirection. public-quarrel's mirrored trust-deltas + into-both-minds mint pass this.
+const SYMMETRIC_CONDITIONS = new Set<VignetteCondition['kind']>(['mutual-damaging']);
+
 function bound(binding: Binding, role: VignetteRole): string {
   const id = role === 'a' ? binding.a : binding.b;
   if (id === null) throw new Error('vignette: consequence references unbound role b');
@@ -71,7 +80,8 @@ function apply(world: WorldState, def: VignetteDef, bind: Binding): void {
       }
       case 'mint-claim': {
         // Genesis machinery re-aimed: ONE shared claim, witnessed into each target mind.
-        const family = `vg:${def.id}:${bind.a}`;
+        // Pair-granular family so two distinct pairs of the same def never collide on one family.
+        const family = `vg:${def.id}:${bind.a}${bind.b ? ':' + bind.b : ''}`;
         const claim = mintClaim(world, {
           family, parent: null,
           subject: bound(bind, c.subject),
@@ -106,14 +116,44 @@ function apply(world: WorldState, def: VignetteDef, bind: Binding): void {
   }
 }
 
+/** Cheap insurance behind the symmetric-enumeration path: a def routed through canonical (a<b)
+ *  pairs drops the (b,a) binding, so every trust-delta / edge-rekind MUST be mirrored across roles
+ *  or one direction is silently lost. Throw loudly at runVignettes time rather than misdirect. */
+function assertSymmetricConsequences(def: VignetteDef): void {
+  const other = (r: VignetteRole): VignetteRole => (r === 'a' ? 'b' : 'a');
+  for (const c of def.consequences) {
+    if (c.kind === 'trust-delta') {
+      const mirrored = def.consequences.some(
+        (o) => o.kind === 'trust-delta' && o.from === other(c.from) && o.to === other(c.to) && o.delta === c.delta,
+      );
+      if (!mirrored) {
+        throw new Error(`vignette '${def.id}': symmetric-condition def has a non-mirrored trust-delta ${c.from}->${c.to}`);
+      }
+    } else if (c.kind === 'edge-rekind') {
+      const mirrored = def.consequences.some(
+        (o) => o.kind === 'edge-rekind' && o.from === other(c.from) && o.to === other(c.to) && o.newKind === c.newKind,
+      );
+      if (!mirrored) {
+        throw new Error(`vignette '${def.id}': symmetric-condition def has a non-mirrored edge-rekind ${c.from}->${c.to}`);
+      }
+    }
+  }
+}
+
 /** Nightly pass: per def, first qualifying binding fires (one per def per night — drama trickles). */
 export function runVignettes(world: WorldState, rules: Rules): void {
   const ids = Object.keys(world.npcs).sort().filter((id) => id !== world.playerId);
   for (const def of rules.vignettes) {
+    const symmetric = def.binding === 'pair' && def.conditions.every((c) => SYMMETRIC_CONDITIONS.has(c.kind));
+    if (symmetric) assertSymmetricConsequences(def);
     const bindings: Binding[] =
       def.binding === 'solo'
         ? ids.map((a) => ({ a, b: null }))
-        : ids.flatMap((a) => ids.filter((b) => b !== a).map((b) => ({ a, b })));
+        : symmetric
+          // canonical UNORDERED pairs (a<b, ids pre-sorted) — one firing per unordered pair.
+          ? ids.flatMap((a, i) => ids.slice(i + 1).map((b) => ({ a, b })))
+          // asymmetric pair def (lover-betrayed, believed-about): each ordering is its own drama.
+          : ids.flatMap((a) => ids.filter((b) => b !== a).map((b) => ({ a, b })));
     for (const bind of bindings) {
       const key = `${def.id}:${bind.a}:${bind.b ?? '-'}`;
       if (world.vignettesFired.includes(key)) continue;

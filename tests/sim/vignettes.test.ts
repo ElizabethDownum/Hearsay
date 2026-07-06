@@ -59,7 +59,7 @@ describe('vignette: public-quarrel (pair)', () => {
     expect(trustBetween(world, 'osric', 'mara')).toBeCloseTo(beforeOM - 0.2, 10);
 
     // Both minds hold a publicly-quarreled-with claim sharing ONE family (one minted claim).
-    const fam = 'vg:public-quarrel:mara';
+    const fam = 'vg:public-quarrel:mara:osric'; // pair-granular family (canonical a:b)
     const mb = world.beliefs['mara']![fam];
     const ob = world.beliefs['osric']![fam];
     expect(mb?.claim.predicate).toBe('publicly-quarreled-with');
@@ -68,8 +68,10 @@ describe('vignette: public-quarrel (pair)', () => {
     expect(mb!.claim.id).toBe(ob!.claim.id); // literally the same minted claim in both minds
   });
 
-  it('(b) latch: the ordered (mara,osric) binding fires once across three nights of standing belief', () => {
+  it('(b) latch: the canonical (mara,osric) pair fires ONCE across three nights — no reversed double-fire', () => {
     const world = buildWorld(TESTFORD, 'vg-latch');
+    const beforeMO = trustBetween(world, 'mara', 'osric');
+    const beforeOM = trustBetween(world, 'osric', 'mara');
     applyInject(world, 'mara', damaging('osric'));
     applyInject(world, 'osric', damaging('mara'));
 
@@ -77,8 +79,13 @@ describe('vignette: public-quarrel (pair)', () => {
 
     const key = 'public-quarrel:mara:osric';
     expect(world.vignettesFired.filter((k) => k === key)).toHaveLength(1);
+    // The (osric,mara) reverse is never enumerated — exactly ONE vignette record total for the run.
+    expect(world.chronicle.filter((e) => e.kind === 'vignette')).toHaveLength(1);
     const recs = vignettesIn(world, 'public-quarrel').filter((e) => e.a === 'mara' && e.b === 'osric');
     expect(recs).toHaveLength(1);
+    // Consequences applied exactly once: each side drops by exactly 0.2, not 0.4 (double-fire).
+    expect(trustBetween(world, 'mara', 'osric')).toBeCloseTo(beforeMO - 0.2, 10);
+    expect(trustBetween(world, 'osric', 'mara')).toBeCloseTo(beforeOM - 0.2, 10);
   });
 
   it('(e) one firing per def per night — a second qualifying pair waits for the next night', () => {
@@ -90,11 +97,19 @@ describe('vignette: public-quarrel (pair)', () => {
     applyInject(world, 'osric', damaging('mara'));
 
     runUntil(world, at(1, 0), STANDARD_RULES); // night 0
-    expect(vignettesIn(world, 'public-quarrel')).toHaveLength(1); // pacing cap: one per night
-    expect(vignettesIn(world, 'public-quarrel')[0]).toMatchObject({ a: 'hew', b: 'jonet' });
+    const afterNight0 = vignettesIn(world, 'public-quarrel');
+    expect(afterNight0).toHaveLength(1); // pacing cap: exactly one per night
+    // Lexicographically-first qualifying canonical pair fires first (hew<jonet, hew<mara).
+    expect(afterNight0[0]).toMatchObject({ a: 'hew', b: 'jonet' });
 
     runUntil(world, at(2, 0), STANDARD_RULES); // night 1
-    expect(vignettesIn(world, 'public-quarrel')).toHaveLength(2); // a second fired, one night later
+    const afterNight1 = vignettesIn(world, 'public-quarrel');
+    expect(afterNight1).toHaveLength(2); // exactly one more fired, one night later
+    // Record identity: day-0 gossip spreads the staged `stole` claims, so hew↔mara also become
+    // mutually-damaging. Night 1 fires the lexicographically-first STILL-qualifying canonical pair —
+    // (hew,mara) queue-jumps (mara,osric) because hew < mara — proving canonical (a<b) ordering.
+    expect(afterNight1[1]).toMatchObject({ a: 'hew', b: 'mara' });
+    expect(afterNight1[1]!.a < afterNight1[1]!.b!).toBe(true); // canonical: a strictly before b
   });
 });
 
@@ -148,7 +163,7 @@ describe('vignette: broken-betrothal (pair)', () => {
     expect(edge.kind).toBe('rival');
     expect(edge.trust).toBe(0); // clamp01(0.3 − 0.4) === 0
 
-    const fam = 'vg:broken-betrothal:ada';
+    const fam = 'vg:broken-betrothal:ada:bez'; // pair-granular family (canonical a:b)
     const belief = world.beliefs['ada']![fam];
     expect(belief?.claim.predicate).toBe('broke-a-betrothal');
     expect(belief?.claim.subject).toBe('bez');
