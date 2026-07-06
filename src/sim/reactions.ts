@@ -1,21 +1,27 @@
 import type { Tick } from '../core/time';
 import { dayOf } from '../core/time';
+import { fnv1a32 } from '../core/rng';
 import { applyInject } from './actions';
 import { SOMEONE, type EntityId, type PredicateId, type RumorId } from './rumors/claim';
 import { STANCE, stanceOf } from './rumors/propagation';
 import type { Rules } from './rules';
 import type { WorldState } from './types';
 
-/** The story an NPC reaches for when spinning their own image: juiciest flattering predicate. */
-export function counterSpinPredicate(rules: Rules): PredicateId | null {
-  let best: PredicateId | null = null;
-  let bestJuice = -1;
-  for (const id of Object.keys(rules.predicates).sort()) {
-    const p = rules.predicates[id]!;
-    if (p.valence !== 'flattering') continue;
-    if (p.juiciness > bestJuice) { best = id; bestJuice = p.juiciness; }
-  }
-  return best;
+/**
+ * The story an NPC reaches for when spinning their own image. Top-3 flattering
+ * predicates by juiciness, picked stably per (family, owner) — so a busy town
+ * spins several different stories instead of converging on one (P4-T3 carry).
+ */
+export function counterSpinPredicate(
+  rules: Rules, family: RumorId, ownerId: EntityId,
+): PredicateId | null {
+  const flattering = Object.keys(rules.predicates).sort()
+    .filter((id) => rules.predicates[id]!.valence === 'flattering')
+    .sort((a, b) => rules.predicates[b]!.juiciness - rules.predicates[a]!.juiciness
+      || (a < b ? -1 : 1));
+  if (flattering.length === 0) return null;
+  const pool = flattering.slice(0, Math.min(3, flattering.length));
+  return pool[fnv1a32(`${family}:${ownerId}`) % pool.length]!;
 }
 
 /**
@@ -48,7 +54,7 @@ export function reactToSelfRumor(
     }
     // Corroborated and taken seriously: author the counter-story, once.
     if (!belief.counterSpun && (stance === 'repeating' || stance === 'believing')) {
-      const predicate = counterSpinPredicate(rules);
+      const predicate = counterSpinPredicate(rules, family, hearerId);
       if (predicate === null) return; // a rules table with no flattery leaves no spin to author
       applyInject(world, hearerId, {
         subject: hearerId, predicate, object: null,

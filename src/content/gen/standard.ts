@@ -48,6 +48,11 @@ export const SECRET_SHAPES: SecretShapeDef[] = [
   { predicate: 'is-having-an-affair-with', needsObject: true,  needsPlace: false, severity: 4, weight: 3 },
   { predicate: 'stole',                    needsObject: false, needsPlace: true,  severity: 4, weight: 2 },
   { predicate: 'is-bankrupt',              needsObject: false, needsPlace: false, severity: 3, weight: 2 },
+  { predicate: 'poisoned',                 needsObject: true,  needsPlace: false, severity: 5, weight: 1 },
+  { predicate: 'forged-the-lineage',       needsObject: false, needsPlace: false, severity: 5, weight: 1 },
+  { predicate: 'embezzles-guild-funds',    needsObject: false, needsPlace: true,  severity: 4, weight: 2 },
+  { predicate: 'fathered-a-bastard',       needsObject: true,  needsPlace: false, severity: 3, weight: 2 },
+  { predicate: 'consorts-with-smugglers',  needsObject: false, needsPlace: true,  severity: 3, weight: 2 },
 ];
 
 export const STANDARD_GEN_CONTENT: GenContent = {

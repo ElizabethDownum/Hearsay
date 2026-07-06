@@ -62,7 +62,11 @@ describe('counter-spin: a corroborated damaging self-rumor pulls a counter-story
       expect(spin.target).toBe('dov');
       const claim = world.claims[spin.claimId]!;
       expect(claim.subject).toBe('dov');
-      expect(claim.predicate).toBe(counterSpinPredicate(RULES));
+      // Re-encoded (P6-T1): the old always-rescued-the-drowning-child pin was an
+      // artifact of the pre-spread convergence bug. Assert the spun story is
+      // flattering and that the picker is stable for this (family, owner) pair.
+      expect(RULES.predicates[claim.predicate]?.valence).toBe('flattering');
+      expect(counterSpinPredicate(RULES, 'f50', 'dov')).toBe(claim.predicate);
       expect(claim.attribution).toBe(SOMEONE);
     }
     expect(world.beliefs['dov']!['f50']!.counterSpun).toBe(true);
@@ -110,5 +114,26 @@ describe('amplify and shrug', () => {
     reactToSelfRumor(world, 'dov', 'f60', 0, neutralRules);
     const after = JSON.stringify([world.inquiries, world.chronicle.length, world.beliefs['dov']!['f60']!.credence]);
     expect(after).toBe(before);
+  });
+});
+
+describe('counter-spin spread: (family, owner) keyed, no town-wide convergence', () => {
+  it('counter-spin varies by (family, owner) — no town-wide convergence on one story', () => {
+    const picks = new Set<string>();
+    for (const family of ['fam-a', 'fam-b', 'fam-c', 'fam-d', 'fam-e', 'fam-f']) {
+      for (const owner of ['ada', 'bez', 'cyn']) {
+        const p = counterSpinPredicate(STANDARD_RULES, family, owner);
+        expect(p).not.toBeNull();
+        expect(STANDARD_RULES.predicates[p!]!.valence).toBe('flattering');
+        picks.add(p!);
+      }
+    }
+    // 18 draws over the top-3 flattering pool: at least 2 distinct stories must appear.
+    expect(picks.size).toBeGreaterThanOrEqual(2);
+  });
+
+  it('counter-spin is stable per (family, owner)', () => {
+    expect(counterSpinPredicate(STANDARD_RULES, 'fam-x', 'ada'))
+      .toBe(counterSpinPredicate(STANDARD_RULES, 'fam-x', 'ada'));
   });
 });

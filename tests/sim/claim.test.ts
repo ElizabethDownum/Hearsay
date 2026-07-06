@@ -1,5 +1,4 @@
 import { diffClaims, mintClaim, SOMEONE, type Claim } from '../../src/sim/rumors/claim';
-import { PREDICATES } from '../../src/content/predicates';
 
 const base = (world: { claimCounter: number }): Claim =>
   mintClaim(world, {
@@ -27,26 +26,7 @@ describe('claims', () => {
     ]);
     expect(diffClaims(a, a)).toEqual([]);
   });
-
-  it('predicate table: seven predicates, sin mappings resolve to real predicates', () => {
-    expect(Object.keys(PREDICATES)).toHaveLength(7);
-    for (const p of Object.values(PREDICATES)) {
-      expect(p.juiciness).toBeGreaterThan(0);
-      expect(p.juiciness).toBeLessThanOrEqual(1);
-      if (p.sinVersion) expect(PREDICATES[p.sinVersion]).toBeDefined();
-    }
-  });
-
-  it('predicate table pins the exact seven-entry ontology', () => {
-    expect(PREDICATES).toEqual({
-      'met-secretly-with':        { id: 'met-secretly-with',        juiciness: 0.7,  sinVersion: 'is-having-an-affair-with', factionRelevant: true, valence: 'damaging' },
-      'is-having-an-affair-with': { id: 'is-having-an-affair-with', juiciness: 0.9,  sinVersion: null, factionRelevant: false, valence: 'damaging' },
-      'stole':                    { id: 'stole',                    juiciness: 0.8,  sinVersion: null, factionRelevant: true, valence: 'damaging' },
-      'is-bankrupt':              { id: 'is-bankrupt',              juiciness: 0.6,  sinVersion: null, factionRelevant: true, valence: 'damaging' },
-      'owes-money-to':            { id: 'owes-money-to',            juiciness: 0.35, sinVersion: 'stole', factionRelevant: false, valence: 'damaging' },
-      'blessed-the-harvest':      { id: 'blessed-the-harvest',      juiciness: 0.15, sinVersion: null, factionRelevant: false, valence: 'flattering' },
-      // Plan 4 Task 3 (amendment #3): the counter-spin vehicle — juicy enough to clear TELL_THRESHOLD.
-      'rescued-the-drowning-child': { id: 'rescued-the-drowning-child', juiciness: 0.65, sinVersion: null, factionRelevant: false, valence: 'flattering' },
-    });
-  });
 });
+// Predicate-registry tests (table scale, sinVersion resolution, exact ontology
+// pin) moved to tests/content/predicates.test.ts — this file now tests only
+// Claim mint/diff mechanics. Moved during P6-T1's 7→24 predicate table growth.
