@@ -65,6 +65,30 @@ describe('determinism law — glob coverage', () => {
   });
 });
 
+describe('determinism law — new Plan-6 dirs are really covered by the src/sim/** globs', () => {
+  // src/sim/scenario/** and src/sim/vignettes/** don't exist as real files yet at this
+  // task's checkpoint (vignettes ships later), but calculateConfigForFile computes config
+  // from the PATH's glob match alone (same pre-registration precedent as the intel/app laws
+  // below) — so these probes prove the existing src/sim/**/*.ts globs really reach the new
+  // subdirs, with no eslint.config.js edit needed or permitted.
+  const newDirs = ['src/sim/scenario/probe.ts', 'src/sim/vignettes/probe.ts'];
+
+  it.each(newDirs)('%s: Math.random() fires the entropy diagnostic', async (file) => {
+    const rules = await determinismRulesFor(file);
+    expect(violations('const x = Math.random();', rules)).toBeGreaterThan(0);
+  }, 15000);
+
+  it.each(newDirs)('%s: importing src/content/** fires the content-ban diagnostic', async (file) => {
+    const rules = await importRulesFor(file);
+    expect(violations("import { X } from '../../content/predicates';", rules)).toBeGreaterThan(0);
+  }, 15000);
+
+  it.each(newDirs)('%s: importing app/src/main fires the app-ban diagnostic', async (file) => {
+    const rules = await importRulesFor(file);
+    expect(violations("import { Y } from '../../../app/src/main';", rules)).toBeGreaterThan(0);
+  }, 15000);
+});
+
 describe('no-omniscience law — the enemy never imports WorldState', () => {
   // Note: the bare Linter() here (like the rest of this file) has no TS parser, so these
   // probes use plain import syntax over the same paths `import type` would use in real code —

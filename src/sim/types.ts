@@ -4,8 +4,10 @@ import type { TraitId } from './rumors/traits';
 import type { EnemyState } from './enemy/state';
 import type { InquiryKey } from './perception';
 import type { IntelState } from '../intel/entry';
+import type { ScenarioState } from './scenario/types';
 
 export type { IntelEntry, IntelState, InformantSpec, HypothesisCard, CodexHypothesis } from '../intel/entry';
+export type { ScenarioState, ScenarioStatus, ScenarioDef, ScenarioCast, WinCondition, Resolution } from './scenario/types';
 
 export interface Venue {
   id: VenueId;
@@ -124,6 +126,8 @@ export interface WorldState {
   playerVenue: VenueId | null;
   /** The player's private knowledge substrate (informants, captured feed, board notes). */
   intel: IntelState;
+  /** The campaign referee's state, or null in a scenario-free (headless/probe) world. */
+  scenario: ScenarioState | null;
   npcs: Record<EntityId, Npc>;
   venues: Record<VenueId, Venue>;
   beliefs: Record<EntityId, BeliefStore>;

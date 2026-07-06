@@ -40,6 +40,7 @@ export function buildWorld(fixture: TownFixture, seed: string): WorldState {
     playerId: null,
     playerVenue: null,
     intel: { informants: [], log: [], cards: [], codex: [] },
+    scenario: null,
     npcs,
     venues,
     beliefs: Object.fromEntries(fixture.npcs.map((n) => [n.id, {}])),
