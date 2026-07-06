@@ -4,7 +4,7 @@ import { TESTFORD } from '../../src/content/fixtures/testford';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT } from '../../src/content/gen/standard';
 import { generateValidTown } from '../../src/world/serve';
-import { worldFromTown } from '../../src/world/attach';
+import { worldFromTown, attachPlayer } from '../../src/world/attach';
 import { attachScenario } from '../../src/sim/scenario/referee';
 import { applyInject } from '../../src/sim/actions';
 import { runUntil } from '../../src/sim/step';
@@ -96,5 +96,48 @@ describe('PILLAR: live ≡ replay with the scenario referee active', () => {
     // The referee actually fired and wrote its ending — otherwise this proves nothing.
     expect(a.scenario!.status).toBe('won');
     expect(a.chronicle.some((e) => e.kind === 'institution')).toBe(true);
+  });
+});
+
+describe('PILLAR: live ≡ replay with scenario + vignettes + enemy + intel ALL active', () => {
+  const SEED = 'all-on-seed-1';
+  const DEF: ScenarioDef = {
+    id: 'det-all-on', name: 'Det All On', days: 40,
+    objectiveTerm: 'objective-topple', win: { kind: 'council-turns', quorum: 2 },
+  };
+  const { town } = generateValidTown(SEED, STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT, STANDARD_RULES);
+  const cast = town.cast!;
+  const damaging = (subject: string) => ({
+    subject, predicate: 'poisoned', object: SOMEONE, count: null,
+    severity: 5 as const, place: null, attribution: SOMEONE,
+  });
+  // Two non-usurper NPCs staged into a mutual quarrel so a vignette actually FIRES — replay must
+  // hold through the vignette nightly writes, not merely with an empty vignettesFired.
+  const [p, q] = town.fixture.npcs.map((n) => n.id).filter((id) => id !== cast.usurper).sort();
+
+  // All four seams live: enemy (worldFromTown roster), scenario (attachScenario), intel/avatar
+  // (attachPlayer informants + feed), vignettes (STANDARD_RULES.vignettes).
+  const build = (): WorldState => {
+    const world = worldFromTown(town, SEED);
+    attachScenario(world, town, DEF);
+    attachPlayer(world, town);
+    return world;
+  };
+  const log: ActionLog = [
+    { tick: at(0, 8), kind: 'inject', target: cast.council[0]!, spec: damaging(cast.usurper) },
+    { tick: at(0, 8), kind: 'inject', target: p!, spec: damaging(q!) }, // p believes q damaging...
+    { tick: at(0, 9), kind: 'inject', target: cast.council[1]!, spec: damaging(cast.usurper) },
+    { tick: at(0, 9), kind: 'inject', target: q!, spec: damaging(p!) }, // ...and q believes p damaging
+  ];
+
+  it('all four systems active — two runs hash-identical over 3 days, with a vignette fired', () => {
+    const a = runLogOn(build(), STANDARD_RULES, log, at(3, 0));
+    const b = runLogOn(build(), STANDARD_RULES, log, at(3, 0));
+    expect(hashWorld(a)).toBe(hashWorld(b));
+    // Every seam actually engaged — otherwise "all active" proves nothing.
+    expect(a.scenario!.status).toBe('won');                          // referee fired
+    expect(a.chronicle.some((e) => e.kind === 'vignette')).toBe(true); // a vignette fired
+    expect(a.playerId).not.toBeNull();                               // intel/avatar attached
+    expect(a.enemy.observers.length).toBeGreaterThan(0);             // enemy roster wired
   });
 });

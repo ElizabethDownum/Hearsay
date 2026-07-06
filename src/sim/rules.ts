@@ -1,5 +1,6 @@
 import type { PredicateId } from './rumors/claim';
 import type { TraitDef, TraitId } from './rumors/traits';
+import type { VignetteDef } from './vignettes/types';
 
 export interface PredicateDef {
   id: PredicateId;
@@ -24,4 +25,6 @@ export interface Rules {
   traits: Record<TraitId, TraitDef>;
   /** Player/intel tuning: which occupations the enemy's watch profiles read as suspicious. */
   intel: { watchOccupations: string[] };
+  /** State-triggered micro-scenes (pillar 7): declarative preconditions → ordinary world facts. */
+  vignettes: readonly VignetteDef[];
 }

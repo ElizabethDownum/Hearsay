@@ -50,6 +50,7 @@ export function buildWorld(fixture: TownFixture, seed: string): WorldState {
     inquiries: {},
     scheduleOverrides: {},
     enemy: emptyEnemyState(),
+    vignettesFired: [],
   };
 }
 

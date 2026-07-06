@@ -106,7 +106,14 @@ export interface InstitutionRecord {
   actors: EntityId[];
   claimIds: string[];
 }
-export type ChronicleEntry = TellingRecord | InjectRecord | AskingRecord | InstitutionRecord;
+export interface VignetteRecord {
+  kind: 'vignette';
+  tick: Tick;
+  defId: string;
+  a: EntityId;
+  b: EntityId | null;
+}
+export type ChronicleEntry = TellingRecord | InjectRecord | AskingRecord | InstitutionRecord | VignetteRecord;
 
 export interface InquiryTask {
   about: InquiryKey;
@@ -125,7 +132,7 @@ export interface ScheduleOverride {
   to: number;
   venue: VenueId;
   /** Provenance: who placed this override — assignment replaces only its own ('player'). */
-  source: 'enemy' | 'player';
+  source: 'enemy' | 'player' | 'vignette';
 }
 
 export interface WorldState {
@@ -153,6 +160,8 @@ export interface WorldState {
   inquiries: Record<EntityId, InquiryTask[]>;
   scheduleOverrides: Record<EntityId, ScheduleOverride[]>;
   enemy: EnemyState;
+  /** Latch keys of vignettes already fired — `${defId}:${a}:${b ?? '-'}` (pillar 7, replay-stable). */
+  vignettesFired: string[];
 }
 
 export interface TownFixture {

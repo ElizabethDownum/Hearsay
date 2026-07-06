@@ -6,6 +6,7 @@ import { chooseTelling, ingest, CONVERSATION_BEAT } from './rumors/propagation';
 import { captureEvidence, runEnemyDay } from './counterintel';
 import { captureIntel } from './fieldwork';
 import { reactToSelfRumor } from './reactions';
+import { runVignettes } from './vignettes/engine';
 import { scenarioNightly } from './scenario/referee';
 import type { Rules } from './rules';
 import type { WorldState } from './types';
@@ -94,9 +95,8 @@ export function step(world: WorldState, rules: Rules): TickEvents {
   if (minuteOfDay(t) === 1439) {
     runEnemyDay(world, rules);          // digest today's evidence into countermeasures...
     expireInquiries(world, dayOf(t));   // ...THEN sweep spent inquiries.
-    // Task 7 inserts runVignettes(world, rules, defs?) HERE — vignettes fire before the
-    // referee so institutions read a settled day including tonight's micro-scenes.
-    scenarioNightly(world, rules);      // ...THEN the institutions decide.
+    runVignettes(world, rules);         // ...THEN tonight's micro-scenes fire (pillar 7), so...
+    scenarioNightly(world, rules);      // ...the institutions read a settled day incl. the vignettes.
   }
 
   world.tick = t + 1;
