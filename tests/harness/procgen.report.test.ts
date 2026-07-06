@@ -12,14 +12,17 @@ const gen = (seed: string): ReturnType<typeof generateValidTown>['town'] =>
 const pct = (n: number): string => `${(n * 100).toFixed(0)}%`;
 
 describe('procgen pacing probe (npm run mc)', () => {
-  // Probe 1 — trait-aware bots, pre-saturation. The served probe-town-2's best-connected
-  // hub is 'enid', a moralizer/partisan — NOT a gatekeeper — so canny and patient hand hop
-  // zero to the same mind there (measured identical, ~81% reach each). The canny>patient
-  // hypothesis only bites where the hub gatekeeps. Swept town seeds; probe-town-5's hub is
-  // 'griffin', a SKEPTIC (retellGate requires-corroboration): patient strands the whisper at
-  // the gatekeeper, canny reads the trait and hands it to 'magnus' instead. Pinned here per
-  // the escalation license — the divergent town is where "read the town" is worth measuring.
-  const DIVERGENT = gen('probe-town-5');
+  // Probe 1 — trait-aware bots, pre-saturation. Re-swept for Plan 6's 14-trait pool (P4-T4
+  // 8-seed sweep over probe-town-1..8, run BEFORE re-pinning): the trait-draw reshape moved the
+  // gatekeeper geometry. probe-town-5's old hub 'griffin' now draws
+  // [moralizer,dramatist,partisan,relocator] — no longer a gatekeeper, so canny≈patient there
+  // (it becomes the non-gatekeeper equivalence town for probes 2–3). The ONE divergent
+  // gatekeeper-hub town in the sweep is probe-town-2, whose best-connected hub 'enid' carries
+  // [skeptic,minimizer] (retellGate requires-corroboration): patient strands the hop-zero whisper
+  // at the gatekeeper (~1% reach), canny reads the trait and hands it to the non-gatekeeper
+  // 'cosima' instead (~89% reach). Pinned here per the escalation license — the divergent town is
+  // where "read the town" is worth measuring.
+  const DIVERGENT = gen('probe-town-2');
   const SEEDS = ['mcg-1', 'mcg-2', 'mcg-3', 'mcg-4', 'mcg-5'];
 
   it('canny reads the town and clears the gatekeeper that strands the patient whisperer', () => {
@@ -34,18 +37,19 @@ describe('procgen pacing probe (npm run mc)', () => {
       return r;
     });
     const [patient, canny] = results;
-    // HYPOTHESIS (escalation license): patient hands hop zero to the skeptic 'griffin' and
-    // strands near 1%; canny hands it to a non-gatekeeper and clears the town. If this fails
-    // structurally, STOP and report with the printed table — never widen seeds/days to force it.
-    // Measured 2026-07: patient reach ~1%, canny reach ~77%.
+    // HYPOTHESIS (escalation license): patient hands hop zero to the skeptic 'enid' and
+    // strands near 1%; canny hands it to the non-gatekeeper 'cosima' and clears the town. If this
+    // fails structurally, STOP and report with the printed table — never widen seeds/days to force it.
+    // Measured 2026-07 (14-trait pool): patient reach ~1%, canny reach ~89%.
     expect(canny!.reach.mean).toBeGreaterThan(patient!.reach.mean);
   });
 
-  // Probe 2 — the butterfly at town scale, pre-saturation. Same fixture, two world seeds:
-  // the circle shuffles diverge before saturation and mint a different claim count. Plan-3
-  // measured this gap on Testford (85 vs 248); here it stands as the town-scale metric.
+  // Probe 2 — the butterfly at town scale, pre-saturation. Same fixture (probe-town-5, the
+  // non-gatekeeper equivalence town after the Plan 6 re-sweep), two world seeds: the circle
+  // shuffles diverge before saturation and mint a different claim count. Plan-3 measured this gap
+  // on Testford (85 vs 248); here it stands as the town-scale metric.
   it('same fixture, different world seed → a different claim count (butterfly, 2 days)', () => {
-    const town = gen('probe-town-2');
+    const town = gen('probe-town-5');
     const r = runMonteCarlo({ fixture: town.fixture, rules: STANDARD_RULES, bot: blitzCrier,
       seeds: ['wseed-1', 'wseed-2'], days: 2 });
     for (const s of r.perSeed) {
@@ -59,7 +63,7 @@ describe('procgen pacing probe (npm run mc)', () => {
   // digest (Task 9) runs and turns the campaign's evidence into sketch features. Feature counts
   // are emergent (reported, not pinned); the assertion is that the machinery ran every seed.
   it('enemy-active: the nightly digest builds a sketch from the campaign it observes', () => {
-    const town = gen('probe-town-2');
+    const town = gen('probe-town-5');
     const r = runMonteCarlo({ makeWorld: (seed) => worldFromTown(town, seed), rules: STANDARD_RULES,
       bot: blitzCrier, seeds: ['es-1', 'es-2', 'es-3'], days: 4 });
     for (const s of r.perSeed) {

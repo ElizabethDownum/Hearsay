@@ -1,6 +1,6 @@
 import { applyTraits, type TraitContext } from '../../src/sim/rumors/traits';
 import { TRAITS } from '../../src/content/traits';
-import { SOMEONE, type Claim, type FieldChange, CLAIM_FIELDS } from '../../src/sim/rumors/claim';
+import { SOMEONE, diffClaims, type Claim, type FieldChange, CLAIM_FIELDS } from '../../src/sim/rumors/claim';
 import type { ReportedClaim } from '../../src/sim/enemy/state';
 
 const ctx = (over: Partial<TraitContext> = {}): TraitContext => ({
@@ -58,6 +58,80 @@ describe('individual traits', () => {
   });
 });
 
+describe('new traits (Plan 6) — transform-exact / abstain / fingerprint vs nearest neighbor', () => {
+  // Apply a trait's own transform, returning the mutated claim; fp() round-trips a
+  // captured before→after through a (possibly other) trait's fingerprint.
+  const apply = (c: Claim, id: string): Claim => ({ ...c, ...TRAITS[id]!.transform(c, ctx()) }) as Claim;
+  const fp = (id: string, before: Claim, after: Claim): boolean =>
+    TRAITS[id]!.fingerprint(before, diffClaims(before, after));
+
+  it('minimizer halves count and drops severity by one; fingerprint splits from peacemaker', () => {
+    const row = { ...probe, predicate: 'stole', count: 4, severity: 4 as const };
+    expect(TRAITS['minimizer']!.transform(row, ctx())).toEqual({ count: 2, severity: 3 });
+    expect(TRAITS['minimizer']!.appliesTo({ ...probe, count: null, severity: 1 }, ctx())).toBe(false);
+    expect(fp('minimizer', row, apply(row, 'minimizer'))).toBe(true);   // −1 / halved is its own
+    expect(fp('minimizer', row, apply(row, 'peacemaker'))).toBe(false); // peacemaker's −2 is not
+  });
+
+  it('dramatist slams severity to 5 from ≤3 damaging; unreachable by exaggerator', () => {
+    const row = { ...probe, predicate: 'stole', severity: 2 as const };
+    expect(TRAITS['dramatist']!.transform(row, ctx())).toEqual({ severity: 5 });
+    expect(TRAITS['dramatist']!.appliesTo({ ...probe, predicate: 'blessed-the-harvest', severity: 2 }, ctx())).toBe(false);
+    expect(fp('dramatist', row, apply(row, 'dramatist'))).toBe(true);
+    expect(fp('dramatist', row, apply(row, 'exaggerator'))).toBe(false); // +1 never reaches the ceiling jump
+  });
+
+  it('name-dropper swaps one named source for a rival; fingerprint splits from vaguener', () => {
+    const row = { ...probe, attribution: 'mara' };
+    const d = TRAITS['name-dropper']!.transform(row, ctx());
+    expect(ctx().rivals).toContain(d.attribution);   // filled from own grudges
+    expect(d.attribution).not.toBe('mara');
+    expect(TRAITS['name-dropper']!.appliesTo({ ...probe, attribution: SOMEONE }, ctx())).toBe(false);
+    expect(fp('name-dropper', row, apply(row, 'name-dropper'))).toBe(true);
+    expect(fp('name-dropper', row, apply(row, 'vaguener'))).toBe(false); // named→someone is not named→named
+  });
+
+  it('vaguener dissolves a named source into someone; fingerprint splits from name-dropper', () => {
+    const row = { ...probe, attribution: 'mara' };
+    expect(TRAITS['vaguener']!.transform(row, ctx())).toEqual({ attribution: SOMEONE });
+    expect(TRAITS['vaguener']!.appliesTo({ ...probe, attribution: SOMEONE }, ctx())).toBe(false);
+    expect(fp('vaguener', row, apply(row, 'vaguener'))).toBe(true);
+    expect(fp('vaguener', row, apply(row, 'name-dropper'))).toBe(false); // named→named is not named→someone
+  });
+
+  it('numberer invents a count of three where there was none; disjoint from exaggerator', () => {
+    const row = { ...probe, count: null };
+    expect(TRAITS['numberer']!.transform(row, ctx())).toEqual({ count: 3 });
+    expect(TRAITS['numberer']!.appliesTo({ ...probe, count: 3 }, ctx())).toBe(false);
+    expect(fp('numberer', row, apply(row, 'numberer'))).toBe(true);
+    expect(fp('numberer', row, apply(row, 'exaggerator'))).toBe(false); // exaggerator leaves a null count null
+  });
+
+  it('peacemaker walks a damaging story down by two; fingerprint splits from minimizer', () => {
+    const row = { ...probe, predicate: 'stole', severity: 4 as const };
+    expect(TRAITS['peacemaker']!.transform(row, ctx())).toEqual({ severity: 2 });
+    expect(TRAITS['peacemaker']!.appliesTo({ ...probe, predicate: 'blessed-the-harvest', severity: 4 }, ctx())).toBe(false);
+    expect(fp('peacemaker', row, apply(row, 'peacemaker'))).toBe(true);
+    expect(fp('peacemaker', row, apply(row, 'minimizer'))).toBe(false); // minimizer's −1 is not the −2 step
+  });
+
+  it('objectifier drags a rival into an empty object slot; the only object-writer', () => {
+    const row = { ...probe, object: null, subject: SOMEONE };
+    const d = TRAITS['objectifier']!.transform(row, ctx());
+    expect(ctx().rivals).toContain(d.object);
+    expect(TRAITS['objectifier']!.appliesTo({ ...probe, object: 'hew' }, ctx())).toBe(false);
+    expect(fp('objectifier', row, apply(row, 'objectifier'))).toBe(true);
+    expect(fp('objectifier', row, apply(row, 'attributor'))).toBe(false); // attributor never touches object
+  });
+
+  it('relocator unmoors the story from its place; the only place-writer', () => {
+    expect(TRAITS['relocator']!.transform(probe, ctx())).toEqual({ place: null });
+    expect(TRAITS['relocator']!.appliesTo({ ...probe, place: null }, ctx())).toBe(false);
+    expect(fp('relocator', probe, apply(probe, 'relocator'))).toBe(true);
+    expect(fp('relocator', probe, apply(probe, 'exaggerator'))).toBe(false); // exaggerator never touches place
+  });
+});
+
 describe('composition', () => {
   it('applies in owner order, each trait seeing the previous output', () => {
     const d = applyTraits([TRAITS['moralizer']!, TRAITS['exaggerator']!], probe, ctx());
@@ -110,7 +184,14 @@ describe('codex fingerprints — the dev-time glossary the Evidence Board deduce
 });
 
 describe('ontology law: fingerprint uniqueness (property test)', () => {
-  it('no two field-changing traits share a change signature on the probe set', () => {
+  // The law compares full field-change VECTORS (from→to), not merely which fields move.
+  // By design, signature ZONES overlap — exaggerator (+count/+sev) and minimizer (−count/−sev)
+  // touch the same {count,severity} fields and are told apart only by value; that ambiguity is
+  // the deduction game. Pre-Plan-6 this guard compared field-NAME sets and so falsely conflated
+  // those zone-mates once minimizer joined the registry. Re-encoded to the value-vector the
+  // ontology law actually uses; the authoritative 5-row battery lives in
+  // tests/content/traits-ontology.test.ts (this stays as the in-suite guard).
+  it('no two field-changing traits share a change VECTOR on the probe set', () => {
     const probes: Claim[] = [
       probe,
       { ...probe, subject: 'wat', predicate: 'stole', count: null },
@@ -121,12 +202,12 @@ describe('ontology law: fingerprint uniqueness (property test)', () => {
       return probes
         .map((p) => {
           if (!t.appliesTo(p, ctx())) return '-';
-          const d = t.transform(p, ctx());
-          return CLAIM_FIELDS.filter((f) => f in d).sort().join(',');
+          const after = { ...p, ...t.transform(p, ctx()) } as Claim;
+          return diffClaims(p, after).map((c) => `${c.field}:${String(c.from)}→${String(c.to)}`).sort().join('|') || '-';
         })
-        .join('|');
+        .join(' ; ');
     };
-    const changing = Object.keys(TRAITS).filter((id) => signature(id).replaceAll('-', '').replaceAll('|', '') !== '');
+    const changing = Object.keys(TRAITS).filter((id) => signature(id).split(' ; ').some((s) => s !== '-'));
     const sigs = changing.map(signature);
     expect(new Set(sigs).size).toBe(changing.length);
   });

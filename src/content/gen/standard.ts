@@ -63,6 +63,10 @@ export const STANDARD_GEN_CONTENT: GenContent = {
     { id: 'exaggerator', weight: 3 }, { id: 'attributor', weight: 3 },
     { id: 'moralizer', weight: 3 },   { id: 'partisan', weight: 3 },
     { id: 'literalist', weight: 2 },  { id: 'skeptic', weight: 1 }, // gatekeepers rare — they kill rumors
+    { id: 'minimizer', weight: 2 },   { id: 'dramatist', weight: 2 },
+    { id: 'name-dropper', weight: 2 },{ id: 'vaguener', weight: 2 },
+    { id: 'numberer', weight: 2 },    { id: 'peacemaker', weight: 1 },
+    { id: 'objectifier', weight: 2 }, { id: 'relocator', weight: 1 },
   ],
   factions: [
     { id: 'guild', weight: 7 }, { id: 'crown', weight: 6 }, { id: 'none', weight: 7 },
