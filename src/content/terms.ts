@@ -1,0 +1,104 @@
+export interface TermDef {
+  id: string;
+  /** The exact label the UI renders (also the highlight target). */
+  label: string;
+  /** Tooltip line, <= 120 chars, mechanical truth in plain words. */
+  short: string;
+  /** Expanded codex-of-terms entry; null until a UI plan needs the long form. */
+  entry: string | null;
+}
+
+export const TERMS: Record<string, TermDef> = {
+  // ── the rumor machine ──
+  'family':          { id: 'family', label: 'Story', short: 'One rumor and all its mutated versions share a family — different tellings of the same story.', entry: null },
+  'version':         { id: 'version', label: 'Version', short: 'The exact wording one mind holds. Versions differ where minds changed them.', entry: null },
+  'diff':            { id: 'diff', label: 'Difference', short: 'The changed fields between two versions — each change fingerprints the mind that made it.', entry: null },
+  'attribution':     { id: 'attribution', label: 'Source (claimed)', short: 'Who the story SAYS it came from. Mutable, often wrong — and the key to tracing.', entry: null },
+  'corroboration':   { id: 'corroboration', label: 'Corroboration', short: 'Hearing a story from apparently independent sources. Manufactured independence still counts.', entry: null },
+  'apparent-source': { id: 'apparent-source', label: 'Apparent source', short: 'Who a hearer THINKS a telling came from — the surviving attribution, or the teller.', entry: null },
+  'credence':        { id: 'credence', label: 'Credence', short: 'How much a mind believes a story, 0 to 1. Trust, plausibility, and corroboration move it.', entry: null },
+  'stance':          { id: 'stance', label: 'Stance', short: 'Belief tiers: dismiss (<0.2), repeat (0.5+), believe (0.75+). Acting takes believing.', entry: null },
+  'freshness':       { id: 'freshness', label: 'Freshness', short: 'Stories go stale in ~3 days unless newly corroborated. Stale news is not retold.', entry: null },
+  'juiciness':       { id: 'juiciness', label: 'Juiciness', short: 'How tellable a story is on its own. Juicy stories race; dull ones die.', entry: null },
+  'circle':          { id: 'circle', label: 'Circle', short: 'A conversation at a venue. Same circle = hear; same venue = see who is present.', entry: null },
+  'overheard':       { id: 'overheard', label: 'Overheard', short: 'Heard without being addressed. Bystanders catch words by the same physics as guards.', entry: null },
+  'access':          { id: 'access', label: 'Access', short: 'Venues are public, invitational, or private. Standing decides which doors open.', entry: null },
+  'bridge':          { id: 'bridge', label: 'Bridge', short: 'A person who frequents two districts. Stories cross firebreaks only on their feet.', entry: null },
+  'firebreak':       { id: 'firebreak', label: 'Firebreak', short: 'Districts that share no venues. Rumors cannot jump them without a bridge.', entry: null },
+  // ── secrets and sources ──
+  'secret':          { id: 'secret', label: 'Secret', short: 'A true thing someone witnessed. Never volunteered — extracted by trust or compulsion.', entry: null },
+  'discretion':      { id: 'discretion', label: 'Held close', short: 'A belief its holder will not gossip about. Trust above 0.7, or authority, unlocks it.', entry: null },
+  'witnessed':       { id: 'witnessed', label: 'Witnessed', short: 'Known first-hand, not heard. Witnessed beliefs are near-certain and start silent.', entry: null },
+  'via':             { id: 'via', label: 'Via', short: 'The channel an entry reached you through: your own eyes, the dossier, or a named informant.', entry: null },
+  'informant':       { id: 'informant', label: 'Informant', short: 'A townsperson on your payroll. Their reports pass through THEIR traits — eyes can lie.', entry: null },
+  'dossier':         { id: 'dossier', label: 'Dossier', short: 'Your day-0 briefing. Everything in it is true — and never enough.', entry: null },
+  // ── your boards ──
+  'evidence-board':  { id: 'evidence-board', label: 'Evidence Board', short: 'Auto-collects what you lawfully heard, clusters versions, highlights diffs. Thinking stays yours.', entry: null },
+  'codex':           { id: 'codex', label: 'Codex', short: 'Your trait deductions. Propose a trait, corroborate from observed pairs, lock at three.', entry: null },
+  'lock':            { id: 'lock', label: 'Lock', short: 'Three corroborating observations confirm a codex hypothesis. Locks trust your channels.', entry: null },
+  'fingerprint':     { id: 'fingerprint', label: 'Fingerprint', short: 'The tell-tale change pattern a trait leaves on stories it retells.', entry: null },
+  'counter-sketch':  { id: 'counter-sketch', label: 'Counter-Sketch', short: 'Your sketch of HIS sketch — what you believe the enemy has pieced together about you.', entry: null },
+  'hypothesis-card': { id: 'hypothesis-card', label: 'Card', short: 'Your written hunch with your confidence. The game files it and never grades it.', entry: null },
+  'assist-level':    { id: 'assist-level', label: 'Assist', short: 'Perception help, 0-3: raw notes, clustering+diffs, trait candidates, route sketches.', entry: null },
+  // ── the hunt ──
+  'sketch':          { id: 'sketch', label: 'Ghost sketch', short: 'The enemy investigates a ghost — every traced operation adds a feature to it.', entry: null },
+  'sketch-feature':  { id: 'sketch-feature', label: 'Feature', short: 'One deduced trait of the ghost: a district, an entry point, a carrier profile.', entry: null },
+  'watch':           { id: 'watch', label: 'Watch', short: 'Guards posted to a district evening after evening. A countermeasure you can SEE.', entry: null },
+  'interrogation':   { id: 'interrogation', label: 'Interrogation', short: 'A named target compelled to answer at an invitational venue. Authority opens mouths.', entry: null },
+  'inquiry':         { id: 'inquiry', label: 'Asking-around', short: 'Someone is asking questions about a story or a person. Asking is itself observable.', entry: null },
+  'authority':       { id: 'authority', label: 'With authority', short: 'A question carrying the watch\'s weight. Refusing discretion does not survive it.', entry: null },
+  'exposure':        { id: 'exposure', label: 'Exposure', short: 'How much of the ghost sketch points at YOUR people. Distinct features, never raw count.', entry: null },
+  'identified':      { id: 'identified', label: 'Identified', short: 'The carrier profile has your face. The hunt is over unless you already won.', entry: null },
+  // ── the campaign ──
+  'doom-clock':      { id: 'doom-clock', label: 'Doom clock', short: 'The campaign\'s natural deadline. Day 40: the coronation happens with or without you.', entry: null },
+  'council':         { id: 'council', label: 'Council', short: 'The electors. When enough of them believe the worst, they act — that is your win.', entry: null },
+  'usurper':         { id: 'usurper', label: 'Usurper', short: 'The one about to be crowned. Your objective walks and talks and has secrets.', entry: null },
+  'denounce':        { id: 'denounce', label: 'Denunciation', short: 'The council turns on the usurper — an institutional act the town itself performs.', entry: null },
+  'coronation':      { id: 'coronation', label: 'Coronation', short: 'The clock ran out. The crown lands; the campaign is lost.', entry: null },
+  'unmasking':       { id: 'unmasking', label: 'Unmasking', short: 'The enemy\'s sketch converged on you. The slow loss, arrived.', entry: null },
+  'objective-topple':{ id: 'objective-topple', label: 'Topple the usurper', short: 'Turn the council before day 40: quorum of electors believing act-tier dirt on the usurper.', entry: null },
+  // ── vignettes ──
+  'vignette-public-quarrel':   { id: 'vignette-public-quarrel', label: 'Public quarrel', short: 'Two rivals who each believe the worst finally collide in public. The town takes notes.', entry: null },
+  'vignette-merchant-ruin':    { id: 'vignette-merchant-ruin', label: 'Ruin', short: 'When enough creditors believe the bankruptcy, the shop shutters — visibly.', entry: null },
+  'vignette-broken-betrothal': { id: 'vignette-broken-betrothal', label: 'Broken betrothal', short: 'A lover who believes the affair breaks it off. Love turns rival; kin hear why.', entry: null },
+  // ── traits (trait-<id>) ──
+  'trait-exaggerator': { id: 'trait-exaggerator', label: 'Exaggerator', short: 'Numbers double and severity climbs each retelling. Storyteller scale.', entry: null },
+  'trait-attributor':  { id: 'trait-attributor', label: 'Attributor', short: 'Fills a vague "someone" with a name from their own grudges. Vague claims are loaded guns.', entry: null },
+  'trait-moralizer':   { id: 'trait-moralizer', label: 'Moralizer', short: 'Rewrites deeds into the sin register: a night meeting becomes an affair.', entry: null },
+  'trait-partisan':    { id: 'trait-partisan', label: 'Partisan', short: 'Softens their faction\'s sins, sharpens the rival\'s. Fires on faction-relevant claims only.', entry: null },
+  'trait-skeptic':     { id: 'trait-skeptic', label: 'Skeptic', short: 'Retells nothing uncorroborated. A gatekeeper where rumors go to die.', entry: null },
+  'trait-literalist':  { id: 'trait-literalist', label: 'Literalist', short: 'Passes stories through unchanged. Rare, precious routing infrastructure.', entry: null },
+  'trait-minimizer':   { id: 'trait-minimizer', label: 'Minimizer', short: 'Halves counts and walks severity down one. Everything was probably fine.', entry: null },
+  'trait-dramatist':   { id: 'trait-dramatist', label: 'Dramatist', short: 'Any damaging story lands at maximum severity. There are no small scandals.', entry: null },
+  'trait-name-dropper':{ id: 'trait-name-dropper', label: 'Name-dropper', short: 'Swaps a named source for a name from their own grudges. Breaks your traces.', entry: null },
+  'trait-vaguener':    { id: 'trait-vaguener', label: 'Vague teller', short: 'Named sources dissolve into "someone". The fog that kills traceroutes.', entry: null },
+  'trait-numberer':    { id: 'trait-numberer', label: 'Numberer', short: 'Invents a count of exactly three where the story had none.', entry: null },
+  'trait-peacemaker':  { id: 'trait-peacemaker', label: 'Peacemaker', short: 'Walks damaging stories down two severity steps. Surely it was a misunderstanding.', entry: null },
+  'trait-objectifier': { id: 'trait-objectifier', label: 'Objectifier', short: 'Drags a grudge-list name into the story\'s empty accomplice slot.', entry: null },
+  'trait-relocator':   { id: 'trait-relocator', label: 'Relocator', short: 'Strips the where from stories. It happened somewhere or other.', entry: null },
+  // ── predicates (predicate-<id>) ──
+  'predicate-met-secretly-with':           { id: 'predicate-met-secretly-with', label: 'Met secretly with', short: 'A claim of an unwitnessed meeting — juicy on its own; one moralizing retelling from becoming an affair.', entry: null },
+  'predicate-is-having-an-affair-with':     { id: 'predicate-is-having-an-affair-with', label: 'Having an affair', short: 'An accusation of an affair — the moralizer\'s final landing spot; no sin-version sits above it.', entry: null },
+  'predicate-stole':                        { id: 'predicate-stole', label: 'Stole', short: 'An accusation of theft — faction-relevant, and the sin-version several lesser claims moralize into.', entry: null },
+  'predicate-is-bankrupt':                  { id: 'predicate-is-bankrupt', label: 'Bankrupt', short: 'A claim of financial ruin — faction-relevant, and the credence the merchant-ruin vignette watches for.', entry: null },
+  'predicate-owes-money-to':                { id: 'predicate-owes-money-to', label: 'Owes money to', short: 'A claim of unpaid debt — mild alone; one moralizing retelling turns it into an accusation of theft.', entry: null },
+  'predicate-poisoned':                     { id: 'predicate-poisoned', label: 'Poisoned', short: 'An accusation of poisoning — the gravest dirt in the game; the watch treats it as treason talk.', entry: null },
+  'predicate-forged-the-lineage':           { id: 'predicate-forged-the-lineage', label: 'Forged the lineage', short: 'An accusation of a falsified bloodline — faction-relevant, and among the juiciest claims in play.', entry: null },
+  'predicate-plans-to-seize-the-throne':    { id: 'predicate-plans-to-seize-the-throne', label: 'Plans to seize the throne', short: 'A claim of plotting the crown — faction-relevant; believed dirt like this is what topples a usurper.', entry: null },
+  'predicate-bribed-the-council':           { id: 'predicate-bribed-the-council', label: 'Bribed the council', short: 'An accusation of buying votes — faction-relevant corruption aimed straight at the council\'s credence.', entry: null },
+  'predicate-embezzles-guild-funds':        { id: 'predicate-embezzles-guild-funds', label: 'Embezzles guild funds', short: 'An accusation of skimming guild coin — faction-relevant, and comfortably juicy on its own.', entry: null },
+  'predicate-consorts-with-smugglers':      { id: 'predicate-consorts-with-smugglers', label: 'Consorts with smugglers', short: 'A claim of smuggler dealings — faction-relevant; guilt by association still counts as dirt.', entry: null },
+  'predicate-cheats-at-cards':              { id: 'predicate-cheats-at-cards', label: 'Cheats at cards', short: 'An accusation of card-sharping — petty and faction-neutral; one retelling from being called theft.', entry: null },
+  'predicate-fathered-a-bastard':           { id: 'predicate-fathered-a-bastard', label: 'Fathered a bastard', short: 'A claim of an unacknowledged child — faction-neutral; one moralizing retelling from an affair charge.', entry: null },
+  'predicate-broke-a-betrothal':            { id: 'predicate-broke-a-betrothal', label: 'Broke a betrothal', short: 'A claim of a broken engagement — faction-neutral, and the claim the broken-betrothal vignette mints.', entry: null },
+  'predicate-publicly-quarreled-with':      { id: 'predicate-publicly-quarreled-with', label: 'Publicly quarreled with', short: 'A claim of an open falling-out — faction-neutral, and the claim the public-quarrel vignette mints.', entry: null },
+  'predicate-shuttered-the-shop':           { id: 'predicate-shuttered-the-shop', label: 'Shuttered the shop', short: 'A claim the shop has closed — faction-neutral, the visible proof the merchant-ruin vignette produces.', entry: null },
+  'predicate-blessed-the-harvest':          { id: 'predicate-blessed-the-harvest', label: 'Blessed the harvest', short: 'A flattering claim of good fortune — faction-neutral, and the least tellable line in the registry.', entry: null },
+  'predicate-rescued-the-drowning-child':   { id: 'predicate-rescued-the-drowning-child', label: 'Rescued the drowning child', short: 'A flattering claim of heroism — faction-neutral, and surprisingly juicy for good news.', entry: null },
+  'predicate-gave-alms-to-the-poor':        { id: 'predicate-gave-alms-to-the-poor', label: 'Gave alms to the poor', short: 'A flattering claim of charity — faction-neutral and only modestly tellable.', entry: null },
+  'predicate-won-the-regatta':              { id: 'predicate-won-the-regatta', label: 'Won the regatta', short: 'A flattering claim of a sporting win — faction-neutral, middling juiciness.', entry: null },
+  'predicate-is-favored-at-court':          { id: 'predicate-is-favored-at-court', label: 'Favored at court', short: 'A flattering claim of royal favor — faction-relevant; the partisan trait sharpens or softens it by side.', entry: null },
+  'predicate-nursed-the-sick-through-fever':{ id: 'predicate-nursed-the-sick-through-fever', label: 'Nursed the sick through fever', short: 'A flattering claim of nursing the sick — faction-neutral and only modestly tellable.', entry: null },
+  'predicate-is-the-true-heir-of':          { id: 'predicate-is-the-true-heir-of', label: 'The true heir', short: 'A claim of true parentage to the throne — faction-relevant, and nearly as juicy as poison itself.', entry: null },
+  'predicate-met-at-the-docks-by-night':    { id: 'predicate-met-at-the-docks-by-night', label: 'Met at the docks by night', short: 'A neutral claim of a night meeting at the docks — one retelling from being called a secret meeting.', entry: null },
+};
