@@ -1,9 +1,17 @@
 import type { EntityId, RumorId } from './rumors/claim';
 import type { ChronicleEntry, WorldState } from './types';
 
-/** Every recorded event belonging to one story family, in recorded (tick) order. */
-export function threadOf(world: WorldState, family: RumorId): ChronicleEntry[] {
-  return world.chronicle.filter((e) => 'claimId' in e && world.claims[e.claimId]?.family === family);
+/**
+ * Every recorded event belonging to one story family, in recorded (tick) order. Only
+ * claimId-bearing records (tellings, injects) belong to a single family — endings carry a
+ * `claimIds` list spanning families, so the `'claimId' in e` guard rightly excludes them and
+ * the narrowed return type keeps callers from reaching for fields an InstitutionRecord lacks.
+ */
+export function threadOf(world: WorldState, family: RumorId): Extract<ChronicleEntry, { claimId: string }>[] {
+  return world.chronicle.filter(
+    (e): e is Extract<ChronicleEntry, { claimId: string }> =>
+      'claimId' in e && world.claims[e.claimId]?.family === family,
+  );
 }
 
 /**

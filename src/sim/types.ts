@@ -94,7 +94,16 @@ export interface AskingRecord {
   authority: boolean;
   heardBy: { id: EntityId; addressed: boolean }[];
 }
-export type ChronicleEntry = TellingRecord | InjectRecord | AskingRecord;
+export interface InstitutionRecord {
+  kind: 'institution';
+  tick: Tick;
+  /** 'denounce' = the council turns on the usurper (win) · 'coronation' = the clock expired (loss). */
+  action: 'denounce' | 'coronation';
+  subject: EntityId;
+  actors: EntityId[];
+  claimIds: string[];
+}
+export type ChronicleEntry = TellingRecord | InjectRecord | AskingRecord | InstitutionRecord;
 
 export interface InquiryTask {
   about: InquiryKey;
