@@ -7,7 +7,7 @@ import type { InquiryKey } from './perception';
 import type { IntelState } from '../intel/entry';
 import type { ScenarioState } from './scenario/types';
 
-export type { IntelEntry, IntelState, InformantSpec, HypothesisCard, CodexHypothesis } from '../intel/entry';
+export type { IntelEntry, IntelState, InformantSpec, HypothesisCard, CodexHypothesis, TagNote } from '../intel/entry';
 export type { ScenarioState, ScenarioStatus, ScenarioDef, ScenarioCast, WinCondition, Resolution } from './scenario/types';
 
 export interface Venue {

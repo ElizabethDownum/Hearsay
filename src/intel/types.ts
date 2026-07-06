@@ -6,7 +6,7 @@ import type { IntelEntry } from './entry';
 
 // The row shape and the player's board notes live in entry.ts; re-export the ones the panels
 // render so Task 8 imports the whole board vocabulary from `src/intel/*` alone.
-export type { IntelEntry, HypothesisCard } from './entry';
+export type { IntelEntry, HypothesisCard, TagNote } from './entry';
 
 /** How much the Codex has unlocked: 0 = raw feed only, 3 = full route sketch. */
 export type AssistLevel = 0 | 1 | 2 | 3;

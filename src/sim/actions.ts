@@ -147,3 +147,46 @@ export function applyCard(
   if (idx === -1) throw new Error(`card remove: unknown id '${id}'`);
   cards.splice(idx, 1);
 }
+
+/** Margin-note target kinds (amendment #5b) — existence of the pointed-at thing is never
+ *  validated, only that its kind is one the UI knows how to point at. */
+const TAG_TARGET_KINDS = ['npc', 'entry', 'cluster', 'informant', 'venue'] as const;
+
+function validTagTarget(target: string): boolean {
+  return TAG_TARGET_KINDS.some((k) => target.startsWith(`${k}:`));
+}
+
+/** Add/update/remove a margin note. Garbage (dup id, bad target prefix, unknown id) throws —
+ *  the same validation shape as applyCard, mirrored field-for-field. */
+export function applyTag(
+  world: WorldState, op: 'add' | 'update' | 'remove', id: string,
+  target: string | null, text: string | null, tick: Tick,
+): void {
+  const tags = world.intel.tags;
+  if (op === 'add') {
+    if (tags.some((t) => t.id === id)) throw new Error(`tag add: duplicate id '${id}'`);
+    if (target === null) throw new Error('tag add: target is required');
+    if (!validTagTarget(target)) {
+      throw new Error(`tag add: target must start with npc:|entry:|cluster:|informant:|venue: (got '${target}')`);
+    }
+    if (text === null) throw new Error('tag add: text is required');
+    tags.push({ id, target, text, createdTick: tick, updatedTick: tick });
+    return;
+  }
+  if (op === 'update') {
+    const tag = tags.find((t) => t.id === id);
+    if (!tag) throw new Error(`tag update: unknown id '${id}'`);
+    if (target !== null) {
+      if (!validTagTarget(target)) {
+        throw new Error(`tag update: target must start with npc:|entry:|cluster:|informant:|venue: (got '${target}')`);
+      }
+      tag.target = target;
+    }
+    if (text !== null) tag.text = text;
+    tag.updatedTick = tick;
+    return;
+  }
+  const idx = tags.findIndex((t) => t.id === id);
+  if (idx === -1) throw new Error(`tag remove: unknown id '${id}'`);
+  tags.splice(idx, 1);
+}

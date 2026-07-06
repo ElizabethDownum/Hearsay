@@ -42,10 +42,26 @@ export interface IntelEntry {
   hintAbout: EntityId | null; hintWitness: EntityId | null; // hint
 }
 
-/** The player's private knowledge substrate: informants, captured feed, and board notes. */
+/**
+ * A player-authored margin note pinned to a target (amendment #5b). UI-only, fallible by right —
+ * existence of the target is never validated, so a hunch may point anywhere, including nowhere.
+ * Read by nothing in src/sim/, src/world/, or src/intel model functions: it can never steer a
+ * decision (the sim-blind property test in tests/sim/tags.test.ts proves it).
+ */
+export interface TagNote {
+  id: string;
+  /** `${kind}:${id}` — kind ∈ npc | entry | cluster | informant | venue. Existence NOT validated: hunches may point anywhere. */
+  target: string;
+  text: string;
+  createdTick: Tick;
+  updatedTick: Tick;
+}
+
+/** The player's private knowledge substrate: informants, captured feed, board notes, and margin notes. */
 export interface IntelState {
   informants: InformantSpec[];
   log: IntelEntry[];
   cards: HypothesisCard[];
   codex: CodexHypothesis[];
+  tags: TagNote[];
 }

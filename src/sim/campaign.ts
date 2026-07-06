@@ -1,6 +1,6 @@
 import type { Tick } from '../core/time';
 import {
-  applyAsk, applyAssignInformant, applyCard, applyCodex, applyGoTo, applyInject, applyTell,
+  applyAsk, applyAssignInformant, applyCard, applyCodex, applyGoTo, applyInject, applyTag, applyTell,
   type InjectSpec,
 } from './actions';
 import type { InquiryKey } from './perception';
@@ -64,9 +64,19 @@ export interface CardAction {
   links: string[] | null;
 }
 
+export interface TagAction {
+  tick: Tick;
+  kind: 'tag';
+  op: 'add' | 'update' | 'remove';
+  id: string;
+  target: string | null;
+  text: string | null;
+}
+
 /** The player's recorded verbs — the entire save-relevant intent surface. */
 export type Action =
-  | InjectAction | GoToAction | TellAction | AskAction | AssignInformantAction | CodexAction | CardAction;
+  | InjectAction | GoToAction | TellAction | AskAction | AssignInformantAction | CodexAction | CardAction
+  | TagAction;
 export type ActionLog = Action[];
 
 /** A complete campaign: the world regrows from these two values alone. */
@@ -100,6 +110,9 @@ export function applyAction(world: WorldState, action: Action): void {
       break;
     case 'card':
       applyCard(world, action.op, action.id, action.text, action.confidence, action.links, action.tick);
+      break;
+    case 'tag':
+      applyTag(world, action.op, action.id, action.target, action.text, action.tick);
       break;
     default: {
       // Saves are untrusted JSON — an unknown kind must fail loudly, never silently no-op.
