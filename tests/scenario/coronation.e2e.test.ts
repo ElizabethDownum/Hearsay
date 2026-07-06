@@ -221,6 +221,17 @@ describe('Coronation — the open-final-door proof', () => {
         expect(res.turned.length).toBeGreaterThanOrEqual(CORONATION.win.quorum);
         for (const t of res.turned) expect(r.world.claims[t.claimId]).toBeDefined();
         expect(res.day).toBeLessThan(CORONATION.days);
+
+        // Anatomy pin (observed on the pinned door seeds): the quorum is at least partly corroboration-driven. If a retune breaks this, the escalation license applies — investigate the new anatomy, don't delete the pin.
+        const corroborated = res.turned.some((t) => (r.world.beliefs[t.npc]?.[t.family]?.apparentSources.length ?? 0) >= 2);
+        expect(corroborated).toBe(true);
+
+        // Informational only (NOT an assertion): usurper-edge visibility per turned member, so future anatomy drift is visible in report output without seed-fragility.
+        const usurper = r.world.scenario!.cast.usurper;
+        for (const t of res.turned) {
+          const hasDirectEdge = r.world.npcs[t.npc]!.edges.some((e) => e.to === usurper);
+          console.log(`[DOOR ${r.seed}] turned=${t.npc} directEdgeToUsurper=${hasDirectEdge}`);
+        }
       }
     }
   });
