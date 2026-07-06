@@ -5,3 +5,11 @@ coverage/
 # Licensed asset binaries — GDM Pro Licence forbids raw redistribution; docs only
 assets/**
 !assets/*.md
+
+# OFL fonts ARE redistributable (never bought — downloaded from Google Fonts under OFL) and the
+# manifest is pure data (content-split law) — both must be tracked. A directory matched by
+# `assets/**` is itself excluded, so git won't recurse into it to find file-level negations unless
+# the directory is un-ignored first (git does not re-include children of an ignored directory).
+!assets/fonts/
+!assets/fonts/**
+!assets/manifest.json
