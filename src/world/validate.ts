@@ -196,6 +196,28 @@ export function validateTown(town: GeneratedTown, config: GenConfig, opts: Valid
     }
   }
 
+  // Scenario cast: the objective must be achievable — principals exist, the council is the
+  // protected keystone set, and the investigation route (true dirt + witness) is real. Tri-state
+  // like the dossier: `undefined` (a hand-built / fixture town) skips; `null` (a generator draw
+  // that found no valid usurper) fails so serve rerolls; a ScenarioCast is checked in full.
+  if (town.cast === null) {
+    fail('scenario-castable', 'town has no scenario cast (no crown-faction candidate or no retargetable secret)');
+  } else if (town.cast !== undefined) {
+    const c = town.cast;
+    const byId = new Map(fixture.npcs.map((n) => [n.id, n]));
+    const u = byId.get(c.usurper);
+    if (!u) fail('scenario-castable', `usurper '${c.usurper}' is not an NPC`);
+    else if (u.faction !== 'crown') fail('scenario-castable', `usurper '${c.usurper}' is faction '${u.faction}', not crown`);
+    if (town.guards.some((g) => g.id === c.usurper)) fail('scenario-castable', `usurper '${c.usurper}' is a guard`);
+    if (c.council.includes(c.usurper)) fail('scenario-castable', `usurper '${c.usurper}' sits on the council`);
+    if (JSON.stringify(c.council) !== JSON.stringify(town.keystones)) {
+      fail('scenario-castable', 'council is not the keystone set');
+    }
+    const dirt = town.secrets.filter((s) => s.subject === c.usurper);
+    if (dirt.length === 0) fail('scenario-castable', `usurper '${c.usurper}' has no secret — no investigation route`);
+    else if (dirt.every((s) => s.witnesses.length === 0)) fail('scenario-castable', 'usurper secrets have no witnesses');
+  }
+
   // Graph invariants only mean something on a structurally sound town.
   if (failures.length > 0) return { ok: false, failures };
 

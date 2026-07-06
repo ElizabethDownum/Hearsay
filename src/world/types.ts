@@ -1,6 +1,7 @@
 import type { EntityId, VenueId } from '../sim/rumors/claim';
 import type { Npc, TownFixture, Venue } from '../sim/types';
 import type { ObserverSpec } from '../sim/enemy/state';
+import type { ScenarioCast } from '../sim/scenario/types';
 
 /** Everything the generator is allowed to randomize, per town. */
 export interface GenConfig {
@@ -117,6 +118,14 @@ export interface GeneratedTown {
   secrets: Secret[];
   /** Day-0 starting intelligence for the avatar. Gen always sets it; enemy-only paths ignore it. */
   dossier: Dossier | null;
+  /**
+   * Scenario principals (gen §11). Tri-state, mirroring the dossier's null-skip precedent but shifted
+   * one slot so `null` can carry meaning: the generator ALWAYS sets it — a `ScenarioCast` when the draw
+   * found a valid usurper, or `null` when it did not (the validator fails `null` so serve rerolls).
+   * Hand-built / fixture towns OMIT it (`undefined`), and `scenario-castable` skips them the way
+   * `dossier-capped` skips a null dossier.
+   */
+  cast?: ScenarioCast | null;
 }
 
 export interface InvariantFailure { invariant: string; detail: string }

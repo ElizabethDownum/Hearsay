@@ -3,6 +3,7 @@ import type { EntityId, VenueId } from '../sim/rumors/claim';
 import type { Npc, ScheduleEntry, Venue } from '../sim/types';
 import type { ObserverSpec } from '../sim/enemy/state';
 import type { DistrictInfo, Dossier, GenConfig, GenContent, GeneratedTown, OccupationDef, Secret } from './types';
+import type { ScenarioCast } from '../sim/scenario/types';
 
 /** Round to 2 decimals — keeps generated trust values readable and JSON-stable. */
 const r2 = (n: number): number => Math.round(n * 100) / 100;
@@ -52,6 +53,7 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
   const keystonesRng = new Rng(seed, 'gen:keystones');
   const secretsRng = new Rng(seed, 'gen:secrets');
   const dossierRng = new Rng(seed, 'gen:dossier');
+  const scenarioRng = new Rng(seed, 'gen:scenario');
 
   // ── 1. Districts + institutional venues (fixed grammar) ─────────────────
   const districtIds = Array.from({ length: config.districtCount }, (_, i) => `d${i}`);
@@ -323,11 +325,58 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
     secretHint: hintedSecret ? { about: hintedSecret.subject, witness: hintedSecret.witnesses[0]! } : null,
   };
 
+  // ── 11. Scenario casting: a crown usurper + the council (keystones wear the robes) ──
+  // The council IS the keystone set — GenConfig already calls keystones "scenario-cast
+  // placeholders the validator must protect", and keystone-2routes is exactly the
+  // objective-reachability guarantee the cast needs. NEVER reuse the `cast: CastMeta[]` local
+  // from section 3 here — the scenario cast is `scenarioCast`.
+  let scenarioCast: ScenarioCast | null = null;
+  {
+    const guardIds = new Set(guards.map((g) => g.id));
+    const keystoneSet = new Set(keystones);
+    const candidates = cast
+      .map((m) => m.npc)
+      .filter((n) => n.faction === 'crown' && !guardIds.has(n.id) && !keystoneSet.has(n.id))
+      .sort((a, b) => a.id.localeCompare(b.id));
+    if (candidates.length > 0) {
+      const usurper = candidates[scenarioRng.int(0, candidates.length)]!;
+      // Investigation-route guarantee: the usurper must own true dirt. If the secret draw
+      // missed them, retarget the lexicographically-last secret (deterministic, count-stable —
+      // 'secrets-valid' arithmetic is untouched) onto the usurper with rewitnessed onlookers.
+      if (!secrets.some((s) => s.subject === usurper.id)) {
+        const donor = [...secrets].sort((a, b) => a.id.localeCompare(b.id)).at(-1);
+        const sharers = cast
+          .map((m) => m.npc)
+          .filter((n) => n.id !== usurper.id &&
+            n.schedule.some((sb) => usurper.schedule.some((ub) => sb.venue === ub.venue)))
+          .sort((a, b) => a.id.localeCompare(b.id));
+        if (donor && sharers.length > 0) {
+          donor.subject = usurper.id;
+          const wCount = 1 + scenarioRng.int(0, Math.min(3, sharers.length));
+          donor.witnesses = sharers.slice(0, wCount).map((n) => n.id);
+          if (donor.object !== null) {
+            const others = sharers.filter((n) => !donor.witnesses.includes(n.id));
+            donor.object = (others[0] ?? sharers[0]!).id;
+          }
+          if (donor.place !== null) {
+            donor.place = usurper.schedule[0]!.venue;
+          }
+        }
+        // If donor/sharers are missing the town stays castless — the validator rerolls it.
+        if (secrets.some((s) => s.subject === usurper.id)) {
+          scenarioCast = { usurper: usurper.id, council: [...keystones] };
+        }
+      } else {
+        scenarioCast = { usurper: usurper.id, council: [...keystones] };
+      }
+    }
+  }
+
   const districts: DistrictInfo[] = districtIds.map((d) => ({
     id: d,
     venueIds: venuesByDistrict.get(d)!,
     npcIds: cast.filter((m) => m.district === d).map((m) => m.npc.id),
   }));
 
-  return { fixture: { venues, npcs: cast.map((m) => m.npc) }, districts, keystones, guards, secrets, dossier };
+  return { fixture: { venues, npcs: cast.map((m) => m.npc) }, districts, keystones, guards, secrets, dossier, cast: scenarioCast };
 }

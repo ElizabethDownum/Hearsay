@@ -120,3 +120,27 @@ describe('designated guards', () => {
     expect(() => generateTown('x', STANDARD_GEN_CONFIG, bad)).toThrow(/eveningTavern/);
   });
 });
+
+describe('scenario cast — the coronation principals', () => {
+  it('deals a scenario cast deterministically: crown usurper, council = keystones', () => {
+    const a = generateTown('cast-seed-1', STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT);
+    const b = generateTown('cast-seed-1', STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT);
+    expect(a.cast).toEqual(b.cast);                        // same seed, same principals
+    expect(a.cast).not.toBeNull();
+    const cast = a.cast!;
+    expect(a.fixture.npcs.find((n) => n.id === cast.usurper)!.faction).toBe('crown');
+    expect(cast.council).toEqual(a.keystones);             // the keystones wear the robes
+    expect(cast.council).not.toContain(cast.usurper);
+    expect(a.guards.map((g) => g.id)).not.toContain(cast.usurper);
+  });
+
+  it('guarantees the investigation route: every cast town has a usurper secret with a witness', () => {
+    for (const seed of ['cast-seed-1', 'cast-seed-2', 'cast-seed-3']) {
+      const town = generateTown(seed, STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT);
+      if (town.cast === null || town.cast === undefined) continue; // uncastable towns are the validator's problem
+      const dirt = town.secrets.filter((s) => s.subject === town.cast!.usurper);
+      expect(dirt.length).toBeGreaterThanOrEqual(1);
+      expect(dirt[0]!.witnesses.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+});

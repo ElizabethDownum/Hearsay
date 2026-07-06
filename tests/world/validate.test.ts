@@ -1,4 +1,5 @@
 import { meetingGraph, validateTown } from '../../src/world/validate';
+import { generateTown } from '../../src/world/gen';
 import { generateValidTown } from '../../src/world/serve';
 import { STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT } from '../../src/content/gen/standard';
 import { STANDARD_RULES } from '../../src/content/rules';
@@ -160,6 +161,33 @@ describe('graph invariants', () => {
     const c5 = cfg({ npcCount: 5, keystoneCount: 1 });
     expect(failuresOf(town([...cluster, e], [v1, v2], ['e']), c5)).toContain('keystone-2routes');
     expect(failuresOf(town([...cluster, e], [v1, v2], ['a']), c5)).not.toContain('keystone-2routes');
+  });
+});
+
+describe('scenario-castable invariant', () => {
+  it('scenario-castable: fails a town with no cast', () => {
+    const town = generateTown('cast-seed-1', STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT);
+    const broken = structuredClone(town);
+    broken.cast = null;
+    const report = validateTown(broken, STANDARD_GEN_CONFIG, {});
+    expect(report.ok).toBe(false);
+    expect(report.failures.some((f) => f.invariant === 'scenario-castable')).toBe(true);
+  });
+
+  it('scenario-castable: fails when the usurper sits on the council', () => {
+    const town = generateTown('cast-seed-1', STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT);
+    const broken = structuredClone(town);
+    broken.cast = { usurper: broken.keystones[0]!, council: broken.keystones };
+    const report = validateTown(broken, STANDARD_GEN_CONFIG, {});
+    expect(report.failures.some((f) => f.invariant === 'scenario-castable')).toBe(true);
+  });
+
+  it('scenario-castable: fails when the usurper has no secret', () => {
+    const town = generateTown('cast-seed-1', STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT);
+    const broken = structuredClone(town);
+    broken.secrets = broken.secrets.filter((s) => s.subject !== broken.cast!.usurper);
+    const report = validateTown(broken, STANDARD_GEN_CONFIG, {});
+    expect(report.failures.some((f) => f.invariant === 'scenario-castable')).toBe(true);
   });
 });
 
