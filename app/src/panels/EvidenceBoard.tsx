@@ -3,7 +3,11 @@ import { useState } from 'react';
 import { Term } from './Term';
 import { TagChip } from './TagChip';
 
-const FIELDS = ['subject', 'predicate', 'object', 'count', 'severity', 'place', 'attribution'] as const;
+/** The seven claim fields the cluster-detail table renders as `<Term id={f} />` row headers.
+ *  Exported so the jargon scan (tests/app/jargon.test.ts) can sweep them registry-style — these ids
+ *  reach <Term> by ITERATION, not as string literals in JSX, so the literal scan alone never sees
+ *  them (renaming one of the seven TERMS entries would otherwise throw at runtime with no failing test). */
+export const FIELDS = ['subject', 'predicate', 'object', 'count', 'severity', 'place', 'attribution'] as const;
 
 /**
  * The Evidence Board — the broadsheet that auto-collects what you lawfully heard. Task-8 upgrades:

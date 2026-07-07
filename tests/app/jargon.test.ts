@@ -6,6 +6,7 @@ import { TERMS } from '../../src/content/terms';
 import { PREDICATES } from '../../src/content/predicates';
 import { TRAITS } from '../../src/content/traits';
 import { VERB_TERM } from '../../app/src/input/actions';
+import { FIELDS } from '../../app/src/panels/EvidenceBoard';
 
 /**
  * The no-unregistered-jargon law (amendment #5c), given teeth: every player-facing label in the
@@ -41,6 +42,11 @@ const scannedPaths = [...panelFiles, mainFile];
 // deleting real code (the TABS array) from the scan. One alternation, scanned left-to-right, lets
 // the `//` line comment claim the whole line (including its embedded `/**`) before the block
 // alternative ever gets a chance to misfire on it.
+//
+// Known blind spot (accepted): comment markers INSIDE string literals ("http://…", 'a /* b') would
+// be mis-stripped — this is a regex scan, not a lexer, and it has no notion of string context. No
+// scanned file triggers it today; if one ever does, the non-vacuity floor and the per-file hit
+// counts are the tripwire (real hits would silently vanish, dropping the count).
 function stripComments(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (m) => (m.startsWith('/*') ? ' ' : ''));
 }
@@ -115,6 +121,18 @@ describe('registry-driven wiring — ids rendered by ITERATING a registry, not b
   });
   it.each(Object.entries(VERB_TERM))('VERB_TERM.%s -> "%s" resolves in TERMS', (kind, termId) => {
     expect(TERMS[termId], `VERB_TERM['${kind}'] -> '${termId}' is not registered in TERMS`).toBeDefined();
+  });
+
+  // EvidenceBoard's cluster-detail table renders its seven field row-headers by ITERATING its
+  // exported FIELDS array through `<Term id={f} />` — non-literal ids the literal scan above never
+  // sees. All seven resolve today, but rename/remove one of those TERMS entries and Term.tsx throws
+  // at runtime with no failing test anywhere — this sweep (importing the panel's own array, so the
+  // check can never drift from the source) closes that gap.
+  it('EvidenceBoard.FIELDS is non-empty (the sweep below would be vacuous otherwise)', () => {
+    expect(FIELDS.length).toBeGreaterThan(0);
+  });
+  it.each([...FIELDS])('EvidenceBoard field "%s" resolves in TERMS', (field) => {
+    expect(TERMS[field], `EvidenceBoard renders <Term id="${field}"> via FIELDS but TERMS has no '${field}'`).toBeDefined();
   });
 });
 
