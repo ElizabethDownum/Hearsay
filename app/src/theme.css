@@ -140,6 +140,125 @@ hr {
   border: 1px solid var(--sepia);
 }
 
+/* ---------- Components (Plan-7 Task 8: the interactive surface). All ink-on-paper, hairline
+   --sepia rules, small-caps headers; colour is never the only channel (badges pair tint with a
+   glyph/weight). Panels read these classes; they never hardcode hex (art-direction law). ---------- */
+
+/* The jargon law's runtime face: a registered term with a hover/focus gloss. Dotted underline so
+   it reads as "defined word" without colour, per the never-colour-alone rule. */
+.term {
+  position: relative;
+  border-bottom: 1px dotted var(--sepia);
+  cursor: help;
+}
+.term-tip {
+  position: absolute;
+  left: 0;
+  top: 1.4em;
+  z-index: 20;
+  width: max-content;
+  max-width: 260px;
+  padding: 4px 8px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--sepia);
+  font-family: var(--font-text);
+  font-size: var(--step-0);
+  line-height: 1.35;
+}
+
+/* Provenance: the via badge every intel row wears (sepia), the vermilion single-channel lock, the
+   gilt lock. Each carries its own glyph so the meaning survives with colour stripped. */
+.badge {
+  display: inline-block;
+  font-family: var(--font-ui);
+  font-size: var(--step-0);
+  font-variant-caps: small-caps;
+  letter-spacing: 0.03em;
+  padding: 0 6px;
+  border: 1px solid var(--sepia);
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.badge-via { color: var(--sepia); }
+.badge-lock { color: var(--gilt); border-color: var(--gilt); }
+.badge-danger { color: var(--vermilion); border-color: var(--vermilion); font-weight: 600; }
+
+/* Margin notes (amendment #5b): verdigris = YOUR things. A chip plus a one-line composer. */
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-ui);
+  font-size: var(--step-0);
+  color: var(--verdigris);
+  border: 1px solid var(--verdigris);
+  border-radius: 10px;
+  padding: 0 4px 0 8px;
+  margin: 2px 4px 2px 0;
+}
+.tag-chip button {
+  border: none;
+  background: none;
+  color: var(--verdigris);
+  cursor: pointer;
+  font: inherit;
+  padding: 0 2px;
+}
+.tag-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin: 4px 0; }
+.tag-row input {
+  font-family: var(--font-ui);
+  font-size: var(--step-0);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--sepia);
+  padding: 1px 4px;
+}
+
+/* Broadsheet tables: hairline rules, small-caps headers, --wash zebra, gilt diff highlight
+   (editor's ink, not neon). */
+.board-table { border-collapse: collapse; font-family: var(--font-ui); font-size: var(--step-1); }
+.board-table th, .board-table td { border: 1px solid var(--sepia); padding: 2px 8px; text-align: left; }
+.board-table th { font-variant-caps: small-caps; letter-spacing: 0.03em; font-weight: 600; }
+.board-table tbody tr:nth-child(even) { background: var(--wash); }
+.diff-cell { background: var(--gilt); color: var(--paper); font-weight: 600; }
+
+/* Chrome: the spymaster's desk. Letterpress buttons, paper warmth, ink hierarchy. */
+.panel { font-family: var(--font-text); }
+.panel h2 { font-family: var(--font-display); font-size: var(--step-3); letter-spacing: 0.04em; margin: 0 0 8px; }
+.panel h3 { font-family: var(--font-ui); font-size: var(--step-2); margin: 12px 0 4px; }
+.desk-btn {
+  font-family: var(--font-ui);
+  font-size: var(--step-1);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--sepia);
+  padding: 2px 10px;
+  cursor: pointer;
+}
+.desk-btn:disabled { color: var(--sepia); cursor: not-allowed; opacity: 0.6; }
+.desk-btn[aria-pressed='true'] { border-color: var(--ink); border-width: 2px; font-weight: 600; }
+.desk-note { font-family: var(--font-ui); font-size: var(--step-0); color: var(--sepia); }
+
+/* Full-page ending cards: gilt win, sepia clock, vermilion exposure/arrest. */
+.ending {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--paper);
+  text-align: center;
+  padding: 24px;
+}
+.ending h1 { font-family: var(--font-display); font-size: var(--step-4); letter-spacing: 0.06em; margin: 0; }
+.ending-won h1 { color: var(--gilt); }
+.ending-clock h1 { color: var(--sepia); }
+.ending-lost h1 { color: var(--vermilion); }
+.ending p { font-family: var(--font-text); max-width: 46ch; }
+
 /* Reduced motion: none. The cross-fade above is the only motion this theme ever authorizes, and
    this media query removes even that. */
 @media (prefers-reduced-motion: reduce) {

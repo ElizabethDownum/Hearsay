@@ -14,6 +14,13 @@ export const TERMS: Record<string, TermDef> = {
   'version':         { id: 'version', label: 'Version', short: 'The exact wording one mind holds. Versions differ where minds changed them.', entry: null },
   'diff':            { id: 'diff', label: 'Difference', short: 'The changed fields between two versions — each change fingerprints the mind that made it.', entry: null },
   'attribution':     { id: 'attribution', label: 'Source (claimed)', short: 'Who the story SAYS it came from. Mutable, often wrong — and the key to tracing.', entry: null },
+  // ── the structured claim (the seven fields every telling carries) ──
+  'subject':         { id: 'subject', label: 'Subject', short: 'Who a claim is about — the person the story targets. Attributors and vaguers move it.', entry: null },
+  'predicate':       { id: 'predicate', label: 'Predicate', short: 'What a claim alleges — the deed itself. Neutral deeds moralize into sins as they spread.', entry: null },
+  'object':          { id: 'object', label: 'Object', short: 'A claim\'s second party — the accomplice or counterparty, when the deed names one.', entry: null },
+  'count':           { id: 'count', label: 'Count', short: 'How many, in a claim that counts. Exaggerators double it; minimizers halve it.', entry: null },
+  'severity':        { id: 'severity', label: 'Severity', short: 'How grave a claim is, 1 to 5. Dramatists max it; peacemakers walk it down.', entry: null },
+  'place':           { id: 'place', label: 'Place', short: 'Where a claim says the deed happened. Relocators strip it away to "somewhere".', entry: null },
   'corroboration':   { id: 'corroboration', label: 'Corroboration', short: 'Hearing a story from apparently independent sources. Manufactured independence still counts.', entry: null },
   'apparent-source': { id: 'apparent-source', label: 'Apparent source', short: 'Who a hearer THINKS a telling came from — the surviving attribution, or the teller.', entry: null },
   'credence':        { id: 'credence', label: 'Credence', short: 'How much a mind believes a story, 0 to 1. Trust, plausibility, and corroboration move it.', entry: null },
@@ -40,6 +47,11 @@ export const TERMS: Record<string, TermDef> = {
   'counter-sketch':  { id: 'counter-sketch', label: 'Counter-Sketch', short: 'Your sketch of HIS sketch — what you believe the enemy has pieced together about you.', entry: null },
   'hypothesis-card': { id: 'hypothesis-card', label: 'Card', short: 'Your written hunch with your confidence. The game files it and never grades it.', entry: null },
   'assist-level':    { id: 'assist-level', label: 'Assist', short: 'Perception help, 0-3: raw notes, clustering+diffs, trait candidates, route sketches.', entry: null },
+  'web-view':        { id: 'web-view', label: 'Web', short: 'The provenance web around a subject: which stories touch it, and who carried each hop to you.', entry: null },
+  'ledger':          { id: 'ledger', label: 'Ledger', short: 'One channel\'s whole record — every report a via filed, and which stories other channels also carried.', entry: null },
+  'evening-report':  { id: 'evening-report', label: 'Evening report', short: 'The day\'s haul, batched: new stories, who brought each, and every authority sighting.', entry: null },
+  'day-planner':     { id: 'day-planner', label: 'Planner', short: 'Pause to plan: travel, tell a circle-mate, ask, post informants. Verbs queue for their next beat.', entry: null },
+  'terms-codex':     { id: 'terms-codex', label: 'Terms', short: 'The glossary of every game term — hover any label for its meaning, or read them all here.', entry: null },
   // ── the hunt ──
   'sketch':          { id: 'sketch', label: 'Ghost sketch', short: 'The enemy investigates a ghost — every traced operation adds a feature to it.', entry: null },
   'sketch-feature':  { id: 'sketch-feature', label: 'Feature', short: 'One deduced trait of the ghost: a district, an entry point, a carrier profile.', entry: null },
@@ -56,6 +68,7 @@ export const TERMS: Record<string, TermDef> = {
   'denounce':        { id: 'denounce', label: 'Denunciation', short: 'The council turns on the usurper — an institutional act the town itself performs.', entry: null },
   'coronation':      { id: 'coronation', label: 'Coronation', short: 'The clock ran out. The crown lands; the campaign is lost.', entry: null },
   'unmasking':       { id: 'unmasking', label: 'Unmasking', short: 'The enemy\'s sketch converged on you. The slow loss, arrived.', entry: null },
+  'arrest':          { id: 'arrest', label: 'Arrest', short: 'A guard heard you speak the words yourself — caught in the act. The campaign ends in the cell.', entry: null },
   'objective-topple':{ id: 'objective-topple', label: 'Topple the usurper', short: 'Turn the council before day 40: quorum of electors believing act-tier dirt on the usurper.', entry: null },
   // ── vignettes ──
   'vignette-public-quarrel':   { id: 'vignette-public-quarrel', label: 'Public quarrel', short: 'Two rivals who each believe the worst finally collide in public. The town takes notes.', entry: null },
