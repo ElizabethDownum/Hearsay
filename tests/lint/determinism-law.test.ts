@@ -238,6 +238,43 @@ describe('townview law — the unfenced barrel can never smuggle an engine value
   });
 });
 
+describe('composition-root fence — only main.tsx + loop/** may import engine values', () => {
+  // The fenced ZONE (any covered app/src module): a sim/world/bots/harness VALUE import fires; core
+  // and content — the foundations the app legitimately uses — do not. (Pre-registered like the panels
+  // law: calculateConfigForFile computes config from the path's glob match alone.)
+  it('flags an engine-value import from a covered app module (assets.ts); leaves core alone', async () => {
+    const rules = await importRulesFor('app/src/assets.ts');
+    expect(violations("import { step } from '../../src/sim/step';", rules)).toBeGreaterThan(0);
+    expect(violations("import { attachPlayer } from '../../src/world/attach';", rules)).toBeGreaterThan(0);
+    expect(violations("import { fnv1a32 } from '../../src/core/rng';", rules)).toBe(0); // core is not the engine
+    expect(violations("import { TERMS } from '../../src/content/terms';", rules)).toBe(0); // content is data
+  });
+
+  // Any covered app/src path that isn't one of the exempt seams is fenced — even one that doesn't
+  // exist yet (the path's glob match is what computes the config).
+  it('the fence reaches a hypothetical new app module', async () => {
+    const rules = await importRulesFor('app/src/widgets/probe.tsx');
+    expect(violations("import { WorldState } from '../../../src/sim/types';", rules)).toBeGreaterThan(0);
+  });
+
+  // The composition root and its substrate are EXEMPT — engine values are legal there by design.
+  it('exempts the named composition root (main.tsx) and loop/**', async () => {
+    const main = await new ESLint().calculateConfigForFile('app/src/main.tsx');
+    expect(isOn(main.rules?.['no-restricted-imports'] ?? 'off')).toBe(false);
+    const loop = await new ESLint().calculateConfigForFile('app/src/loop/session.ts');
+    expect(isOn(loop.rules?.['no-restricted-imports'] ?? 'off')).toBe(false);
+  });
+
+  // The type-only seams are exempt (they cross by TYPE only, pinned type-only elsewhere) so the
+  // specifier-keyed core rule can't false-fire on their legal `import type`/`export type`.
+  it('exempts the type-only seams input/** and townview.ts', async () => {
+    const input = await new ESLint().calculateConfigForFile('app/src/input/actions.ts');
+    expect(isOn(input.rules?.['no-restricted-imports'] ?? 'off')).toBe(false);
+    const barrel = await new ESLint().calculateConfigForFile('app/src/townview.ts');
+    expect(isOn(barrel.rules?.['no-restricted-imports'] ?? 'off')).toBe(false);
+  });
+});
+
 describe('headless-sim law — the engine never imports app/UI code', () => {
   it('flags an app import from a src engine file; the content ban survives alongside it', async () => {
     const rules = await importRulesFor('src/sim/step.ts');

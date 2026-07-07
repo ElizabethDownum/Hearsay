@@ -96,4 +96,32 @@ export default tseslint.config(
       ] }],
     },
   },
+  {
+    // Composition-root fence (Plan-7 Task 8): the app is props-fed. Only the NAMED composition root
+    // (main.tsx) and its engine substrate (loop/**) may import engine VALUES; every other app/src
+    // module receives its data. The ban list is the panels-law engine trees — same rule value, a
+    // DISJOINT files set (via ignores), so no file matches two no-restricted-imports blocks and the
+    // flat-config replacement trap (a repeated rule key dropping the other block's groups) can't fire.
+    //   Exemptions, and why each is safe:
+    //   - main.tsx / loop/**  : the composition root — engine values are legal here by design.
+    //   - panels/** / town/** : covered by the STRICTER panels-law block above (no type crossings).
+    //   - input/**            : crosses by TYPE only (`import type { Action }`, pinned in-file); the
+    //                           core no-restricted-imports rule keys off the specifier, not the
+    //                           `type` modifier, so it would false-fire on that legal type import.
+    //   - townview.ts         : the scan-pinned type-only barrel (see the townview law test).
+    files: ['app/src/**/*.{ts,tsx}'],
+    ignores: [
+      'app/src/main.tsx', 'app/src/loop/**',
+      'app/src/panels/**', 'app/src/town/**',
+      'app/src/input/**', 'app/src/townview.ts',
+    ],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [
+        {
+          group: ['**/sim/**', '**/world/**', '**/bots/**', '**/harness/**'],
+          message: 'Composition-root fence: only main.tsx + loop/** import engine values; the rest of app/src is props-fed (input/** + townview.ts cross by TYPE only, and are pinned type-only elsewhere).',
+        },
+      ] }],
+    },
+  },
 );
