@@ -162,6 +162,22 @@ describe('panels law — presentation code receives props, never reaches into th
     expect(violations("import { step } from '../../../src/sim/step';", rules)).toBeGreaterThan(0);
     expect(violations("import { Row } from './parts';", rules)).toBe(0);
   });
+
+  // The SAME panels-law block now also covers app/src/town/** (its `files` array gained the town
+  // glob — no new block, same rule value). This prong proves the fence really reaches a town/ path:
+  // a src/sim import from the town canvas fires the panels-law diagnostic, while local + assets +
+  // the townview type-barrel imports the diagram legitimately uses stay clean.
+  it('flags a sim import for app/src/town/** (fence extended over the town canvas)', async () => {
+    const rules = await importRulesFor('app/src/town/TownCanvas.tsx');
+    expect(violations("import { playerView } from '../../../src/sim/fieldwork';", rules)).toBeGreaterThan(0);
+    expect(violations("import { buildTownMap } from '../../../src/sim/world';", rules)).toBeGreaterThan(0);
+    expect(violations("import { computeLayout } from './layout';", rules)).toBe(0);
+    expect(violations("import { resolveSlot } from '../assets';", rules)).toBe(0);
+    // The type-barrel path (../townview) is unfenced — the diagram gets PlayerView/TownMap through
+    // it without tripping the fence. (Plain-import syntax: the bare Linter() has no TS parser; the
+    // rule keys off the specifier, not the `type` modifier.)
+    expect(violations("import { PlayerView } from '../townview';", rules)).toBe(0);
+  });
 });
 
 describe('headless-sim law — the engine never imports app/UI code', () => {

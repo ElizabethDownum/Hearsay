@@ -86,7 +86,7 @@ export default tseslint.config(
   },
   {
     // Panels are pure presentation: they receive props, never reach into the sim/world/bots.
-    files: ['app/src/panels/**/*.{ts,tsx}'],
+    files: ['app/src/panels/**/*.{ts,tsx}', 'app/src/town/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': ['error', { patterns: [
         {
