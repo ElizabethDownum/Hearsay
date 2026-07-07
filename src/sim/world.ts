@@ -2,6 +2,7 @@ import type { EntityId, VenueId } from './rumors/claim';
 import type { Npc, TownFixture, WorldState } from './types';
 import { emptyEnemyState } from './enemy/state';
 import type { TownMap } from './enemy/state';
+import type { Rules } from './rules';
 
 /** First id that appears twice, or null — dup detection before records collapse duplicates. */
 function firstDuplicate(ids: readonly string[]): string | null {
@@ -13,7 +14,13 @@ function firstDuplicate(ids: readonly string[]): string | null {
   return null;
 }
 
-export function buildWorld(fixture: TownFixture, seed: string): WorldState {
+/**
+ * `rules` is optional and used only to seed the treasury (`rules.economy.startingCoin`);
+ * every other call site that doesn't touch coin is untouched by this parameter. Omitted
+ * → coin starts at 0 (the neutral absence value, matching `playerId: null` etc. — not a
+ * price, never read from the one price table).
+ */
+export function buildWorld(fixture: TownFixture, seed: string, rules?: Rules): WorldState {
   const dupVenue = firstDuplicate(fixture.venues.map((v) => v.id));
   if (dupVenue) throw new Error(`buildWorld: duplicate venue id '${dupVenue}'`);
   const dupNpc = firstDuplicate(fixture.npcs.map((n) => n.id));
@@ -37,6 +44,7 @@ export function buildWorld(fixture: TownFixture, seed: string): WorldState {
     seed,
     tick: 0,
     claimCounter: 0,
+    coin: rules ? rules.economy.startingCoin : 0,
     playerId: null,
     playerVenue: null,
     pendingTell: null,

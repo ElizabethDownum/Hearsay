@@ -1,4 +1,4 @@
-import { dayOf, minuteOfDay } from '../core/time';
+import { dayOf, dayOfWeek, minuteOfDay, REST_DAY } from '../core/time';
 import { circlesAt, positionOf } from './agents';
 import { expireInquiries, runAskPhase } from './inquiry';
 import { observationsFor, type Asking, type TickEvents, type Utterance } from './perception';
@@ -129,6 +129,10 @@ export function step(world: WorldState, rules: Rules): TickEvents {
   // The nightly beat: digest today's evidence into countermeasures (world facts),
   // THEN sweep spent inquiries. No-op on rosters with no observers (old suites untouched).
   if (minuteOfDay(t) === 1439) {
+    // The treasury's weekly beat: flat integer stipend, exactly on the rest-day nightly
+    // (day 6, 13, ...). Coin feeds nothing else yet (spending helper arrives Task 3), so
+    // this is independent of — and ordered before — the countermeasure/vignette/referee beats.
+    if (dayOfWeek(t) === REST_DAY) world.coin += rules.economy.weeklyStipend;
     runEnemyDay(world, rules);          // digest today's evidence into countermeasures...
     expireInquiries(world, dayOf(t));   // ...THEN sweep spent inquiries.
     runVignettes(world, rules);         // ...THEN tonight's micro-scenes fire (pillar 7), so...

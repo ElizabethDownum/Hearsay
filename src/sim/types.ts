@@ -141,6 +141,8 @@ export interface WorldState {
   seed: string;
   tick: Tick;
   claimCounter: number;
+  /** The treasury — flat integer coin (Plan 8: money prices choices, never a second game). */
+  coin: number;
   /** The avatar's NPC id, or null in a headless (player-free) world. */
   playerId: EntityId | null;
   /** The avatar's current venue — overrides schedule/venueAt when set. */
