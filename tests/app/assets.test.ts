@@ -71,7 +71,11 @@ function licenseGateViolations(slots: Record<string, string | string[] | null>, 
     if (value === null) continue;
     const paths = Array.isArray(value) ? value : [value];
     for (const p of paths) {
-      if (p.startsWith('fonts/')) continue; // OFL fonts are pre-cleared, never bought
+      // OFL fonts are pre-cleared, never bought — but ONLY the font.* slot family gets this
+      // exemption. Gating on path prefix alone would let a non-font id smuggle an asset in by
+      // pointing its path at fonts/ (e.g. "icon.ui.rumor": "fonts/smuggled.png"); both the id
+      // family AND the path must agree before we skip the CONFIRMED check.
+      if (id.startsWith('font.') && p.startsWith('fonts/')) continue;
       const packDir = p.split('/')[0]!;
       // A pack row is CONFIRMED only if some line naming this pack dir also says CONFIRMED —
       // per-line, not "anywhere in the file", so one pack's TBD row can't be shadowed by another
@@ -97,6 +101,11 @@ describe('license gate has real teeth (assets/LICENSES.md)', () => {
     const confirmedLicenses = `${licensesText}\n| \`assets/testpack/\` | some-pack | Some Artist | CONFIRMED (order #999) |\n`;
     const hypothetical = { 'icon.ui.coin': 'testpack/Coin.png' };
     expect(licenseGateViolations(hypothetical, confirmedLicenses)).toEqual([]);
+  });
+
+  it('teeth: a non-font id smuggling a path under fonts/ is NOT exempt — path prefix alone is not enough', () => {
+    const smuggled = { 'icon.ui.rumor': 'fonts/smuggled.png' };
+    expect(licenseGateViolations(smuggled, licensesText)).toEqual(['icon.ui.rumor']);
   });
 
   it('every wired (non-null) font slot really is under fonts/', () => {
