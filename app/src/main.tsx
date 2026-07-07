@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import './theme.css';
 import { runDevCampaign, DEV_SEED, DEV_DAYS } from './campaign';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { boardView } from '../../src/intel/board';

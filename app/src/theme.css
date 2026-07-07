@@ -1,0 +1,154 @@
+/**
+ * Hearsay theme tokens — derived from docs/art-direction.md (STANDING LAW, byte-exact hex values
+ * from the "Palette" table). This file supplies the printed-matter look for every surface: boards,
+ * town view, and chrome all read these custom properties rather than hardcoding color or type.
+ *
+ * Font files are served from the repo-level assets/fonts/ tree (assets/manifest.json's
+ * font.display / font.text / font.ui slots). vite.config.ts scopes `publicDir` to that one folder
+ * (fonts only — never the whole assets/ tree, which also holds unconfirmed-license art packs), so
+ * the files are served/copied verbatim at stable ROOT-ABSOLUTE paths in both `npm run app:dev` and
+ * `npm run app:build` — no relative-depth math, no /@fs/ dev-only path, no build-time hash to chase.
+ * app/index.html's preloads use the same absolute paths.
+ */
+
+/* ---------- @font-face: the three OFL families, regular weight only (the only weight the
+   manifest currently wires — see docs/asset-slots.md row 6 / assets/manifest.json). ---------- */
+
+@font-face {
+  font-family: 'Cinzel';
+  src: url('/Cinzel-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'EB Garamond';
+  src: url('/EBGaramond-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/Inter-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---------- Palette: light ("parchment") is the default; dark ("chalk on slate") applies via
+   prefers-color-scheme. `[data-theme]` overrides win over BOTH — the attribute selector's higher
+   specificity ((0,2,0) vs. plain :root's (0,1,0)) beats the media-scoped :root regardless of source
+   order, so an explicit data-theme="light" holds even under a dark OS, and vice versa. ---------- */
+
+:root {
+  --paper: #f3ead8;
+  --ink: #221a12;
+  --sepia: #7a5c3e;
+  --verdigris: #3e6e64;
+  --vermilion: #9e2b25;
+  --gilt: #b8912f;
+  --wash: rgba(122, 92, 62, 0.08);
+
+  /* Typography (docs/art-direction.md "Typography" section). */
+  --font-display: 'Cinzel', serif;
+  --font-text: 'EB Garamond', Georgia, serif;
+  --font-ui: 'Inter', system-ui, sans-serif;
+
+  /* Scale: 12/14/16/20/28px steps; boards default 14 EB Garamond; never below 12. */
+  --step-0: 12px;
+  --step-1: 14px;
+  --step-2: 16px;
+  --step-3: 20px;
+  --step-4: 28px;
+
+  /* Motion: paper doesn't animate. State changes cross-fade <=150ms. */
+  --motion-fade: 150ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #23201b;
+    --ink: #e8dfce;
+    --sepia: #a98f6e;
+    --verdigris: #6fa79a;
+    --vermilion: #c65b4e;
+    --gilt: #d4b25e;
+    --wash: rgba(169, 143, 110, 0.1);
+  }
+}
+
+:root[data-theme='light'] {
+  --paper: #f3ead8;
+  --ink: #221a12;
+  --sepia: #7a5c3e;
+  --verdigris: #3e6e64;
+  --vermilion: #9e2b25;
+  --gilt: #b8912f;
+  --wash: rgba(122, 92, 62, 0.08);
+}
+
+:root[data-theme='dark'] {
+  --paper: #23201b;
+  --ink: #e8dfce;
+  --sepia: #a98f6e;
+  --verdigris: #6fa79a;
+  --vermilion: #c65b4e;
+  --gilt: #d4b25e;
+  --wash: rgba(169, 143, 110, 0.1);
+}
+
+/* ---------- Base rules ---------- */
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--step-1);
+  line-height: 1.5;
+}
+
+/* Focus-visible rings in verdigris — never rely on color alone elsewhere, but a focus ring is
+   the one place a single outline channel is the whole point. */
+:focus-visible {
+  outline: 2px solid var(--verdigris);
+  outline-offset: 2px;
+}
+
+/* Small-caps utility (district labels, board headers) — font-variant-caps first, with a
+   letter-spacing nudge so synthesized small caps (fonts without a true smcp table) still read as
+   intentional letterspaced capitals rather than cramped fallback text. */
+.small-caps {
+  font-variant-caps: small-caps;
+  letter-spacing: 0.03em;
+}
+
+/* Hairline --sepia borders (rules, dividers, board hairlines). */
+hr {
+  border: none;
+  border-top: 1px solid var(--sepia);
+}
+
+.hairline {
+  border: 1px solid var(--sepia);
+}
+
+/* Reduced motion: none. The cross-fade above is the only motion this theme ever authorizes, and
+   this media query removes even that. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
