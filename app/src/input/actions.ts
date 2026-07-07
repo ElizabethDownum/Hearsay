@@ -44,3 +44,22 @@ export const KEYMAP: Record<string, UIAction> = {
   t: { kind: 'open-panel', panel: 'terms' },
   Escape: { kind: 'close' },
 };
+
+/**
+ * Registered language for every verb kind (the jargon law reaches toasts too): a player-facing
+ * mention of a queued verb renders TERMS[VERB_TERM[kind]].label — never the raw camelCase action
+ * kind. Total over Action['kind'] (still a type-only crossing — the values are plain term-id
+ * strings), so adding a verb kind fails the build until it names its registered term. `inject` is
+ * unreachable from the shell's planner; it maps to the tell verb it is the staging twin of
+ * (applyInject: "player tells a rumor to one NPC — hop zero").
+ */
+export const VERB_TERM: Record<Action['kind'], string> = {
+  goTo: 'verb-travel',
+  tell: 'verb-tell',
+  ask: 'verb-ask',
+  assignInformant: 'verb-post',
+  tag: 'verb-note',
+  codex: 'codex',
+  card: 'hypothesis-card',
+  inject: 'verb-tell',
+};

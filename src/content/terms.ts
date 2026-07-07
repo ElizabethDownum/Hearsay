@@ -52,6 +52,12 @@ export const TERMS: Record<string, TermDef> = {
   'evening-report':  { id: 'evening-report', label: 'Evening report', short: 'The day\'s haul, batched: new stories, who brought each, and every authority sighting.', entry: null },
   'day-planner':     { id: 'day-planner', label: 'Planner', short: 'Pause to plan: travel, tell a circle-mate, ask, post informants. Verbs queue for their next beat.', entry: null },
   'terms-codex':     { id: 'terms-codex', label: 'Terms', short: 'The glossary of every game term — hover any label for its meaning, or read them all here.', entry: null },
+  // ── your verbs (the planner's logged actions) ──
+  'verb-travel':     { id: 'verb-travel', label: 'Travel', short: 'Move your avatar to a venue. Takes effect on the very next tick the sim steps.', entry: null },
+  'verb-tell':       { id: 'verb-tell', label: 'Tell', short: 'Speak a story to a circle-mate, under full physics. Fires on the next conversation beat.', entry: null },
+  'verb-ask':        { id: 'verb-ask', label: 'Ask', short: 'Ask a circle-mate about a story or a person. Fires on the next beat — and asking is observable.', entry: null },
+  'verb-post':       { id: 'verb-post', label: 'Post informant', short: 'Assign an informant to a venue. They keep the mid-day post from the next day onward.', entry: null },
+  'verb-note':       { id: 'verb-note', label: 'Margin note', short: 'Pin a private note to anything. Read by nothing in the town — a hunch, never evidence.', entry: null },
   // ── the hunt ──
   'sketch':          { id: 'sketch', label: 'Ghost sketch', short: 'The enemy investigates a ghost — every traced operation adds a feature to it.', entry: null },
   'sketch-feature':  { id: 'sketch-feature', label: 'Feature', short: 'One deduced trait of the ghost: a district, an entry point, a carrier profile.', entry: null },

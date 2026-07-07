@@ -37,7 +37,10 @@ export function Codex({ rows }: { rows: CodexDetailRow[] }) {
                 <td>{r.hits}</td>
                 <td>
                   {r.locked ? <span className="badge badge-lock"><Term id="lock" /></span> : `${Math.max(0, 3 - r.hits)} to lock`}
-                  {r.singleChannelVia && <span className="badge badge-danger" title="single-channel lock"> single-channel — rests entirely on {r.singleChannelVia}&apos;s reports</span>}
+                  {/* The C-decision badge is a LOCK badge ("this lock rests entirely on…") — it only
+                      renders on a locked row. Pre-lock single-channel provenance stays readable as
+                      plain via-pairs in the detail below, without the vermilion alarm. */}
+                  {r.locked && r.singleChannelVia && <span className="badge badge-danger" title="single-channel lock"> single-channel — rests entirely on {r.singleChannelVia}&apos;s reports</span>}
                 </td>
               </tr>
             ))}

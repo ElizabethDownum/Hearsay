@@ -6,7 +6,8 @@ import './theme.css';
 // fence). Everything below the panels boundary receives props; nothing there reaches the engine. ──
 import { newSession, type ActionIntent } from './loop/session';
 import { makeClock } from './loop/clock';
-import { KEYMAP, type UIAction } from './input/actions';
+import { KEYMAP, VERB_TERM, type UIAction } from './input/actions';
+import { TERMS } from '../../src/content/terms';
 import { computeLayout } from './town/layout';
 import { TownCanvas } from './town/TownCanvas';
 import { playerView } from '../../src/sim/fieldwork';
@@ -154,7 +155,8 @@ function App() {
 
   const submitVerb = (intent: ActionIntent) => {
     const { queuedFor } = session.submit(intent);
-    setToast(`${intent.kind} queued for ${fmtTick(queuedFor)} — unpause to fire`);
+    // The toast speaks registered language (jargon law): the verb's TERMS label, never a raw kind.
+    setToast(`${TERMS[VERB_TERM[intent.kind]]!.label} queued for ${fmtTick(queuedFor)} — unpause to fire`);
     force();
   };
   const addTag = (target: string, text: string) =>
@@ -175,6 +177,11 @@ function App() {
     : { kind: 'objective', usurper: cast?.usurper ?? '', council: cast?.council ?? [] };
   const web = webView(log, webSubject, damagingFamilies(log, STANDARD_RULES));
   const vias = ['self', 'dossier', ...world.intel.informants.map((i) => i.id)];
+  // One board fold serves both the board panel and the planner's family-ask list (the brief's
+  // "family from board clusters"): the families the player can ask about are the clusters the
+  // board shows, so family-asking unlocks with clustering (assist >= 1), exactly like the board.
+  const board = boardView(log, assist, STANDARD_RULES);
+  const clusterFamilies = (board.clusters ?? []).map((c) => c.family);
 
   return (
     <main style={{ fontFamily: 'var(--font-text)', maxWidth: 1200, margin: '0 auto', padding: 16 }}>
@@ -214,7 +221,7 @@ function App() {
             ))}
           </div>
 
-          {panel === 'board' && <EvidenceBoard view={boardView(log, assist, STANDARD_RULES)} tags={tags} onAddTag={addTag} onRemoveTag={removeTag} />}
+          {panel === 'board' && <EvidenceBoard view={board} tags={tags} onAddTag={addTag} onRemoveTag={removeTag} />}
           {panel === 'codex' && <Codex rows={codexDetailView(log, world.intel.codex, STANDARD_RULES)} />}
           {panel === 'counter' && <CounterSketch view={counterSketchView(log, world.intel.cards)} />}
           {panel === 'web' && (
@@ -231,7 +238,7 @@ function App() {
               <InformantLedger ledger={informantLedger(log, ledgerVia)} onSelectFamily={() => setPanel('board')} />
             </div>
           )}
-          {panel === 'planner' && <DayPlanner view={view} paused={speed === 0} onVerb={submitVerb} />}
+          {panel === 'planner' && <DayPlanner view={view} paused={speed === 0} clusterFamilies={clusterFamilies} onVerb={submitVerb} />}
           {panel === 'report' && <EveningReport report={eveningReport(log, view.scenario?.day ?? dayOf(world.tick))} onOpenBoard={() => setPanel('board')} />}
           {panel === 'terms' && <TermsCodex />}
         </div>

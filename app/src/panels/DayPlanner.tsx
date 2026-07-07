@@ -5,11 +5,13 @@ import type { ActionIntent } from '../loop/session';
 import { Term } from './Term';
 
 /**
- * The planner — the spymaster's desk where verbs are composed. Props-only and pinned to exactly
- * { view, paused, onVerb }: everything it offers is derived from the epistemic PlayerView plus the
- * TERMS registry (predicate labels), never world/engine state. Verbs are DISABLED while running
- * (pause-to-plan, the low-APM law); submitting shows the beat the verb queued for. `onVerb` hands
- * the intent to the composition root, which submits it through the session log.
+ * The planner — the spymaster's desk where verbs are composed. Props-only: everything it offers is
+ * derived from the epistemic PlayerView, the TERMS registry (predicate labels), and
+ * `clusterFamilies` — the board's cluster families, folded in the composition root, so the ask
+ * composer can offer "ask about a story" (family) alongside "ask about a person" (subject), the
+ * brief's pinned pair. Verbs are DISABLED while running (pause-to-plan, the low-APM law);
+ * submitting shows the beat the verb queued for. `onVerb` hands the intent to the composition
+ * root, which submits it through the session log.
  *
  * `SOMEONE` mirrors the sim's vague-source sentinel (src/sim/rumors/claim, value 'someone'); the
  * value can't be imported across the panels fence, so it is restated here as the stable public
@@ -22,8 +24,8 @@ const PREDICATES = Object.keys(TERMS)
   .sort((a, b) => a.id.localeCompare(b.id));
 
 export function DayPlanner({
-  view, paused, onVerb,
-}: { view: PlayerView; paused: boolean; onVerb(intent: ActionIntent): void }) {
+  view, paused, clusterFamilies, onVerb,
+}: { view: PlayerView; paused: boolean; clusterFamilies: string[]; onVerb(intent: ActionIntent): void }) {
   const off = !paused; // pause-to-plan: every verb control is inert while the sim runs
   const venues = [...view.map.venues].sort((a, b) => a.id.localeCompare(b.id));
   const people = [...view.map.directory].map((p) => p.id).sort();
@@ -43,7 +45,7 @@ export function DayPlanner({
       <TellComposer view={view} off={off} onVerb={onVerb} people={people} venues={venues.map((v) => v.id)} />
 
       <h3><Term id="inquiry" /> · ask a circle-mate</h3>
-      <AskComposer members={view.avatar.circleMembers} people={people} off={off} onVerb={onVerb} />
+      <AskComposer members={view.avatar.circleMembers} people={people} families={clusterFamilies} off={off} onVerb={onVerb} />
 
       <h3><Term id="informant" /> · postings</h3>
       {view.informants.length === 0 ? <p className="desk-note">No informants recruited.</p> : view.informants.map((inf) => (
@@ -100,19 +102,32 @@ function TellComposer({
   );
 }
 
+/** The brief's pinned pair — "ask composer (family from board clusters | subject)". Family mode is
+ *  offered whenever the board has clusters (and is the default then, matching the brief's order);
+ *  with no clusters yet, subject mode stands alone. Mode labels are registered TERMS labels. */
 function AskComposer({
-  members, people, off, onVerb,
-}: { members: string[]; people: string[]; off: boolean; onVerb(i: ActionIntent): void }) {
+  members, people, families, off, onVerb,
+}: { members: string[]; people: string[]; families: string[]; off: boolean; onVerb(i: ActionIntent): void }) {
+  const [mode, setMode] = useState<'family' | 'subject'>(families.length > 0 ? 'family' : 'subject');
   const [to, setTo] = useState('');
   const [subject, setSubject] = useState('');
+  const [family, setFamily] = useState('');
   const target = to || members[0] || '';
   const subj = subject || people[0] || '';
+  const fam = family || families[0] || '';
   if (members.length === 0) return <p className="desk-note">No circle-mates in earshot this beat.</p>;
+  const useFamily = mode === 'family' && fam !== '';
   return (
     <div className="tag-row">
       <label>ask <select className="desk-btn" disabled={off} value={target} onChange={(e) => setTo(e.target.value)}>{members.map((m) => <option key={m} value={m}>{m}</option>)}</select></label>
-      <label>about <Term id="subject" /> <select className="desk-btn" disabled={off} value={subj} onChange={(e) => setSubject(e.target.value)}>{people.map((p) => <option key={p} value={p}>{p}</option>)}</select></label>
-      <button className="desk-btn" disabled={off} onClick={() => onVerb({ kind: 'ask', to: target, about: { subject: subj } })}>ask</button>
+      <label>about <select className="desk-btn" disabled={off} value={mode} onChange={(e) => setMode(e.target.value as 'family' | 'subject')} aria-label="ask about a story or a person">
+        {families.length > 0 && <option value="family">{TERMS['family']!.label}</option>}
+        <option value="subject">{TERMS['subject']!.label}</option>
+      </select></label>
+      {useFamily
+        ? <select className="desk-btn" disabled={off} value={fam} aria-label="which story" onChange={(e) => setFamily(e.target.value)}>{families.map((f) => <option key={f} value={f}>{f}</option>)}</select>
+        : <select className="desk-btn" disabled={off} value={subj} aria-label="which person" onChange={(e) => setSubject(e.target.value)}>{people.map((p) => <option key={p} value={p}>{p}</option>)}</select>}
+      <button className="desk-btn" disabled={off} onClick={() => onVerb({ kind: 'ask', to: target, about: useFamily ? { family: fam } : { subject: subj } })}>ask</button>
     </div>
   );
 }

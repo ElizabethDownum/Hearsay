@@ -12,16 +12,19 @@ export function WebViewPanel({ web, onSelectNpc }: { web: WebView; onSelectNpc(i
   const s = web.subject;
   const principals = s.kind === 'objective' ? [s.usurper, ...s.council] : [];
   const touched = new Set(web.principalsTouched);
+  // EVERY touched principal wears the gilt checkmark — the usurper FIRST among them (the primary
+  // objective; "how close you're getting" starts with him), then each council member.
+  const mark = (id: string) => (touched.has(id)
+    ? <span className="badge badge-lock" title="damaging word reached this principal"> ✓</span>
+    : null);
   return (
     <section className="panel">
       <h2><Term id="web-view" /></h2>
       {s.kind === 'objective'
         ? (
           <p>
-            <Term id="usurper" /> <b>{s.usurper}</b> · <Term id="council" />:{' '}
-            {principals.slice(1).map((c) => (
-              <span key={c}>{c}{touched.has(c) ? <span className="badge badge-lock" title="damaging word reached this principal"> ✓</span> : ''} </span>
-            ))}
+            <Term id="usurper" /> <b>{s.usurper}</b>{mark(s.usurper)} · <Term id="council" />:{' '}
+            {s.council.map((c) => <span key={c}>{c}{mark(c)} </span>)}
           </p>
         )
         : <p><Term id="subject" />: <b>{s.id}</b></p>}
