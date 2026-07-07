@@ -134,11 +134,14 @@ export function applyCard(
   if (op === 'update') {
     const card = cards.find((c) => c.id === id);
     if (!card) throw new Error(`card update: unknown id '${id}'`);
-    if (text !== null) card.text = text;
-    if (confidence !== null) {
-      if (!validConfidence(confidence)) throw new Error('card update: confidence must be in [0, 1]');
-      card.confidence = confidence;
+    // Validate BEFORE any mutation: a dropped bad-confidence update must leave the card untouched,
+    // or a partial text write survives live but never enters the (rejected) log — a live≠replay
+    // hazard now that the UI submits card updates. Validation first, then all-or-nothing mutation.
+    if (confidence !== null && !validConfidence(confidence)) {
+      throw new Error('card update: confidence must be in [0, 1]');
     }
+    if (text !== null) card.text = text;
+    if (confidence !== null) card.confidence = confidence;
     if (links !== null) card.links = links;
     card.updatedTick = tick;
     return;

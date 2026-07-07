@@ -110,6 +110,25 @@ describe('player actions — validation matrix', () => {
       tick: 0, kind: 'card', op: 'add', id: 'k3', text: 'b', confidence: 0.5, links: null,
     })).toThrow();
   });
+
+  // Rider 1 (controller): applyCard must validate BEFORE it mutates. The UI can now submit card
+  // updates, so a dropped bad-confidence update (which never enters the log) must leave the world
+  // byte-identical — otherwise a partial text mutation survives live but is absent from replay.
+  it('card update: a bad-confidence update leaves the world hash unchanged (validate before mutate)', () => {
+    const world = buildWorld(miniTown(), 'card-atomic');
+    applyAction(world, {
+      tick: 0, kind: 'card', op: 'add', id: 'k1', text: 'original text', confidence: 0.5, links: [],
+    });
+    const before = hashWorld(world);
+
+    // A single update carrying BOTH a new text and an out-of-range confidence must throw and touch
+    // nothing: no partial text write, no updatedTick bump — the failed verb is a no-op on the world.
+    expect(() => applyAction(world, {
+      tick: 0, kind: 'card', op: 'update', id: 'k1', text: 'poisoned text', confidence: 1.5, links: null,
+    })).toThrow(/confidence/);
+    expect(world.intel.cards[0]!.text).toBe('original text'); // NOT the partial 'poisoned text'
+    expect(hashWorld(world)).toBe(before);
+  });
 });
 
 describe('player actions — deterministic replay', () => {
