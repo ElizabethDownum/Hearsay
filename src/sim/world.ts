@@ -45,6 +45,7 @@ export function buildWorld(fixture: TownFixture, seed: string, rules?: Rules): W
     tick: 0,
     claimCounter: 0,
     coin: rules ? rules.economy.startingCoin : 0,
+    station: null,
     playerId: null,
     playerVenue: null,
     pendingTell: null,

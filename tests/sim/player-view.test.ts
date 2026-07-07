@@ -14,13 +14,14 @@ describe('playerView — the epistemic selector: presence appears only under liv
     const world = watchfordWorld('pv-a');
     enrollPlayer(world, { home: 'home-gs' });
     world.playerVenue = 'home-gs';
-    // gale is posted (as an informant) to square-w1 — coverage follows the POST, not gale's own body.
-    world.intel.informants.push({ id: 'gale', assignedVenue: 'square-w1' });
+    // hugo is posted (as an informant) to square-w1, a venue its body actually occupies at 10:00 —
+    // so the post is LIVE (controller rider: coverage rides the actual post, not all-day assignedVenue).
+    world.intel.informants.push({ id: 'hugo', assignedVenue: 'square-w1' });
     world.tick = at(0, 10); // 10:00 — both squares are staffed under WATCHFORD's allDay schedules
 
     const view = playerView(world);
 
-    expect(view.informants).toEqual([{ id: 'gale', assignedVenue: 'square-w1' }]);
+    expect(view.informants).toEqual([{ id: 'hugo', assignedVenue: 'square-w1' }]);
     expect(view.occupantsByVenue['square-w1']!.slice().sort()).toEqual(['hugo', 'quill', 'rosa']);
     expect(view.occupantsByVenue['home-gs']).toEqual(['you']);
     // square-w0 is known-occupied (gale, mira, otto, sten all really stand there) but nobody has

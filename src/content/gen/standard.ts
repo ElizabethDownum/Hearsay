@@ -22,6 +22,11 @@ export const VENUE_ARCHETYPES: VenueArchetypeDef[] = [
   { id: 'workshop', scope: 'per-district', access: 'public' },
   { id: 'well', scope: 'per-district', access: 'public' },
   { id: 'guard-post', scope: 'per-district', access: 'invitational' }, // terrain for the enemy AI (Plan 4)
+  // Station-hosted rooms (Plan 8 §12): no regulars — no occupation names them a workplace and no
+  // schedule reaches them, so they add zero occupancy physics. The access law opens the salon to
+  // nobles and the back-rooms to lowlifes; rung-4 hosting (Task 6) fills them on demand.
+  { id: 'salon', scope: 'singleton', access: 'invitational' },     // one, in district 0 (noble ground)
+  { id: 'back-room', scope: 'per-district', access: 'invitational' }, // one per district (lowlife ground)
   { id: 'cathedral', scope: 'singleton', access: 'public' },
   { id: 'docks', scope: 'singleton', access: 'public' },
 ];

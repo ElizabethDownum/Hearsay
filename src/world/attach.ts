@@ -30,17 +30,21 @@ export function worldFromTown(town: GeneratedTown, seed: string): WorldState {
 /**
  * Attach the avatar to a live world: its own private `safehouse` venue (first district), the two
  * dossier informants wired into the intel state, and the day-0 dossier seeded into the intel log
- * — `via: 'dossier'`, tick 0, in traitReads → edgeReads → hint order. Station-neutral: no enemy
- * wiring. Throws if the town has no dossier, a safehouse venue already exists, or a player is
- * already enrolled (so a second attach throws).
+ * — `via: 'dossier'`, tick 0, in traitReads → edgeReads → hint order. Writes `world.station` (the
+ * access law's standing): defaults to the seed's deal, or an explicit `station` for tests/staging
+ * (the deal already shaped the dossier at gen time — the override only moves which doors open, not
+ * where the dossier looked). Throws if the town has no dossier, a safehouse venue already exists,
+ * or a player is already enrolled (so a second attach throws).
  */
-export function attachPlayer(world: WorldState, town: GeneratedTown): void {
+export function attachPlayer(world: WorldState, town: GeneratedTown, station?: 'noble' | 'lowlife'): void {
   const dossier = town.dossier;
   if (!dossier) throw new Error('attachPlayer: town has no dossier');
   if (world.venues['safehouse']) throw new Error('attachPlayer: a safehouse venue already exists');
 
   world.venues['safehouse'] = { id: 'safehouse', district: town.districts[0]!.id, access: 'private' };
   enrollPlayer(world, { home: 'safehouse' });
+  // Generated towns always carry a deal; 'noble' is the neutral fallback only for a hand-built town.
+  world.station = station ?? town.stationDeal ?? 'noble';
 
   for (const id of dossier.informants) {
     world.intel.informants.push({ id, assignedVenue: null });

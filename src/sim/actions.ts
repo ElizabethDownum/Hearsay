@@ -4,7 +4,7 @@ import type { InquiryKey } from './perception';
 import { CONVERSATION_BEAT } from './rumors/propagation';
 import { mintClaim, type Claim, type EntityId, type VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
-import type { WorldState } from './types';
+import type { Venue, WorldState } from './types';
 
 export interface InjectSpec {
   subject: Claim['subject'];
@@ -68,10 +68,54 @@ export function applyAsk(world: WorldState, to: EntityId, about: InquiryKey, tic
 /** Informant posting window (spec: 15-aligned, mid-day). Exported for the assign law + tests. */
 export const ASSIGNMENT = { from: 960, to: 1200 } as const;
 
-/** Move the avatar to a venue. Requires an enrolled player and a real venue. */
+/**
+ * The access law (Plan 8): whether a given standing opens `venue` without suspicion.
+ * public always · safehouse always · invitational: noble → salon only, lowlife → back-rooms only
+ * (guard-post + every other invitational shut to both) · private never (engineered invitations are
+ * post-v1 — the séance grave is Plan 9's own verb).
+ */
+export function venueOpensFor(station: 'noble' | 'lowlife', venue: Venue): boolean {
+  if (venue.access === 'public') return true;
+  if (venue.id === 'safehouse') return true;
+  if (venue.access === 'private') return false;
+  // invitational — only the room this standing hosts
+  if (venue.id === 'salon') return station === 'noble';
+  if (venue.id.startsWith('back-room-')) return station === 'lowlife';
+  return false;
+}
+
+/**
+ * The access law as a boolean (no throw) — the ONE predicate the UI/probe seam reuses. Inert
+ * (every real venue opens) when no standing has been dealt: the P7 pre-station behavior. Unknown
+ * venue → false.
+ */
+export function canEnter(world: WorldState, venue: VenueId): boolean {
+  const v = world.venues[venue];
+  if (!v) return false;
+  return world.station === null || venueOpensFor(world.station, v);
+}
+
+/** The term-registered refusal for a door the standing doesn't open. */
+function accessDenial(v: Venue): string {
+  if (v.access === 'private') {
+    return `goTo: '${v.id}' is private — no engineered invitation exists (post-v1)`;
+  }
+  if (v.id === 'salon') return `goTo: no standing at the salon — you'd be conspicuous`;
+  if (v.id.startsWith('back-room-')) return `goTo: no standing in the back rooms — you'd be conspicuous`;
+  return `goTo: no standing at the guard post — you'd be conspicuous`;
+}
+
+/**
+ * Move the avatar to a venue. Requires an enrolled player and a real venue, and — once the seed has
+ * dealt a standing (`world.station`) — that the standing opens that door (the access law). The P7
+ * UI-only gate retires here: the sim now enforces it, so bots/fixtures using public venues stay
+ * untouched while a station-bearing campaign is bound by the law.
+ */
 export function applyGoTo(world: WorldState, venue: VenueId): void {
   if (world.playerId === null) throw new Error('goTo: no player is enrolled');
-  if (!world.venues[venue]) throw new Error(`goTo: unknown venue '${venue}'`);
+  const v = world.venues[venue];
+  if (!v) throw new Error(`goTo: unknown venue '${venue}'`);
+  if (world.station !== null && !venueOpensFor(world.station, v)) throw new Error(accessDenial(v));
   world.playerVenue = venue;
 }
 

@@ -119,6 +119,13 @@ export interface GeneratedTown {
   /** Day-0 starting intelligence for the avatar. Gen always sets it; enemy-only paths ignore it. */
   dossier: Dossier | null;
   /**
+   * The societal standing the seed dealt (Plan 8 §12: "the player's station is dealt by the seed").
+   * Tri-state mirroring `cast`: the generator ALWAYS sets 'noble' | 'lowlife'; `null` marks a draw
+   * that dealt nothing (the validator fails it so serve rerolls); hand-built / fixture towns OMIT it
+   * (`undefined`), and `station-sane` skips them the way `dossier-capped` skips a null dossier.
+   */
+  stationDeal?: 'noble' | 'lowlife' | null;
+  /**
    * Scenario principals (gen §11). Tri-state, mirroring the dossier's null-skip precedent but shifted
    * one slot so `null` can carry meaning: the generator ALWAYS sets it — a `ScenarioCast` when the draw
    * found a valid usurper, or `null` when it did not (the validator fails `null` so serve rerolls).

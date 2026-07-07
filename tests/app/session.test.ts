@@ -4,6 +4,7 @@ import { CORONATION } from '../../src/content/scenarios/coronation';
 import { hashWorld } from '../../src/sim/hash';
 import { at, minuteOfDay, TICKS_PER_DAY, type Tick } from '../../src/core/time';
 import { venueAt, CIRCLE_SIZE } from '../../src/sim/agents';
+import { canEnter } from '../../src/sim/actions';
 import { CONVERSATION_BEAT } from '../../src/sim/rumors/propagation';
 import { SOMEONE, type EntityId } from '../../src/sim/rumors/claim';
 import type { WorldState } from '../../src/sim/types';
@@ -35,6 +36,7 @@ function findCoCircle(world: WorldState, minNpcs: number): { venue: string; tick
     }
     for (const [venue, ids] of [...byVenue].sort(([a], [b]) => a.localeCompare(b))) {
       if (!world.venues[venue]) continue;                 // must be a real, goTo-able venue
+      if (!canEnter(world, venue)) continue;              // ...that the avatar's standing opens (P8 access law)
       if (ids.some((id) => guardIds.has(id))) continue;   // no observer in earshot
       if (ids.length >= minNpcs && ids.length + 1 <= CIRCLE_SIZE) {
         return { venue, tick: t, npcs: [...ids].sort() };

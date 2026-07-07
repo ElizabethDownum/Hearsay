@@ -143,6 +143,12 @@ export interface WorldState {
   claimCounter: number;
   /** The treasury — flat integer coin (Plan 8: money prices choices, never a second game). */
   coin: number;
+  /**
+   * The avatar's societal standing (Plan 8: dealt by the seed, written by attachPlayer). Decides
+   * which venue doors `applyGoTo` opens without suspicion. `null` in a headless / pre-station world
+   * (the access law is then inert — the P7 pre-station behavior).
+   */
+  station: 'noble' | 'lowlife' | null;
   /** The avatar's NPC id, or null in a headless (player-free) world. */
   playerId: EntityId | null;
   /** The avatar's current venue — overrides schedule/venueAt when set. */

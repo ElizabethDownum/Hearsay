@@ -218,6 +218,19 @@ export function validateTown(town: GeneratedTown, config: GenConfig, opts: Valid
     else if (dirt.every((s) => s.witnesses.length === 0)) fail('scenario-castable', 'usurper secrets have no witnesses');
   }
 
+  // Station (Plan 8 §12): the seed deals a standing and the town carries its hosted venues (one
+  // singleton salon in district 0 + one back-room per district). Tri-state like the cast: `null`
+  // (a draw that dealt nothing) fails so serve rerolls; `undefined` (a hand-built / fixture town)
+  // skips; a real deal is checked in full — deal present AND the venues exist.
+  if (town.stationDeal === null) {
+    fail('station-sane', 'town has no station deal');
+  } else if (town.stationDeal !== undefined) {
+    if (!venueIds.has('salon')) fail('station-sane', 'no salon venue (invitational, district 0)');
+    for (const d of town.districts) {
+      if (!venueIds.has(`back-room-${d.id}`)) fail('station-sane', `no back-room venue for district '${d.id}'`);
+    }
+  }
+
   // Graph invariants only mean something on a structurally sound town.
   if (failures.length > 0) return { ok: false, failures };
 

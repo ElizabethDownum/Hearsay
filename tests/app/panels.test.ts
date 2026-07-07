@@ -12,6 +12,7 @@ import { webView, type WebView } from '../../src/intel/web';
 import { at, TICKS_PER_DAY } from '../../src/core/time';
 import { CONVERSATION_BEAT } from '../../src/sim/rumors/propagation';
 import { venueAt, CIRCLE_SIZE } from '../../src/sim/agents';
+import { canEnter } from '../../src/sim/actions';
 import { SOMEONE, type EntityId } from '../../src/sim/rumors/claim';
 import type { InjectSpec } from '../../src/sim/actions';
 import type { IntelEntry } from '../../src/intel/types';
@@ -113,11 +114,14 @@ describe('VERB_TERM — every verb kind names a registered term', () => {
 
 // ── RUN A re-verification (persistent): the usurper's checkmark renders from the LIVE fold ───────
 
-/** Deterministic day-0 probe (session.test.ts's findCoCircle, compacted): a venue+beat where the
- *  avatar is guaranteed co-circled with >=1 non-observer npc — staging, never physics. */
+/** Deterministic day-0 probe (session.test.ts's findCoCircle, compacted): an ACCESSIBLE venue+beat
+ *  where the avatar is guaranteed co-circled with >=1 non-observer npc — staging, never physics.
+ *  Prefers a tavern (the evening gossip hub) so a whispered mark actually circulates back into the
+ *  player's feed; the P8 access law shut the pre-dawn home circles this run used to open in. */
 function findCoCircle(world: WorldState, minNpcs: number): { venue: string; tick: number; npcs: EntityId[] } {
   const guardIds = new Set(world.enemy.observers.map((o) => o.id));
   const others = Object.values(world.npcs).filter((n) => n.id !== world.playerId);
+  const candidates: { venue: string; tick: number; npcs: EntityId[] }[] = [];
   for (let t = CONVERSATION_BEAT; t < TICKS_PER_DAY; t += CONVERSATION_BEAT) {
     const byVenue = new Map<string, EntityId[]>();
     for (const n of others) {
@@ -126,11 +130,14 @@ function findCoCircle(world: WorldState, minNpcs: number): { venue: string; tick
     }
     for (const [venue, ids] of [...byVenue].sort(([a], [b]) => a.localeCompare(b))) {
       if (!world.venues[venue]) continue;
+      if (!canEnter(world, venue)) continue;              // ...that the avatar's standing opens (P8 access law)
       if (ids.some((id) => guardIds.has(id))) continue;
-      if (ids.length >= minNpcs && ids.length + 1 <= CIRCLE_SIZE) return { venue, tick: t, npcs: [...ids].sort() };
+      if (ids.length >= minNpcs && ids.length + 1 <= CIRCLE_SIZE) candidates.push({ venue, tick: t, npcs: [...ids].sort() });
     }
   }
-  throw new Error('probe: no co-circle venue found on day 0');
+  const spot = candidates.find((c) => c.venue.startsWith('tavern-')) ?? candidates[0];
+  if (!spot) throw new Error('probe: no accessible co-circle venue found on day 0');
+  return spot;
 }
 
 function damagingFamilies(log: readonly IntelEntry[]): Set<string> {

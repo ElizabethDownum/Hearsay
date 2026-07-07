@@ -54,6 +54,7 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
   const secretsRng = new Rng(seed, 'gen:secrets');
   const dossierRng = new Rng(seed, 'gen:dossier');
   const scenarioRng = new Rng(seed, 'gen:scenario');
+  const stationRng = new Rng(seed, 'gen:station');
 
   // ── 1. Districts + institutional venues (fixed grammar) ─────────────────
   const districtIds = Array.from({ length: config.districtCount }, (_, i) => `d${i}`);
@@ -350,13 +351,33 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
     }
   }
 
+  // ── 12. Station: the seed deals a societal standing ─────────────────────
+  // 'gen:station' is a fresh stream (never reshuffles another subsystem); the salon + back-room
+  // venues are stamped in §1 from their archetypes. Dealt BEFORE §11 because the dossier's station
+  // filter reads it. A station RANKS read-candidates by where the standing sees clearly (lower rank
+  // = looked at first): noble = crown-faction then district 0; lowlife = docks workers then away
+  // from district 0. The rank is a stable-sort key applied to the SAME shuffle draws — same counts,
+  // same caps, same stream: only WHERE the dossier looks changes, never how much it takes.
+  const d0 = districtIds[0]!;
+  const stationDeal: 'noble' | 'lowlife' = stationRng.float() < 0.5 ? 'noble' : 'lowlife';
+  const stationRank = (id: EntityId): number => {
+    const m = byId.get(id)!;
+    if (stationDeal === 'noble') {
+      return (m.npc.faction === 'crown' ? 0 : 2) + (m.district === d0 ? 0 : 1);
+    }
+    return (m.occupation.workplace === 'docks' ? 0 : 2) + (m.district !== d0 ? 0 : 1);
+  };
+
   // ── 11. Day-0 dossier: truthful, capped starting intelligence ───────────
   // References the finished cast + post-retarget secrets; a fresh 'gen:dossier' stream keeps every
   // earlier draw byte-identical, so adding the dossier never reshuffles another subsystem.
   const nonGuardIds = cast.filter((m) => m.npc.occupation !== content.guardOccupation.id)
     .map((m) => m.npc.id).sort();
   const informantIds = dossierRng.shuffle(nonGuardIds).slice(0, config.dossierInformants);
+  // Station filter pass: reorder the shuffled candidates by station rank (stable, so the shuffle's
+  // order survives inside each rank) BEFORE the existing draw indexes apply.
   const readPool = dossierRng.shuffle(cast.map((m) => m.npc.id).sort());
+  readPool.sort((a, b) => stationRank(a) - stationRank(b));
   const traitReads: Dossier['traitReads'] = [];
   const readCount = dossierRng.int(1, config.dossierTraitReadMax + 1);
   for (const id of readPool.slice(0, readCount)) {
@@ -365,7 +386,10 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
   }
   const allEdges = cast.flatMap((m) => m.npc.edges.map((e) => ({ from: m.npc.id, to: e.to, kind: e.kind })))
     .sort((a, b) => `${a.from}:${a.to}:${a.kind}`.localeCompare(`${b.from}:${b.to}:${b.kind}`));
-  const edgeReads = dossierRng.shuffle(allEdges).slice(0, dossierRng.int(2, config.dossierEdgeReadMax + 1));
+  const shuffledEdges = dossierRng.shuffle(allEdges);
+  const edgeReadCount = dossierRng.int(2, config.dossierEdgeReadMax + 1);
+  shuffledEdges.sort((a, b) => stationRank(a.from) - stationRank(b.from)); // same station filter pass
+  const edgeReads = shuffledEdges.slice(0, edgeReadCount);
   const hintedSecret = secrets.length > 0 && dossierRng.float() < 0.5
     ? secrets[dossierRng.int(0, secrets.length)]! : null;
   const dossier: Dossier = {
@@ -379,5 +403,5 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
     npcIds: cast.filter((m) => m.district === d).map((m) => m.npc.id),
   }));
 
-  return { fixture: { venues, npcs: cast.map((m) => m.npc) }, districts, keystones, guards, secrets, dossier, cast: scenarioCast };
+  return { fixture: { venues, npcs: cast.map((m) => m.npc) }, districts, keystones, guards, secrets, dossier, cast: scenarioCast, stationDeal };
 }

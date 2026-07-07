@@ -117,11 +117,16 @@ export function playerView(world: WorldState): PlayerView {
         .filter((m) => m !== playerId) ?? [])
     : [];
 
-  // Live coverage: your own venue, plus every venue an informant is actually posted to.
+  // Live coverage: your own venue, plus each informant's post — but ONLY while the informant is
+  // actually standing there (controller rider: coverage rides the 960–1200 post window that
+  // assignInformant writes, not all-day via assignedVenue). Keyed on the informant's real position,
+  // same as captureIntel's feed: outside the post the eyes go with the body, not the assignment.
   const covered = new Set<VenueId>();
   if (world.playerVenue !== null) covered.add(world.playerVenue);
   for (const inf of world.intel.informants) {
-    if (inf.assignedVenue !== null) covered.add(inf.assignedVenue);
+    if (inf.assignedVenue === null) continue;
+    const npc = world.npcs[inf.id];
+    if (npc && positionOf(world, npc, tick) === inf.assignedVenue) covered.add(inf.assignedVenue);
   }
 
   const occupantsByVenue: Record<VenueId, EntityId[]> = {};
