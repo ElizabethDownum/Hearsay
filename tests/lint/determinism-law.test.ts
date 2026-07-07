@@ -1,4 +1,7 @@
 import { ESLint, Linter } from 'eslint';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // The determinism law is only real if every prong PROVABLY fires. We pull the
 // computed config for a real engine file (glob application included) and run
@@ -177,6 +180,61 @@ describe('panels law — presentation code receives props, never reaches into th
     // it without tripping the fence. (Plain-import syntax: the bare Linter() has no TS parser; the
     // rule keys off the specifier, not the `type` modifier.)
     expect(violations("import { PlayerView } from '../townview';", rules)).toBe(0);
+  });
+});
+
+// townview.ts is a barrel that sits at app/src/ — OUTSIDE both the panels/** and town/** globs
+// the panels-law block fences (eslint.config.js). The prong above ("the type-barrel path
+// (../townview) is unfenced") relies on that fact: it's how the fenced town canvas legally
+// obtains PlayerView/TownMap by name. But "unfenced" cuts both ways — no eslint block ever
+// inspects townview.ts's OWN exports or imports, so nothing stops a future edit from adding a
+// runtime (VALUE) export or a value/side-effect import there. If that happened, any fenced
+// town/ file importing '../townview' would receive an engine value with zero lint diagnostic —
+// the fence would go dark exactly where it matters. This is a plain source-scan (no eslint
+// involved) pinning townview.ts to a type-only surface, closing that hole without touching the
+// fence's pinned rule value.
+describe('townview law — the unfenced barrel can never smuggle an engine value', () => {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const repoRoot = path.resolve(here, '../..');
+  const townviewSource = fs.readFileSync(path.join(repoRoot, 'app/src/townview.ts'), 'utf8');
+
+  // Comments must not fool the scan (e.g. a commented-out `export const foo = 1;` in a future
+  // edit's diff noise should never count as a real statement either way), so block and line
+  // comments are stripped before anything else runs.
+  function stripComments(src: string): string {
+    return src
+      .replace(/\/\*[\s\S]*?\*\//g, ' ') // block comments (incl. this file's own header doc)
+      .replace(/\/\/[^\n]*/g, '');       // line comments
+  }
+
+  // Flatten to one line so a statement that wraps multiple source lines (e.g. a multi-line
+  // `export type {\n  Foo,\n} from '...';`) is still captured whole, then split on the keyword's
+  // own statement boundary (the next `;`, or end of file for a trailing statement with no
+  // semicolon). This is a scan, not a parser — cheap and deliberately over-strict, which is
+  // exactly right for a file whose entire job is to carry nothing but type re-exports.
+  function topLevelStatements(src: string, keyword: 'export' | 'import'): string[] {
+    const flattened = stripComments(src).replace(/\s+/g, ' ').trim();
+    const re = new RegExp(`\\b${keyword}\\b[^;]*(?:;|$)`, 'g');
+    return (flattened.match(re) ?? []).map((s) => s.trim()).filter((s) => s.length > 0);
+  }
+
+  it('finds real export statements (the scan itself is not vacuous)', () => {
+    expect(topLevelStatements(townviewSource, 'export').length).toBeGreaterThan(0);
+  });
+
+  it('every top-level export is `export type` — no export {, default, *, const/function/class/let/var', () => {
+    for (const statement of topLevelStatements(townviewSource, 'export')) {
+      expect(statement).toMatch(/^export\s+type\b/);
+    }
+  });
+
+  it('every top-level import is `import type` — no side-effect, value, or dynamic import', () => {
+    // townview.ts has zero import statements today (it only re-exports); this asserts the law
+    // that WOULD bind the moment one is added — a bare `import '../../src/sim/x'` or a value
+    // `import { x } from '...'` can't start with "import type" and so fails immediately.
+    for (const statement of topLevelStatements(townviewSource, 'import')) {
+      expect(statement).toMatch(/^import\s+type\b/);
+    }
   });
 });
 
