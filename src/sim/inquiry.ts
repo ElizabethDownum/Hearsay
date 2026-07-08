@@ -31,6 +31,22 @@ function traitContext(npc: Npc, world: WorldState): TraitContext {
   };
 }
 
+/**
+ * The two floors an answer honors EVEN when compelled. Compulsion (an authority ask at an
+ * invitational venue) bypasses the discretion gate and the trust gate — but NEVER these:
+ *  - the DISMISS floor: a belief below STANCE.DISMISS is too faint to confirm; and
+ *  - the self-dirt block: you never confirm a DAMAGING claim about YOURSELF — "not even behind
+ *    closed doors" (the compelled/invitational case). Both are `compelled`-independent.
+ * chooseAnswer enforces these inline below; applyDebrief (the debrief's own compulsion) filters its
+ * deterministic pick on the SAME predicate — one mechanic, one set of constants, no duplication.
+ */
+export function confirmableUnderCompulsion(belief: Belief, answererId: EntityId, rules: Rules): boolean {
+  if (belief.credence < STANCE.DISMISS) return false;
+  const valence = rules.predicates[belief.claim.predicate]?.valence ?? 'neutral';
+  if (belief.claim.subject === answererId && valence === 'damaging') return false;
+  return true;
+}
+
 export function chooseAnswer(
   world: WorldState, answererId: EntityId, asking: Asking, t: Tick, rules: Rules,
 ): Utterance | null {
@@ -39,12 +55,11 @@ export function chooseAnswer(
   if (answererId === world.playerId) return null;
   const answerer = world.npcs[answererId]!;
   const belief = matchBelief(world.beliefs[answererId] ?? {}, asking.about);
-  if (!belief || belief.credence < STANCE.DISMISS) return null;
+  if (!belief) return null;
+  // The two compelled-independent floors (DISMISS + self-dirt) — honored even behind closed doors.
+  if (!confirmableUnderCompulsion(belief, answererId, rules)) return null;
 
   const compelled = asking.authority && world.venues[asking.venue]?.access === 'invitational';
-  const valence = rules.predicates[belief.claim.predicate]?.valence ?? 'neutral';
-  // You never confirm dirt on yourself — not even behind closed doors.
-  if (belief.claim.subject === answererId && valence === 'damaging') return null;
   const trust = trustBetween(world, answererId, asking.speaker);
   if (!compelled && trust <= 0) return null;
   // Held-close knowledge: extracted by authority, or confided to the very trusted.

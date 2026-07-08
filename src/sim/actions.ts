@@ -11,6 +11,7 @@ import { canAfford, debitCoin, dispositionOf, findAsset, setDispositionEdge, sli
 import { recordFact } from './network/compartment';
 import { blankIntel } from './fieldwork';
 import { reportThrough } from './reporting';
+import { confirmableUnderCompulsion } from './inquiry';
 
 export interface InjectSpec {
   subject: Claim['subject'];
@@ -336,13 +337,23 @@ export function applyHost(
  * family field): the OLDEST belief in their store by `firstHeardAt` — that field's own doc comment
  * ("the debrief timeline reads this") marks it as this feature's substrate, so debrief reads the
  * existing field rather than minting a new rule. Ties broken alphabetically by family (matchBelief's
- * own tie-break, mirrored). Null on an empty store.
+ * own tie-break, mirrored).
+ *
+ * The candidates are filtered by `confirmableUnderCompulsion` (inquiry.ts) — the compelled machinery
+ * bypasses discretion and the trust gate, but the DISMISS floor and the self-dirt block are
+ * `compelled`-independent and hold here too. So debrief answers about the oldest thing the asset CAN
+ * be compelled to confirm; a floored belief (self-dirt or below-DISMISS) is silently skipped — the
+ * asset never confirms THAT (mirroring chooseAnswer's null), it produces no refusal signal. Null when
+ * NO belief survives the floors (or the store is empty) — a whole-debrief refusal upstream.
  */
-function oldestBelief(store: Record<string, Belief>): { family: RumorId; belief: Belief } | null {
+function oldestConfirmableBelief(
+  store: Record<string, Belief>, answererId: EntityId, rules: Rules,
+): { family: RumorId; belief: Belief } | null {
   let best: Belief | null = null;
   let bestFamily = '';
   for (const family of Object.keys(store).sort()) {
     const b = store[family]!;
+    if (!confirmableUnderCompulsion(b, answererId, rules)) continue;
     if (best === null || b.firstHeardAt < best.firstHeardAt) { best = b; bestFamily = family; }
   }
   return best ? { family: bestFamily, belief: best } : null;
@@ -354,11 +365,14 @@ function oldestBelief(store: Record<string, Belief>): { family: RumorId; belief:
  * co-presence — "luck"): the same beat-validation shape as tell/recruit, specialized to the one
  * venue (playerVenue === safehouse AND the asset in the avatar's circle there this beat).
  *
- * The asset answers ONE asking about the OLDEST family in their belief store, AS IF COMPELLED —
- * discretion is bypassed entirely (your authority over your own payroll: chooseAnswer's 0.7-confide
- * gate never runs here). The intel entry rides `reportThrough` — the SAME channel every other report
- * rides (one mechanic, no special-casing): a turned asset's compelled answer is doctored exactly like
- * their story reports.
+ * The asset answers ONE asking about the OLDEST family they CAN be compelled to confirm, AS IF
+ * COMPELLED — discretion is bypassed entirely (your authority over your own payroll: chooseAnswer's
+ * 0.7-confide gate and its trust≤0 gate never run here). But the two `compelled`-independent floors
+ * STILL hold (`confirmableUnderCompulsion`, inquiry.ts): the DISMISS floor and the self-dirt block
+ * ("never confirm dirt on yourself, not even behind closed doors"). A floored belief is silently
+ * skipped by the pick — the asset simply never confirms THAT one, no refusal signal. The intel entry
+ * rides `reportThrough` — the SAME channel every other report rides (one mechanic, no special-casing):
+ * a turned asset's compelled answer is doctored exactly like their story reports.
  *
  * Cost is NOT coin: a disposition strike, via the SAME `slideDisposition` the nightly wage shortfall
  * uses (−0.1 trust) plus +1 on the strike counter. ZERO new constants — the existing 0.7 confide line
@@ -370,7 +384,8 @@ function oldestBelief(store: Record<string, Belief>): { family: RumorId; belief:
  * back to, so a refusal here refuses the WHOLE debrief.
  *
  * VALIDATE-BEFORE-MUTATE: every precondition — not-your-asset, wrong venue, off-beat, not co-present,
- * an empty belief store, the ideology refusal — throws before any state change (zero residue).
+ * no belief the asset can be compelled to confirm (empty store OR all beliefs floored), the ideology
+ * refusal — throws before any state change (zero residue).
  */
 export function applyDebrief(world: WorldState, asset: EntityId, tick: Tick, rules: Rules): void {
   if (world.playerId === null) throw new Error('debrief: no player is enrolled');
@@ -383,8 +398,8 @@ export function applyDebrief(world: WorldState, asset: EntityId, tick: Tick, rul
     throw new Error(`debrief: '${asset}' is not with you at the safehouse this beat`);
   }
 
-  const picked = oldestBelief(world.beliefs[asset] ?? {});
-  if (!picked) throw new Error(`debrief: '${asset}' holds nothing in their belief store to extract`);
+  const picked = oldestConfirmableBelief(world.beliefs[asset] ?? {}, asset, rules);
+  if (!picked) throw new Error(`debrief: '${asset}' holds nothing they can be compelled to confirm`);
   const { belief } = picked;
 
   // Ideology won't give up its own faction under pressure either (the refusal law courier reuses).

@@ -236,6 +236,73 @@ describe('debrief joins the Action union', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+describe('debrief — the compelled-independent floors survive compulsion (self-dirt + DISMISS)', () => {
+  /** Directly seat a belief in an asset's store with a precise firstHeardAt (ordering control). */
+  function seatBelief(
+    w: WorldState, holder: EntityId, family: string, subject: EntityId, predicate: string,
+    credence: number, firstHeardAt: number,
+  ): void {
+    const claim: Claim = {
+      id: `c-${family}`, family, parent: null,
+      subject, predicate, object: null, count: 1, severity: 3, place: null, attribution: SOMEONE,
+    };
+    w.claims[claim.id] = claim;
+    w.beliefs[holder]![family] = {
+      claim, credence, heardFrom: 'witnessed', heardAt: firstHeardAt, firstHeardAt,
+      timesHeard: 1, apparentSources: [], discretion: false, counterSpun: false,
+    };
+  }
+
+  it('skips a self-subject damaging OLDEST belief; debriefs the next-oldest answerable one (self-dirt never surfaces)', () => {
+    const w = world('debrief-selfdirt');
+    makeAsset(w, 'ann', 'money', 0.6);
+    applyMeet(w, 'ann', 0);
+    runUntil(w, BEAT, RULES);
+
+    seatBelief(w, 'ann', 'f-self', 'ann', 'stole', 0.9, 0);   // OLDEST: dirt on ANN herself (damaging) — floored
+    seatBelief(w, 'ann', 'f-other', 'dot', 'stole', 0.9, 5);  // next-oldest: answerable (about someone else)
+
+    const logBefore = w.intel.log.length;
+    applyDebrief(w, 'ann', BEAT, RULES);
+    const added = w.intel.log.slice(logBefore);
+    expect(added).toHaveLength(1);
+    expect(added[0]!.family).toBe('f-other');                      // the next-oldest, NOT the self-dirt
+    expect(w.intel.log.some((e) => e.family === 'f-self')).toBe(false); // silent non-confirmation, no residue in the log
+  });
+
+  it('skips a below-DISMISS OLDEST belief; debriefs the next-oldest above-floor one', () => {
+    const w = world('debrief-belowdismiss');
+    makeAsset(w, 'ann', 'money', 0.6);
+    applyMeet(w, 'ann', 0);
+    runUntil(w, BEAT, RULES);
+
+    seatBelief(w, 'ann', 'f-faint', 'dot', 'stole', 0.1, 0);  // OLDEST: credence below STANCE.DISMISS (0.2) — floored
+    seatBelief(w, 'ann', 'f-solid', 'dot', 'stole', 0.9, 5);  // next-oldest: above the floor
+
+    const logBefore = w.intel.log.length;
+    applyDebrief(w, 'ann', BEAT, RULES);
+    const added = w.intel.log.slice(logBefore);
+    expect(added).toHaveLength(1);
+    expect(added[0]!.family).toBe('f-solid');
+    expect(w.intel.log.some((e) => e.family === 'f-faint')).toBe(false);
+  });
+
+  it('refuses (zero residue) when EVERY belief is floored (self-dirt and/or below-DISMISS)', () => {
+    const w = world('debrief-allfloored');
+    makeAsset(w, 'ann', 'money', 0.6);
+    applyMeet(w, 'ann', 0);
+    runUntil(w, BEAT, RULES);
+
+    seatBelief(w, 'ann', 'f-self', 'ann', 'stole', 0.9, 0);   // self-dirt — floored
+    seatBelief(w, 'ann', 'f-faint', 'dot', 'stole', 0.1, 5);  // below DISMISS — floored
+
+    const before = hashWorld(w);
+    expect(() => applyDebrief(w, 'ann', BEAT, RULES)).toThrow(/nothing|belief store|compel/i);
+    expect(hashWorld(w)).toBe(before);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 describe("debrief — the strike compounds into Task 8's flip precondition (integration)", () => {
   /** Task 8's own twin-world staging idiom (tests/network/turncoats.test.ts), reused verbatim:
    *  a valid generated town -> a live world (with his enemyNet) -> the avatar (dossier assets). */
