@@ -71,8 +71,9 @@ export function setDispositionEdge(world: WorldState, asset: EntityId, trust: nu
 }
 
 /** Nudge an asset's disposition edge by `delta`, clamped to [0, 1]. Only an existing edge moves —
- *  a missing edge already reads 0 (dispositionOf), which a negative slide can't go below. */
-function slideDisposition(world: WorldState, asset: EntityId, delta: number): void {
+ *  a missing edge already reads 0 (dispositionOf), which a negative slide can't go below. Exported
+ *  (Task 9): the debrief strike reuses this SAME mechanic — one physics, never a duplicate slide. */
+export function slideDisposition(world: WorldState, asset: EntityId, delta: number): void {
   const playerId = world.playerId;
   if (playerId === null) return;
   const edge = world.npcs[asset]?.edges.find((e) => e.to === playerId);

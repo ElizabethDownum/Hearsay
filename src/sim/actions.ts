@@ -5,10 +5,12 @@ import { CONVERSATION_BEAT, STANCE } from './rumors/propagation';
 import { mintClaim, SOMEONE, type Claim, type EntityId, type RumorId, type VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
 import type { Rules } from './rules';
-import type { ScheduleOverride, Venue, WorldState } from './types';
+import type { Belief, ScheduleOverride, Venue, WorldState } from './types';
 import type { Mice } from './network/types';
-import { canAfford, debitCoin, dispositionOf, findAsset, setDispositionEdge } from './network/roster';
+import { canAfford, debitCoin, dispositionOf, findAsset, setDispositionEdge, slideDisposition } from './network/roster';
 import { recordFact } from './network/compartment';
+import { blankIntel } from './fieldwork';
+import { reportThrough } from './reporting';
 
 export interface InjectSpec {
   subject: Claim['subject'];
@@ -327,6 +329,83 @@ export function applyHost(
     world.scheduleOverrides[id] = [override, ...(world.scheduleOverrides[id] ?? [])];
     recordFact(world, id, { kind: 'attended-hosting', ref: venue }); // the guest list, on the record
   }
+}
+
+/**
+ * The asset's own pick when compelled with no family named (Amendment #4b's typed action carries no
+ * family field): the OLDEST belief in their store by `firstHeardAt` — that field's own doc comment
+ * ("the debrief timeline reads this") marks it as this feature's substrate, so debrief reads the
+ * existing field rather than minting a new rule. Ties broken alphabetically by family (matchBelief's
+ * own tie-break, mirrored). Null on an empty store.
+ */
+function oldestBelief(store: Record<string, Belief>): { family: RumorId; belief: Belief } | null {
+  let best: Belief | null = null;
+  let bestFamily = '';
+  for (const family of Object.keys(store).sort()) {
+    const b = store[family]!;
+    if (best === null || b.firstHeardAt < best.firstHeardAt) { best = b; bestFamily = family; }
+  }
+  return best ? { family: bestFamily, belief: best } : null;
+}
+
+/**
+ * Amendment #4b — debrief under pressure: the compulsion machinery pointed at your OWN payroll.
+ * Valid at the safehouse with the asset actually present (a Task 6 meet arranges this, or organic
+ * co-presence — "luck"): the same beat-validation shape as tell/recruit, specialized to the one
+ * venue (playerVenue === safehouse AND the asset in the avatar's circle there this beat).
+ *
+ * The asset answers ONE asking about the OLDEST family in their belief store, AS IF COMPELLED —
+ * discretion is bypassed entirely (your authority over your own payroll: chooseAnswer's 0.7-confide
+ * gate never runs here). The intel entry rides `reportThrough` — the SAME channel every other report
+ * rides (one mechanic, no special-casing): a turned asset's compelled answer is doctored exactly like
+ * their story reports.
+ *
+ * Cost is NOT coin: a disposition strike, via the SAME `slideDisposition` the nightly wage shortfall
+ * uses (−0.1 trust) plus +1 on the strike counter. ZERO new constants — the existing 0.7 confide line
+ * (chooseAnswer) and Task 8's 0.4 flip line (FLIP_DISPOSITION) already price the heavy-handedness;
+ * debrief only ever pushes an asset toward them.
+ *
+ * Ideology refusal: the SAME law as courier (won't give up a damaging claim about their own faction),
+ * checked against the ONE family the deterministic pick selects — there is no other family to fall
+ * back to, so a refusal here refuses the WHOLE debrief.
+ *
+ * VALIDATE-BEFORE-MUTATE: every precondition — not-your-asset, wrong venue, off-beat, not co-present,
+ * an empty belief store, the ideology refusal — throws before any state change (zero residue).
+ */
+export function applyDebrief(world: WorldState, asset: EntityId, tick: Tick, rules: Rules): void {
+  if (world.playerId === null) throw new Error('debrief: no player is enrolled');
+  const record = world.network.assets.find((a) => a.id === asset);
+  if (!record) throw new Error(`debrief: '${asset}' is not one of your assets`);
+  if (world.playerVenue !== 'safehouse') throw new Error('debrief: the avatar must be at the safehouse');
+  if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) throw new Error('debrief: debriefing happens on conversation beats');
+  const circle = circlesAt(world, tick).find((c) => c.members.includes(world.playerId!));
+  if (!circle || !circle.members.includes(asset)) {
+    throw new Error(`debrief: '${asset}' is not with you at the safehouse this beat`);
+  }
+
+  const picked = oldestBelief(world.beliefs[asset] ?? {});
+  if (!picked) throw new Error(`debrief: '${asset}' holds nothing in their belief store to extract`);
+  const { belief } = picked;
+
+  // Ideology won't give up its own faction under pressure either (the refusal law courier reuses).
+  if (record.mice === 'ideology' && belief.claim.subject !== SOMEONE) {
+    const assetFaction = world.npcs[asset]!.faction;
+    const subjectFaction = world.npcs[belief.claim.subject]?.faction;
+    const valence = rules.predicates[belief.claim.predicate]?.valence;
+    if (subjectFaction === assetFaction && valence === 'damaging') {
+      throw new Error(`debrief: '${asset}' is an ideology asset and refuses to give up their own faction under pressure`);
+    }
+  }
+
+  // --- Effects (all validation passed) ---
+  world.intel.log.push({
+    ...blankIntel(), tick, venue: 'safehouse', via: asset,
+    kind: 'utterance', overheard: false, speaker: asset, addressedTo: world.playerId,
+    mode: 'answer', claimId: belief.claim.id, family: belief.claim.family,
+    reported: reportThrough(world, asset, belief.claim, rules),
+  });
+  slideDisposition(world, asset, -0.1); // Amendment #4b's disposition strike — the wage-slide mechanics, reused
+  record.strikes += 1;                  // +1 strike, the same ledger wages use
 }
 
 /** Informant posting window (spec: 15-aligned, mid-day). Exported for the assign law + tests. */

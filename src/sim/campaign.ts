@@ -1,7 +1,7 @@
 import type { Tick } from '../core/time';
 import {
-  applyAsk, applyAssignInformant, applyCard, applyCodex, applyCourier, applyGoTo, applyHost, applyInject,
-  applyMeet, applyRecruit, applySetDrop, applyTag, applyTell,
+  applyAsk, applyAssignInformant, applyCard, applyCodex, applyCourier, applyDebrief, applyGoTo, applyHost,
+  applyInject, applyMeet, applyRecruit, applySetDrop, applyTag, applyTell,
   type InjectSpec,
 } from './actions';
 import type { InquiryKey } from './perception';
@@ -119,10 +119,18 @@ export interface HostAction {
   invitees: EntityId[];
 }
 
+export interface DebriefAction {
+  tick: Tick;
+  kind: 'debrief';
+  /** One of YOUR assets, present at the safehouse this beat — no family field (Amendment #4b's
+   *  typed interface): the asset's own belief store picks the ONE family (oldest firstHeardAt). */
+  asset: EntityId;
+}
+
 /** The player's recorded verbs — the entire save-relevant intent surface. */
 export type Action =
   | InjectAction | GoToAction | TellAction | AskAction | AssignInformantAction | CodexAction | CardAction
-  | TagAction | RecruitAction | SetDropAction | CourierAction | MeetAction | HostAction;
+  | TagAction | RecruitAction | SetDropAction | CourierAction | MeetAction | HostAction | DebriefAction;
 export type ActionLog = Action[];
 
 /** A complete campaign: the world regrows from these two values alone. */
@@ -185,6 +193,12 @@ export function applyAction(world: WorldState, action: Action, rules?: Rules): v
     case 'host':
       if (!rules) throw new Error('applyAction: host requires rules (economy prices)');
       applyHost(world, action.venue, action.invitees, action.tick, rules);
+      break;
+    case 'debrief':
+      // Not priced in coin (the meet precedent) — but the ideology refusal reads predicate valence
+      // and the intel entry rides reportThrough's trait chain, so rules is required all the same.
+      if (!rules) throw new Error('applyAction: debrief requires rules (predicate valence + reportThrough traits)');
+      applyDebrief(world, action.asset, action.tick, rules);
       break;
     default: {
       // Saves are untrusted JSON — an unknown kind must fail loudly, never silently no-op.
