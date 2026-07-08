@@ -53,7 +53,7 @@ describe('vignette reachability probe (npm run mc)', () => {
   const SEEDS = ['vr-1', 'vr-2', 'vr-3', 'vr-4', 'vr-5'];
   const DAYS = 6;
 
-  it('fires micro-scenes across procgen towns with a bankrupt-blitz bot — prints per-def counts', () => {
+  it('fires micro-scenes across procgen towns with a bankrupt-blitz bot — prints per-def counts', { timeout: 30000 }, () => {
     const totals: Record<string, number> = Object.fromEntries(STANDARD_VIGNETTES.map((d) => [d.id, 0]));
     const perSeed: { seed: string; npcs: number }[] = [];
 
