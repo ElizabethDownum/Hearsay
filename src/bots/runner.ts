@@ -33,7 +33,7 @@ export function runBotCampaignOn(
     let i = 0;
     while (world.tick < dayEnd) {
       while (i < actions.length && actions[i]!.tick === world.tick) {
-        applyAction(world, actions[i]!);
+        applyAction(world, actions[i]!, rules);
         i += 1;
       }
       step(world, rules);

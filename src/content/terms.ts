@@ -58,6 +58,7 @@ export const TERMS: Record<string, TermDef> = {
   'verb-ask':        { id: 'verb-ask', label: 'Ask', short: 'Ask a circle-mate about a story or a person. Fires on the next beat — and asking is observable.', entry: null },
   'verb-post':       { id: 'verb-post', label: 'Post informant', short: 'Assign an informant to a venue. They keep the mid-day post from the next day onward.', entry: null },
   'verb-note':       { id: 'verb-note', label: 'Margin note', short: 'Pin a private note to anything. Read by nothing in the town — a hunch, never evidence.', entry: null },
+  'verb-recruit':    { id: 'verb-recruit', label: 'Recruit', short: 'Bring an in-circle NPC onto your roster through one of the four MICE handles. Priced in coin.', entry: null },
   // ── the hunt ──
   'sketch':          { id: 'sketch', label: 'Ghost sketch', short: 'The enemy investigates a ghost — every traced operation adds a feature to it.', entry: null },
   'sketch-feature':  { id: 'sketch-feature', label: 'Feature', short: 'One deduced trait of the ghost: a district, an entry point, a carrier profile.', entry: null },

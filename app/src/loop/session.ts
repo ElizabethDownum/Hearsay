@@ -86,7 +86,7 @@ function makeSession(seed: string, world: WorldState, log: Action[]): Session {
           const action = queue[i]!;
           queue.splice(i, 1); // drop from the queue BEFORE applying, so a throw never retries it
           try {
-            applyAction(world, action); // validation is deferred to here (test (c))
+            applyAction(world, action, STANDARD_RULES); // validation is deferred to here (test (c))
             log.push(action);           // ...and ONLY a successfully-applied action enters the save
           } catch (err) {
             // A failed verb never enters the log; the batch still finishes so the world always

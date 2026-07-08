@@ -6,6 +6,7 @@ import { chooseTelling, ingest, CONVERSATION_BEAT } from './rumors/propagation';
 import { mintClaim } from './rumors/claim';
 import { captureEvidence, runEnemyDay } from './counterintel';
 import { captureIntel } from './fieldwork';
+import { payWagesNightly } from './network/roster';
 import { reactToSelfRumor } from './reactions';
 import { runVignettes } from './vignettes/engine';
 import { scenarioNightly } from './scenario/referee';
@@ -129,10 +130,14 @@ export function step(world: WorldState, rules: Rules): TickEvents {
   // The nightly beat: digest today's evidence into countermeasures (world facts),
   // THEN sweep spent inquiries. No-op on rosters with no observers (old suites untouched).
   if (minuteOfDay(t) === 1439) {
-    // The treasury's weekly beat: flat integer stipend, exactly on the rest-day nightly
-    // (day 6, 13, ...). Coin feeds nothing else yet (spending helper arrives Task 3), so
-    // this is independent of — and ordered before — the countermeasure/vignette/referee beats.
-    if (dayOfWeek(t) === REST_DAY) world.coin += rules.economy.weeklyStipend;
+    // The treasury's weekly beat, exactly on the rest-day nightly (day 6, 13, ...). PINNED ORDER
+    // (Task 4): the stipend credits FIRST, then payroll debits — a treasury the stipend just topped
+    // up covers that night's wages (books-balance depends on this; Task 12 asserts it). A wage
+    // shortfall never refuses: it strikes the unpaid asset and slides its disposition.
+    if (dayOfWeek(t) === REST_DAY) {
+      world.coin += rules.economy.weeklyStipend;
+      payWagesNightly(world, rules);
+    }
     runEnemyDay(world, rules);          // digest today's evidence into countermeasures...
     expireInquiries(world, dayOf(t));   // ...THEN sweep spent inquiries.
     runVignettes(world, rules);         // ...THEN tonight's micro-scenes fire (pillar 7), so...

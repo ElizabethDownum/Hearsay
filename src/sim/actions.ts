@@ -1,10 +1,14 @@
 import { dayOf, minuteOfDay, type Tick } from '../core/time';
 import { circlesAt } from './agents';
 import type { InquiryKey } from './perception';
-import { CONVERSATION_BEAT } from './rumors/propagation';
-import { mintClaim, type Claim, type EntityId, type VenueId } from './rumors/claim';
+import { CONVERSATION_BEAT, STANCE } from './rumors/propagation';
+import { mintClaim, type Claim, type EntityId, type RumorId, type VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
+import type { Rules } from './rules';
 import type { Venue, WorldState } from './types';
+import type { Mice } from './network/types';
+import { canAfford, debitCoin, findAsset, setDispositionEdge } from './network/roster';
+import { recordFact } from './network/compartment';
 
 export interface InjectSpec {
   subject: Claim['subject'];
@@ -63,6 +67,74 @@ export function applyAsk(world: WorldState, to: EntityId, about: InquiryKey, tic
   }
   const tasks = world.inquiries[world.playerId] ?? (world.inquiries[world.playerId] = []);
   tasks.push({ about, from: 'self', expiresDay: dayOf(tick) + 2, asked: [], answersHeard: 0 });
+}
+
+/** Recruitment disposition floor by handle — the trust the recruit establishes toward the player.
+ *  Coercion is lowest (they don't love you — nearest Task 8's flip line); ideology highest. */
+const RECRUIT_DISPOSITION: Record<Mice, number> = {
+  money: 0.6, ideology: 0.7, coercion: 0.5, ego: 0.6,
+};
+
+/**
+ * Recruit an in-circle NPC onto the roster (spec's MICE). VALIDATE-BEFORE-MUTATE: every precondition
+ * throws BEFORE any state changes, so a refused recruit leaves ZERO residue (no asset, informant,
+ * edge, fact, or coin move). Recruitment is a conversation, like tell — beat-aligned, avatar present,
+ * target in the avatar's circle this beat. Per-handle gate: `money` none; `ideology` needs the target
+ * to already hold a damaging conviction about the usurper at ≥REPEAT (the cause is the coronation);
+ * `coercion` needs `leverageFamily` to name a damaging family ABOUT the target in the PLAYER'S INTEL
+ * LOG (never world truth — your leverage can be a lie you believe); `ego` none. Cost from the one
+ * economy table; insufficient coin REFUSES (distinct from the nightly wage shortfall, which slides).
+ */
+export function applyRecruit(
+  world: WorldState, target: EntityId, mice: Mice, leverageFamily: RumorId | null, tick: Tick, rules: Rules,
+): void {
+  if (world.playerId === null) throw new Error('recruit: no player is enrolled');
+  if (world.playerVenue === null) throw new Error('recruit: the avatar is nowhere');
+  if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) throw new Error('recruit: recruitment happens on conversation beats');
+  if (!world.npcs[target]) throw new Error(`recruit: unknown npc '${target}'`);
+  if (target === world.playerId) throw new Error('recruit: cannot recruit the avatar');
+
+  // Identity exclusions (spec) — checked before the co-circle gate so a guard/cast member is refused
+  // as such even when not in earshot.
+  if (world.enemy.observers.some((o) => o.id === target)) throw new Error(`recruit: '${target}' is a guard and cannot be recruited`);
+  const cast = world.scenario?.cast;
+  if (cast && (cast.usurper === target || cast.council.includes(target))) {
+    throw new Error('recruit: the usurper and council cannot be recruited');
+  }
+  // Either side: recruiting HIS asset is Task 8's turncoat flow, a different verb.
+  if (findAsset(world, target)) throw new Error(`recruit: '${target}' is already an asset`);
+
+  // Co-circle basis (recruitment is a conversation — the same validation shape as tell).
+  const circle = circlesAt(world, tick).find((c) => c.members.includes(world.playerId!));
+  if (!circle || !circle.members.includes(target)) {
+    throw new Error(`recruit: '${target}' is not in the avatar's circle this beat`);
+  }
+
+  // Per-handle gate.
+  if (mice === 'ideology') {
+    const usurper = cast?.usurper;
+    const leans = usurper !== undefined && Object.values(world.beliefs[target] ?? {}).some((b) =>
+      b.claim.subject === usurper && rules.predicates[b.claim.predicate]?.valence === 'damaging' && b.credence >= STANCE.REPEAT);
+    if (!leans) throw new Error('recruit: ideology needs the target to already hold a damaging conviction about the usurper');
+  } else if (mice === 'coercion') {
+    const holdsDirt = leverageFamily !== null && world.intel.log.some((e) =>
+      e.family === leverageFamily && e.reported !== null && e.reported.subject === target
+      && rules.predicates[e.reported.predicate]?.valence === 'damaging');
+    if (!holdsDirt) throw new Error('recruit: coercion needs damaging leverage you hold on the target');
+  }
+
+  // Cost (validate-before-mutate: refuse an unaffordable recruit).
+  const cost = rules.economy.recruitCost[mice];
+  if (!canAfford(world, cost)) {
+    throw new Error(`recruit: the treasury cannot cover this recruitment (${cost} needed, ${world.coin} held)`);
+  }
+
+  // --- Effects (all validation passed; edges-only writes keep the fixture clone sound) ---
+  debitCoin(world, cost);
+  world.network.assets.push({ id: target, mice, wagePaidThroughDay: dayOf(tick), strikes: 0, facts: [] });
+  recordFact(world, target, { kind: 'recruited-by', ref: 'player' }); // tick-stamped from world.tick (=== tick)
+  setDispositionEdge(world, target, RECRUIT_DISPOSITION[mice]);
+  world.intel.informants.push({ id: target, assignedVenue: null });
 }
 
 /** Informant posting window (spec: 15-aligned, mid-day). Exported for the assign law + tests. */

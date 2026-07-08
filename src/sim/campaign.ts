@@ -1,14 +1,15 @@
 import type { Tick } from '../core/time';
 import {
-  applyAsk, applyAssignInformant, applyCard, applyCodex, applyGoTo, applyInject, applyTag, applyTell,
+  applyAsk, applyAssignInformant, applyCard, applyCodex, applyGoTo, applyInject, applyRecruit, applyTag, applyTell,
   type InjectSpec,
 } from './actions';
 import type { InquiryKey } from './perception';
 import type { Rules } from './rules';
 import { step } from './step';
 import type { TownFixture, WorldState } from './types';
-import type { EntityId, VenueId } from './rumors/claim';
+import type { EntityId, RumorId, VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
+import type { Mice } from './network/types';
 import { buildWorld } from './world';
 
 export interface InjectAction {
@@ -73,10 +74,19 @@ export interface TagAction {
   text: string | null;
 }
 
+export interface RecruitAction {
+  tick: Tick;
+  kind: 'recruit';
+  target: EntityId;
+  mice: Mice;
+  /** Only read for coercion — the damaging family (about the target) you hold in your intel log. */
+  leverageFamily: RumorId | null;
+}
+
 /** The player's recorded verbs — the entire save-relevant intent surface. */
 export type Action =
   | InjectAction | GoToAction | TellAction | AskAction | AssignInformantAction | CodexAction | CardAction
-  | TagAction;
+  | TagAction | RecruitAction;
 export type ActionLog = Action[];
 
 /** A complete campaign: the world regrows from these two values alone. */
@@ -85,7 +95,13 @@ export interface Save {
   log: ActionLog;
 }
 
-export function applyAction(world: WorldState, action: Action): void {
+/**
+ * `rules` is optional so the existing verb call sites (tell/ask/goTo/... in tests and harnesses)
+ * stay untouched. `recruit` is the one verb that needs it — economy prices + predicate valence —
+ * and REFUSES loudly if applied without rules (never silently no-ops an untrusted save). runLogOn,
+ * the app session, and the bot runner all forward the rules already in their scope.
+ */
+export function applyAction(world: WorldState, action: Action, rules?: Rules): void {
   if (action.tick !== world.tick) {
     throw new Error(`applyAction: action tick ${action.tick} != world tick ${world.tick}`);
   }
@@ -113,6 +129,10 @@ export function applyAction(world: WorldState, action: Action): void {
       break;
     case 'tag':
       applyTag(world, action.op, action.id, action.target, action.text, action.tick);
+      break;
+    case 'recruit':
+      if (!rules) throw new Error('applyAction: recruit requires rules (economy prices + predicate valence)');
+      applyRecruit(world, action.target, action.mice, action.leverageFamily, action.tick, rules);
       break;
     default: {
       // Saves are untrusted JSON — an unknown kind must fail loudly, never silently no-op.
@@ -143,7 +163,7 @@ export function runLogOn(
   let i = 0;
   while (world.tick < untilTick) {
     while (i < log.length && log[i]!.tick === world.tick) {
-      applyAction(world, log[i]!);
+      applyAction(world, log[i]!, rules);
       i += 1;
     }
     step(world, rules);
