@@ -63,4 +63,6 @@ export const VERB_TERM: Record<Action['kind'], string> = {
   card: 'hypothesis-card',
   inject: 'verb-tell',
   recruit: 'verb-recruit',
+  setDrop: 'verb-set-drop',
+  courier: 'verb-courier',
 };

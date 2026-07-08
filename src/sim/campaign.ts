@@ -1,6 +1,7 @@
 import type { Tick } from '../core/time';
 import {
-  applyAsk, applyAssignInformant, applyCard, applyCodex, applyGoTo, applyInject, applyRecruit, applyTag, applyTell,
+  applyAsk, applyAssignInformant, applyCard, applyCodex, applyCourier, applyGoTo, applyInject, applyRecruit,
+  applySetDrop, applyTag, applyTell,
   type InjectSpec,
 } from './actions';
 import type { InquiryKey } from './perception';
@@ -83,10 +84,29 @@ export interface RecruitAction {
   leverageFamily: RumorId | null;
 }
 
+export interface SetDropAction {
+  tick: Tick;
+  kind: 'setDrop';
+  id: string;
+  /** Public venues only — the drop is placed and known by the avatar implicitly. */
+  venue: VenueId;
+}
+
+export interface CourierAction {
+  tick: Tick;
+  kind: 'courier';
+  /** One of YOUR assets — the carrier whose schedule does the walking. */
+  asset: EntityId;
+  spec: InjectSpec;
+  target: EntityId;
+  /** null = face handoff (co-locate now); a drop id = via the dead drop (no co-location). */
+  viaDrop: string | null;
+}
+
 /** The player's recorded verbs — the entire save-relevant intent surface. */
 export type Action =
   | InjectAction | GoToAction | TellAction | AskAction | AssignInformantAction | CodexAction | CardAction
-  | TagAction | RecruitAction;
+  | TagAction | RecruitAction | SetDropAction | CourierAction;
 export type ActionLog = Action[];
 
 /** A complete campaign: the world regrows from these two values alone. */
@@ -133,6 +153,14 @@ export function applyAction(world: WorldState, action: Action, rules?: Rules): v
     case 'recruit':
       if (!rules) throw new Error('applyAction: recruit requires rules (economy prices + predicate valence)');
       applyRecruit(world, action.target, action.mice, action.leverageFamily, action.tick, rules);
+      break;
+    case 'setDrop':
+      if (!rules) throw new Error('applyAction: setDrop requires rules (economy prices)');
+      applySetDrop(world, action.id, action.venue, rules);
+      break;
+    case 'courier':
+      if (!rules) throw new Error('applyAction: courier requires rules (economy prices + predicate valence)');
+      applyCourier(world, action.asset, action.spec, action.target, action.viaDrop, action.tick, rules);
       break;
     default: {
       // Saves are untrusted JSON — an unknown kind must fail loudly, never silently no-op.

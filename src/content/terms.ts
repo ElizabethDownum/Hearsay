@@ -59,6 +59,8 @@ export const TERMS: Record<string, TermDef> = {
   'verb-post':       { id: 'verb-post', label: 'Post informant', short: 'Assign an informant to a venue. They keep the mid-day post from the next day onward.', entry: null },
   'verb-note':       { id: 'verb-note', label: 'Margin note', short: 'Pin a private note to anything. Read by nothing in the town — a hunch, never evidence.', entry: null },
   'verb-recruit':    { id: 'verb-recruit', label: 'Recruit', short: 'Bring an in-circle NPC onto your roster through one of the four MICE handles. Priced in coin.', entry: null },
+  'verb-set-drop':   { id: 'verb-set-drop', label: 'Set dead drop', short: 'Cache a story at a public venue for a courier to collect — no meeting needed, co-location broken.', entry: null },
+  'verb-courier':    { id: 'verb-courier', label: 'Courier', short: 'Task an asset to carry your story to a target on their own schedule, trait-transformed as they tell it.', entry: null },
   // ── the hunt ──
   'sketch':          { id: 'sketch', label: 'Ghost sketch', short: 'The enemy investigates a ghost — every traced operation adds a feature to it.', entry: null },
   'sketch-feature':  { id: 'sketch-feature', label: 'Feature', short: 'One deduced trait of the ghost: a district, an entry point, a carrier profile.', entry: null },

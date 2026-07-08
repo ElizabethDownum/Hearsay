@@ -2,7 +2,7 @@ import { dayOf, minuteOfDay, type Tick } from '../core/time';
 import { circlesAt } from './agents';
 import type { InquiryKey } from './perception';
 import { CONVERSATION_BEAT, STANCE } from './rumors/propagation';
-import { mintClaim, type Claim, type EntityId, type RumorId, type VenueId } from './rumors/claim';
+import { mintClaim, SOMEONE, type Claim, type EntityId, type RumorId, type VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
 import type { Rules } from './rules';
 import type { Venue, WorldState } from './types';
@@ -135,6 +135,95 @@ export function applyRecruit(
   recordFact(world, target, { kind: 'recruited-by', ref: 'player' }); // tick-stamped from world.tick (=== tick)
   setDispositionEdge(world, target, RECRUIT_DISPOSITION[mice]);
   world.intel.informants.push({ id: target, assignedVenue: null });
+}
+
+/**
+ * Place a dead drop at a PUBLIC venue (Plan 8 rung 2 — a drop breaks co-location). The placer is the
+ * avatar, who knows it implicitly (`knownBy` seeds with the player). VALIDATE-BEFORE-MUTATE: a private/
+ * unknown venue, a duplicate id, or an unaffordable setup REFUSES with zero residue. Cost from the one
+ * economy table. No co-location needed — you designate the drop, the courier learns it at tasking.
+ */
+export function applySetDrop(world: WorldState, id: string, venue: VenueId, rules: Rules): void {
+  if (world.playerId === null) throw new Error('setDrop: no player is enrolled');
+  const v = world.venues[venue];
+  if (!v) throw new Error(`setDrop: unknown venue '${venue}'`);
+  if (v.access !== 'public') throw new Error(`setDrop: a dead drop hides in a public venue — '${venue}' is ${v.access}`);
+  if (world.network.drops.some((d) => d.id === id)) throw new Error(`setDrop: duplicate drop id '${id}'`);
+  const cost = rules.economy.deadDropSetup;
+  if (!canAfford(world, cost)) {
+    throw new Error(`setDrop: the treasury cannot cover this dead drop (${cost} needed, ${world.coin} held)`);
+  }
+  debitCoin(world, cost);
+  world.network.drops.push({ id, venue, knownBy: [world.playerId] });
+}
+
+/**
+ * Task one of YOUR assets to courier a payload to a target — store-and-forward made purchasable
+ * (Plan 8 rung 2). The run queues on the asset (NetworkState.pendingCouriers); delivery is the asset's
+ * next co-circle with the target, their schedule doing the walking (step's deliverCouriers). ZERO new
+ * spread machinery: the delivery is an ordinary utterance, trait-transformed by the ASSET's real traits.
+ *
+ * VALIDATE-BEFORE-MUTATE — every precondition throws before any state changes (zero residue on refusal):
+ *  - the asset must be one of YOUR assets; the target a real NPC.
+ *  - Ideology refusal: an ideology asset won't smear its own side (subject's faction === the asset's
+ *    faction && the predicate is damaging → throw, term-registered).
+ *  - Face handoff (viaDrop null): beat-aligned + avatar present + the courier IN the avatar's circle
+ *    this beat (the tell/recruit shape) — records a `met-asset` fact (the courier met the avatar).
+ *  - Via a drop: the handoff leg is SKIPPED — no co-location, no `met-asset`; the named drop must exist
+ *    and be avatar-known, the courier LEARNS it (a `knows-drop` fact) and the drop's knownBy grows.
+ * Cost debits now; the 3-day expiry (step) never refunds — a priced failure.
+ */
+export function applyCourier(
+  world: WorldState, asset: EntityId, spec: InjectSpec, target: EntityId, viaDrop: string | null,
+  tick: Tick, rules: Rules,
+): void {
+  if (world.playerId === null) throw new Error('courier: no player is enrolled');
+  const record = world.network.assets.find((a) => a.id === asset);
+  if (!record) throw new Error(`courier: '${asset}' is not one of your assets`);
+  if (!world.npcs[target]) throw new Error(`courier: unknown npc '${target}'`);
+
+  // Ideology won't carry a smear of its own faction (the refusal law the debrief will reuse, Task 9).
+  if (record.mice === 'ideology' && spec.subject !== SOMEONE) {
+    const assetFaction = world.npcs[asset]!.faction;
+    const subjectFaction = world.npcs[spec.subject]?.faction;
+    const valence = rules.predicates[spec.predicate]?.valence;
+    if (subjectFaction === assetFaction && valence === 'damaging') {
+      throw new Error(`courier: '${asset}' is an ideology asset and refuses to carry a damaging claim about their own faction`);
+    }
+  }
+
+  // The handoff leg. Face: co-locate now (validate-before-mutate — the tell/recruit circle shape).
+  if (viaDrop === null) {
+    if (world.playerVenue === null) throw new Error('courier: the avatar is nowhere for a face handoff');
+    if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) throw new Error('courier: a face handoff happens on conversation beats');
+    const circle = circlesAt(world, tick).find((c) => c.members.includes(world.playerId!));
+    if (!circle || !circle.members.includes(asset)) {
+      throw new Error(`courier: '${asset}' is not in the avatar's circle this beat for the handoff`);
+    }
+  } else {
+    const drop = world.network.drops.find((d) => d.id === viaDrop);
+    if (!drop) throw new Error(`courier: unknown dead drop '${viaDrop}'`);
+    if (!drop.knownBy.includes(world.playerId)) throw new Error(`courier: you don't know the dead drop '${viaDrop}'`);
+  }
+
+  // Cost (validate-before-mutate: refuse an unaffordable run).
+  const cost = rules.economy.courierRun;
+  if (!canAfford(world, cost)) {
+    throw new Error(`courier: the treasury cannot cover this run (${cost} needed, ${world.coin} held)`);
+  }
+
+  // --- Effects (all validation passed; edges-only + roster/queue writes keep the fixture clone sound) ---
+  debitCoin(world, cost);
+  if (viaDrop === null) {
+    // A face handoff is a meeting: the courier's compartment records having met the avatar (ONE
+    // direction — the avatar keeps no compartment). This is the `met-asset` that the drop path lacks.
+    recordFact(world, asset, { kind: 'met-asset', ref: world.playerId });
+  } else {
+    const drop = world.network.drops.find((d) => d.id === viaDrop)!;
+    if (!drop.knownBy.includes(asset)) drop.knownBy.push(asset);
+    recordFact(world, asset, { kind: 'knows-drop', ref: viaDrop });
+  }
+  world.network.pendingCouriers.push({ asset, spec, target, viaDrop, queuedTick: tick });
 }
 
 /** Informant posting window (spec: 15-aligned, mid-day). Exported for the assign law + tests. */

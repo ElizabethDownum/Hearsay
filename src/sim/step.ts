@@ -7,6 +7,7 @@ import { mintClaim } from './rumors/claim';
 import { captureEvidence, runEnemyDay } from './counterintel';
 import { captureIntel } from './fieldwork';
 import { payWagesNightly } from './network/roster';
+import { deliverCouriers } from './network/couriers';
 import { reactToSelfRumor } from './reactions';
 import { runVignettes } from './vignettes/engine';
 import { scenarioNightly } from './scenario/referee';
@@ -54,6 +55,11 @@ export function step(world: WorldState, rules: Rules): TickEvents {
         if (u) utterances.push(u);
       }
     }
+    // Couriers deliver: a tasked asset that shares a circle with its target THIS beat tells the
+    // player's payload as an ordinary utterance (their schedule did the walking — zero new spread
+    // machinery). The utterances fold into the SAME chronicle/capture/ingest passes below, so a
+    // guard who overhears attributes the CARRIER, and the delivery is heard by the circle like any.
+    utterances.push(...deliverCouriers(world, t, rules));
   }
 
   const events: TickEvents = { tick: t, positions, utterances, askings };
