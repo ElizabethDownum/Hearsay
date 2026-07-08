@@ -65,4 +65,6 @@ export const VERB_TERM: Record<Action['kind'], string> = {
   recruit: 'verb-recruit',
   setDrop: 'verb-set-drop',
   courier: 'verb-courier',
+  meet: 'verb-meet',
+  host: 'verb-host',
 };

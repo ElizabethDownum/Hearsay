@@ -1,7 +1,7 @@
 import type { Tick } from '../core/time';
 import {
-  applyAsk, applyAssignInformant, applyCard, applyCodex, applyCourier, applyGoTo, applyInject, applyRecruit,
-  applySetDrop, applyTag, applyTell,
+  applyAsk, applyAssignInformant, applyCard, applyCodex, applyCourier, applyGoTo, applyHost, applyInject,
+  applyMeet, applyRecruit, applySetDrop, applyTag, applyTell,
   type InjectSpec,
 } from './actions';
 import type { InquiryKey } from './perception';
@@ -103,10 +103,26 @@ export interface CourierAction {
   viaDrop: string | null;
 }
 
+export interface MeetAction {
+  tick: Tick;
+  kind: 'meet';
+  /** One of YOUR assets — pulled to the safehouse for the next beat (a private 2-person circle). */
+  asset: EntityId;
+}
+
+export interface HostAction {
+  tick: Tick;
+  kind: 'host';
+  /** The standing's own room: salon (noble) or a back-room (lowlife). */
+  venue: VenueId;
+  /** ≤ 6 NPCs, each trusting the player ≥ 0.5 — the circle you pick. */
+  invitees: EntityId[];
+}
+
 /** The player's recorded verbs — the entire save-relevant intent surface. */
 export type Action =
   | InjectAction | GoToAction | TellAction | AskAction | AssignInformantAction | CodexAction | CardAction
-  | TagAction | RecruitAction | SetDropAction | CourierAction;
+  | TagAction | RecruitAction | SetDropAction | CourierAction | MeetAction | HostAction;
 export type ActionLog = Action[];
 
 /** A complete campaign: the world regrows from these two values alone. */
@@ -161,6 +177,14 @@ export function applyAction(world: WorldState, action: Action, rules?: Rules): v
     case 'courier':
       if (!rules) throw new Error('applyAction: courier requires rules (economy prices + predicate valence)');
       applyCourier(world, action.asset, action.spec, action.target, action.viaDrop, action.tick, rules);
+      break;
+    case 'meet':
+      // A meet is FREE (the walk is the price) — no rules needed, like tell/goTo.
+      applyMeet(world, action.asset, action.tick);
+      break;
+    case 'host':
+      if (!rules) throw new Error('applyAction: host requires rules (economy prices)');
+      applyHost(world, action.venue, action.invitees, action.tick, rules);
       break;
     default: {
       // Saves are untrusted JSON — an unknown kind must fail loudly, never silently no-op.

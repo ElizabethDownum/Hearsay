@@ -5,9 +5,9 @@ import { CONVERSATION_BEAT, STANCE } from './rumors/propagation';
 import { mintClaim, SOMEONE, type Claim, type EntityId, type RumorId, type VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
 import type { Rules } from './rules';
-import type { Venue, WorldState } from './types';
+import type { ScheduleOverride, Venue, WorldState } from './types';
 import type { Mice } from './network/types';
-import { canAfford, debitCoin, findAsset, setDispositionEdge } from './network/roster';
+import { canAfford, debitCoin, dispositionOf, findAsset, setDispositionEdge } from './network/roster';
 import { recordFact } from './network/compartment';
 
 export interface InjectSpec {
@@ -224,6 +224,106 @@ export function applyCourier(
     recordFact(world, asset, { kind: 'knows-drop', ref: viaDrop });
   }
   world.network.pendingCouriers.push({ asset, spec, target, viaDrop, queuedTick: tick });
+}
+
+/** The invitee cap on a hosted event (spec, rung 4) — you pick the circle, but a room seats only so many. */
+export const HOST_INVITEE_CAP = 6;
+/** The acceptance floor: only NPCs whose trust toward the player is ≥ this accept an invitation. */
+const HOST_ACCEPT_TRUST = 0.5;
+/** The hosted event's evening block (spec: 1080–1200, source 'player'), placed on the invitees' NEXT evening. */
+export const HOST_EVENT = { from: 1080, to: 1200 } as const;
+
+/**
+ * Rung 3 — the safehouse meet. Pull one of YOUR assets to the private safehouse for the NEXT
+ * conversation beat only: a guaranteed 2-person circle (the safehouse is private with no regulars, so
+ * the pulled asset and the avatar are its only occupants) for a tell/ask/debrief with ZERO overhear
+ * risk. The pull is a one-beat, 15-aligned, source-'player' schedule OVERRIDE (the assignInformant
+ * override shape — never a base-schedule write, Task 3's edges-/overrides-only discipline), PREPENDED
+ * so a transient meet wins over any standing player posting for its one beat and the posting resumes
+ * the next beat. FREE — the economy table prices no meet; the WALK is the price (the asset's movement
+ * is public presence, and a `met-asset` fact lands on the record: contact tracing's handle). The avatar
+ * attends by being at (or going to) the safehouse, which the access law always opens — meet never moves
+ * the avatar. VALIDATE-BEFORE-MUTATE: no-player / non-asset / no-safehouse REFUSES with zero residue.
+ */
+export function applyMeet(world: WorldState, asset: EntityId, tick: Tick): void {
+  if (world.playerId === null) throw new Error('meet: no player is enrolled');
+  if (!world.venues['safehouse']) throw new Error('meet: this world has no safehouse');
+  if (!world.network.assets.some((a) => a.id === asset)) {
+    throw new Error(`meet: '${asset}' is not one of your assets`);
+  }
+  // The next conversation beat STRICTLY after `tick` (absolute-tick arithmetic carries the day rollover).
+  const nextBeat = (Math.floor(tick / CONVERSATION_BEAT) + 1) * CONVERSATION_BEAT;
+  const override: ScheduleOverride = {
+    fromDay: dayOf(nextBeat), toDay: dayOf(nextBeat) + 1,
+    from: minuteOfDay(nextBeat), to: minuteOfDay(nextBeat) + CONVERSATION_BEAT,
+    venue: 'safehouse', source: 'player',
+  };
+  // Prepend (not the assignInformant REPLACE): a meet is a transient pull, so it takes precedence for
+  // its one beat over any standing player override, which resumes automatically once the window passes.
+  world.scheduleOverrides[asset] = [override, ...(world.scheduleOverrides[asset] ?? [])];
+  recordFact(world, asset, { kind: 'met-asset', ref: world.playerId }); // the visit, on the record
+}
+
+/** The room a standing HOSTS in (rung 4): noble → the salon, lowlife → any back-room. Stricter than the
+ *  access law (which also opens public/safehouse) — an event is thrown ONLY at the standing's own room. */
+function isHostRoom(station: 'noble' | 'lowlife', venue: VenueId): boolean {
+  return station === 'noble' ? venue === 'salon' : venue.startsWith('back-room-');
+}
+
+/**
+ * Rung 4 — the hosted room. Throw a salon (noble) / back-room (lowlife) evening: the invitees' NEXT
+ * evening gains the event block (1080–1200, source 'player' — the assignInformant override shape,
+ * PREPENDED so the event wins over a standing posting), and an `attended-hosting` fact lands on every
+ * invitee (guest lists are evidence when compartments crack). A controlled room: you pick the circle,
+ * sampling + injection in one place, with no bystander overhear. VALIDATE-BEFORE-MUTATE — every
+ * precondition throws before any state changes (zero residue on refusal):
+ *  - a standing must host its OWN room (noble→salon, lowlife→back-room); the wrong room REFUSES.
+ *  - 1..6 distinct invitees, none the avatar (the invitee cap, spec).
+ *  - the acceptance gate: each invitee's trust toward the player must be ≥ 0.5 (you can't summon
+ *    strangers — a strike-slid asset that dropped under 0.5 stops coming). dispositionOf ≥ 0.5 implies
+ *    roster membership (only assets carry a player-trust edge), so the effects' recordFact never throws.
+ *  - the event cost (salon 8 / back-room 4) from the one economy table; an unaffordable event REFUSES.
+ * The avatar attends by going to their own room at the event (the access law opens it) — host never
+ * moves the avatar and never sets playerVenue.
+ */
+export function applyHost(
+  world: WorldState, venue: VenueId, invitees: EntityId[], tick: Tick, rules: Rules,
+): void {
+  if (world.playerId === null) throw new Error('host: no player is enrolled');
+  if (world.station === null) throw new Error('host: no standing to host an event');
+  if (!world.venues[venue]) throw new Error(`host: unknown venue '${venue}'`);
+  if (!isHostRoom(world.station, venue)) {
+    throw new Error(world.station === 'noble'
+      ? `host: a noble hosts in the salon, not '${venue}' — you'd have no standing there`
+      : `host: a lowlife hosts in a back-room, not '${venue}' — you'd have no standing there`);
+  }
+  if (invitees.length === 0) throw new Error('host: an event needs at least one invitee');
+  if (invitees.length > HOST_INVITEE_CAP) {
+    throw new Error(`host: the invitee cap is ${HOST_INVITEE_CAP} (got ${invitees.length})`);
+  }
+  if (new Set(invitees).size !== invitees.length) throw new Error('host: duplicate invitee');
+  for (const id of invitees) {
+    if (id === world.playerId) throw new Error('host: the avatar cannot be their own invitee');
+    if (!world.npcs[id]) throw new Error(`host: unknown npc '${id}'`);
+    if (dispositionOf(world, id) < HOST_ACCEPT_TRUST) {
+      throw new Error(`host: '${id}' will not accept — trust below ${HOST_ACCEPT_TRUST} (you can't summon strangers)`);
+    }
+  }
+  const cost = world.station === 'noble' ? rules.economy.salonEvent : rules.economy.backRoomEvent;
+  if (!canAfford(world, cost)) {
+    throw new Error(`host: the treasury cannot cover this event (${cost} needed, ${world.coin} held)`);
+  }
+
+  // --- Effects (all validation passed) ---
+  debitCoin(world, cost);
+  for (const id of invitees) {
+    const override: ScheduleOverride = {
+      fromDay: dayOf(tick) + 1, toDay: dayOf(tick) + 2,
+      from: HOST_EVENT.from, to: HOST_EVENT.to, venue, source: 'player',
+    };
+    world.scheduleOverrides[id] = [override, ...(world.scheduleOverrides[id] ?? [])];
+    recordFact(world, id, { kind: 'attended-hosting', ref: venue }); // the guest list, on the record
+  }
 }
 
 /** Informant posting window (spec: 15-aligned, mid-day). Exported for the assign law + tests. */
