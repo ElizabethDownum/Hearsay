@@ -2,6 +2,7 @@ import type { EntityId, VenueId } from './rumors/claim';
 import type { Npc, TownFixture, WorldState } from './types';
 import { emptyEnemyState } from './enemy/state';
 import type { TownMap } from './enemy/state';
+import { emptyNetworkState } from './network/types';
 import type { Rules } from './rules';
 
 /** First id that appears twice, or null — dup detection before records collapse duplicates. */
@@ -27,7 +28,12 @@ export function buildWorld(fixture: TownFixture, seed: string, rules?: Rules): W
   if (dupNpc) throw new Error(`buildWorld: duplicate npc id '${dupNpc}'`);
 
   const venues = Object.fromEntries(fixture.venues.map((v) => [v.id, v]));
-  const npcs = Object.fromEntries(fixture.npcs.map((n) => [n.id, n]));
+  // The world OWNS its npcs — clone each (and its edges) so post-build edge writes (Plan 8
+  // disposition/recruit/turncoat physics) never leak back into the shared fixture. Without this,
+  // reusing one town across builds (the determinism/replay idiom) would pollute the fixture.
+  const npcs = Object.fromEntries(
+    fixture.npcs.map((n) => [n.id, { ...n, edges: n.edges.map((e) => ({ ...e })) }]),
+  );
 
   for (const n of fixture.npcs) {
     const check = (venueId: string): void => {
@@ -50,6 +56,7 @@ export function buildWorld(fixture: TownFixture, seed: string, rules?: Rules): W
     playerVenue: null,
     pendingTell: null,
     intel: { informants: [], log: [], cards: [], codex: [], tags: [] },
+    network: emptyNetworkState(),
     scenario: null,
     npcs,
     venues,

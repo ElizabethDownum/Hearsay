@@ -1,12 +1,19 @@
 import { SOMEONE, mintClaim } from '../sim/rumors/claim';
 import { blankIntel } from '../sim/fieldwork';
 import { buildTownMap, buildWorld, enrollPlayer } from '../sim/world';
+import type { Rules } from '../sim/rules';
 import type { WorldState } from '../sim/types';
 import type { GeneratedTown } from './types';
 
-/** Build a live world from a generated town: enemy roster + map wired, secret witnesses seeded. */
-export function worldFromTown(town: GeneratedTown, seed: string): WorldState {
-  const world = buildWorld(town.fixture, seed);
+/**
+ * Build a live world from a generated town: enemy roster + map wired, secret witnesses seeded.
+ * `rules` is optional and only seeds the treasury (forwarded to `buildWorld` → `startingCoin`);
+ * engine code never imports content, so composition roots (the app's session staging, harness
+ * entries) PASS rules in — a bare `worldFromTown(town, seed)` keeps the coin-0 fallback for
+ * hand-built fixture tests that don't care about the economy.
+ */
+export function worldFromTown(town: GeneratedTown, seed: string, rules?: Rules): WorldState {
+  const world = buildWorld(town.fixture, seed, rules);
   world.enemy.observers = town.guards.map((g) => ({ ...g }));
   world.enemy.map = buildTownMap(town.fixture);
   for (const secret of [...town.secrets].sort((a, b) => a.id.localeCompare(b.id))) {
@@ -46,8 +53,22 @@ export function attachPlayer(world: WorldState, town: GeneratedTown, station?: '
   // Generated towns always carry a deal; 'noble' is the neutral fallback only for a hand-built town.
   world.station = station ?? town.stationDeal ?? 'noble';
 
+  const playerId = world.playerId!; // enrollPlayer just set it
   for (const id of dossier.informants) {
     world.intel.informants.push({ id, assignedVenue: null });
+    // Migration (Task 3): each dossier freebie becomes a roster AssetRecord — a legacy loyalist
+    // (mice: null), recruited by the player at tick 0, on the record interrogation reads back.
+    world.network.assets.push({
+      id, mice: null, wagePaidThroughDay: 0, strikes: 0,
+      facts: [{ tick: 0, kind: 'recruited-by', ref: 'player' }],
+    });
+    // Disposition IS the trust edge (asset → player), amendment #4c. P5 wired no such edge —
+    // informants were an intel-side id list only — so create it at 0.75 (above the 0.7 confide
+    // line) when absent; an existing edge is reused as-is.
+    const informant = world.npcs[id];
+    if (informant && !informant.edges.some((e) => e.to === playerId)) {
+      informant.edges.push({ to: playerId, kind: 'friend', trust: 0.75 });
+    }
   }
 
   for (const tr of dossier.traitReads) {

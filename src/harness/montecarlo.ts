@@ -56,7 +56,9 @@ export function runMonteCarlo(config: {
   }
 
   const perSeed: McSeedResult[] = config.seeds.map((seed) => {
-    const world0 = config.makeWorld ? config.makeWorld(seed) : buildWorld(config.fixture!, seed);
+    // Controller rider: the fixture path forwards rules so MC worlds start at the real startingCoin
+    // (the makeWorld path is caller-composed and passes its own rules to worldFromTown).
+    const world0 = config.makeWorld ? config.makeWorld(seed) : buildWorld(config.fixture!, seed, config.rules);
     const { world } = runBotCampaignOn(world0, config.rules, config.bot, config.days);
     return {
       seed,

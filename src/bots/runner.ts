@@ -46,5 +46,6 @@ export function runBotCampaignOn(
 export function runBotCampaign(
   fixture: TownFixture, rules: Rules, seed: string, bot: Bot, days: number,
 ): BotRun {
-  return runBotCampaignOn(buildWorld(fixture, seed), rules, bot, days);
+  // Controller rider: forward rules so the bot's world starts at the real startingCoin (20).
+  return runBotCampaignOn(buildWorld(fixture, seed, rules), rules, bot, days);
 }

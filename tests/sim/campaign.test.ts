@@ -19,7 +19,9 @@ const save: Save = {
 
 describe('runCampaign — Save = seed + action log', () => {
   it('replay equals the hand-driven campaign, hash-identical at day 3', () => {
-    const hand = buildWorld(TESTFORD, 'camp-1');
+    // runCampaign now forwards rules (controller rider → startingCoin 20); the hand-driven
+    // comparison must build the same way, or the coin field alone diverges the hash.
+    const hand = buildWorld(TESTFORD, 'camp-1', STANDARD_RULES);
     runUntil(hand, at(0, 8), STANDARD_RULES);
     applyInject(hand, 'mara', spec);
     runUntil(hand, at(3, 0), STANDARD_RULES);

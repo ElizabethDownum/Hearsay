@@ -6,6 +6,7 @@ import type { EnemyState } from './enemy/state';
 import type { InquiryKey } from './perception';
 import type { IntelState } from '../intel/entry';
 import type { ScenarioState } from './scenario/types';
+import type { NetworkState } from './network/types';
 
 export type { IntelEntry, IntelState, InformantSpec, HypothesisCard, CodexHypothesis, TagNote } from '../intel/entry';
 export type { ScenarioState, ScenarioStatus, ScenarioDef, ScenarioCast, WinCondition, Resolution } from './scenario/types';
@@ -160,6 +161,12 @@ export interface WorldState {
   pendingTell: { to: EntityId; spec: InjectSpec } | null;
   /** The player's private knowledge substrate (informants, captured feed, board notes). */
   intel: IntelState;
+  /**
+   * The sim-truth roster: what each asset FACTUALLY knows (the compartment interrogation reads),
+   * dead drops, and the enemy-side mirror (Task 7). A superset of `intel.informants` — the roster
+   * is sim truth, intel is the player's view.
+   */
+  network: NetworkState;
   /** The campaign referee's state, or null in a scenario-free (headless/probe) world. */
   scenario: ScenarioState | null;
   npcs: Record<EntityId, Npc>;

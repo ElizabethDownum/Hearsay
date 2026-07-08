@@ -154,5 +154,7 @@ export function runLogOn(
 export function runCampaign(
   fixture: TownFixture, rules: Rules, save: Save, untilTick: Tick,
 ): WorldState {
-  return runLogOn(buildWorld(fixture, save.seed), rules, save.log, untilTick);
+  // Controller rider: forward the rules already in scope so a live campaign starts at
+  // rules.economy.startingCoin (20), not the 2-arg fallback 0.
+  return runLogOn(buildWorld(fixture, save.seed, rules), rules, save.log, untilTick);
 }

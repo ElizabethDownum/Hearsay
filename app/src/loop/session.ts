@@ -38,7 +38,8 @@ export type ActionIntent = DistributiveOmit<Action, 'tick'>;
 /** The proven Coronation staging pipeline (coronation.e2e buildFull): serve → world → avatar → referee. */
 function stageWorld(seed: string): WorldState {
   const { town } = generateValidTown(seed, STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT, STANDARD_RULES);
-  const world = worldFromTown(town, seed);
+  // Composition root: pass rules so live campaigns start at STANDARD_ECONOMY.startingCoin (20).
+  const world = worldFromTown(town, seed, STANDARD_RULES);
   attachPlayer(world, town);
   attachScenario(world, town, CORONATION);
   return world;

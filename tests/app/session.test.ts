@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newSession, loadSession } from '../../app/src/loop/session';
 import { CORONATION } from '../../src/content/scenarios/coronation';
+import { STANDARD_ECONOMY } from '../../src/content/economy';
 import { hashWorld } from '../../src/sim/hash';
 import { at, minuteOfDay, TICKS_PER_DAY, type Tick } from '../../src/core/time';
 import { venueAt, CIRCLE_SIZE } from '../../src/sim/agents';
@@ -64,6 +65,12 @@ describe('newSession — a running Coronation world with dossier intel', () => {
     expect(session.world.playerId).toBe('you');
     expect(session.world.intel.log.length).toBeGreaterThan(0);
     expect(session.world.intel.log.every((e) => e.via === 'dossier')).toBe(true);
+  });
+
+  it('stages the treasury at STANDARD_ECONOMY.startingCoin (20) — Rules wired through stageWorld (controller rider)', () => {
+    const session = newSession(SEED);
+    expect(session.world.coin).toBe(STANDARD_ECONOMY.startingCoin);
+    expect(session.world.coin).toBe(20);
   });
 });
 
