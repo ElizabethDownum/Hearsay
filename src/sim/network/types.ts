@@ -56,11 +56,18 @@ export interface NetworkState {
   drops: DeadDrop[];
   /** Enemy-side mirror, gen-seeded (Task 7): HIS assets. Same shapes — one machinery. */
   enemyAssets: AssetRecord[];
+  /**
+   * The embodied enemy spymaster's id, gen-seeded (Task 7) — or `null` in a headless / hand-built
+   * world with no enemyNet. World-side state (NEVER digest input): the `runEnemyDay` budget spend
+   * reads HIS belief store through this handle, and `applyRecruit` excludes him. The digest signature
+   * stays `(EnemyState, day, rules)` and never sees this field.
+   */
+  spymaster: EntityId | null;
   /** Pending courier runs (Task 5), consumed at the delivery beat and expired at 3 days. */
   pendingCouriers: CourierTasking[];
 }
 
 /** A fresh, empty network compartment — the neutral world-init value (buildWorld seeds this). */
 export function emptyNetworkState(): NetworkState {
-  return { assets: [], drops: [], enemyAssets: [], pendingCouriers: [] };
+  return { assets: [], drops: [], enemyAssets: [], spymaster: null, pendingCouriers: [] };
 }

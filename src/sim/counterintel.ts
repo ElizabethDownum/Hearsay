@@ -1,6 +1,6 @@
 import { dayOf } from '../core/time';
 import { observationsFor, type TickEvents } from './perception';
-import { juiciness } from './rumors/propagation';
+import { juiciness, STANCE } from './rumors/propagation';
 import { reportThrough } from './reporting';
 import { enemyDigest } from './enemy/digest';
 import type { Rules } from './rules';
@@ -82,8 +82,49 @@ export function applyEnemyDecision(world: WorldState, decision: EnemyDecision): 
   }
 }
 
-/** The nightly beat: digest what the network sampled today, act on it. */
+/**
+ * The embodied spymaster's nightly countermeasure budget (Plan 8 §13; amendment #4, ratified:
+ * "effectiveness loss = nightly countermeasure budget spent reacting to their own scandal"). This
+ * is the WORLD-SIDE seam — it runs AFTER the digest and reads the spymaster's OWN belief store
+ * (amendment-#3 machinery: `counterSpun` + credence), never digest input. The digest signature stays
+ * `(EnemyState, day, rules)` and cannot see his mind, so the no-omniscience pillar holds UNCHANGED.
+ *
+ * Each un-counter-spun damaging self-rumor he holds at >= REPEAT stance consumes one countermeasure
+ * slot; slots are spent interrogation-first, then watch (deterministic). He spends the night on his
+ * own scandal instead of hunting you — the digest emits fewer orders, one dropped per scandal. No-op
+ * when no spymaster is wired (a headless / hand-built world) or his mind holds no qualifying scandal.
+ */
+function spendCountermeasureBudget(world: WorldState, decision: EnemyDecision, rules: Rules): void {
+  const spymaster = world.network.spymaster;
+  if (spymaster === null) return;
+  const store = world.beliefs[spymaster];
+  if (!store) return;
+
+  let slotsToSpend = 0;
+  for (const belief of Object.values(store)) {
+    if (belief.claim.subject !== spymaster) continue;                        // only rumors about HIM
+    if (belief.counterSpun) continue;                                        // he already answered it
+    if (rules.predicates[belief.claim.predicate]?.valence !== 'damaging') continue; // must sting
+    if (belief.credence < STANCE.REPEAT) continue;                           // and be taken seriously
+    slotsToSpend += 1;
+  }
+  if (slotsToSpend === 0) return;
+
+  // Deterministic: the interrogation slot goes first, then the watch — one order per spent slot.
+  if (slotsToSpend > 0 && decision.interrogations.length > 0) {
+    decision.interrogations = decision.interrogations.slice(1);
+    slotsToSpend -= 1;
+  }
+  if (slotsToSpend > 0 && decision.watches.length > 0) {
+    decision.watches = decision.watches.slice(1);
+    slotsToSpend -= 1;
+  }
+}
+
+/** The nightly beat: digest what the network sampled today, spend the spymaster's budget, act on it. */
 export function runEnemyDay(world: WorldState, rules: Rules): void {
   if (world.enemy.observers.length === 0) return;
-  applyEnemyDecision(world, enemyDigest(world.enemy, dayOf(world.tick), rules));
+  const decision = enemyDigest(world.enemy, dayOf(world.tick), rules);
+  spendCountermeasureBudget(world, decision, rules);
+  applyEnemyDecision(world, decision);
 }

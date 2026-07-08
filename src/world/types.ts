@@ -133,6 +133,14 @@ export interface GeneratedTown {
    * `dossier-capped` skips a null dossier.
    */
   cast?: ScenarioCast | null;
+  /**
+   * The embodied enemy spymaster (crown-faction, non-guard, non-cast) and his ENEMY_ASSET_COUNT
+   * civilian assets — his informants, townspeople rather than guards (gen §13, the `gen:enemynet`
+   * stream). Same tri-state as `cast`: the generator ALWAYS sets it — a value when the draw found a
+   * spymaster + enough disjoint civilians, or `null` when it did not (the validator fails `null` so
+   * serve rerolls). Hand-built / fixture towns OMIT it (`undefined`), and `enemy-net-sane` skips them.
+   */
+  enemyNet?: { spymaster: EntityId; assets: EntityId[] } | null;
 }
 
 export interface InvariantFailure { invariant: string; detail: string }

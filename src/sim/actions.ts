@@ -101,6 +101,9 @@ export function applyRecruit(
   if (cast && (cast.usurper === target || cast.council.includes(target))) {
     throw new Error('recruit: the usurper and council cannot be recruited');
   }
+  // Task 7: the embodied spymaster is off-limits (the plan's "not the usurper/council/spymaster"
+  // precondition — vacuous until enemyNet existed). He is nobody's asset, so this is his own gate.
+  if (world.network.spymaster === target) throw new Error('recruit: the enemy spymaster cannot be recruited');
   // Either side: recruiting HIS asset is Task 8's turncoat flow, a different verb.
   if (findAsset(world, target)) throw new Error(`recruit: '${target}' is already an asset`);
 

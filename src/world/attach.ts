@@ -5,6 +5,9 @@ import type { Rules } from '../sim/rules';
 import type { WorldState } from '../sim/types';
 import type { GeneratedTown } from './types';
 
+/** His civilian assets sense the town at a flat vigilance v1 (spec: "vigilance 0.5 flat v1"). */
+const ENEMY_ASSET_VIGILANCE = 0.5;
+
 /**
  * Build a live world from a generated town: enemy roster + map wired, secret witnesses seeded.
  * `rules` is optional and only seeds the treasury (forwarded to `buildWorld` → `startingCoin`);
@@ -16,6 +19,21 @@ export function worldFromTown(town: GeneratedTown, seed: string, rules?: Rules):
   const world = buildWorld(town.fixture, seed, rules);
   world.enemy.observers = town.guards.map((g) => ({ ...g }));
   world.enemy.map = buildTownMap(town.fixture);
+  // The embodied spymaster (Task 7): his civilian assets grow the enemy's coverage beyond the
+  // guards through the SAME observer machinery (vigilance 0.5 flat), and his id is the world-side
+  // handle the runEnemyDay budget spend / applyRecruit read. His assets also join the enemy-side
+  // roster mirror as AssetRecords (one machinery — Task 8 reads them). Skipped for a hand-built town
+  // with no enemyNet (undefined) or a validator-rejected null.
+  if (town.enemyNet) {
+    world.network.spymaster = town.enemyNet.spymaster;
+    for (const id of town.enemyNet.assets) {
+      world.enemy.observers.push({ id, vigilance: ENEMY_ASSET_VIGILANCE });
+      world.network.enemyAssets.push({
+        id, mice: null, wagePaidThroughDay: 0, strikes: 0,
+        facts: [{ tick: 0, kind: 'recruited-by', ref: town.enemyNet.spymaster }],
+      });
+    }
+  }
   for (const secret of [...town.secrets].sort((a, b) => a.id.localeCompare(b.id))) {
     const claim = mintClaim(world, {
       family: secret.id, parent: null, subject: secret.subject, predicate: secret.predicate,

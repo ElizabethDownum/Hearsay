@@ -10,6 +10,7 @@
  */
 import { TICKS_PER_DAY } from '../core/time';
 import { venueAt } from '../sim/agents';
+import { ENEMY_ASSET_COUNT } from './gen';
 import type { EntityId } from '../sim/rumors/claim';
 import type { TownFixture } from '../sim/types';
 import type { GenConfig, GeneratedTown, InvariantFailure, ValidateOptions, ValidationReport } from './types';
@@ -228,6 +229,36 @@ export function validateTown(town: GeneratedTown, config: GenConfig, opts: Valid
     if (!venueIds.has('salon')) fail('station-sane', 'no salon venue (invitational, district 0)');
     for (const d of town.districts) {
       if (!venueIds.has(`back-room-${d.id}`)) fail('station-sane', `no back-room venue for district '${d.id}'`);
+    }
+  }
+
+  // Enemy network (Plan 8 §13): the spymaster + his civilian assets must all exist, be distinct,
+  // non-guard, and disjoint from the cast and the dossier informants (spymaster ∉ assets). Tri-state
+  // like the cast: `null` (a draw with too thin a pool) fails so serve rerolls; `undefined` (a
+  // hand-built / fixture town) skips; a real net is checked in full.
+  if (town.enemyNet === null) {
+    fail('enemy-net-sane', 'town has no enemy network (no crown spymaster or too few disjoint civilians)');
+  } else if (town.enemyNet !== undefined) {
+    const net = town.enemyNet;
+    const guardIds = new Set(town.guards.map((g) => g.id));
+    const castIds = new Set<EntityId>([
+      ...(town.cast ? [town.cast.usurper, ...town.cast.council] : []),
+    ]);
+    const informantIds = new Set<EntityId>(town.dossier ? town.dossier.informants : []);
+    const members: { id: EntityId; role: string }[] = [
+      { id: net.spymaster, role: 'spymaster' },
+      ...net.assets.map((id) => ({ id, role: 'asset' })),
+    ];
+    if (net.assets.length !== ENEMY_ASSET_COUNT) {
+      fail('enemy-net-sane', `${net.assets.length} assets !== ${ENEMY_ASSET_COUNT}`);
+    }
+    const dupMember = firstDuplicate(members.map((m) => m.id));
+    if (dupMember) fail('enemy-net-sane', `'${dupMember}' appears twice in the enemy network (spymaster ∉ assets, assets distinct)`);
+    for (const { id, role } of members) {
+      if (!npcIds.has(id)) fail('enemy-net-sane', `${role} '${id}' is not an NPC`);
+      if (guardIds.has(id)) fail('enemy-net-sane', `${role} '${id}' is a guard`);
+      if (castIds.has(id)) fail('enemy-net-sane', `${role} '${id}' is a cast principal`);
+      if (informantIds.has(id)) fail('enemy-net-sane', `${role} '${id}' is a dossier informant`);
     }
   }
 

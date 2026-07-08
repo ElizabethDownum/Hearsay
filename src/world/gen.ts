@@ -24,6 +24,9 @@ const EVENING_STARTS = [1080, 1110, 1140] as const; // 18:00 / 18:30 / 19:00
 const BRIDGE_FROM = 1080;
 const BRIDGE_TO = 1200;
 
+/** The spymaster's civilian informants per town (spec: "3 civilian assets per town"). */
+export const ENEMY_ASSET_COUNT = 3;
+
 interface CastMeta {
   npc: Npc;
   district: string;
@@ -55,6 +58,7 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
   const dossierRng = new Rng(seed, 'gen:dossier');
   const scenarioRng = new Rng(seed, 'gen:scenario');
   const stationRng = new Rng(seed, 'gen:station');
+  const enemyNetRng = new Rng(seed, 'gen:enemynet');
 
   // ── 1. Districts + institutional venues (fixed grammar) ─────────────────
   const districtIds = Array.from({ length: config.districtCount }, (_, i) => `d${i}`);
@@ -397,11 +401,41 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
     secretHint: hintedSecret ? { about: hintedSecret.subject, witness: hintedSecret.witnesses[0]! } : null,
   };
 
+  // ── 13. Enemy network: the embodied spymaster + his civilian assets ─────
+  // 'gen:enemynet' is a fresh stream (never reshuffles another subsystem — the §12 station
+  // precedent), and this section runs AFTER the cast, guards, and dossier so it can be disjoint
+  // from all three. The spymaster is a crown-faction, non-guard, non-cast NPC; his assets are
+  // ENEMY_ASSET_COUNT other townspeople (non-guard, non-cast, not dossier informants, not the
+  // spymaster). Designated by construction so a valid town rarely rerolls; when the pool is too
+  // thin the draw yields `null` and 'enemy-net-sane' rerolls the town (the lawful reroll shift).
+  const guardIdSet = new Set(guards.map((g) => g.id));
+  const castIdSet = new Set<EntityId>([...keystones, ...(scenarioCast ? [scenarioCast.usurper] : [])]);
+  const informantIdSet = new Set<EntityId>(dossier.informants);
+  const reservedForNet = (id: EntityId): boolean =>
+    guardIdSet.has(id) || castIdSet.has(id) || informantIdSet.has(id);
+  let enemyNet: { spymaster: EntityId; assets: EntityId[] } | null = null;
+  const spymasterCandidates = cast
+    .map((m) => m.npc)
+    .filter((n) => n.faction === 'crown' && !reservedForNet(n.id))
+    .map((n) => n.id)
+    .sort();
+  if (spymasterCandidates.length > 0) {
+    const spymaster = spymasterCandidates[enemyNetRng.int(0, spymasterCandidates.length)]!;
+    const assetPool = cast
+      .map((m) => m.npc.id)
+      .filter((id) => id !== spymaster && !reservedForNet(id))
+      .sort();
+    if (assetPool.length >= ENEMY_ASSET_COUNT) {
+      const assets = enemyNetRng.shuffle(assetPool).slice(0, ENEMY_ASSET_COUNT);
+      enemyNet = { spymaster, assets };
+    }
+  }
+
   const districts: DistrictInfo[] = districtIds.map((d) => ({
     id: d,
     venueIds: venuesByDistrict.get(d)!,
     npcIds: cast.filter((m) => m.district === d).map((m) => m.npc.id),
   }));
 
-  return { fixture: { venues, npcs: cast.map((m) => m.npc) }, districts, keystones, guards, secrets, dossier, cast: scenarioCast, stationDeal };
+  return { fixture: { venues, npcs: cast.map((m) => m.npc) }, districts, keystones, guards, secrets, dossier, cast: scenarioCast, stationDeal, enemyNet };
 }

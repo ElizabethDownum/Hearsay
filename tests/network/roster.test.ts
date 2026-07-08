@@ -73,7 +73,7 @@ describe('attach migration — the two dossier freebies become roster AssetRecor
 
   it('a fresh world starts with an empty network roster (init)', () => {
     const world = buildWorld(TESTFORD, 'net-empty');
-    expect(world.network).toEqual({ assets: [], drops: [], enemyAssets: [], pendingCouriers: [] });
+    expect(world.network).toEqual({ assets: [], drops: [], enemyAssets: [], spymaster: null, pendingCouriers: [] });
   });
 });
 

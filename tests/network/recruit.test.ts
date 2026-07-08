@@ -59,13 +59,14 @@ function pinnedCircleMate(world: WorldState, id: EntityId): number {
   throw new Error(`pinnedCircleMate: ${id} never shared the avatar's circle`);
 }
 
-/** The alphabetically-first NPC recruitable in principle: not the avatar, a guard, cast, or an asset. */
+/** The alphabetically-first NPC recruitable in principle: not the avatar, a guard, cast, the enemy
+ *  spymaster, or an asset. */
 function civilian(world: WorldState, town: GeneratedTown): EntityId {
   const guardIds = new Set(world.enemy.observers.map((o) => o.id));
   const assetIds = new Set(world.network.assets.map((a) => a.id));
   const id = Object.keys(world.npcs).sort().find((n) =>
     n !== 'you' && !guardIds.has(n) && n !== town.cast!.usurper
-    && !town.cast!.council.includes(n) && !assetIds.has(n));
+    && !town.cast!.council.includes(n) && n !== world.network.spymaster && !assetIds.has(n));
   if (!id) throw new Error('civilian: none found');
   return id;
 }
@@ -116,7 +117,7 @@ describe('MICE recruit — ideology: loyal to the cause', () => {
       b.claim.subject === town.cast!.usurper && RULES.predicates[b.claim.predicate]?.valence === 'damaging' && b.credence >= 0.5);
     const id = Object.keys(world.npcs).sort().find((n) =>
       n !== 'you' && !guardIds.has(n) && n !== town.cast!.usurper
-      && !town.cast!.council.includes(n) && !assetIds.has(n) && !leans(n));
+      && !town.cast!.council.includes(n) && n !== world.network.spymaster && !assetIds.has(n) && !leans(n));
     if (!id) throw new Error('unconvinced: none found');
     return id;
   }
@@ -180,7 +181,7 @@ describe('MICE recruit — ego: no gate, chronic exaggeration overlay (one mecha
     const assetIds = new Set(world.network.assets.map((a) => a.id));
     const id = Object.keys(world.npcs).sort().find((n) =>
       n !== 'you' && !guardIds.has(n) && n !== town.cast!.usurper && !town.cast!.council.includes(n)
-      && !assetIds.has(n) && !world.npcs[n]!.traits.includes('exaggerator')
+      && n !== world.network.spymaster && !assetIds.has(n) && !world.npcs[n]!.traits.includes('exaggerator')
       && reportThrough(world, n, asClaim(spec), RULES).count === spec.count);
     if (!id) throw new Error('egoTarget: none found');
     return id;
@@ -249,6 +250,15 @@ describe('MICE recruit — preconditions refuse (identity + conversation shape)'
       const existing = world.network.assets[0]!.id; // a dossier freebie — already on the roster
       expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: existing, mice: 'money', leverageFamily: null }, RULES)).toThrow(/already an asset/);
     }
+    {
+      // Task 7: the embodied spymaster now EXISTS, so the plan's "not the usurper/council/spymaster"
+      // precondition (vacuous until this task) has teeth. He is not a guard, not cast, not an asset —
+      // the exclusion is his own, and fires before the co-circle gate (refused as such, not on earshot).
+      const { world } = stage('rec-spymaster');
+      const spymaster = world.network.spymaster!;
+      expect(spymaster).toBeTruthy();
+      expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: spymaster, mice: 'money', leverageFamily: null }, RULES)).toThrow(/spymaster/);
+    }
   });
 
   it('refuses no-player, off-beat, and non-circle targets', () => {
@@ -300,7 +310,8 @@ describe('recruit routing — save = seed + action log', () => {
         if (!c) continue;
         const target = c.members.find((m) => m !== 'you' && !guardIds.has(m)
           && m !== probe.scenario?.cast.usurper && !(probe.scenario?.cast.council ?? []).includes(m)
-          && m !== town.cast!.usurper && !town.cast!.council.includes(m) && !assetIds.has(m));
+          && m !== town.cast!.usurper && !town.cast!.council.includes(m)
+          && m !== probe.network.spymaster && !assetIds.has(m));
         if (target) { found = { venue: v.id, t, target }; break; }
       }
     }

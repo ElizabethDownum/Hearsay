@@ -38,7 +38,12 @@ describe('secret generation', () => {
 describe('worldFromTown', () => {
   it('wires the enemy roster and map, seeds witnesses with witnessed+discretion beliefs, genesis-chronicled', () => {
     const world = worldFromTown(town, 'attach-1');
-    expect(world.enemy.observers).toEqual(town.guards);
+    // The guards, PLUS the embodied spymaster's civilian assets as flat-0.5 observers (Task 7 —
+    // his coverage grows beyond the guards through the same observer machinery).
+    expect(world.enemy.observers).toEqual([
+      ...town.guards,
+      ...town.enemyNet!.assets.map((id) => ({ id, vigilance: 0.5 })),
+    ]);
     expect(world.enemy.map.directory).toHaveLength(town.fixture.npcs.length);
     for (const s of town.secrets) {
       for (const w of s.witnesses) {
