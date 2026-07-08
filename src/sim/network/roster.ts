@@ -26,6 +26,17 @@ export function dispositionOf(world: WorldState, asset: EntityId): number {
 }
 
 /**
+ * Is `id` a PLAYER-side asset that has turned (Plan 8 Task 8)? The ONE predicate the doctoring
+ * composition (reportThrough's minimizer overlay) and the channel filter (captureIntel's presence/
+ * authority-asking drop) share — never duplicated, so both channels doctor by the same rule. Reads
+ * the player roster only: an enemy-side walk-in (`enemyAssets` turned) is the OTHER direction and
+ * never doctors the player's own channel.
+ */
+export function isTurnedAsset(world: WorldState, id: EntityId): boolean {
+  return world.network.assets.some((a) => a.id === id && a.turned === true);
+}
+
+/**
  * The one spending predicate every player VERB checks before it mutates (validate-before-mutate):
  * a recruit/courier/host/drop that can't be covered REFUSES with zero residue. Distinct from the
  * nightly WAGE shortfall, which never refuses — it slides disposition instead (see payWagesNightly).

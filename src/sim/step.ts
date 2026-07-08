@@ -7,6 +7,7 @@ import { mintClaim } from './rumors/claim';
 import { captureEvidence, runEnemyDay } from './counterintel';
 import { captureIntel } from './fieldwork';
 import { payWagesNightly } from './network/roster';
+import { runTurncoatPass } from './network/turncoats';
 import { deliverCouriers } from './network/couriers';
 import { reactToSelfRumor } from './reactions';
 import { runVignettes } from './vignettes/engine';
@@ -144,6 +145,10 @@ export function step(world: WorldState, rules: Rules): TickEvents {
       world.coin += rules.economy.weeklyStipend;
       payWagesNightly(world, rules);
     }
+    // Turncoats (Task 8), plan-verbatim: AFTER wages — a rest-day wage slide can push an eroded asset
+    // under the flip line the SAME night — and BEFORE vignettes. Flip detection runs every night; the
+    // weekly leak/walk-in emissions gate to the rest-day beat INSIDE the pass (the wage cadence).
+    runTurncoatPass(world, rules);
     runEnemyDay(world, rules);          // digest today's evidence into countermeasures...
     expireInquiries(world, dayOf(t));   // ...THEN sweep spent inquiries.
     runVignettes(world, rules);         // ...THEN tonight's micro-scenes fire (pillar 7), so...

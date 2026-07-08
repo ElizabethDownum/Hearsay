@@ -37,6 +37,14 @@ export interface EvidenceEntry {
   family: RumorId | null;     // null for subject-keyed askings
   reported: ReportedClaim | null;
   about: InquiryKeyData | null; // for askings
+  /**
+   * Plan 8 Task 8 — a turned player-side asset's WEEKLY leak: one compartment fact handed to the
+   * enemy through a lawful in-fiction channel (the turncoat meets their handler; this is inside
+   * testimony, not overheard gossip). Present ONLY on leak entries; every capture-sourced entry
+   * leaves it undefined (so pre-Task-8 evidence hashes unchanged). The digest is BLIND to it — the
+   * fold reads `family`/`reported` (both null on a leak), so the no-omniscience pillar is unmoved.
+   */
+  leaked?: { from: EntityId; fact: { tick: Tick; kind: string; ref: string } };
 }
 
 export interface SketchFeature {

@@ -2,6 +2,7 @@ import { dayOf, minuteOfDay, type Tick } from '../core/time';
 import { circlesAt, positionOf } from './agents';
 import { observationsFor, type TickEvents } from './perception';
 import { reportThrough } from './reporting';
+import { isTurnedAsset } from './network/roster';
 import { CONVERSATION_BEAT } from './rumors/propagation';
 import type { Rules } from './rules';
 import type { IntelEntry, WorldState } from './types';
@@ -51,6 +52,11 @@ export function captureIntel(world: WorldState, events: TickEvents, rules: Rules
     // perceived (never in a circle or position), so its feed is empty anyway — but skip it here
     // so a malformed informant list degrades to a no-op instead of tripping reportThrough's lookup.
     if (!world.npcs[source.id]) continue;
+    // Turncoat doctoring (Plan 8 Task 8): a TURNED asset's channel drops the enemy-relevant rows —
+    // watch sightings (kind 'presence' at watch posts) and authority-backed askings — so the enemy's
+    // activity goes unreported to the player. Story reports are NOT dropped: they minimize in
+    // reportThrough (one mechanic). The DIVERGENCE from a loyal channel is the only tell — no flag.
+    const doctored = source.via !== 'self' && isTurnedAsset(world, source.via);
     const feed = observationsFor(source.id, events);
     for (const obs of feed.observations) {
       if (obs.kind === 'utterance') {
@@ -61,6 +67,7 @@ export function captureIntel(world: WorldState, events: TickEvents, rules: Rules
           reported: heardClaim(world, source.via, obs.claim, rules),
         });
       } else if (obs.kind === 'asking') {
+        if (doctored && obs.authority) continue;   // authority askings OMITTED from a turned channel
         world.intel.log.push({
           ...blankIntel(), tick: obs.tick, venue: obs.venue, via: source.via,
           kind: 'asking', overheard: obs.overheard, speaker: obs.speaker, addressedTo: obs.addressedTo,
@@ -68,6 +75,7 @@ export function captureIntel(world: WorldState, events: TickEvents, rules: Rules
           family: 'family' in obs.about ? obs.about.family : null,
         });
       } else if (obs.kind === 'presence') {
+        if (doctored) continue;                     // watch sightings DROPPED from a turned channel
         if (!watch.has(world.npcs[obs.actor]?.occupation ?? '')) continue;
         const dup = world.intel.log.some((e) => e.kind === 'presence' && e.actor === obs.actor
           && e.venue === obs.venue && dayOf(e.tick) === day);

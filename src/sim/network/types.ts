@@ -28,6 +28,22 @@ export interface AssetRecord {
    */
   strikes: number;
   facts: CompartmentFact[];
+  /**
+   * Plan 8 Task 8 — the turncoat flag, HIDDEN from every player-facing selector (structurally
+   * invisible: the player catches a turncoat ONLY by diffing their own channels, never a UI tell).
+   * On a PLAYER-side asset (`assets`): they secretly serve the enemy — their reports DOCTOR and they
+   * LEAK a compartment fact each week. On an ENEMY-side asset (`enemyAssets`): they have flipped to
+   * YOU — a walk-in who volunteers a real sketch feature each week. Latched once true (v1: a turncoat
+   * never comes back). Undefined = loyal — and `undefined` never enters the state hash, so every
+   * pre-Task-8 record hashes exactly as before.
+   */
+  turned?: boolean;
+  /** Player-side turncoat leak bookkeeping: how many compartment facts have already been handed to
+   *  the enemy. The weekly leak picks `facts[leakedThrough]` — the oldest unleaked. Undefined = 0. */
+  leakedThrough?: number;
+  /** Enemy-side walk-in bookkeeping: how many subject-bearing sketch features this walk-in has
+   *  already revealed. The weekly reveal picks the next one. Undefined = 0. */
+  revealedThrough?: number;
 }
 
 export interface DeadDrop { id: string; venue: VenueId; knownBy: EntityId[] }
