@@ -7,7 +7,8 @@ top-down after the v1 tag. Plan 10's ship gate reconciles every plan's deferred 
 this file — nothing ships orphaned.
 
 All 24 items ratified into this list 2026-07-05 (vignette content width was pulled INTO v1 —
-Plan 10 Task 2 — and is deliberately absent here).
+Plan 10 Task 2 — and is deliberately absent here). Item 25 added 2026-07-08 (Ellie-ratified
+during Plan 8 execution; "we don't need to implement it asap").
 
 | # | Item | What it is | Seams already in place |
 |---|------|-----------|------------------------|
@@ -35,3 +36,4 @@ Plan 10 Task 2 — and is deliberately absent here).
 | 22 | **Auditing-enemy spymaster archetype** | The enemy that canaries its own instruments — difficulty knob (standing ruling: never v1) | Amendment-#4 machinery exists player-side |
 | 23 | **Cutout recruiters / deeper cells** | `recruited-by` someone other than you; interrogation chains lengthen | CompartmentFact schema carries it |
 | 24 | **DOM component test rig** | Only if debrief-UI regressions actually bite (Ellie: skip for now, 2026-07-05) | — |
+| 25 | **Routine as cover / anomaly evidence** | "Routine is cover, deviation is evidence" — the enemy weighs OFF-routine presence, and routine itself needs CORROBORATION (Ellie, 2026-07-08: "friends when asked say they see them at the bar consistently, guards see them coming in and out routinely — at first not reportable, but when the asset comes under suspicion, suddenly their movements *are* under scrutiny"). Presence/testimony accumulates inert; a suspicion gate RE-READS it retroactively — the file already exists, suspicion just opens it. Players build patterns before using them. Pairs with #4 (contact-tracing). | Position-keyed presence capture (P8-T2), corroboration machinery (P2/P5), the digest's suspicious-gate idiom (P4 heuristics), `met-asset`/`attended-hosting` facts (P8) |
