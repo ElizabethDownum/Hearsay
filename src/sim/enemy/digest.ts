@@ -201,10 +201,14 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
     const invitational = state.map.venues.filter((v) => v.access === 'invitational').map((v) => v.id).sort(byId);
     // Pressure 2 lifts the cap 1 -> 2, taking the NEXT candidate off the SAME sorted pool —
     // never a new selection rule, just more of the same one. Each extra slot rotates to the
-    // NEXT observer (round-robin by id, wrapping when guards are scarce) so two interrogations
-    // never collapse into one 3-way circle at a single guard/venue — a guard interrogates one
-    // target at a time, and each guard's own district still picks the venue (falling back to
-    // whatever invitational venue exists at all).
+    // NEXT observer (round-robin by id, wrapping when guards are scarce). `usedVenues` then
+    // guarantees the true post-fix property: no two interrogation orders from ONE digest call
+    // ever resolve to the same venue+window — keyed on the VENUE (not merely the guard id),
+    // because two DISTINCT guards who simply live in the same district would otherwise still
+    // land at that district's one invitational venue and merge. When a slot's assigned guard
+    // would land at an already-claimed venue, the slot is DROPPED — honest degradation (cap
+    // unmet) rather than a silent multi-way circle.
+    const usedVenues = new Set<string>();
     candidates.slice(0, INTERROGATION_CAP[pressure]).forEach(({ target, family }, i) => {
       const guard = observerIds[i % observerIds.length]!;
       const guardDistrict = personOf.get(guard)?.district ?? null;
@@ -212,9 +216,9 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
         .filter((v) => v.access === 'invitational' && v.district === guardDistrict)
         .map((v) => v.id).sort(byId);
       const venue = inDistrict[0] ?? invitational[0] ?? null;
-      if (venue !== null) {
-        interrogations.push({ target, guard, day: day + 1, about: { family }, venue });
-      }
+      if (venue === null || usedVenues.has(venue)) return;
+      usedVenues.add(venue);
+      interrogations.push({ target, guard, day: day + 1, about: { family }, venue });
     });
   }
 
@@ -238,20 +242,23 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
       .sort(byId);
     // Pressure >= 1 lifts the cap 1 -> 2, taking the NEXT watchable district off the SAME
     // sorted pool. `usedGuards` prevents the second watch from double-booking a guard the
-    // first watch already posted (a guard can only stand in one place at once) WHEN enough
-    // guards exist to avoid it; with too few guards, reuse is the honest degenerate case (a
-    // weaker, shorter posts array) rather than a silent scheduling collision.
+    // first watch already posted (a guard can only stand in one place at once) — the true
+    // post-fix guarantee: a watch order's posts are ALWAYS guards not already committed to an
+    // earlier watch this same digest call. `addOverride` only appends (never replaces), so a
+    // reused guard's position would silently resolve to whichever watch was processed FIRST,
+    // making the later watch's own posts a phantom nobody actually stands. When the unclaimed
+    // pool is empty for a later district, that watch's posts shrink to fewer guards — or to
+    // zero, in which case the order is DROPPED entirely — rather than reusing a committed guard.
     const usedGuards = new Set<EntityId>();
     for (const district of watchable.slice(0, WATCH_CAP[pressure])) {
       const venues = publicVenuesOf(district);
       const available = observerIds.filter((o) => !usedGuards.has(o));
-      const pool = available.length > 0 ? available : observerIds;
-      const matched = pool.filter((o) => personOf.get(o)?.district === district);
-      const rest = pool.filter((o) => personOf.get(o)?.district !== district);
+      const matched = available.filter((o) => personOf.get(o)?.district === district);
+      const rest = available.filter((o) => personOf.get(o)?.district !== district);
       const posts = [...matched, ...rest].slice(0, 2)
         .map((guard, i) => ({ guard, venue: venues[i % venues.length]! }));
       for (const p of posts) usedGuards.add(p.guard);
-      watches.push({ district, posts, startDay: day + 1 });
+      if (posts.length > 0) watches.push({ district, posts, startDay: day + 1 });
     }
   }
 

@@ -108,19 +108,28 @@ describe('enemyDigest — the cap tables (digest-internal, pure)', () => {
     expect(withDefault.watches[0]).toMatchObject({ district: 'w0' });
   });
 
-  it('pressure 1 lifts the WATCH cap to 2 but leaves the interrogation cap at 1', () => {
+  // Task 10 FIX WAVE (review I-2): this fixture's roster is exactly 2 guards total (gale/w0,
+  // hugo/w1). The watch cap lifting to 2 means up to 2 districts are ATTEMPTED, not that 2
+  // necessarily MATERIALIZE — the first watchable district (w0, sorted first) claims both
+  // guards (posts cap at 2), leaving none for w1, which honestly degrades to a DROPPED order
+  // rather than the pre-fix phantom (w1's "watch" silently reusing gale/hugo, neither of whom
+  // ever actually stood at square-w1). The cap genuinely delivering 2 MATERIALIZED watches under
+  // a roster that can afford it is proven at the schedule-application layer in
+  // tests/sim/enemy-schedule-application.test.ts ('(e) generous-roster control').
+  it('pressure 1 lifts the WATCH cap to 2, but this 2-guard roster only has enough guards to staff ONE — honest degradation, not a phantom', () => {
     const state = stateWith(combinedEvidence());
     const d = enemyDigest(state, 1, RULES, 1);
     expect(d.interrogations).toHaveLength(1);
-    expect(d.watches).toHaveLength(2);
-    expect(d.watches.map((w) => w.district).sort()).toEqual(['w0', 'w1']);
+    expect(d.watches).toHaveLength(1);
+    expect(d.watches[0]!.district).toBe('w0');
+    expect(d.watches[0]!.posts.map((p) => p.guard).sort()).toEqual(['gale', 'hugo']);
   });
 
-  it('pressure 2 lifts BOTH caps to 2 (escalation stacks — pressure 2 keeps pressure 1\'s watch relief)', () => {
+  it('pressure 2 lifts BOTH caps to 2 (escalation stacks — pressure 2 keeps pressure 1\'s watch relief, same roster-scarcity caveat as above)', () => {
     const state = stateWith(combinedEvidence());
     const d = enemyDigest(state, 1, RULES, 2);
     expect(d.interrogations).toHaveLength(2);
-    expect(d.watches).toHaveLength(2);
+    expect(d.watches).toHaveLength(1); // still just w0 — this fixture's 2 guards are fully claimed there
     // the SAME candidate pool, just more of it — lexicographic order preserved.
     expect(d.interrogations.map((i) => i.target).sort()).toEqual(['mira', 'sten']);
     // distinct guards used for the two interrogations when >1 observer exists (no forced
@@ -133,10 +142,15 @@ describe('enemyDigest — the cap tables (digest-internal, pure)', () => {
     expect(INTERROGATION_CAP).toEqual({ 0: 1, 1: 1, 2: 2 });
   });
 
-  it('a scarce-guard town (only 1 observer) degrades gracefully at pressure 2 — no crash, guard reused', () => {
+  // Task 10 FIX WAVE (review I-1): pre-fix, this exact fixture (1 guard, 2 candidates) shipped
+  // TWO interrogation orders that both resolved to gale/guard-post-w0 — a silent 3-way merged
+  // circle the decision object alone can't see. Post-fix: honest degradation to ONE order (cap
+  // unmet) rather than a second order colliding on the same venue. The circle-reality proof
+  // (via applyEnemyDecision + circlesAt) lives in tests/sim/enemy-schedule-application.test.ts.
+  it('a scarce-guard town (only 1 observer) degrades gracefully at pressure 2 — no crash, cap unmet rather than a merged circle', () => {
     const scarce: EnemyState = { ...stateWith(combinedEvidence()), observers: [{ id: 'gale', vigilance: 0.9 }] };
     const d = enemyDigest(scarce, 1, RULES, 2);
-    expect(d.interrogations.length).toBeGreaterThan(0);
+    expect(d.interrogations).toHaveLength(1);
     expect(d.interrogations.every((i) => i.guard === 'gale')).toBe(true);
   });
 });
@@ -175,20 +189,32 @@ describe('runEnemyDay — twin-world at staged scores (the retune baseline)', ()
     expect(d.watches).toHaveLength(1);
   });
 
-  it('score 3 (pressure 1): watch cap lifts to 2, interrogation cap stays 1', () => {
+  // score 3 and 4 both map to pressure 1 (M-2: score-4 boundary parity — see below). This
+  // fixture's 2-guard roster (gale/hugo) fully claims district w0's watch, honestly degrading
+  // (dropping, not phantom-staffing) the w1 order — see the FIX WAVE comment above the
+  // decision-level pressure-1 test for the same roster-scarcity caveat.
+  it('score 3 (pressure 1): watch cap lifts to 2 (this roster only staffs 1), interrogation cap stays 1', () => {
     const world = stagedWorld(3);
     runEnemyDay(world, RULES);
     const d = world.enemy.decisions.at(-1)!;
     expect(d.interrogations).toHaveLength(1);
-    expect(d.watches).toHaveLength(2);
+    expect(d.watches).toHaveLength(1);
   });
 
-  it('score 5 (pressure 2): both caps lift to 2', () => {
+  it('score 4 (pressure 1, M-2 boundary parity): the same staged-score twin-world path as scores 2/3/5', () => {
+    const world = stagedWorld(4);
+    runEnemyDay(world, RULES);
+    const d = world.enemy.decisions.at(-1)!;
+    expect(d.interrogations).toHaveLength(1);
+    expect(d.watches).toHaveLength(1);
+  });
+
+  it('score 5 (pressure 2): both caps lift to 2 (interrogations do; this roster still only staffs 1 watch)', () => {
     const world = stagedWorld(5);
     runEnemyDay(world, RULES);
     const d = world.enemy.decisions.at(-1)!;
     expect(d.interrogations).toHaveLength(2);
-    expect(d.watches).toHaveLength(2);
+    expect(d.watches).toHaveLength(1);
   });
 
   it('an enemy-off world (no observers) is a no-op regardless of score — enemy-off pins never move', () => {

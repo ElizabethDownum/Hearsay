@@ -73,6 +73,7 @@ export const TERMS: Record<string, TermDef> = {
   'inquiry':         { id: 'inquiry', label: 'Asking-around', short: 'Someone is asking questions about a story or a person. Asking is itself observable.', entry: null },
   'authority':       { id: 'authority', label: 'With authority', short: 'A question carrying the watch\'s weight. Refusing discretion does not survive it.', entry: null },
   'exposure':        { id: 'exposure', label: 'Exposure', short: 'How much of the ghost sketch points at YOUR people. Distinct features, never raw count.', entry: null },
+  'pressure':        { id: 'pressure', label: 'Pressure', short: 'How exposed you are: score 3+ doubles the enemy nightly watches; score 5+ also doubles his interrogations.', entry: null },
   'identified':      { id: 'identified', label: 'Identified', short: 'The carrier profile has your face. The hunt is over unless you already won.', entry: null },
   // ── the campaign ──
   'doom-clock':      { id: 'doom-clock', label: 'Doom clock', short: 'The campaign\'s natural deadline. Day 40: the coronation happens with or without you.', entry: null },
