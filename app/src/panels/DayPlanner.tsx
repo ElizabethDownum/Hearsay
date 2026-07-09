@@ -14,10 +14,14 @@ import { Term } from './Term';
  * edge). Where a hidden gate can still refuse, the engine is the real gate and its throw surfaces as
  * a toast; the composer never invents a message that would leak ground truth (see the recruit note).
  *
- * One speech-act per beat (T10 review carry): tell / ask / sell are mutually exclusive within a beat
- * — a single mode toggle governs which speech submit is live, so the UI can only ever OFFER one
- * avatar utterance per beat. This is the sanctioned v1 gate (same shape as P7's UI-only access gate);
- * no cross-verb physics guard is added to the sim here.
+ * One speech-act per beat (T10 review carry, note 9): tell / ask / sell are mutually exclusive within
+ * a conversation beat. TWO gates enforce it, because a mode toggle alone was defeatable (submit tell
+ * → toggle → submit sell queued BOTH — review I-1): (1) a single mode toggle governs which speech
+ * submit is live at rest; (2) `speechLatched` — derived at the composition root from the SESSION
+ * queue (so it survives this panel remounting) — greys ALL THREE speech submits once a speech act is
+ * queued for the beat, clearing only when the beat advances. The session queue itself refuses a
+ * second speech verb, so the render is the visible half of a real gate, not decoration. This is the
+ * sanctioned v1 gate (same shape as P7's UI-only access gate); no cross-verb physics guard is added.
  *
  * `SOMEONE` mirrors the sim's vague-source sentinel (src/sim/rumors/claim, value 'someone'); it can't
  * be imported across the panels fence, so it is restated here as the stable public token it is.
@@ -33,10 +37,13 @@ const PREDICATES = Object.keys(TERMS)
 type SpeechMode = 'tell' | 'ask' | 'sell';
 
 export function DayPlanner({
-  view, paused, clusterFamilies, net, coin, economy, onVerb,
+  view, paused, clusterFamilies, net, coin, economy, onVerb, speechLatched = false,
 }: {
   view: PlayerView; paused: boolean; clusterFamilies: string[];
   net: NetworkView; coin: number; economy: EconomyDef; onVerb(intent: ActionIntent): void;
+  /** A speech act (tell/ask/sell) is already queued for this beat — grey ALL speech submits until it
+   *  advances. Derived from the session queue at the composition root, so it survives a panel remount. */
+  speechLatched?: boolean;
 }) {
   const off = !paused; // pause-to-plan: every verb control is inert while the sim runs
   const [speech, setSpeech] = useState<SpeechMode>('tell');
@@ -71,9 +78,9 @@ export function DayPlanner({
             onClick={() => setSpeech(m)}>{TERMS[m === 'tell' ? 'verb-tell' : m === 'ask' ? 'verb-ask' : 'verb-sell']!.label}</button>
         ))}
       </div>
-      <TellComposer view={view} off={off} active={speech === 'tell'} onVerb={onVerb} people={people} venues={venues.map((v) => v.id)} />
-      <AskComposer members={view.avatar.circleMembers} people={people} families={clusterFamilies} off={off} active={speech === 'ask'} onVerb={onVerb} />
-      <SellComposer members={view.avatar.circleMembers} families={clusterFamilies} off={off} active={speech === 'sell'} onVerb={onVerb} />
+      <TellComposer view={view} off={off} active={speech === 'tell'} latched={speechLatched} onVerb={onVerb} people={people} venues={venues.map((v) => v.id)} />
+      <AskComposer members={view.avatar.circleMembers} people={people} families={clusterFamilies} off={off} active={speech === 'ask'} latched={speechLatched} onVerb={onVerb} />
+      <SellComposer members={view.avatar.circleMembers} families={clusterFamilies} off={off} active={speech === 'sell'} latched={speechLatched} onVerb={onVerb} />
 
       <RecruitComposer
         candidates={view.avatar.circleMembers.filter((id) => !roster.has(id))}
@@ -110,8 +117,8 @@ export function DayPlanner({
 // ── The three speech verbs (mutually exclusive per beat via `active`) ─────────────────────────────
 
 function TellComposer({
-  view, off, active, onVerb, people, venues,
-}: { view: PlayerView; off: boolean; active: boolean; onVerb(i: ActionIntent): void; people: string[]; venues: string[] }) {
+  view, off, active, latched, onVerb, people, venues,
+}: { view: PlayerView; off: boolean; active: boolean; latched: boolean; onVerb(i: ActionIntent): void; people: string[]; venues: string[] }) {
   const members = view.avatar.circleMembers;
   const [to, setTo] = useState('');
   const [s, setS] = useState({ subject: SOMEONE, predicate: PREDICATES[0]!.id, object: '', count: '', severity: '3', place: '', attribution: SOMEONE });
@@ -140,15 +147,15 @@ function TellComposer({
       <label><Term id="place" /> <select className="desk-btn" disabled={off} value={s.place} onChange={set('place')}><option value="">—</option>{venues.map((v) => <option key={v} value={v}>{v}</option>)}</select></label>
       <label><Term id="attribution" /> <select className="desk-btn" disabled={off} value={s.attribution} onChange={set('attribution')}>{withSomeone.map((p) => <option key={p} value={p}>{p}</option>)}</select></label>
       <label>to <select className="desk-btn" disabled={off} value={target} onChange={(e) => setTo(e.target.value)}>{members.map((m) => <option key={m} value={m}>{m}</option>)}</select></label>
-      <button className="desk-btn" aria-label="submit tell" disabled={off || !active} onClick={submit}>tell</button>
+      <button className="desk-btn" aria-label="submit tell" disabled={off || !active || latched} onClick={submit}>tell</button>
     </div>
   );
 }
 
 /** The brief's pinned pair — "ask composer (family from board clusters | subject)". */
 function AskComposer({
-  members, people, families, off, active, onVerb,
-}: { members: string[]; people: string[]; families: string[]; off: boolean; active: boolean; onVerb(i: ActionIntent): void }) {
+  members, people, families, off, active, latched, onVerb,
+}: { members: string[]; people: string[]; families: string[]; off: boolean; active: boolean; latched: boolean; onVerb(i: ActionIntent): void }) {
   const [mode, setMode] = useState<'family' | 'subject'>(families.length > 0 ? 'family' : 'subject');
   const [to, setTo] = useState('');
   const [subject, setSubject] = useState('');
@@ -168,7 +175,7 @@ function AskComposer({
       {useFamily
         ? <select className="desk-btn" disabled={off} value={fam} aria-label="which story" onChange={(e) => setFamily(e.target.value)}>{families.map((f) => <option key={f} value={f}>{f}</option>)}</select>
         : <select className="desk-btn" disabled={off} value={subj} aria-label="which person" onChange={(e) => setSubject(e.target.value)}>{people.map((p) => <option key={p} value={p}>{p}</option>)}</select>}
-      <button className="desk-btn" aria-label="submit ask" disabled={off || !active} onClick={() => onVerb({ kind: 'ask', to: target, about: useFamily ? { family: fam } : { subject: subj } })}>ask</button>
+      <button className="desk-btn" aria-label="submit ask" disabled={off || !active || latched} onClick={() => onVerb({ kind: 'ask', to: target, about: useFamily ? { family: fam } : { subject: subj } })}>ask</button>
     </div>
   );
 }
@@ -176,8 +183,8 @@ function AskComposer({
 /** Sell a story you HOLD (a board cluster family) to a circle-mate — the brokerage. Priced by the
  *  family's severity in the engine; the composer only needs the family + buyer (both player-known). */
 function SellComposer({
-  members, families, off, active, onVerb,
-}: { members: string[]; families: string[]; off: boolean; active: boolean; onVerb(i: ActionIntent): void }) {
+  members, families, off, active, latched, onVerb,
+}: { members: string[]; families: string[]; off: boolean; active: boolean; latched: boolean; onVerb(i: ActionIntent): void }) {
   const [to, setTo] = useState('');
   const [family, setFamily] = useState('');
   const target = to || members[0] || '';
@@ -193,7 +200,7 @@ function SellComposer({
             <>
               <label>sell <select className="desk-btn" disabled={off} value={fam} aria-label="which story to sell" onChange={(e) => setFamily(e.target.value)}>{families.map((f) => <option key={f} value={f}>{f}</option>)}</select></label>
               <label>to <select className="desk-btn" disabled={off} value={target} onChange={(e) => setTo(e.target.value)}>{members.map((m) => <option key={m} value={m}>{m}</option>)}</select></label>
-              <button className="desk-btn" aria-label="submit sell" disabled={off || !active} onClick={() => onVerb({ kind: 'sell', family: fam, buyer: target })}>sell</button>
+              <button className="desk-btn" aria-label="submit sell" disabled={off || !active || latched} onClick={() => onVerb({ kind: 'sell', family: fam, buyer: target })}>sell</button>
             </>
           )}
     </div>

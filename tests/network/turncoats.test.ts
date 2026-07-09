@@ -11,7 +11,7 @@ import { worldFromTown, attachPlayer } from '../../src/world/attach';
 import { runTurncoatPass } from '../../src/sim/network/turncoats';
 import { dispositionOf, findAsset, setDispositionEdge } from '../../src/sim/network/roster';
 import { recordFact } from '../../src/sim/network/compartment';
-import { captureIntel, playerView, networkView } from '../../src/sim/fieldwork';
+import { captureIntel, playerView, networkView, courierRouteView, blankIntel } from '../../src/sim/fieldwork';
 import { reportThrough } from '../../src/sim/reporting';
 import { runUntil } from '../../src/sim/step';
 import { STANCE } from '../../src/sim/rumors/propagation';
@@ -348,15 +348,34 @@ describe('the pass is wired into the nightly — AFTER wages, BEFORE vignettes',
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe('turncoats are invisible player-side — the flag is not the game', () => {
-  it('flipping `turned` on every asset changes NO playerView OR networkView output (structural invisibility)', () => {
+  it('flipping `turned` on every asset changes NO playerView, networkView, OR courierRouteView output (structural invisibility)', () => {
     for (const seed of ['inv-1', 'inv-2', 'inv-3']) {
       const { world } = stage(seed);
       world.tick = at(1, 8); // a live tick with circles populated
+
+      // M-2: seed a NON-VACUOUS courier route so the flip actually exercises courierRouteView's
+      // output. Its inputs are pendingCouriers / drops / informants / intel.log (via lastKnownVenue)
+      // — never `turned`; but an empty overlay would make the byte-identity check below prove
+      // nothing. A drop-handoff run sets out from the drop's venue; the target's `to` comes from a
+      // single intel row placing them — both PLAYER-KNOWN, same fence as the other two selectors.
+      const asset = world.network.assets[0]!.id;
+      const someVenue = Object.keys(world.venues)[0]!;
+      const targetNpc = Object.keys(world.npcs).find((id) => id !== world.playerId && id !== asset)!;
+      world.network.drops.push({ id: 'd-flip', venue: someVenue, knownBy: [] });
+      world.network.pendingCouriers.push({
+        asset, target: targetNpc, viaDrop: 'd-flip', queuedTick: world.tick,
+        spec: { subject: SOMEONE, predicate: 'stole', object: null, count: null, severity: 3, place: null, attribution: SOMEONE },
+      });
+      world.intel.log.push({ ...blankIntel(), tick: world.tick, venue: someVenue, via: 'self', kind: 'utterance', overheard: false, speaker: targetNpc });
+      expect(courierRouteView(world)).toHaveLength(1); // the route is real — the assertion below is not vacuous
+
       const before = stableStringify(playerView(world));
-      const beforeNet = stableStringify(networkView(world)); // T11: the roster surface is invisible too
+      const beforeNet = stableStringify(networkView(world));       // T11: the roster surface is invisible too
+      const beforeCourier = stableStringify(courierRouteView(world)); // M-2: …and the courier overlay too
       for (const a of [...world.network.assets, ...world.network.enemyAssets]) a.turned = true;
       expect(stableStringify(playerView(world))).toBe(before);
       expect(stableStringify(networkView(world))).toBe(beforeNet);
+      expect(stableStringify(courierRouteView(world))).toBe(beforeCourier);
     }
   });
 

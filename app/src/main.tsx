@@ -162,9 +162,12 @@ function App() {
   );
 
   const submitVerb = (intent: ActionIntent) => {
-    const { queuedFor } = session.submit(intent);
+    const { queuedFor, refused } = session.submit(intent);
     // The toast speaks registered language (jargon law): the verb's TERMS label, never a raw kind.
-    setToast(`${TERMS[VERB_TERM[intent.kind]]!.label} queued for ${fmtTick(queuedFor)} — unpause to fire`);
+    setToast(refused
+      // The one-speech-act-per-beat latch turned this away (note 9) — say so honestly, don't claim it queued.
+      ? `${TERMS[VERB_TERM[intent.kind]]!.label} refused — one speech act per beat (already queued for ${fmtTick(queuedFor)})`
+      : `${TERMS[VERB_TERM[intent.kind]]!.label} queued for ${fmtTick(queuedFor)} — unpause to fire`);
     force();
   };
   const addTag = (target: string, text: string) =>
@@ -194,6 +197,9 @@ function App() {
   const net = networkView(world);
   const courierRoutes = courierRouteView(world);
   const stipendDay = nextStipendDay(view.scenario?.day ?? dayOf(world.tick));
+  // One speech act per beat (note 9): true once a tell/ask/sell is queued for the current beat. Read
+  // from the session queue (not panel state) so the greying survives the planner tab remounting.
+  const speechLatched = session.speechQueuedForBeat(world.tick);
 
   return (
     <main style={{ fontFamily: 'var(--font-text)', maxWidth: 1200, margin: '0 auto', padding: 16 }}>
@@ -253,7 +259,8 @@ function App() {
           {panel === 'planner' && (
             <DayPlanner
               view={view} paused={speed === 0} clusterFamilies={clusterFamilies}
-              net={net} coin={world.coin} economy={STANDARD_RULES.economy} onVerb={submitVerb} />
+              net={net} coin={world.coin} economy={STANDARD_RULES.economy} onVerb={submitVerb}
+              speechLatched={speechLatched} />
           )}
           {panel === 'network' && <Network view={net} />}
           {panel === 'treasury' && <Treasury coin={world.coin} stipendDay={stipendDay} economy={STANDARD_RULES.economy} />}

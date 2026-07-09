@@ -76,27 +76,25 @@ describe('newSession — a running Coronation world with dossier intel', () => {
 
 // ── (b) THE load-bearing test: the browser game IS the replay ─────────────────────────────
 describe('submit + advance reproduces runLogOn exactly — live ≡ replay', () => {
-  it('a session that queues {goTo, tell, ask, tag} + advances 2 days hashes equal to a fresh loadSession', () => {
+  it('a session that queues {goTo, tag, tell} + advances 2 days hashes equal to a fresh loadSession', () => {
     const session = newSession(SEED);
     const usurper = session.world.scenario!.cast.usurper;
     const spot = findCoCircle(session.world, 1);
     const target = spot.npcs[0]!;
 
-    // Two tick-0 verbs (goTo, tag), then two beat-aligned speech verbs at the co-circle beat.
+    // Two tick-0 verbs (goTo, tag), then ONE beat-aligned speech verb at the co-circle beat. (This
+    // test used to queue a tell AND an ask in the SAME beat; note 9's one-speech-act-per-beat law
+    // now refuses the second at the session boundary — I-1 below. Mixed tell+ask replay across
+    // DISTINCT beats keeps its coverage in tests/sim/determinism.test.ts, tick 0 vs tick 15.)
     session.submit({ kind: 'goTo', venue: spot.venue });
     session.submit({ kind: 'tag', op: 'add', id: 'note-1', target: `npc:${target}`, text: 'watch this one' });
     advanceTo(session, spot.tick);
     const tell = session.submit({ kind: 'tell', to: target, spec: poison(usurper) });
-    const ask = session.submit({ kind: 'ask', to: target, about: { subject: usurper } });
     expect(tell.queuedFor).toBe(spot.tick);
-    expect(ask.queuedFor).toBe(spot.tick);
 
-    // Fire the beat: the tell speaks (a chronicle 'telling'), the ask places its self-inquiry. (The
-    // ask emits no 'asking' here — a fresh avatar trusts no one, so runAskPhase finds no eligible
-    // addressee; the verb still engaged, which is what replay must reproduce.)
+    // Fire the beat: the tell speaks (a chronicle 'telling').
     session.advance(spot.tick + 1 - session.world.tick);
     expect(session.world.chronicle.some((e) => e.kind === 'telling' && e.speaker === 'you')).toBe(true);
-    expect((session.world.inquiries['you'] ?? []).some((task) => task.from === 'self')).toBe(true);
 
     session.advance(at(2, 0) - session.world.tick); // finish out 2 sim-days
     // The window stays live (no terminal mid-batch) — the probe invariant this test rests on.
@@ -104,7 +102,7 @@ describe('submit + advance reproduces runLogOn exactly — live ≡ replay', () 
     expect(session.world.tick).toBe(at(2, 0));
 
     const save = session.save();
-    expect(save.log.map((a) => a.kind)).toEqual(['goTo', 'tag', 'tell', 'ask']);
+    expect(save.log.map((a) => a.kind)).toEqual(['goTo', 'tag', 'tell']);
 
     const replay = loadSession(save, at(2, 0));
     expect(hashWorld(replay.world)).toBe(hashWorld(session.world));
@@ -142,19 +140,110 @@ describe('submit beat-alignment + advance-time validation', () => {
     expect(session.save().log).toHaveLength(0); // failed action never enters the save
   });
 
-  it('a second tell queued for the same beat throws (one telling per beat) and is dropped', () => {
+});
+
+// ── (I-1) one speech act per beat — enforced at the SESSION QUEUE BOUNDARY (note 9) ────────────────
+// tell, ask, and sell are mutually exclusive within a conversation beat. The sim guards only
+// tell-vs-tell and sell-vs-sell (per-verb pending flags), never cross-verb — so a mode-toggle in the
+// composer let submit tell → toggle → submit sell queue BOTH for one beat (review I-1). The fix
+// latches the speech slot in the session's own queue: once a speech verb is queued for a beat, any
+// further speech verb for that beat is refused BEFORE it enters the queue (and thus before the sim
+// ever validates it). The latch clears only when the beat is stepped (the queued verb drains) —
+// never on pause/unpause or a composer remount, since the queue lives in the session, not the panel.
+describe('I-1 — the speech-act latch: at most one avatar speech verb per beat, refused at the queue', () => {
+  it('a second TELL for the same beat is refused at submit — the sim one-per-beat guard is never even reached', () => {
     const session = newSession(SEED);
     const usurper = session.world.scenario!.cast.usurper;
-    const spot = findCoCircle(session.world, 2); // need two co-circled targets
+    const spot = findCoCircle(session.world, 2); // two co-circled targets for two distinct tells
     const [n1, n2] = spot.npcs;
 
     session.submit({ kind: 'goTo', venue: spot.venue });
-    advanceTo(session, spot.tick);
-    session.submit({ kind: 'tell', to: n1!, spec: poison(usurper) });
-    session.submit({ kind: 'tell', to: n2!, spec: poison(usurper) });
+    advanceTo(session, spot.tick); // pause ON the beat — the composer's intended usage
+    const first = session.submit({ kind: 'tell', to: n1!, spec: poison(usurper) });
+    const second = session.submit({ kind: 'tell', to: n2!, spec: poison(usurper) });
+    expect(first.refused).toBeFalsy();
+    expect(first.queuedFor).toBe(spot.tick);
+    expect(second.refused).toBe(true); // the second never entered the queue
 
-    expect(() => session.advance(CONVERSATION_BEAT + 1)).toThrow(/one telling per beat/);
-    expect(session.save().log.filter((a) => a.kind === 'tell')).toHaveLength(1); // only the first survives
+    // Advancing the beat therefore fires EXACTLY ONE telling and never throws — the sim's own
+    // 'one telling per beat' guard stays as defense-in-depth for hand-built log replays, unreached.
+    expect(() => session.advance(CONVERSATION_BEAT + 1)).not.toThrow();
+    expect(session.world.chronicle.filter((e) => e.kind === 'telling' && e.speaker === 'you')).toHaveLength(1);
+    expect(session.save().log.filter((a) => a.kind === 'tell')).toHaveLength(1);
+  });
+
+  it('the exact defeat: submit tell → (toggle) → submit SELL for the same beat — the sell is refused, never reaching the sim', () => {
+    const session = newSession(SEED);
+    const usurper = session.world.scenario!.cast.usurper;
+    const spot = findCoCircle(session.world, 1);
+    const target = spot.npcs[0]!;
+
+    session.submit({ kind: 'goTo', venue: spot.venue });
+    advanceTo(session, spot.tick);
+    session.submit({ kind: 'tell', to: target, spec: poison(usurper) });
+    // The toggle-then-resubmit that defeated the mode-toggle gate on 1e59034: a DIFFERENT speech verb
+    // for the SAME beat. It is refused at the queue boundary BEFORE any sim validation — the family
+    // need not even be held; the point is that the second speech act never queues.
+    const sell = session.submit({ kind: 'sell', family: 'f-unheld', buyer: target });
+    expect(sell.refused).toBe(true);
+
+    // Because the sell never queued, advancing cannot surface a sell-side throw and fires exactly one
+    // avatar speech act — the tell. (On 1e59034 the sell queued and reached applySell → a throw.)
+    expect(() => session.advance(CONVERSATION_BEAT + 1)).not.toThrow();
+    expect(session.world.chronicle.filter((e) => e.kind === 'telling' && e.speaker === 'you')).toHaveLength(1);
+    expect(session.save().log.filter((a) => a.kind === 'sell')).toHaveLength(0);
+  });
+
+  it('ASK is a speech act too (note 9): tell then a same-beat ask — the ask is refused, so no self-inquiry is placed', () => {
+    const session = newSession(SEED);
+    const usurper = session.world.scenario!.cast.usurper;
+    const spot = findCoCircle(session.world, 1);
+    const target = spot.npcs[0]!;
+
+    session.submit({ kind: 'goTo', venue: spot.venue });
+    advanceTo(session, spot.tick);
+    session.submit({ kind: 'tell', to: target, spec: poison(usurper) });
+    const ask = session.submit({ kind: 'ask', to: target, about: { subject: usurper } });
+    expect(ask.refused).toBe(true);
+
+    session.advance(spot.tick + 1 - session.world.tick);
+    // The tell fired; the ask never placed its 'self' inquiry. On 1e59034 BOTH applied — the sim
+    // guards tell-vs-tell and sell-vs-sell but NEVER tell-vs-ask, so nothing stopped the second act.
+    expect(session.world.chronicle.some((e) => e.kind === 'telling' && e.speaker === 'you')).toBe(true);
+    expect((session.world.inquiries['you'] ?? []).some((t) => t.from === 'self')).toBe(false);
+  });
+
+  it('a NON-speech verb is never latched — recruit/goTo/tag queue freely alongside a queued speech act', () => {
+    const session = newSession(SEED);
+    const usurper = session.world.scenario!.cast.usurper;
+    const spot = findCoCircle(session.world, 1);
+    const target = spot.npcs[0]!;
+
+    session.submit({ kind: 'goTo', venue: spot.venue });
+    advanceTo(session, spot.tick);
+    session.submit({ kind: 'tell', to: target, spec: poison(usurper) });
+    // Only the three SPEECH verbs share the per-beat slot; a tag (bookkeeping) is untouched by it.
+    const tag = session.submit({ kind: 'tag', op: 'add', id: 'note-x', target: `npc:${target}`, text: 'still watching' });
+    expect(tag.refused).toBeFalsy();
+  });
+
+  it('the latch clears on beat ADVANCE (not on remount/pause): a speech act queues again in the NEXT beat', () => {
+    const session = newSession(SEED);
+    const usurper = session.world.scenario!.cast.usurper;
+    const spot = findCoCircle(session.world, 1);
+    const target = spot.npcs[0]!;
+
+    session.submit({ kind: 'goTo', venue: spot.venue });
+    advanceTo(session, spot.tick);
+    session.submit({ kind: 'tell', to: target, spec: poison(usurper) });
+    expect(session.speechQueuedForBeat(session.world.tick)).toBe(true); // slot taken for this beat
+
+    session.advance(CONVERSATION_BEAT); // step a whole beat forward — the queued tell drains
+    expect(session.speechQueuedForBeat(session.world.tick)).toBe(false); // slot free again
+
+    // A fresh speech verb for the NEW beat is accepted (the latch was beat-scoped, not permanent).
+    const again = session.submit({ kind: 'ask', to: target, about: { subject: usurper } });
+    expect(again.refused).toBeFalsy();
   });
 });
 

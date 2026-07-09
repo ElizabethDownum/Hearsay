@@ -124,6 +124,19 @@ describe('DayPlanner — one avatar speech verb per beat', () => {
     expect(page).toContain('aria-label="submit ask" disabled');
     expect(page).toContain('aria-label="submit sell" disabled');
   });
+
+  it('I-1: once the beat holds a queued speech act (speechLatched), ALL THREE submits grey — even the active tell', () => {
+    // The composition root derives speechLatched from the SESSION queue (survives a panel remount),
+    // so the toggle-then-resubmit defeat is closed at the render layer too: toggling to sell can no
+    // longer re-open a submit, because the latch greys every speech submit regardless of the mode.
+    const page = html(createElement(DayPlanner, {
+      view: plannerView, paused: true, clusterFamilies: ['f6'], net: EMPTY_NET, coin: 20, economy: ECON, onVerb: noop,
+      speechLatched: true,
+    }));
+    expect(page).toContain('aria-label="submit tell" disabled'); // the active mode is greyed too
+    expect(page).toContain('aria-label="submit ask" disabled');
+    expect(page).toContain('aria-label="submit sell" disabled');
+  });
 });
 
 // ── Task 11: recruit/host greying on player-known seams; costs render through <Term> ──────────────
