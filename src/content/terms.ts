@@ -64,6 +64,7 @@ export const TERMS: Record<string, TermDef> = {
   'verb-meet':       { id: 'verb-meet', label: 'Meet', short: 'Pull one asset to your safehouse for the next beat — a private circle to tell, ask, or debrief.', entry: null },
   'verb-host':       { id: 'verb-host', label: 'Host', short: 'Throw a salon or back-room evening: you pick the guest circle. Priced; the guest list is on the record.', entry: null },
   'verb-debrief':    { id: 'verb-debrief', label: 'Debrief', short: 'Compel an asset at the safehouse to answer, bypassing their discretion. Costs their trust and a strike.', entry: null },
+  'verb-sell':       { id: 'verb-sell', label: 'Sell', short: 'Sell a story to a circle-mate for coin. Priced by its severity — and selling it leaks it, same as telling.', entry: null },
   // ── the hunt ──
   'sketch':          { id: 'sketch', label: 'Ghost sketch', short: 'The enemy investigates a ghost — every traced operation adds a feature to it.', entry: null },
   'sketch-feature':  { id: 'sketch-feature', label: 'Feature', short: 'One deduced trait of the ghost: a district, an entry point, a carrier profile.', entry: null },

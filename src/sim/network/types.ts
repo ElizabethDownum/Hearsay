@@ -1,5 +1,5 @@
 import type { Tick } from '../../core/time';
-import type { EntityId, VenueId } from '../rumors/claim';
+import type { EntityId, RumorId, VenueId } from '../rumors/claim';
 import type { InjectSpec } from '../actions';
 
 /** The four recruitment handles (spec's MICE). `null` marks a dossier freebie (a legacy loyalist). */
@@ -81,9 +81,11 @@ export interface NetworkState {
   spymaster: EntityId | null;
   /** Pending courier runs (Task 5), consumed at the delivery beat and expired at 3 days. */
   pendingCouriers: CourierTasking[];
+  /** Plan 8 Task 10 — the brokerage's dedupe key: one sale per (family, buyer) pair, ever. */
+  sales: { family: RumorId; buyer: EntityId }[];
 }
 
 /** A fresh, empty network compartment — the neutral world-init value (buildWorld seeds this). */
 export function emptyNetworkState(): NetworkState {
-  return { assets: [], drops: [], enemyAssets: [], spymaster: null, pendingCouriers: [] };
+  return { assets: [], drops: [], enemyAssets: [], spymaster: null, pendingCouriers: [], sales: [] };
 }

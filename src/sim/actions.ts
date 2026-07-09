@@ -5,7 +5,7 @@ import { CONVERSATION_BEAT, STANCE } from './rumors/propagation';
 import { mintClaim, SOMEONE, type Claim, type EntityId, type RumorId, type VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
 import type { Rules } from './rules';
-import type { Belief, ScheduleOverride, Venue, WorldState } from './types';
+import type { Belief, IntelEntry, ScheduleOverride, Venue, WorldState } from './types';
 import type { Mice } from './network/types';
 import { canAfford, debitCoin, dispositionOf, findAsset, setDispositionEdge, slideDisposition } from './network/roster';
 import { recordFact } from './network/compartment';
@@ -55,6 +55,60 @@ export function applyTell(world: WorldState, to: EntityId, spec: InjectSpec, tic
     throw new Error(`tell: '${to}' is not in the avatar's circle this beat`);
   }
   world.pendingTell = { to, spec };
+}
+
+/**
+ * Read severity from the family's BEST intel version the player holds: the highest-severity
+ * `reported` entry in the player's OWN intel log for that family (never world truth — the same
+ * epistemic stance coercion leverage takes, controller note 4). Ties break to the EARLIEST tick
+ * (the first-known version) — a deterministic, zero-entropy pick. Null when the player holds no
+ * intel entry for the family (an asking/presence/trait-read/... row never carries `reported`, so
+ * this naturally excludes everything but utterance-kind rows).
+ */
+function bestIntelVersion(world: WorldState, family: RumorId): IntelEntry | null {
+  let best: IntelEntry | null = null;
+  for (const e of world.intel.log) {
+    if (e.family !== family || e.reported === null) continue;
+    if (best === null || e.reported.severity > best.reported!.severity ||
+      (e.reported.severity === best.reported!.severity && e.tick < best.tick)) {
+      best = e;
+    }
+  }
+  return best;
+}
+
+/**
+ * The brokerage (Plan 8 Task 10): sell a family you hold intel on to a buyer in your circle THIS
+ * beat. Price = severity x `brokerSaleBase`, read from the family's BEST intel version (see
+ * `bestIntelVersion` — the player's KNOWLEDGE prices the sale, not world truth). VALIDATE-BEFORE-
+ * MUTATE: every precondition throws before any state change; one sale per (family, buyer) pair
+ * ever (`world.network.sales`, the dedupe key).
+ *
+ * Effects are DEFERRED to the same tick's step() — the applyTell idiom: the sale's conversation
+ * becomes an ordinary Utterance (speaker = avatar, mode 'telling'), so it rides the SAME capture /
+ * caught-in-the-act physics as any other telling (selling info leaks it: your telling is
+ * capturable like any tell). The claim is NOT re-minted — the buyer's belief store takes the
+ * EXISTING claim behind the best intel version directly (applyInject's belief-entry idiom,
+ * `apparentSources: [avatar]` so they now retell it by ordinary tellability), because it is the
+ * SAME family entering their mind, never a fresh one.
+ */
+export function applySell(world: WorldState, buyer: EntityId, family: RumorId, tick: Tick, rules: Rules): void {
+  if (world.playerId === null) throw new Error('sell: no player is enrolled');
+  if (world.playerVenue === null) throw new Error('sell: the avatar is nowhere');
+  if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) throw new Error('sell: speech happens on conversation beats');
+  if (!world.npcs[buyer]) throw new Error(`sell: unknown npc '${buyer}'`);
+  if (world.pendingSell) throw new Error('sell: one sale per beat');
+  const circle = circlesAt(world, tick).find((c) => c.members.includes(world.playerId!));
+  if (!circle || !circle.members.includes(buyer)) {
+    throw new Error(`sell: '${buyer}' is not in the avatar's circle this beat`);
+  }
+  const best = bestIntelVersion(world, family);
+  if (!best) throw new Error(`sell: you hold no intel on family '${family}' — you can't sell what you don't hold`);
+  if (world.network.sales.some((s) => s.family === family && s.buyer === buyer)) {
+    throw new Error(`sell: '${family}' has already been sold to '${buyer}'`);
+  }
+  const price = best.reported!.severity * rules.economy.brokerSaleBase;
+  world.pendingSell = { buyer, family, price, claimId: best.claimId! };
 }
 
 /** The avatar asks a circle-mate about a family/subject. Enqueues a 'self' inquiry task — the one

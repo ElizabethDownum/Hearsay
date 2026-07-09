@@ -41,6 +41,30 @@ export function step(world: WorldState, rules: Rules): TickEvents {
       }
       world.pendingTell = null;
     }
+    // The brokerage (Task 10): a sale is ALSO the player's word this beat, consumed the SAME way
+    // (validated at apply-time; the circle re-found here, tell's own laxity mirrored — see
+    // applyTell's comment). The claim is NEVER re-minted (the existing claim behind the best
+    // intel version, already resolved at apply-time); effects (coin, dedupe, the buyer's belief)
+    // land ATOMICALLY with the utterance — either the whole sale happens, or (circle vanished
+    // since apply-time) none of it does, exactly like tell.
+    if (world.pendingSell && world.playerId !== null) {
+      const pc = circlesAt(world, t).find((c) => c.members.includes(world.playerId!));
+      if (pc) {
+        const { buyer, family, price, claimId } = world.pendingSell;
+        const claim = world.claims[claimId]!;
+        world.coin += price;
+        world.network.sales.push({ family, buyer });
+        world.beliefs[buyer]![family] = {
+          claim, credence: 0.85, heardFrom: world.playerId, heardAt: t, firstHeardAt: t,
+          timesHeard: 1, apparentSources: [world.playerId], discretion: false, counterSpun: false,
+        };
+        utterances.push({
+          tick: t, venue: world.playerVenue!, circleMembers: pc.members,
+          speaker: world.playerId, addressedTo: buyer, claim, mode: 'telling',
+        });
+      }
+      world.pendingSell = null;
+    }
     for (const circle of circlesAt(world, t)) {
       if (circle.members.length < 2) continue;
       const phase = runAskPhase(world, circle, t, rules);

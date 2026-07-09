@@ -73,7 +73,10 @@ describe('attach migration — the two dossier freebies become roster AssetRecor
 
   it('a fresh world starts with an empty network roster (init)', () => {
     const world = buildWorld(TESTFORD, 'net-empty');
-    expect(world.network).toEqual({ assets: [], drops: [], enemyAssets: [], spymaster: null, pendingCouriers: [] });
+    // Task 10 adds `sales` (the brokerage's dedupe key) — a fresh network state names it too.
+    expect(world.network).toEqual({
+      assets: [], drops: [], enemyAssets: [], spymaster: null, pendingCouriers: [], sales: [],
+    });
   });
 });
 

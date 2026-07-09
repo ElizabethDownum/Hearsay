@@ -1,6 +1,6 @@
 import type { Tick } from '../core/time';
 import type { InjectSpec } from './actions';
-import type { Claim, EntityId, RumorId, VenueId } from './rumors/claim';
+import type { Claim, ClaimId, EntityId, RumorId, VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
 import type { EnemyState } from './enemy/state';
 import type { InquiryKey } from './perception';
@@ -159,6 +159,12 @@ export interface WorldState {
    * step consumes it — the apply-then-step order makes the handoff replay-exact). Null otherwise.
    */
   pendingTell: { to: EntityId; spec: InjectSpec } | null;
+  /**
+   * A sale the avatar logged this beat, awaiting the same tick's step (applySell validates +
+   * prices; step consumes it — the pendingTell handoff idiom, so the sale becomes an ordinary
+   * Utterance and is capturable exactly like any telling). Null otherwise.
+   */
+  pendingSell: { buyer: EntityId; family: RumorId; price: number; claimId: ClaimId } | null;
   /** The player's private knowledge substrate (informants, captured feed, board notes). */
   intel: IntelState;
   /**

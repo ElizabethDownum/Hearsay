@@ -68,4 +68,5 @@ export const VERB_TERM: Record<Action['kind'], string> = {
   meet: 'verb-meet',
   host: 'verb-host',
   debrief: 'verb-debrief',
+  sell: 'verb-sell',
 };

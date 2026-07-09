@@ -55,6 +55,7 @@ export function buildWorld(fixture: TownFixture, seed: string, rules?: Rules): W
     playerId: null,
     playerVenue: null,
     pendingTell: null,
+    pendingSell: null,
     intel: { informants: [], log: [], cards: [], codex: [], tags: [] },
     network: emptyNetworkState(),
     scenario: null,

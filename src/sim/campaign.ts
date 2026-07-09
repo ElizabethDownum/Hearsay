@@ -1,7 +1,7 @@
 import type { Tick } from '../core/time';
 import {
   applyAsk, applyAssignInformant, applyCard, applyCodex, applyCourier, applyDebrief, applyGoTo, applyHost,
-  applyInject, applyMeet, applyRecruit, applySetDrop, applyTag, applyTell,
+  applyInject, applyMeet, applyRecruit, applySell, applySetDrop, applyTag, applyTell,
   type InjectSpec,
 } from './actions';
 import type { InquiryKey } from './perception';
@@ -127,10 +127,21 @@ export interface DebriefAction {
   asset: EntityId;
 }
 
+export interface SellAction {
+  tick: Tick;
+  kind: 'sell';
+  /** The family you hold intel on — price and the buyer's belief-entry both read your OWN
+   *  intel log's best (highest-severity) version, never world truth. */
+  family: RumorId;
+  /** Must be in the avatar's circle THIS beat — the UI offers circle-mates only (the tell shape). */
+  buyer: EntityId;
+}
+
 /** The player's recorded verbs — the entire save-relevant intent surface. */
 export type Action =
   | InjectAction | GoToAction | TellAction | AskAction | AssignInformantAction | CodexAction | CardAction
-  | TagAction | RecruitAction | SetDropAction | CourierAction | MeetAction | HostAction | DebriefAction;
+  | TagAction | RecruitAction | SetDropAction | CourierAction | MeetAction | HostAction | DebriefAction
+  | SellAction;
 export type ActionLog = Action[];
 
 /** A complete campaign: the world regrows from these two values alone. */
@@ -199,6 +210,10 @@ export function applyAction(world: WorldState, action: Action, rules?: Rules): v
       // and the intel entry rides reportThrough's trait chain, so rules is required all the same.
       if (!rules) throw new Error('applyAction: debrief requires rules (predicate valence + reportThrough traits)');
       applyDebrief(world, action.asset, action.tick, rules);
+      break;
+    case 'sell':
+      if (!rules) throw new Error('applyAction: sell requires rules (economy prices)');
+      applySell(world, action.buyer, action.family, action.tick, rules);
       break;
     default: {
       // Saves are untrusted JSON — an unknown kind must fail loudly, never silently no-op.

@@ -14,13 +14,42 @@ type EvidenceRef = SketchFeature['evidence'][number];
 const byId = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /**
+ * Plan 8 Task 10 — exposure escalation tiers (P6 deferral #2). How hard the PLAYER'S OWN
+ * exposure score pushes the enemy's nightly countermeasure caps. `runEnemyDay` (world-side;
+ * `exposureStatus` is adjudicator-only, but runEnemyDay reads it the same way the referee
+ * does — the no-omniscience law's "same class as the referee" carve-out) computes a single
+ * integer `pressure` from `exposureStatus(world).score` against these bands and hands it to
+ * the digest as a plain argument — the ONLY channel through which your own exposure can ever
+ * reach the digest's cap logic (the caps are digest-INTERNAL: heuristics 7/8 below). Both the
+ * score bands and the cap tables live HERE, in one place — a retune surface (T11 enriches);
+ * term-registered as a minimal `pressure` term for now.
+ *
+ * Tiers STACK (escalation, not a single-band switch): pressure 2 keeps pressure 1's watch
+ * relief AND adds the interrogation relief. Pressure never edits WHICH candidates qualify —
+ * only how many of the SAME lexicographically-sorted pool the digest is allowed to act on.
+ */
+export const PRESSURE_TIERS = { tier1: 3, tier2: 5 } as const; // score 0-2 -> 0; 3-4 -> 1; >=5 -> 2
+export const WATCH_CAP: Record<0 | 1 | 2, number> = { 0: 1, 1: 2, 2: 2 };
+export const INTERROGATION_CAP: Record<0 | 1 | 2, number> = { 0: 1, 1: 1, 2: 2 };
+
+/** Exposure score -> pressure tier. The plan's exact bands: 0-2 -> 0; 3-4 -> 1; >=5 -> 2. */
+export function pressureFor(score: number): 0 | 1 | 2 {
+  if (score >= PRESSURE_TIERS.tier2) return 2;
+  if (score >= PRESSURE_TIERS.tier1) return 1;
+  return 0;
+}
+
+/**
  * The enemy's mind: a pure fold from the evidence log to a decision. Zero entropy,
  * zero world access, zero mutation. Attribution corruption by answerer traits is
  * CHASED, not seen through — the enemy trusts testimony the way testimony deserves.
  *
  * The nine digest heuristics appear below as named sections, in the spec's order.
+ * `pressure` defaults to 0 (the pre-Task-10 shape) so every existing call site — the
+ * no-omniscience pillar test included — stays byte-identical without touching a single
+ * call.
  */
-export function enemyDigest(state: EnemyState, day: number, rules: Rules): EnemyDecision {
+export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressure: 0 | 1 | 2 = 0): EnemyDecision {
   // Street knowledge only — venue→district and person directory (never beliefs/traits/edges).
   const districtOf = new Map(state.map.venues.map((v) => [v.id, v.district] as const));
   const personOf = new Map(state.map.directory.map((p) => [p.id, p] as const));
@@ -153,7 +182,7 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules): Enemy
     }
   }
 
-  // ── Heuristic 7: Interrogations (<= 1 per digest — v1 pacing) ───────────────
+  // ── Heuristic 7: Interrogations (cap 1, or 2 at pressure tier 2 — Task 10) ──
   // A suspicious family's `answer` names a source A (an EntityId, not the answerer),
   // A un-interrogated (key `${A}:f:${family}`), no origin-vague for that family yet.
   // Ties broken lexicographically by target id.
@@ -168,20 +197,28 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules): Enemy
     candidates.push({ target: a, family: e.family });
   }
   candidates.sort((x, y) => byId(x.target, y.target) || byId(x.family, y.family));
-  if (candidates.length > 0 && firstObserver !== null) {
-    const { target, family } = candidates[0]!;
-    const guardDistrict = personOf.get(firstObserver)?.district ?? null;
+  if (candidates.length > 0 && observerIds.length > 0) {
     const invitational = state.map.venues.filter((v) => v.access === 'invitational').map((v) => v.id).sort(byId);
-    const inDistrict = state.map.venues
-      .filter((v) => v.access === 'invitational' && v.district === guardDistrict)
-      .map((v) => v.id).sort(byId);
-    const venue = inDistrict[0] ?? invitational[0] ?? null;
-    if (venue !== null) {
-      interrogations.push({ target, guard: firstObserver, day: day + 1, about: { family }, venue });
-    }
+    // Pressure 2 lifts the cap 1 -> 2, taking the NEXT candidate off the SAME sorted pool —
+    // never a new selection rule, just more of the same one. Each extra slot rotates to the
+    // NEXT observer (round-robin by id, wrapping when guards are scarce) so two interrogations
+    // never collapse into one 3-way circle at a single guard/venue — a guard interrogates one
+    // target at a time, and each guard's own district still picks the venue (falling back to
+    // whatever invitational venue exists at all).
+    candidates.slice(0, INTERROGATION_CAP[pressure]).forEach(({ target, family }, i) => {
+      const guard = observerIds[i % observerIds.length]!;
+      const guardDistrict = personOf.get(guard)?.district ?? null;
+      const inDistrict = state.map.venues
+        .filter((v) => v.access === 'invitational' && v.district === guardDistrict)
+        .map((v) => v.id).sort(byId);
+      const venue = inDistrict[0] ?? invitational[0] ?? null;
+      if (venue !== null) {
+        interrogations.push({ target, guard, day: day + 1, about: { family }, venue });
+      }
+    });
   }
 
-  // ── Heuristic 8: Watches (<= 1 per digest) ─────────────────────────────────
+  // ── Heuristic 8: Watches (cap 1, or 2 at pressure tier >= 1 — Task 10) ─────
   // A district with >= 2 sketch features (district non-null) while >= 1 origin-vague
   // exists anywhere, not already watched → post 2 observers round-robin over the
   // district's PUBLIC venues (prefer observers whose directory district matches).
@@ -199,13 +236,21 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules): Enemy
       .filter(([d, n]) => n >= 2 && !state.watchedDistricts.includes(d) && publicVenuesOf(d).length > 0)
       .map(([d]) => d)
       .sort(byId);
-    const district = watchable[0];
-    if (district !== undefined) {
+    // Pressure >= 1 lifts the cap 1 -> 2, taking the NEXT watchable district off the SAME
+    // sorted pool. `usedGuards` prevents the second watch from double-booking a guard the
+    // first watch already posted (a guard can only stand in one place at once) WHEN enough
+    // guards exist to avoid it; with too few guards, reuse is the honest degenerate case (a
+    // weaker, shorter posts array) rather than a silent scheduling collision.
+    const usedGuards = new Set<EntityId>();
+    for (const district of watchable.slice(0, WATCH_CAP[pressure])) {
       const venues = publicVenuesOf(district);
-      const matched = observerIds.filter((o) => personOf.get(o)?.district === district);
-      const rest = observerIds.filter((o) => personOf.get(o)?.district !== district);
+      const available = observerIds.filter((o) => !usedGuards.has(o));
+      const pool = available.length > 0 ? available : observerIds;
+      const matched = pool.filter((o) => personOf.get(o)?.district === district);
+      const rest = pool.filter((o) => personOf.get(o)?.district !== district);
       const posts = [...matched, ...rest].slice(0, 2)
         .map((guard, i) => ({ guard, venue: venues[i % venues.length]! }));
+      for (const p of posts) usedGuards.add(p.guard);
       watches.push({ district, posts, startDay: day + 1 });
     }
   }

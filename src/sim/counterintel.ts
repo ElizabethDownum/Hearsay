@@ -2,7 +2,8 @@ import { dayOf } from '../core/time';
 import { observationsFor, type TickEvents } from './perception';
 import { juiciness, STANCE } from './rumors/propagation';
 import { reportThrough } from './reporting';
-import { enemyDigest } from './enemy/digest';
+import { enemyDigest, pressureFor } from './enemy/digest';
+import { exposureStatus } from './scenario/exposure';
 import type { Rules } from './rules';
 import type { EnemyDecision } from './enemy/state';
 import type { WorldState } from './types';
@@ -121,10 +122,20 @@ function spendCountermeasureBudget(world: WorldState, decision: EnemyDecision, r
   }
 }
 
-/** The nightly beat: digest what the network sampled today, spend the spymaster's budget, act on it. */
+/**
+ * The nightly beat: digest what the network sampled today, spend the spymaster's budget, act on
+ * it. `pressure` (Plan 8 Task 10, exposure escalation tiers) is computed HERE — the world-side
+ * seam — from `exposureStatus(world).score` (adjudicator-only, but runEnemyDay is world-side and
+ * reads it the same lawful way the referee does) and threaded into the digest as a plain integer.
+ * The digest signature stays a pure fold: it never sees `world`, only the single number this
+ * function hands it, so the no-omniscience pillar holds UNCHANGED. Computed AFTER the observers-
+ * empty guard, so an enemy-off world never even touches exposureStatus (the enemy-off pins never
+ * move — Task 10 changes nothing about a headless/guardless roster).
+ */
 export function runEnemyDay(world: WorldState, rules: Rules): void {
   if (world.enemy.observers.length === 0) return;
-  const decision = enemyDigest(world.enemy, dayOf(world.tick), rules);
+  const pressure = pressureFor(exposureStatus(world).score);
+  const decision = enemyDigest(world.enemy, dayOf(world.tick), rules, pressure);
   spendCountermeasureBudget(world, decision, rules);
   applyEnemyDecision(world, decision);
 }
