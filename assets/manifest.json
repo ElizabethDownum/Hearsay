@@ -10,6 +10,13 @@
     "portrait.npc.pool": null,
 
     "icon.ui.rumor": null,
+    "icon.ui.coin": null,
+    "icon.ui.courier": null,
+    "icon.ui.dead-drop": null,
+    "icon.ui.salon": null,
+    "icon.ui.walk-in": null,
+
+    "map.token.courier": null,
 
     "icon.venue.tavern": null,
     "icon.venue.market": null,

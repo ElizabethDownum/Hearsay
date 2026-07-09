@@ -4,6 +4,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { WebViewPanel } from '../../app/src/panels/WebViewPanel';
 import { Codex, type CodexDetailRow } from '../../app/src/panels/Codex';
 import { DayPlanner } from '../../app/src/panels/DayPlanner';
+import { Network } from '../../app/src/panels/Network';
+import { Treasury } from '../../app/src/panels/Treasury';
 import { VERB_TERM } from '../../app/src/input/actions';
 import { newSession } from '../../app/src/loop/session';
 import { TERMS } from '../../src/content/terms';
@@ -16,8 +18,11 @@ import { canEnter } from '../../src/sim/actions';
 import { SOMEONE, type EntityId } from '../../src/sim/rumors/claim';
 import type { InjectSpec } from '../../src/sim/actions';
 import type { IntelEntry } from '../../src/intel/types';
-import type { PlayerView } from '../../src/sim/fieldwork';
+import type { PlayerView, NetworkView } from '../../src/sim/fieldwork';
 import type { WorldState } from '../../src/sim/types';
+
+const ECON = STANDARD_RULES.economy;
+const EMPTY_NET: NetworkView = { assets: [], drops: [] };
 
 // Static server-render (react-dom/server, no DOM, no browser) — the honest way to pin what a
 // props-only panel puts on the page, per the no-UI-automation guardrail.
@@ -81,24 +86,111 @@ const plannerView: PlayerView = {
     venues: [{ id: 'v1', district: 'd0', access: 'public' }],
     directory: [{ id: 'ada', occupation: 'weaver', district: 'd0' }],
   },
+  station: 'noble',
   scenario: null,
 };
 
 describe('DayPlanner — family-based asking from board clusters', () => {
   it('with cluster families, the ask composer offers family mode (registered label) and the family ids', () => {
     const page = html(createElement(DayPlanner, {
-      view: plannerView, paused: true, clusterFamilies: ['f6', 'f9'], onVerb: noop,
+      view: plannerView, paused: true, clusterFamilies: ['f6', 'f9'], net: EMPTY_NET, coin: 20, economy: ECON, onVerb: noop,
     }));
-    expect(page).toContain(`>${TERMS['family']!.label}<`); // the mode option speaks registered language
+    // The ask "about" select offers a family <option> whose text is the registered label.
+    expect(page).toContain('<option value="family"');
+    expect(page).toContain(`>${TERMS['family']!.label}<`); // the option text speaks registered language
     expect(page).toContain('>f6<');
     expect(page).toContain('>f9<');
   });
 
   it('with no clusters yet, only subject mode is offered', () => {
     const page = html(createElement(DayPlanner, {
-      view: plannerView, paused: true, clusterFamilies: [], onVerb: noop,
+      view: plannerView, paused: true, clusterFamilies: [], net: EMPTY_NET, coin: 20, economy: ECON, onVerb: noop,
     }));
-    expect(page).not.toContain(`>${TERMS['family']!.label}<`);
+    // Precise marker (the sell composer legitimately mentions <Term id="family"> elsewhere): the ask
+    // composer offers NO family <option> when the board holds no clusters.
+    expect(page).not.toContain('<option value="family"');
+  });
+});
+
+// ── Task 11: one speech-act per beat (T10 review carry, note 9) — tell/ask/sell mutually exclusive ──
+
+describe('DayPlanner — one avatar speech verb per beat', () => {
+  it('in the default (tell) mode, only the tell submit is live; ask and sell submits are greyed', () => {
+    const page = html(createElement(DayPlanner, {
+      view: plannerView, paused: true, clusterFamilies: ['f6'], net: EMPTY_NET, coin: 20, economy: ECON, onVerb: noop,
+    }));
+    // tell is the active mode → its submit is enabled; the other two speech submits carry `disabled`.
+    expect(page).not.toContain('aria-label="submit tell" disabled');
+    expect(page).toContain('aria-label="submit ask" disabled');
+    expect(page).toContain('aria-label="submit sell" disabled');
+  });
+});
+
+// ── Task 11: recruit/host greying on player-known seams; costs render through <Term> ──────────────
+
+describe('DayPlanner — network verb composers gate on player-known seams', () => {
+  it('recruit greys when the treasury cannot cover the handle cost (term-registered reason)', () => {
+    const page = html(createElement(DayPlanner, {
+      view: plannerView, paused: true, clusterFamilies: [], net: EMPTY_NET, coin: 0, economy: ECON, onVerb: noop,
+    }));
+    // ada is an in-circle non-asset → a recruit candidate; coin 0 < any handle cost → greyed.
+    expect(page).toContain('aria-label="submit recruit" disabled');
+    expect(page).toContain(`>${TERMS['treasury']!.label}<`); // the reason names the treasury via <Term>
+  });
+
+  it('recruit is live once the treasury can cover the money handle', () => {
+    const page = html(createElement(DayPlanner, {
+      view: plannerView, paused: true, clusterFamilies: [], net: EMPTY_NET, coin: 50, economy: ECON, onVerb: noop,
+    }));
+    expect(page).not.toContain('aria-label="submit recruit" disabled');
+  });
+});
+
+// ── Task 11: the Network roster panel — verdigris bars from bookkeeping, no trust number ─────────
+
+describe('Network — the roster surface renders player-known bookkeeping only', () => {
+  const netView: NetworkView = {
+    assets: [
+      { id: 'gale', mice: 'money', strikes: 2, wagePaidThroughDay: 3, assignedVenue: 'tavern-0', factsCount: 4, dispositionBar: 0.6 },
+      { id: 'mira', mice: null, strikes: 0, wagePaidThroughDay: 6, assignedVenue: null, factsCount: 1, dispositionBar: 1 },
+    ],
+    drops: [{ id: 'drop-a', venue: 'square-0' }],
+  };
+
+  it('shows each asset id, its MICE handle label, the strike-derived bar, and the facts COUNT', () => {
+    const page = html(createElement(Network, { view: netView }));
+    expect(page).toContain('gale');
+    expect(page).toContain(`>${TERMS['mice-money']!.label}<`);   // handle named through <Term>
+    expect(page).toContain('width:60%');                         // the verdigris bar fill = strike proxy
+    expect(page).toContain('2✗');                                // strikes shown as a colour-free channel
+    expect(page).toContain('>4<');                               // facts COUNT, never the fact content
+    expect(page).toContain(`>${TERMS['dossier']!.label}<`);      // a null-handle freebie reads "dossier"
+  });
+
+  it('lists dead drops and teaches the turncoat cross-check habit (no trust number anywhere)', () => {
+    const page = html(createElement(Network, { view: netView }));
+    expect(page).toContain('drop-a');
+    expect(page).toContain(`>${TERMS['turncoat']!.label}<`);
+    expect(page).not.toContain('trust:'); // trust is never surfaced as a number
+  });
+
+  it('an empty roster invites recruiting, without crashing', () => {
+    const page = html(createElement(Network, { view: { assets: [], drops: [] } }));
+    expect(page).toContain(`>${TERMS['verb-recruit']!.label}<`);
+  });
+});
+
+// ── Task 11: the Treasury panel — coin, next stipend, the whole price list through <Term> ────────
+
+describe('Treasury — coin and a visible price list, every row named', () => {
+  it('shows the treasury, next stipend day, and priced verbs from the one economy table', () => {
+    const page = html(createElement(Treasury, { coin: 17, stipendDay: 6, economy: ECON }));
+    expect(page).toContain('17');                                   // coin on hand
+    expect(page).toContain(`>${TERMS['stipend']!.label}<`);
+    expect(page).toContain('day 6');                                // next stipend
+    expect(page).toContain(`>${ECON.recruitCost.money}<`);          // recruit·money price
+    expect(page).toContain(`>${ECON.salonEvent}<`);                 // host·salon price
+    expect(page).toContain(`>${TERMS['brokerage']!.label}<`);       // the brokerage row exists
   });
 });
 

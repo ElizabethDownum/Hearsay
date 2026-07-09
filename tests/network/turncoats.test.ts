@@ -11,7 +11,7 @@ import { worldFromTown, attachPlayer } from '../../src/world/attach';
 import { runTurncoatPass } from '../../src/sim/network/turncoats';
 import { dispositionOf, findAsset, setDispositionEdge } from '../../src/sim/network/roster';
 import { recordFact } from '../../src/sim/network/compartment';
-import { captureIntel, playerView } from '../../src/sim/fieldwork';
+import { captureIntel, playerView, networkView } from '../../src/sim/fieldwork';
 import { reportThrough } from '../../src/sim/reporting';
 import { runUntil } from '../../src/sim/step';
 import { STANCE } from '../../src/sim/rumors/propagation';
@@ -348,25 +348,31 @@ describe('the pass is wired into the nightly — AFTER wages, BEFORE vignettes',
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe('turncoats are invisible player-side — the flag is not the game', () => {
-  it('flipping `turned` on every asset changes NO playerView output (structural invisibility)', () => {
+  it('flipping `turned` on every asset changes NO playerView OR networkView output (structural invisibility)', () => {
     for (const seed of ['inv-1', 'inv-2', 'inv-3']) {
       const { world } = stage(seed);
       world.tick = at(1, 8); // a live tick with circles populated
       const before = stableStringify(playerView(world));
+      const beforeNet = stableStringify(networkView(world)); // T11: the roster surface is invisible too
       for (const a of [...world.network.assets, ...world.network.enemyAssets]) a.turned = true;
-      const after = stableStringify(playerView(world));
-      expect(after).toBe(before);
+      expect(stableStringify(playerView(world))).toBe(before);
+      expect(stableStringify(networkView(world))).toBe(beforeNet);
     }
   });
 
   it('no player-facing selector or app surface reads the asset `turned` flag (adversarial scan)', () => {
-    // playerView (THE epistemic selector) never mentions the flag. NOTE: networkView lands in Task 11
-    // in this same file and MUST be added to this scan then (a T11 obligation) — it exposes only
-    // player-known bookkeeping (wages/strikes/facts-count), never `turned`.
+    // playerView (THE epistemic selector) never mentions the flag. T11 obligation MET: networkView +
+    // courierRouteView (the Task 11 network-surface selectors) join this scan — they expose only
+    // player-known bookkeeping (wages/strikes/facts-count/assignments/drops), never the flip flag.
     const fieldwork = readFileSync(join(process.cwd(), 'src/sim/fieldwork.ts'), 'utf8');
     const pv = fieldwork.slice(fieldwork.indexOf('export function playerView'));
     expect(pv).not.toMatch(/turned/);
     expect(pv).not.toMatch(/isTurnedAsset/);
+    // The dedicated networkView slice (to EOF — covers courierRouteView too): same fence, made explicit.
+    const nv = fieldwork.slice(fieldwork.indexOf('export function networkView'));
+    expect(nv.length).toBeGreaterThan(0);
+    expect(nv).not.toMatch(/turned/);
+    expect(nv).not.toMatch(/isTurnedAsset/);
 
     // No app surface reads the roster's turncoat state at all.
     const walk = (dir: string): string[] => readdirSync(dir).flatMap((name) => {

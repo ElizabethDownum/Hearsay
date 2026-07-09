@@ -16,3 +16,7 @@
  */
 export type { PlayerView } from '../../src/sim/fieldwork';
 export type { TownMap } from '../../src/sim/enemy/state';
+// Plan 8 Task 11 — the network surface's epistemic view-models + the one price table's type. Same
+// erased-type-only re-export discipline: names flow to the fenced panels, zero runtime coupling.
+export type { NetworkView, NetworkAssetView, NetworkDropView, CourierRoute } from '../../src/sim/fieldwork';
+export type { EconomyDef } from '../../src/sim/rules';

@@ -51,6 +51,26 @@ export const VENUE_GLYPHS: Record<string, string> = {
   press: '✒',
 };
 
+/**
+ * Unicode-glyph fallbacks for the Plan 8 Task 11 UI icons (asset-slots.md, icon.ui.* rows). Each slot
+ * is registered null in the manifest (wired never — assets still gated), so the game SHIPS these
+ * dingbat-class glyphs (art-direction: fallback glyphs are dingbats, never emoji faces). A panel that
+ * wants an icon renders the glyph; if a licensed pack ever lands, resolveSlot swaps it in with no
+ * panel change.
+ */
+export const UI_GLYPHS: Record<string, string> = {
+  coin: '¤',
+  courier: '✉',
+  'dead-drop': '⚑',
+  salon: '❧',
+  'walk-in': '⇥',
+};
+
+/** Unicode-glyph fallback for the town-view map tokens (asset-slots.md, map.token.* rows). */
+export const MAP_TOKEN_GLYPHS: Record<string, string> = {
+  courier: '◈',
+};
+
 /** Number of hue bands the initials-avatar fallback rotates through — see note below. */
 const DISTRICT_HUE_BANDS = 8;
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveSlot, portraitFor, VENUE_GLYPHS } from '../../app/src/assets';
+import { resolveSlot, portraitFor, VENUE_GLYPHS, UI_GLYPHS, MAP_TOKEN_GLYPHS } from '../../app/src/assets';
 
 // This test reads assets/manifest.json and assets/LICENSES.md straight off disk (fs), deliberately
 // NOT via the app's Vite JSON import — the loader (app/src/assets.ts) and this test are two
@@ -157,6 +157,34 @@ describe('portraitFor', () => {
     expect(Number.isInteger(r.districtHue)).toBe(true);
     expect(r.districtHue).toBeGreaterThanOrEqual(0);
     expect(r.districtHue).toBeLessThan(360);
+  });
+});
+
+// Plan 8 Task 11 — the new network/treasury visual slots: registered FIRST, null (wired never),
+// with a fallback glyph each. Assets stay gated; the glyph is the shipped look.
+const NEW_UI_ICONS = ['coin', 'courier', 'dead-drop', 'salon', 'walk-in'];
+
+describe('Task 11 network slots — registered (null) with fallback glyphs', () => {
+  it('every new icon.ui.* slot is present and null (assets still gated)', () => {
+    for (const name of NEW_UI_ICONS) {
+      expect(manifest.slots, `missing icon.ui.${name}`).toHaveProperty(`icon.ui.${name}`);
+      expect(manifest.slots[`icon.ui.${name}`]).toBeNull();
+    }
+  });
+  it('map.token.courier is present and null', () => {
+    expect(manifest.slots).toHaveProperty('map.token.courier');
+    expect(manifest.slots['map.token.courier']).toBeNull();
+  });
+  it('resolveSlot returns fallback for each new slot (registered, unwired)', () => {
+    for (const name of NEW_UI_ICONS) expect(resolveSlot(`icon.ui.${name}`)).toEqual({ kind: 'fallback' });
+    expect(resolveSlot('map.token.courier')).toEqual({ kind: 'fallback' });
+  });
+  it('each new UI/token slot has a non-empty unicode fallback glyph', () => {
+    for (const name of NEW_UI_ICONS) {
+      expect(UI_GLYPHS[name], `icon.ui.${name} fallback glyph`).toBeTruthy();
+      expect(UI_GLYPHS[name]!.length).toBeGreaterThan(0);
+    }
+    expect(MAP_TOKEN_GLYPHS['courier']!.length).toBeGreaterThan(0);
   });
 });
 

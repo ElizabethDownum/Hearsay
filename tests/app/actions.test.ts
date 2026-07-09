@@ -21,6 +21,8 @@ describe('KEYMAP — the default keyboard-to-UIAction map (data, rebindable late
       p: { kind: 'open-panel', panel: 'planner' },
       r: { kind: 'open-panel', panel: 'report' },
       t: { kind: 'open-panel', panel: 'terms' },
+      n: { kind: 'open-panel', panel: 'network' },
+      y: { kind: 'open-panel', panel: 'treasury' },
       Escape: { kind: 'close' },
     };
     expect(KEYMAP).toEqual(expected);
@@ -32,9 +34,9 @@ describe('KEYMAP — the default keyboard-to-UIAction map (data, rebindable late
       .toEqual([0.25, 0.5, 1, 2, 4]);
   });
 
-  it('b/c/x/w/l/p/r/t open the eight panels; Escape closes', () => {
-    const panels = 'bcxwlprt'.split('').map((k) => (KEYMAP[k] as { panel: string }).panel);
-    expect(panels).toEqual(['board', 'codex', 'counter', 'web', 'ledger', 'planner', 'report', 'terms']);
+  it('b/c/x/w/l/p/r/t/n/y open the ten panels; Escape closes', () => {
+    const panels = 'bcxwlprtny'.split('').map((k) => (KEYMAP[k] as { panel: string }).panel);
+    expect(panels).toEqual(['board', 'codex', 'counter', 'web', 'ledger', 'planner', 'report', 'terms', 'network', 'treasury']);
     expect(KEYMAP.Escape).toEqual({ kind: 'close' });
   });
 });

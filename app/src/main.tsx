@@ -10,7 +10,7 @@ import { KEYMAP, VERB_TERM, type UIAction } from './input/actions';
 import { TERMS } from '../../src/content/terms';
 import { computeLayout } from './town/layout';
 import { TownCanvas } from './town/TownCanvas';
-import { playerView } from '../../src/sim/fieldwork';
+import { playerView, networkView, courierRouteView } from '../../src/sim/fieldwork';
 import { boardView } from '../../src/intel/board';
 import { counterSketchView } from '../../src/intel/countersketch';
 import { corroborations } from '../../src/intel/codex';
@@ -31,6 +31,8 @@ import { InformantLedger } from './panels/InformantLedger';
 import { EveningReport } from './panels/EveningReport';
 import { DayPlanner } from './panels/DayPlanner';
 import { TermsCodex } from './panels/TermsCodex';
+import { Network } from './panels/Network';
+import { Treasury } from './panels/Treasury';
 
 const SEED = 'cor-1';
 type PanelKind = Extract<UIAction, { kind: 'open-panel' }>['panel'];
@@ -38,8 +40,14 @@ const TABS: { key: PanelKind; term: string }[] = [
   { key: 'board', term: 'evidence-board' }, { key: 'codex', term: 'codex' },
   { key: 'counter', term: 'counter-sketch' }, { key: 'web', term: 'web-view' },
   { key: 'ledger', term: 'ledger' }, { key: 'planner', term: 'day-planner' },
+  { key: 'network', term: 'network' }, { key: 'treasury', term: 'treasury' },
   { key: 'report', term: 'evening-report' }, { key: 'terms', term: 'terms-codex' },
 ];
+
+/** The next rest-day (day-of-week 6) on or after `day` — when the weekly stipend next credits. */
+function nextStipendDay(day: number): number {
+  return day + ((6 - (day % 7)) + 7) % 7;
+}
 const SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
 
 // ── Composition-root view-model folds (computed here so panels stay props-only) ──────────────────
@@ -182,6 +190,10 @@ function App() {
   // board shows, so family-asking unlocks with clustering (assist >= 1), exactly like the board.
   const board = boardView(log, assist, STANDARD_RULES);
   const clusterFamilies = (board.clusters ?? []).map((c) => c.family);
+  // The network surface (Task 11): the roster/treasury/courier folds, all through epistemic selectors.
+  const net = networkView(world);
+  const courierRoutes = courierRouteView(world);
+  const stipendDay = nextStipendDay(view.scenario?.day ?? dayOf(world.tick));
 
   return (
     <main style={{ fontFamily: 'var(--font-text)', maxWidth: 1200, margin: '0 auto', padding: 16 }}>
@@ -208,7 +220,7 @@ function App() {
 
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 380px', minWidth: 320 }}>
-          <TownCanvas view={view} layout={layout} selected={selected} watchSightings={watchSightings} onSelect={setSelected} />
+          <TownCanvas view={view} layout={layout} selected={selected} watchSightings={watchSightings} courierRoutes={courierRoutes} onSelect={setSelected} />
           {selected && <p className="desk-note">selected: {selected}</p>}
         </div>
 
@@ -238,7 +250,13 @@ function App() {
               <InformantLedger ledger={informantLedger(log, ledgerVia)} onSelectFamily={() => setPanel('board')} />
             </div>
           )}
-          {panel === 'planner' && <DayPlanner view={view} paused={speed === 0} clusterFamilies={clusterFamilies} onVerb={submitVerb} />}
+          {panel === 'planner' && (
+            <DayPlanner
+              view={view} paused={speed === 0} clusterFamilies={clusterFamilies}
+              net={net} coin={world.coin} economy={STANDARD_RULES.economy} onVerb={submitVerb} />
+          )}
+          {panel === 'network' && <Network view={net} />}
+          {panel === 'treasury' && <Treasury coin={world.coin} stipendDay={stipendDay} economy={STANDARD_RULES.economy} />}
           {panel === 'report' && <EveningReport report={eveningReport(log, view.scenario?.day ?? dayOf(world.tick))} onOpenBoard={() => setPanel('board')} />}
           {panel === 'terms' && <TermsCodex />}
         </div>

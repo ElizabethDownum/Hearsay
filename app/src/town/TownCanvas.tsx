@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PlayerView } from '../townview';
-import { resolveSlot, VENUE_GLYPHS } from '../assets';
+import type { PlayerView, CourierRoute } from '../townview';
+import { resolveSlot, VENUE_GLYPHS, MAP_TOKEN_GLYPHS } from '../assets';
 import { computeAngleOrder, venueArchetype, type TownLayout } from './layout';
 
 /**
@@ -25,6 +25,10 @@ export interface TownCanvasProps {
   layout: TownLayout;
   selected: string | null;
   watchSightings: ReadonlySet<string>;
+  /** Your own planning marks (Task 11): dotted sepia courier routes, from PLAYER-KNOWN data only
+   *  (courierRouteView — the tasking you issued + the target's last-known intel presence). Never
+   *  schedule truth; they clear when the run delivers or expires. */
+  courierRoutes: readonly CourierRoute[];
   onSelect(id: string): void;
 }
 
@@ -52,7 +56,7 @@ function cachedImage(url: string, onLoad: () => void): HTMLImageElement | null {
   return null;
 }
 
-export function TownCanvas({ view, layout, selected, watchSightings, onSelect }: TownCanvasProps) {
+export function TownCanvas({ view, layout, selected, watchSightings, courierRoutes, onSelect }: TownCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawRef = useRef<() => void>(() => {});
   const [hover, setHover] = useState<string | null>(null);
@@ -61,13 +65,13 @@ export function TownCanvas({ view, layout, selected, watchSightings, onSelect }:
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const draw = () => paint(canvas, { view, layout, selected, watchSightings, hover }, () => drawRef.current());
+    const draw = () => paint(canvas, { view, layout, selected, watchSightings, courierRoutes, hover }, () => drawRef.current());
     drawRef.current = draw;
     draw();
     const ro = new ResizeObserver(() => drawRef.current());
     ro.observe(canvas);
     return () => ro.disconnect();
-  }, [view, layout, selected, watchSightings, hover]);
+  }, [view, layout, selected, watchSightings, courierRoutes, hover]);
 
   const venueAt = (e: { clientX: number; clientY: number }): string | null => {
     const canvas = canvasRef.current;
@@ -113,7 +117,7 @@ export function TownCanvas({ view, layout, selected, watchSightings, onSelect }:
 
 interface Frame {
   view: PlayerView; layout: TownLayout; selected: string | null;
-  watchSightings: ReadonlySet<string>; hover: string | null;
+  watchSightings: ReadonlySet<string>; courierRoutes: readonly CourierRoute[]; hover: string | null;
 }
 
 function geometryOf(w: number, h: number): Geometry {
@@ -148,12 +152,13 @@ function paint(canvas: HTMLCanvasElement, frame: Frame, requestRedraw: () => voi
 
   const pal = readPalette(canvas);
   const g = geometryOf(w, h);
-  const { view, layout, selected, watchSightings, hover } = frame;
+  const { view, layout, selected, watchSightings, courierRoutes, hover } = frame;
 
   ctx.fillStyle = pal.paper;
   ctx.fillRect(0, 0, w, h);
 
   drawWashesAndHulls(ctx, layout, g, pal);
+  drawCourierRoutes(ctx, courierRoutes, layout, g, pal);
 
   const access = accessById(view);
   drawNodes(ctx, layout, g, pal, access, watchSightings, requestRedraw);
@@ -162,6 +167,44 @@ function paint(canvas: HTMLCanvasElement, frame: Frame, requestRedraw: () => voi
   drawInformants(ctx, view, layout, g, pal, access);
   if (hover && hover !== selected) drawHalo(ctx, layout, g, pal.sepia, hover, access, false);
   if (selected) drawHalo(ctx, layout, g, pal.ink, selected, access, true);
+}
+
+/**
+ * The town-view courier overlays (Task 11): one dotted --sepia line per player-known courier run,
+ * with the courier token glyph (map.token.courier fallback) at its midpoint. Drawn UNDER the venue
+ * nodes — these are annotations on the surveyor's plate, not the diagram itself. The route endpoints
+ * are already fenced upstream (courierRouteView reads only issued taskings + intel), so this draws
+ * exactly what the composition root hands it and never touches world truth.
+ */
+function drawCourierRoutes(
+  ctx: CanvasRenderingContext2D, routes: readonly CourierRoute[], layout: TownLayout, g: Geometry, pal: Palette,
+): void {
+  if (routes.length === 0) return;
+  const token = MAP_TOKEN_GLYPHS['courier'] ?? '◈';
+  ctx.save();
+  ctx.strokeStyle = pal.sepia;
+  ctx.fillStyle = pal.sepia;
+  ctx.lineWidth = 1 * g.scale;
+  ctx.setLineDash([4 * g.scale, 3 * g.scale]); // dotted sepia — the art-direction route language
+  ctx.font = `${Math.round(10 * g.scale)}px "Inter", system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const r of routes) {
+    const a = layout.venues[r.from];
+    const b = layout.venues[r.to];
+    if (!a || !b) continue;
+    const pa = project(g, a.x, a.y);
+    const pb = project(g, b.x, b.y);
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y);
+    ctx.lineTo(pb.x, pb.y);
+    ctx.stroke();
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.fillText(token, (pa.x + pb.x) / 2, (pa.y + pb.y) / 2);
+    ctx.restore();
+  }
+  ctx.restore();
 }
 
 function drawWashesAndHulls(ctx: CanvasRenderingContext2D, layout: TownLayout, g: Geometry, pal: Palette): void {

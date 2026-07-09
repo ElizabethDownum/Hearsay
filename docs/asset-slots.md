@@ -48,15 +48,24 @@ or panel code. Buy what you love; the architecture doesn't care.
 |---|-------------|--------------|----------|--------------------|----------|----------|
 | 1 | `portrait.npc.*` | Layered system (≥8 bases × hair/clothing/accessory layers) **or** ≥100 statics, commoner-heavy | square PNG, transparent, ≥256px, one framing family | initials-avatar disc, faction-tinted | Board cluster detail, Codex rows, Counter-Sketch, town tooltips, debrief | Plan 7 |
 | 2 | `icon.venue.*` | 13: tavern, market, chapel, workshop, well, guard-post, cathedral, docks, salon, palazzo, press, safehouse, home | SVG or mono PNG ≥64px, recolorable, ONE style set | unicode glyph + label | Town-view nodes, board venue refs, day-planner | Plan 7 |
-| 3 | `icon.ui.*` | ~20: rumor, inquiry, watch-eye, secret-lock, informant, courier, dead-drop, coin, letter, forgery-quill, scrying, séance, doomclock, arrest, duel, faction ×3, assist, alert | same set/style as #2 (buy together) | unicode glyph | All panels, toasts, timeline | Plan 7 (subset), 8–9 (rest) |
+| 3 | `icon.ui.*` | ~20: rumor, inquiry, watch-eye, secret-lock, informant, courier, dead-drop, coin, salon, walk-in, letter, forgery-quill, scrying, séance, doomclock, arrest, duel, faction ×3, assist, alert | same set/style as #2 (buy together) | unicode glyph | All panels, toasts, timeline | Plan 7 (subset), 8–9 (rest) |
 | 4 | `texture.paper.*` | 4–6: full-page parchment ×2, tileable grain, desk/leather | ≥1024px, subtle contrast, readable overlay text in light+dark | flat CSS color + border | Board backgrounds, debrief, dossier | Plan 7 |
 | 5 | `frame.portrait.*` | 2–3 nine-slice border variants (neutral / suspect / your-informant) | PNG nine-slice or CSS border-image | CSS border, state-tinted | Everywhere portraits render | Plan 7 |
 | 6 | `font.display` / `font.ui` | 2 (DON'T buy — Google Fonts OFL: Cinzel / IM Fell / EB Garamond + Inter / Source Sans 3) | woff2, OFL license file in assets/ | system serif/sans stack | Everything | Plan 7 |
-| 7 | `map.token.*` | optional: NPC/watch/player tokens for the graph view | tiny SVG/PNG, recolorable | colored circles/rings (these look GOOD on a diagram — genuinely optional) | Town view | Plan 7+ |
+| 7 | `map.token.*` | optional: NPC/watch/player/courier tokens for the graph view | tiny SVG/PNG, recolorable | colored circles/rings + dingbat glyph (these look GOOD on a diagram — genuinely optional) | Town view | Plan 7+ |
 | 8 | `sfx.ui.*` | v1.1 — separate brief later | — | silence | — | post-v1 |
 
 **Purchase guidance lives in `asset-shopping-brief.md`** (search terms, red flags, GDM license verdict).
 Buying order if budget-constrained: **1 → 2+3 (one pack) → 4**; 5–7 are polish.
+
+**Plan 8 Task 11 additions (2026-07-09):** `icon.ui.{coin,courier,dead-drop,salon,walk-in}` and
+`map.token.courier` register here first (manifest keys `null`, fallback dingbat glyphs in
+`app/src/assets.ts` UI_GLYPHS / MAP_TOKEN_GLYPHS) — **wired never this plan, assets still gated.**
+Note the deliberate choice of **`icon.ui.walk-in`, NOT `icon.ui.turncoat`** (the plan's Global
+Constraints line named `turncoat`): a turncoat icon would have **no lawful render site** — turncoats
+are player-invisible by pillar law (`networkView` never exposes the flip), so a `turncoat` slot could
+only ever bait a future epistemic violation. The player-facing walk-in (an enemy asset who flipped to
+you, whose tip is a lawful intel row) is the honest slot. Controller adjudication, Task 11.
 
 ## Rules for future plans & AI sessions
 

@@ -7,6 +7,7 @@ import { CONVERSATION_BEAT } from './rumors/propagation';
 import type { Rules } from './rules';
 import type { IntelEntry, WorldState } from './types';
 import type { Claim, EntityId, VenueId } from './rumors/claim';
+import type { Mice } from './network/types';
 import type { TownMap } from './enemy/state';
 import type { ScenarioStatus } from './scenario/types';
 import { buildTownMap } from './world';
@@ -105,6 +106,12 @@ export interface PlayerView {
   /** Presence law: occupants listed ONLY for venues where you have live eyes. */
   occupantsByVenue: Record<VenueId, EntityId[]>;
   map: TownMap;
+  /**
+   * The avatar's OWN societal standing (Plan 8 Task 11): the player's to know — it decides which
+   * venue doors the planner may offer (the access law) and which room they host in. Not the enemy's
+   * mind, not a verdict — just where the seed seated you. `null` in a headless / pre-station world.
+   */
+  station: 'noble' | 'lowlife' | null;
   scenario: { status: ScenarioStatus; day: number; daysTotal: number } | null;
 }
 
@@ -150,8 +157,108 @@ export function playerView(world: WorldState): PlayerView {
     informants: world.intel.informants.map((i) => ({ id: i.id, assignedVenue: i.assignedVenue })),
     occupantsByVenue,
     map: townMapFor(world),
+    station: world.station,
     scenario: world.scenario
       ? { status: world.scenario.status, day: dayOf(tick), daysTotal: world.scenario.days }
       : null,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The NETWORK surface (Plan 8 Task 11). Two more epistemic selectors, same fence as playerView:
+// they read ONLY what the player's own actions put on the record and NEVER the secret flip flag
+// (turncoat invisibility is a pillar law — the player catches a turncoat by diffing channels, never
+// a roster tell). No selector here reads the flip predicate, the enemy roster, or a raw trust edge.
+
+/** Each strike shaves this much off an asset's verdigris bar — the ONE disclosed bar formula. */
+export const STRIKE_BAR_PENALTY = 0.2;
+
+/** One roster row, in PLAYER-KNOWN bookkeeping only: the recruit handle you chose, the weekly wage
+ *  cursor, the strikes you have run up (missed wages + debriefs), where you posted them, and how
+ *  MANY facts they carry — never WHICH facts (compartment contents surface at debrief, not here). */
+export interface NetworkAssetView {
+  id: EntityId;
+  mice: Mice | null;
+  strikes: number;
+  wagePaidThroughDay: number;
+  assignedVenue: VenueId | null;
+  factsCount: number;
+  /** A 0..1 morale bar derived from `strikes` alone (STRIKE_BAR_PENALTY) — bookkeeping you can see,
+   *  NEVER the hidden trust edge. Trust isn't directly visible; this is the honest proxy for it. */
+  dispositionBar: number;
+}
+
+export interface NetworkDropView { id: string; venue: VenueId }
+
+export interface NetworkView {
+  assets: NetworkAssetView[];
+  drops: NetworkDropView[];
+}
+
+/**
+ * The roster panel's feed: your PLAYER-SIDE assets (never the enemy roster) with only the bookkeeping
+ * your own actions authored — wages, strikes, postings, drops, a facts-COUNT. The secret flip flag is
+ * absent by construction (this function never touches it), so flipping every asset changes nothing
+ * here — the structural-invisibility the turncoat pillar demands.
+ */
+export function networkView(world: WorldState): NetworkView {
+  const postOf = new Map(world.intel.informants.map((i) => [i.id, i.assignedVenue]));
+  const assets = [...world.network.assets]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((a) => ({
+      id: a.id,
+      mice: a.mice,
+      strikes: a.strikes,
+      wagePaidThroughDay: a.wagePaidThroughDay,
+      assignedVenue: postOf.get(a.id) ?? null,
+      factsCount: a.facts.length,
+      dispositionBar: Math.max(0, 1 - STRIKE_BAR_PENALTY * a.strikes),
+    }));
+  const drops = [...world.network.drops]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((d) => ({ id: d.id, venue: d.venue }));
+  return { assets, drops };
+}
+
+/** A courier's planning mark on the surveyor's plate: where it sets out, where it is bound. */
+export interface CourierRoute {
+  asset: EntityId;
+  target: EntityId;
+  from: VenueId;
+  to: VenueId;
+}
+
+/** The venue the player LAST logged `id` at in their OWN intel (max-tick row naming id as speaker,
+ *  addressee, or watched actor, with a venue) — or null if the player has never seen them. Reads the
+ *  intel record ONLY, never positionOf/world truth: the courier overlay's epistemic fence. */
+function lastKnownVenue(world: WorldState, id: EntityId): VenueId | null {
+  let best: IntelEntry | null = null;
+  for (const e of world.intel.log) {
+    if (e.speaker !== id && e.addressedTo !== id && e.actor !== id) continue;
+    if (best === null || e.tick > best.tick) best = e;
+  }
+  return best ? best.venue : null;
+}
+
+/**
+ * The town-view courier overlays (Ellie-ratified 2026-07-05): one route per pending courier run,
+ * built from PLAYER-KNOWN data ONLY — the tasking you issued, the drop's venue, and the target's
+ * last-known presence from YOUR intel log. A face handoff sets out from where you posted the asset
+ * (or last saw them); a drop run sets out from the drop's venue. A run whose endpoint the player
+ * cannot place (a target never yet seen) draws NO mark — you do not get to peek at world truth to
+ * aim it. These are your own planning marks, never schedule truth; they clear when the run leaves
+ * `pendingCouriers` (delivered or expired), so the overlay is always live by construction.
+ */
+export function courierRouteView(world: WorldState): CourierRoute[] {
+  const postOf = new Map(world.intel.informants.map((i) => [i.id, i.assignedVenue]));
+  const routes: CourierRoute[] = [];
+  for (const run of world.network.pendingCouriers) {
+    const from = run.viaDrop !== null
+      ? (world.network.drops.find((d) => d.id === run.viaDrop)?.venue ?? null)
+      : (postOf.get(run.asset) ?? lastKnownVenue(world, run.asset));
+    const to = lastKnownVenue(world, run.target);
+    if (from === null || to === null) continue; // an endpoint the player can't place → no mark drawn
+    routes.push({ asset: run.asset, target: run.target, from, to });
+  }
+  return routes;
 }
