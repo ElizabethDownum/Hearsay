@@ -139,6 +139,10 @@ const RECRUIT_DISPOSITION: Record<Mice, number> = {
   money: 0.6, ideology: 0.7, coercion: 0.5, ego: 0.6,
 };
 
+/** O3: the ONE uniform identity-exclusion refusal (see applyRecruit). It names no target and no
+ *  category, so no throw string can leak guard / enemy-asset / spymaster status. */
+const RECRUIT_EXCLUDED = 'recruit: this person cannot be recruited';
+
 /**
  * Recruit an in-circle NPC onto the roster (spec's MICE). VALIDATE-BEFORE-MUTATE: every precondition
  * throws BEFORE any state changes, so a refused recruit leaves ZERO residue (no asset, informant,
@@ -159,17 +163,19 @@ export function applyRecruit(
   if (target === world.playerId) throw new Error('recruit: cannot recruit the avatar');
 
   // Identity exclusions (spec) — checked before the co-circle gate so a guard/cast member is refused
-  // as such even when not in earshot.
-  if (world.enemy.observers.some((o) => o.id === target)) throw new Error(`recruit: '${target}' is a guard and cannot be recruited`);
+  // as such even when not in earshot. O3 (Plan 8 T12; T11 adjudication A; Ellie 2026-07-09): all four
+  // excluded classes refuse with the SAME uniform message (RECRUIT_EXCLUDED). The message names no
+  // category, so it can never hand the player a hidden-state oracle — that a target is a guard, the
+  // enemy spymaster, or (the sharpest leak) a SECRETLY enemy-net asset, which a "already an asset"
+  // string on someone the player never recruited would out. The residual recruitable/not oracle (a
+  // refusal at all) is Ellie-ratified v1 tradecraft; composer-side sealing is structurally barred.
+  if (world.enemy.observers.some((o) => o.id === target)) throw new Error(RECRUIT_EXCLUDED);
   const cast = world.scenario?.cast;
-  if (cast && (cast.usurper === target || cast.council.includes(target))) {
-    throw new Error('recruit: the usurper and council cannot be recruited');
-  }
-  // Task 7: the embodied spymaster is off-limits (the plan's "not the usurper/council/spymaster"
-  // precondition — vacuous until enemyNet existed). He is nobody's asset, so this is his own gate.
-  if (world.network.spymaster === target) throw new Error('recruit: the enemy spymaster cannot be recruited');
-  // Either side: recruiting HIS asset is Task 8's turncoat flow, a different verb.
-  if (findAsset(world, target)) throw new Error(`recruit: '${target}' is already an asset`);
+  if (cast && (cast.usurper === target || cast.council.includes(target))) throw new Error(RECRUIT_EXCLUDED);
+  // The embodied spymaster (Task 7) is nobody's asset — his own gate; recruiting HIS asset is Task 8's
+  // turncoat flow, a different verb. Both refuse with the SAME message as the guard/cast exclusions.
+  if (world.network.spymaster === target) throw new Error(RECRUIT_EXCLUDED);
+  if (findAsset(world, target)) throw new Error(RECRUIT_EXCLUDED);
 
   // Co-circle basis (recruitment is a conversation — the same validation shape as tell).
   const circle = circlesAt(world, tick).find((c) => c.members.includes(world.playerId!));

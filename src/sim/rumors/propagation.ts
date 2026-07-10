@@ -4,7 +4,7 @@ import type { Utterance } from '../perception';
 import type { Rules } from '../rules';
 import type { Belief, Npc, WorldState } from '../types';
 import { mintClaim, SOMEONE, type Claim, type EntityId } from './claim';
-import { applyTraits, type TraitContext } from './traits';
+import { applyTraits, traitContextOf } from './traits';
 import { trustBetween } from '../world';
 
 export const TELL_THRESHOLD = 0.25;
@@ -66,15 +66,6 @@ export function tellability(
   return juiciness(belief.claim, rules) * relevance(hearer, belief.claim) * belief.credence * freshness(belief, t);
 }
 
-function traitContext(npc: Npc, world: WorldState): TraitContext {
-  return {
-    ownerId: npc.id,
-    faction: npc.faction,
-    rivals: npc.rivals,
-    factionOf: (e) => world.npcs[e]?.faction ?? null,
-  };
-}
-
 function passesGates(teller: Npc, belief: Belief, world: WorldState, t: Tick, rules: Rules): boolean {
   // A rumor about you is bait, not a script (spec amendment #3): until the full
   // reaction system lands with the enemy AI, NPCs won't parrot DAMAGING claims
@@ -118,7 +109,7 @@ export function chooseTelling(
   if (!best) return null;
 
   const tellerTraits = teller.traits.flatMap((id) => (rules.traits[id] ? [rules.traits[id]!] : []));
-  const delta = applyTraits(tellerTraits, best.belief.claim, traitContext(teller, world));
+  const delta = applyTraits(tellerTraits, best.belief.claim, traitContextOf(teller, world));
   const outgoing = mintClaim(world, {
     ...best.belief.claim, ...delta,
     family: best.belief.claim.family, parent: best.belief.claim.id,

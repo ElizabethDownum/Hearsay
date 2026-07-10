@@ -9,7 +9,7 @@ import { STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT } from '../../src/content/gen
 import { STANDARD_RULES } from '../../src/content/rules';
 import { TRAITS } from '../../src/content/traits';
 import { TESTFORD } from '../../src/content/fixtures/testford';
-import { emptyEnemyState, type EnemyState, type EvidenceEntry, type TownMap } from '../../src/sim/enemy/state';
+import { emptyEnemyState, type EnemyState, type EvidenceEntry, type ReportedClaim, type TownMap } from '../../src/sim/enemy/state';
 import { SOMEONE, type Claim } from '../../src/sim/rumors/claim';
 import { at, dayOf } from '../../src/core/time';
 import { stableStringify } from '../../src/sim/hash';
@@ -162,5 +162,95 @@ describe('the budget spend — his scandals spend his nights', () => {
     w.tick = at(1, 23, 59);
     runEnemyDay(w, RULES);
     expect(w.enemy.decisions.at(-1)!.interrogations).toHaveLength(1);
+  });
+});
+
+// ── O1 (T7 Minor a): the both-slots spend — two qualifying scandals consume BOTH slots, in order ──
+// The T7 budget shipped under reading (C): one slot per scandal, interrogation-FIRST. The two-slot
+// case (two scandals in one night) was UNTESTED. The full-ladder e2e stages budget outcomes and needs
+// the slot ORDER stable, so pin it: interrogation-first, then watch.
+const MAP2: TownMap = {
+  venues: [
+    { id: 'pub-A', district: 'dA', access: 'public' },
+    { id: 'inv-A', district: 'dA', access: 'invitational' },
+    { id: 'pub-B', district: 'dB', access: 'public' },
+    { id: 'inv-B', district: 'dB', access: 'invitational' },
+  ],
+  directory: [
+    { id: 'g1', occupation: 'guard', district: 'dA' }, { id: 'g2', occupation: 'guard', district: 'dB' },
+    { id: 'src', occupation: 'grocer', district: 'dA' },
+    { id: 'carrier', occupation: 'joiner', district: 'dB' },
+    { id: 'spk', occupation: 'carter', district: 'dA' },
+  ],
+};
+
+const dmg = (subject: string, attribution: string): ReportedClaim =>
+  ({ subject, predicate: 'stole', object: null, count: 2, severity: 4, place: null, attribution });
+
+/** A staged enemy whose nightly digest orders EXACTLY one interrogation (fA names 'src') AND one
+ *  watch (district dB, driven by fB's origin-vague) — the both-slots premise. */
+function twoSlotEnemy(): EnemyState {
+  return {
+    ...emptyEnemyState(),
+    observers: [{ id: 'g1', vigilance: 0.9 }, { id: 'g2', vigilance: 0.9 }],
+    map: MAP2,
+    evidence: [
+      // fA — a suspicious story + an answer NAMING a source ('src'): the interrogation candidate.
+      { tick: 480, venue: 'pub-A', observer: 'g1', overheard: true, speaker: 'spk', addressedTo: 'src', kind: 'utterance', mode: 'telling', claimId: 'cA1', family: 'fA', reported: dmg('src', SOMEONE), about: null },
+      { tick: 905, venue: 'inv-A', observer: 'g1', overheard: false, speaker: 'spk', addressedTo: 'g1', kind: 'utterance', mode: 'answer', claimId: 'cA2', family: 'fA', reported: dmg('src', 'src'), about: null },
+      // fB — a suspicious story + a VAGUE answer (origin-vague): carrier-profile + a watchable district dB.
+      { tick: 481, venue: 'pub-B', observer: 'g2', overheard: true, speaker: 'carrier', addressedTo: 'g2', kind: 'utterance', mode: 'telling', claimId: 'cB1', family: 'fB', reported: dmg('carrier', SOMEONE), about: null },
+      { tick: 906, venue: 'pub-B', observer: 'g2', overheard: false, speaker: 'carrier', addressedTo: 'g2', kind: 'utterance', mode: 'answer', claimId: 'cB2', family: 'fB', reported: dmg('carrier', SOMEONE), about: null },
+    ],
+  };
+}
+
+/** A damaging self-rumor family the spymaster holds at `credence`, un-counter-spun by default. */
+function selfScandal(family: string, spymaster: string, credence: number): Belief {
+  const claim: Claim = { id: `c-${family}`, family, parent: null, subject: spymaster,
+    predicate: 'stole', object: null, count: null, severity: 4, place: null, attribution: SOMEONE };
+  return { claim, credence, heardFrom: 'injected', heardAt: 0, firstHeardAt: 0, timesHeard: 2,
+    apparentSources: [], discretion: false, counterSpun: false };
+}
+
+describe('the budget spend — two scandals consume BOTH slots, interrogation-first (O1)', () => {
+  const SPY = 'edmund';
+  const stage2 = (scandals: number): WorldState => {
+    const w = buildWorld(TESTFORD, 'o1-budget');
+    w.enemy = twoSlotEnemy();
+    w.network.spymaster = SPY;
+    w.tick = at(1, 23, 59);
+    if (scandals > 0) {
+      w.beliefs[SPY] = {};
+      for (let i = 0; i < scandals; i++) w.beliefs[SPY]![`f-s${i}`] = selfScandal(`f-s${i}`, SPY, 0.6);
+    }
+    return w;
+  };
+
+  it('control (0 scandals): the digest orders EXACTLY one interrogation AND one watch (the premise)', () => {
+    const w = stage2(0);
+    runEnemyDay(w, RULES);
+    const d = w.enemy.decisions.at(-1)!;
+    expect(d.interrogations).toHaveLength(1);
+    expect(d.watches).toHaveLength(1);
+  });
+
+  it('ONE scandal drops ONLY the interrogation — the watch survives (interrogation-first order)', () => {
+    const w = stage2(1);
+    // BOUNDARY: the scandal lives in HIS beliefs, never the evidence — the raw digest is bit-identical.
+    expect(stableStringify(enemyDigest(w.enemy, dayOf(w.tick), RULES)))
+      .toBe(stableStringify(enemyDigest(stage2(0).enemy, dayOf(w.tick), RULES)));
+    runEnemyDay(w, RULES);
+    const d = w.enemy.decisions.at(-1)!;
+    expect(d.interrogations).toHaveLength(0); // slot 1 → the interrogation
+    expect(d.watches).toHaveLength(1);        // …the watch is untouched
+  });
+
+  it('TWO scandals consume BOTH slots — interrogation AND watch dropped', () => {
+    const w = stage2(2);
+    runEnemyDay(w, RULES);
+    const d = w.enemy.decisions.at(-1)!;
+    expect(d.interrogations).toHaveLength(0);
+    expect(d.watches).toHaveLength(0);
   });
 });

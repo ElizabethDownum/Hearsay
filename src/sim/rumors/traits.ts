@@ -1,5 +1,6 @@
 import type { Claim, EntityId, FieldChange } from './claim';
 import type { ReportedClaim } from '../enemy/state';
+import type { Npc, WorldState } from '../types';
 
 export type TraitId = string;
 
@@ -9,6 +10,21 @@ export interface TraitContext {
   /** Stable order fixed at world authoring — deterministic fills index into this. */
   rivals: readonly EntityId[];
   factionOf(e: EntityId): string | null;
+}
+
+/**
+ * The ONE face of TraitContext construction (Plan 8 T12 O5): a reporter's own context — ownerId +
+ * faction + rivals from the npc, `factionOf` resolved against the world roster. Extracted from the
+ * four byte-identical copies that had grown up in propagation, the courier path, reporting, and the
+ * inquiry answerer — same mechanic, one place. Pure and behavior-preserving (soak/mc unmoved).
+ */
+export function traitContextOf(npc: Npc, world: WorldState): TraitContext {
+  return {
+    ownerId: npc.id,
+    faction: npc.faction,
+    rivals: npc.rivals,
+    factionOf: (e) => world.npcs[e]?.faction ?? null,
+  };
 }
 
 export interface TraitDef {

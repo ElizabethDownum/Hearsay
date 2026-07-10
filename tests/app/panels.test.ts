@@ -14,12 +14,12 @@ import { webView, type WebView } from '../../src/intel/web';
 import { at, TICKS_PER_DAY } from '../../src/core/time';
 import { CONVERSATION_BEAT } from '../../src/sim/rumors/propagation';
 import { venueAt, CIRCLE_SIZE } from '../../src/sim/agents';
-import { canEnter } from '../../src/sim/actions';
+import { canEnter, venueOpensFor } from '../../src/sim/actions';
 import { SOMEONE, type EntityId } from '../../src/sim/rumors/claim';
 import type { InjectSpec } from '../../src/sim/actions';
 import type { IntelEntry } from '../../src/intel/types';
 import type { PlayerView, NetworkView } from '../../src/sim/fieldwork';
-import type { WorldState } from '../../src/sim/types';
+import type { Venue, WorldState } from '../../src/sim/types';
 
 const ECON = STANDARD_RULES.economy;
 const EMPTY_NET: NetworkView = { assets: [], drops: [] };
@@ -276,4 +276,48 @@ describe('RUN A re-verified — seed cor-1, tell poison on the usurper, three da
     const page = html(createElement(WebViewPanel, { web, onSelectNpc: noop }));
     expect(page).toContain(`<b>${usurper}</b><span class="badge badge-lock"`); // …and now the RENDER
   });
+});
+
+// ── O8 (T11 Minor M-3): DayPlanner.canGo mirrors the engine's venueOpensFor (offer/gate parity) ──
+// canGo re-derives the access law to grey doors; the engine (applyGoTo → venueOpensFor) is the real
+// gate. This behavioral parity test renders the planner and checks that a door is OFFERED (a goTo
+// button) iff the engine would open it — guarding the UI mirror against drift from the engine law.
+describe('DayPlanner — canGo offers exactly the doors venueOpensFor opens (O8 parity)', () => {
+  const testVenues: Venue[] = [
+    { id: 'market', district: 'd0', access: 'public' },
+    { id: 'safehouse', district: 'd0', access: 'private' },        // special-cased always-open
+    { id: 'salon', district: 'd0', access: 'invitational' },       // noble's room
+    { id: 'back-room-d0', district: 'd0', access: 'invitational' },// lowlife's room
+    { id: 'guard-post', district: 'd0', access: 'invitational' },  // invitational, opens for neither
+    { id: 'crypt', district: 'd0', access: 'private' },            // private, opens for neither
+  ];
+
+  const viewFor = (station: 'noble' | 'lowlife' | null): PlayerView => ({
+    tick: 0,
+    avatar: { id: 'you', venue: 'safehouse', circleMembers: [] },
+    informants: [],
+    occupantsByVenue: {},
+    map: { venues: testVenues, directory: [] },
+    station,
+    scenario: null,
+  });
+
+  for (const station of [null, 'noble', 'lowlife'] as const) {
+    it(`station=${station ?? 'null'}: every door's button/greyed state matches venueOpensFor`, () => {
+      const page = html(createElement(DayPlanner, {
+        view: viewFor(station), paused: true, clusterFamilies: [],
+        net: EMPTY_NET, coin: 100, economy: ECON, onVerb: noop,
+      }));
+      for (const v of testVenues) {
+        // Engine truth: pre-station (null) opens everything (P7 behavior); else the access law.
+        const engineOpens = station === null ? true : venueOpensFor(station, v);
+        // UI truth (the access-law section renders a goTo button `>id</button>` when open, else a
+        // greyed `id — no standing` span). Both markers are unique to that section.
+        const offeredAsButton = page.includes(`>${v.id}</button>`);
+        const greyedAsSpan = page.includes(`${v.id} — no`);
+        expect(offeredAsButton, `${station}/${v.id}: offered iff engine opens`).toBe(engineOpens);
+        expect(greyedAsSpan, `${station}/${v.id}: greyed iff engine shuts`).toBe(!engineOpens);
+      }
+    });
+  }
 });

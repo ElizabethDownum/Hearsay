@@ -7,6 +7,7 @@ import { applySetDrop, applyCourier, type InjectSpec } from '../../src/sim/actio
 import { applyAction, runLogOn, type Action } from '../../src/sim/campaign';
 import { circlesAt } from '../../src/sim/agents';
 import { runUntil } from '../../src/sim/step';
+import { deliverCouriers } from '../../src/sim/network/couriers';
 import { reportThrough } from '../../src/sim/reporting';
 import { compartmentOf } from '../../src/sim/network/compartment';
 import { findAsset } from '../../src/sim/network/roster';
@@ -17,7 +18,7 @@ import { SOMEONE, type Claim, type EntityId } from '../../src/sim/rumors/claim';
 import { TRAITS } from '../../src/content/traits';
 import type { TraitContext } from '../../src/sim/rumors/traits';
 import type { Mice } from '../../src/sim/network/types';
-import type { WorldState } from '../../src/sim/types';
+import type { TownFixture, WorldState } from '../../src/sim/types';
 
 const RULES = STANDARD_RULES;
 
@@ -324,6 +325,45 @@ describe('courier preconditions — validate-before-mutate refusals', () => {
     expect(hashWorld(world)).toBe(before);
     expect(world.network.pendingCouriers).toHaveLength(0);
     expect(compartmentOf(world, 'mara').some((f) => f.kind === 'met-asset')).toBe(false);
+  });
+});
+
+// ── O5b: same-beat distinct-family minting (guards the P6-T7 keyed-collision class) ───────────────
+describe('courier delivery — same-beat distinct-family minting (O5b)', () => {
+  it('two runs delivering in ONE beat mint DISTINCT families off the global counter — never a keyed collision', () => {
+    // A single public venue with exactly 4 residents → circlesAt forms ONE circle of all four, so both
+    // (asset → target) pairs co-locate the SAME beat: the two-delivery-in-one-call condition, by construction.
+    const fixture: TownFixture = {
+      venues: [{ id: 'sq', district: 'd0', access: 'public' }],
+      npcs: ['a1', 't1', 'a2', 't2'].map((id) => ({
+        id, name: id, home: 'sq', occupation: 'grocer', faction: 'none' as const,
+        traits: ['literalist' as const], rivals: [], edges: [],
+        schedule: [{ days: 'all' as const, from: 0, to: 1439, venue: 'sq' }],
+      })),
+    };
+    const world = buildWorld(fixture, 'o5b', RULES);
+    for (const id of ['a1', 'a2']) {
+      world.network.assets.push({ id, mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [{ tick: 0, kind: 'recruited-by', ref: 'player' }] });
+    }
+    const mk = (subject: string): InjectSpec => ({ subject, predicate: 'stole', object: null, count: 2, severity: 3, place: null, attribution: SOMEONE });
+    const t = at(0, 8);       // a conversation beat
+    const queued = at(0, 7);  // strictly before t, same day (no expiry, delivery fires t > queuedTick)
+    world.network.pendingCouriers.push({ asset: 'a1', spec: mk('t2'), target: 't1', viaDrop: null, queuedTick: queued });
+    world.network.pendingCouriers.push({ asset: 'a2', spec: mk('t1'), target: 't2', viaDrop: null, queuedTick: queued });
+
+    const before = world.claimCounter;
+    const delivered = deliverCouriers(world, t, RULES);
+
+    expect(delivered).toHaveLength(2); // NON-VACUOUS: BOTH runs delivered this same beat
+    const families = delivered.map((u) => u.claim.family).sort();
+    // Distinct families is the whole guard — a keyed scheme (vignettes' pair-granular ids) could collide;
+    // the global counter can't. They are exactly the two consecutive mints f{n}, f{n+1}.
+    expect(new Set(families).size).toBe(2);
+    expect(families).toEqual([`f${before}`, `f${before + 1}`]);
+    // …and each courier's compartment recorded its OWN carried family, distinct from the other's.
+    const f1 = compartmentOf(world, 'a1').find((f) => f.kind === 'carried-story')!.ref;
+    const f2 = compartmentOf(world, 'a2').find((f) => f.kind === 'carried-story')!.ref;
+    expect(f1).not.toBe(f2);
   });
 });
 

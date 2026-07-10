@@ -1,16 +1,9 @@
-import { applyTraits, type TraitContext } from './rumors/traits';
+import { applyTraits, traitContextOf } from './rumors/traits';
 import type { Claim } from './rumors/claim';
 import type { ReportedClaim } from './enemy/state';
-import type { Npc, WorldState } from './types';
+import type { WorldState } from './types';
 import type { Rules } from './rules';
 import { isTurnedAsset } from './network/roster';
-
-function ctxOf(npc: Npc, world: WorldState): TraitContext {
-  return {
-    ownerId: npc.id, faction: npc.faction, rivals: npc.rivals,
-    factionOf: (e) => world.npcs[e]?.faction ?? null,
-  };
-}
 
 /**
  * What a claim sounds like after passing through the reporter's firmware — its traits get
@@ -27,8 +20,17 @@ function ctxOf(npc: Npc, world: WorldState): TraitContext {
  * the registered `minimizer` transform composed LAST, on top of everything above (the ego-overlay
  * idiom, inverted). Disclosed composition order: REAL traits → ego overlay (if ego) → doctoring (if
  * turned). One mechanic — each layer is a registered `TraitDef.transform` on the chain, never a
- * bespoke reduction. This only ever fires on the PLAYER'S channel: a turned asset is nobody's enemy
- * observer, so captureEvidence never routes through here for them.
+ * bespoke reduction.
+ *
+ * O6 (T8 Minor a) — the doctoring layer is CHANNEL-AGNOSTIC: `isTurnedAsset` fires here no matter WHO
+ * called `reportThrough` (the player's captureIntel OR the enemy's captureEvidence). That is safe today
+ * ONLY because of a structural invariant elsewhere: a turned asset is a PLAYER-side asset, and a
+ * player-side asset can NEVER be an enemy observer — `applyRecruit` refuses to enrol any enemy observer
+ * (guards + his enemy-net assets), so player-roster ∩ enemy-observers = ∅. Therefore captureEvidence
+ * never routes an enemy observer's report through this doctoring branch, and the enemy's own capture is
+ * never walked down. The invariant is pinned as a structural test (tests/network/turncoats.test.ts,
+ * "O6 …"): if a future path ever puts an enemy-net id on the player roster, that test trips FIRST — a
+ * documented tripwire rather than a silent misfire that doctors the enemy's evidence against himself.
  */
 export function reportThrough(world: WorldState, reporterId: string, claim: Claim, rules: Rules): ReportedClaim {
   const reporter = world.npcs[reporterId]!;
@@ -41,7 +43,7 @@ export function reportThrough(world: WorldState, reporterId: string, claim: Clai
     ...(isEgoAsset && exaggerator ? [exaggerator] : []),
     ...(isTurnedAsset(world, reporterId) && minimizer ? [minimizer] : []),
   ];
-  const filtered = { ...claim, ...applyTraits(chain, claim, ctxOf(reporter, world)) };
+  const filtered = { ...claim, ...applyTraits(chain, claim, traitContextOf(reporter, world)) };
   const { subject, predicate, object, count, severity, place, attribution } = filtered;
   return { subject, predicate, object, count, severity, place, attribution };
 }

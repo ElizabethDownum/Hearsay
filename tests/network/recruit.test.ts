@@ -230,25 +230,67 @@ describe('MICE recruit — ego: no gate, chronic exaggeration overlay (one mecha
   });
 });
 
+// ── O2 (Ellie ruling 2026-07-08(2), KEEP; T4-M2): ego × natural-exaggerator stacking ──────────────
+// "The flattered braggart brags harder" — the ruling KEPT the natural composition of two lawful
+// transforms. The reachable ×4 / +2 stack (ego overlay ON TOP of a natural exaggerator) was untested.
+describe('MICE recruit — ego × natural-exaggerator stacking (O2)', () => {
+  it('an ego-recruited NATURAL exaggerator double-exaggerates — EXACTLY exaggerator ∘ (real chain), by mechanism', () => {
+    const world = buildWorld(TESTFORD, 'o2-stack', RULES);
+    const target = 'mara'; // Testford: traits [exaggerator, attributor] — she IS a natural exaggerator
+    expect(world.npcs[target]!.traits).toContain('exaggerator'); // the premise of the stack
+
+    // Named subject + attribution keeps mara's attributor INERT — the count/severity move is the
+    // exaggerator's alone, so the two composed passes are unambiguous.
+    const spec: InjectSpec = { subject: 'tomas', predicate: 'stole', object: null, count: 2, severity: 2, place: null, attribution: 'seth' };
+    const claim = asClaim(spec);
+
+    // r0 = her report as a NON-ego (money) asset — her REAL chain already exaggerates ONCE.
+    world.network.assets = [{ id: target, mice: 'money', wagePaidThroughDay: 0, strikes: 0, facts: [] }];
+    const r0 = reportThrough(world, target, claim, RULES);
+
+    // rE = her report as an EGO asset — the overlay adds ONE MORE registered exaggerator pass, composed LAST.
+    world.network.assets = [{ id: target, mice: 'ego', wagePaidThroughDay: 0, strikes: 0, facts: [] }];
+    const rE = reportThrough(world, target, claim, RULES);
+
+    // BY MECHANISM: rE is EXACTLY the registered exaggerator transform composed onto r0 — the natural
+    // composition of two lawful transforms (NOT the ×4/+2 constants asserted as such). This is the KEEP.
+    const ctx: TraitContext = {
+      ownerId: target, faction: world.npcs[target]!.faction, rivals: world.npcs[target]!.rivals,
+      factionOf: (e) => world.npcs[e]?.faction ?? null,
+    };
+    const exag = TRAITS['exaggerator']!;
+    const r0Claim = { id: 'x', family: 'x', parent: null, ...r0 } as Claim;
+    const overlaid = exag.appliesTo(r0Claim, ctx) ? { ...r0, ...exag.transform(r0Claim, ctx) } : r0;
+    expect(rE).toEqual(overlaid);
+
+    // Reachability of the ×4 / +2 stack (informational — it FOLLOWS from the mechanism above).
+    expect(r0.count).toBe(spec.count! * 2);                     // natural exaggerator: ×2
+    expect(rE.count).toBe(spec.count! * 4);                     // ego overlay: ×2 again → ×4
+    expect(rE.severity).toBe(Math.min(5, spec.severity + 2));  // +1 then +1 → +2 (clamped)
+    // Control: without the ego overlay the stack is not reachable (a single natural pass only).
+    expect(r0.severity).toBe(spec.severity + 1);
+  });
+});
+
 describe('MICE recruit — preconditions refuse (identity + conversation shape)', () => {
-  it('refuses guards, the usurper, council members, and existing assets', () => {
+  it('refuses guards, the usurper, council members, and existing assets (O3: one uniform refusal)', () => {
     {
       const { world } = stage('rec-guard');
       const guard = world.enemy.observers[0]!.id;
-      expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: guard, mice: 'money', leverageFamily: null }, RULES)).toThrow(/guard/);
+      expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: guard, mice: 'money', leverageFamily: null }, RULES)).toThrow(/cannot be recruited/);
     }
     {
       const { world, town } = stage('rec-usurper');
-      expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: town.cast!.usurper, mice: 'money', leverageFamily: null }, RULES)).toThrow(/usurper|council/);
+      expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: town.cast!.usurper, mice: 'money', leverageFamily: null }, RULES)).toThrow(/cannot be recruited/);
     }
     {
       const { world, town } = stage('rec-council');
-      expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: town.cast!.council[0]!, mice: 'money', leverageFamily: null }, RULES)).toThrow(/usurper|council/);
+      expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: town.cast!.council[0]!, mice: 'money', leverageFamily: null }, RULES)).toThrow(/cannot be recruited/);
     }
     {
       const { world } = stage('rec-existing');
       const existing = world.network.assets[0]!.id; // a dossier freebie — already on the roster
-      expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: existing, mice: 'money', leverageFamily: null }, RULES)).toThrow(/already an asset/);
+      expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: existing, mice: 'money', leverageFamily: null }, RULES)).toThrow(/cannot be recruited/);
     }
     {
       // Task 7: the embodied spymaster now EXISTS, so the plan's "not the usurper/council/spymaster"
@@ -257,8 +299,46 @@ describe('MICE recruit — preconditions refuse (identity + conversation shape)'
       const { world } = stage('rec-spymaster');
       const spymaster = world.network.spymaster!;
       expect(spymaster).toBeTruthy();
-      expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: spymaster, mice: 'money', leverageFamily: null }, RULES)).toThrow(/spymaster/);
+      expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: spymaster, mice: 'money', leverageFamily: null }, RULES)).toThrow(/cannot be recruited/);
     }
+  });
+
+  // ── O3 (T11 adjudication A; Ellie 2026-07-09): the identity-exclusion refusal leaks NOTHING ──────
+  it('O3: every identity-excluded class refuses with the IDENTICAL message that names no category', () => {
+    const capture = (fn: () => void): string => {
+      try { fn(); } catch (e) { return (e as Error).message; }
+      throw new Error('expected a refusal throw, got none');
+    };
+    // One target per excluded class: guard/observer, usurper, council, existing asset, enemy spymaster.
+    const guardW = stage('o3-guard');
+    const usurpW = stage('o3-usurp');
+    const cnclW = stage('o3-cncl');
+    const asstW = stage('o3-asst');
+    const spyW = stage('o3-spy');
+    const rec = (w: WorldState, target: EntityId): (() => void) =>
+      () => applyAction(w, { tick: 0, kind: 'recruit', target, mice: 'money', leverageFamily: null }, RULES);
+
+    const messages = [
+      capture(rec(guardW.world, guardW.world.enemy.observers[0]!.id)),
+      capture(rec(usurpW.world, usurpW.town.cast!.usurper)),
+      capture(rec(cnclW.world, cnclW.town.cast!.council[0]!)),
+      capture(rec(asstW.world, asstW.world.network.assets[0]!.id)),
+      capture(rec(spyW.world, spyW.world.network.spymaster!)),
+    ];
+
+    // (a) Identical across every excluded class — no per-class message survives.
+    expect(new Set(messages).size).toBe(1);
+    // (b) The message names no category — no hidden-state oracle (guard / enemy-asset / spymaster).
+    for (const m of messages) {
+      expect(m).not.toMatch(/guard/i);
+      expect(m).not.toMatch(/spymaster/i);
+      expect(m).not.toMatch(/asset/i);
+      // …and not the specific ids either (the target id would still narrow the class for a probe).
+      expect(m).not.toContain(spyW.world.network.spymaster!);
+      expect(m).not.toContain(usurpW.town.cast!.usurper);
+    }
+    // NON-VACUOUS: it really is a refusal, and still a validation throw (the failed action drops).
+    expect(messages[0]).toMatch(/recruit/);
   });
 
   it('refuses no-player, off-beat, and non-circle targets', () => {

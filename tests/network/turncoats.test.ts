@@ -9,6 +9,7 @@ import { STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT } from '../../src/content/gen
 import { generateValidTown } from '../../src/world/serve';
 import { worldFromTown, attachPlayer } from '../../src/world/attach';
 import { runTurncoatPass } from '../../src/sim/network/turncoats';
+import { applyRecruit } from '../../src/sim/actions';
 import { dispositionOf, findAsset, setDispositionEdge } from '../../src/sim/network/roster';
 import { recordFact } from '../../src/sim/network/compartment';
 import { captureIntel, playerView, networkView, courierRouteView, blankIntel } from '../../src/sim/fieldwork';
@@ -403,6 +404,37 @@ describe('turncoats are invisible player-side — the flag is not the game', () 
       expect(src, `${file} reads network roster`).not.toMatch(/network\.(enemyA|a)ssets/);
       expect(src, `${file} reads isTurnedAsset`).not.toMatch(/isTurnedAsset/);
       expect(src, `${file} reads .turned`).not.toMatch(/\.turned\b/);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// O6 (T8 Minor a): reportThrough's turncoat doctoring is CHANNEL-AGNOSTIC — it fires whoever calls it
+// (the player's captureIntel OR the enemy's captureEvidence). That is safe ONLY because a player-side
+// asset can never be an enemy observer: applyRecruit refuses every observer, so player-roster ∩
+// enemy-observers = ∅ and captureEvidence never routes a doctored report on the enemy's own channel.
+describe('O6 — the invariant that keeps channel-agnostic doctoring off the enemy channel', () => {
+  it('no player asset is ever an enemy observer, and recruit ENFORCES it by refusing every observer', () => {
+    const { world, town } = stage('o6-invariant');
+    const observerIds = new Set(world.enemy.observers.map((o) => o.id));
+    expect(observerIds.size).toBeGreaterThan(0); // non-vacuous: there ARE observers (guards + his assets)
+
+    // (1) The invariant holds in the staged world: player-roster ∩ enemy-observers = ∅.
+    for (const a of world.network.assets) {
+      expect(observerIds.has(a.id), `player asset ${a.id} must not be an enemy observer`).toBe(false);
+    }
+    // (2) It is ENFORCED, not incidental: recruiting ANY observer refuses (guards AND his enemy-net
+    //     assets, which worldFromTown makes observers) — the wall that keeps a turned asset out of the
+    //     enemy's own reporting channel. captureEvidence only ever reports through his OBSERVERS.
+    for (const o of world.enemy.observers) {
+      expect(() => applyRecruit(world, o.id, 'money', null, 0, RULES)).toThrow(/cannot be recruited/);
+      expect(world.network.assets.some((a) => a.id === o.id)).toBe(false); // zero residue — no observer joined the roster
+    }
+    // (3) His enemy-net assets specifically: observers, and never player assets (a walk-in never
+    //     becomes a PLAYER asset that could then doctor his channel — the OTHER direction entirely).
+    for (const id of town.enemyNet!.assets) {
+      expect(observerIds.has(id)).toBe(true);
+      expect(world.network.assets.some((a) => a.id === id)).toBe(false);
     }
   });
 });

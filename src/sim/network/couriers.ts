@@ -1,7 +1,7 @@
 import { dayOf, minuteOfDay, type Tick } from '../../core/time';
 import { circlesAt } from '../agents';
-import { mintClaim, type Claim, type EntityId } from '../rumors/claim';
-import { applyTraits, type TraitContext } from '../rumors/traits';
+import { mintClaim, type Claim } from '../rumors/claim';
+import { applyTraits, traitContextOf } from '../rumors/traits';
 import { CONVERSATION_BEAT } from '../rumors/propagation';
 import type { Utterance } from '../perception';
 import type { Rules } from '../rules';
@@ -11,18 +11,6 @@ import { recordFact } from './compartment';
 
 /** A courier run undelivered by its 3rd day past tasking lapses — the coin is never refunded. */
 export const COURIER_EXPIRY_DAYS = 3;
-
-/** The asset's OWN trait context — couriers are minds, not pipes: the payload transforms by the
- *  courier's REAL traits (their grudges/inflations), keyed to their identity for deterministic fills. */
-function traitContext(npcId: EntityId, world: WorldState): TraitContext {
-  const npc = world.npcs[npcId]!;
-  return {
-    ownerId: npc.id,
-    faction: npc.faction,
-    rivals: npc.rivals,
-    factionOf: (e) => world.npcs[e]?.faction ?? null,
-  };
-}
 
 /**
  * Deliver every pending courier run whose asset shares a circle with its target THIS beat — the
@@ -58,7 +46,7 @@ export function deliverCouriers(world: WorldState, t: Tick, rules: Rules): Utter
     const family = `f${world.claimCounter}`;
     const base: Claim = { id: 'pending', family, parent: null, ...run.spec };
     const traits = world.npcs[run.asset]!.traits.flatMap((id) => (rules.traits[id] ? [rules.traits[id]!] : []));
-    const delta = applyTraits(traits, base, traitContext(run.asset, world));
+    const delta = applyTraits(traits, base, traitContextOf(world.npcs[run.asset]!, world));
     const claim = mintClaim(world, { ...run.spec, ...delta, family, parent: null });
     world.claims[claim.id] = claim;
     recordFact(world, run.asset, { kind: 'carried-story', ref: family });

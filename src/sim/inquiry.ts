@@ -5,8 +5,8 @@ import type { Asking, InquiryKey, Utterance } from './perception';
 import { mintClaim, SOMEONE, type EntityId } from './rumors/claim';
 import { STANCE } from './rumors/propagation';
 import type { Rules } from './rules';
-import { applyTraits, type TraitContext } from './rumors/traits';
-import type { Belief, InquiryTask, Npc, WorldState } from './types';
+import { applyTraits, traitContextOf } from './rumors/traits';
+import type { Belief, InquiryTask, WorldState } from './types';
 import { trustBetween } from './world';
 
 /** The belief an answerer would produce for a key, or null. */
@@ -22,13 +22,6 @@ export function matchBelief(store: Record<string, Belief>, about: InquiryKey): B
     }
   }
   return best;
-}
-
-function traitContext(npc: Npc, world: WorldState): TraitContext {
-  return {
-    ownerId: npc.id, faction: npc.faction, rivals: npc.rivals,
-    factionOf: (e) => world.npcs[e]?.faction ?? null,
-  };
 }
 
 /**
@@ -73,7 +66,7 @@ export function chooseAnswer(
       ? SOMEONE : belief.heardFrom,
   };
   const tellerTraits = answerer.traits.flatMap((id) => (rules.traits[id] ? [rules.traits[id]!] : []));
-  const delta = applyTraits(tellerTraits, disclosed, traitContext(answerer, world));
+  const delta = applyTraits(tellerTraits, disclosed, traitContextOf(answerer, world));
   const outgoing = mintClaim(world, {
     ...disclosed, ...delta,
     family: belief.claim.family, parent: belief.claim.id,
