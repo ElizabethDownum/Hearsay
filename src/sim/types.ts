@@ -125,6 +125,14 @@ export interface InquiryTask {
   expiresDay: number;
   asked: EntityId[];
   answersHeard: number;
+  /**
+   * Rider 11R: the person a PLAYER ask names. Set ONLY by `applyAsk` — the ask verb is a speech act,
+   * so `runAskPhase` addresses exactly this person and consumes the task at the firing beat (never
+   * trust-repicked, never a 2-day/2-answer tail). ABSENT on every NPC/enemy dispatch task, whose
+   * asking stays sim-internal; that omission keeps their serialization and behavior byte-unchanged
+   * (the key never appears in the stable hash for those tasks). Never written as `undefined`.
+   */
+  addressee?: EntityId;
 }
 
 /** One-day-scoped venue override (watches, interrogations). toDay exclusive; null = open-ended. */

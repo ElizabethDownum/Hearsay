@@ -159,20 +159,22 @@ describe('player groundwork — the avatar under physics', () => {
     expect(world.chronicle.some((e) => e.kind === 'asking' && e.speaker === 'you')).toBe(false);
   });
 
-  // Skip-law refinement (Plan 7): the avatar still never auto-asks and is never conscripted by the
-  // enemy — but a SELF task (volition the human logged via the ask verb) IS consumed by runAskPhase.
-  it('a logged self-inquiry IS consumed — the avatar asks the human’s question', () => {
+  // Skip-law refinement (Plan 7) + rider 11R: the avatar still never auto-asks and is never conscripted
+  // by the enemy — but a SELF task (volition the human logged via the ask verb, which now RECORDS the
+  // named addressee) IS consumed by runAskPhase, addressed to exactly that person, and retired this beat.
+  it('a logged self-inquiry IS consumed — the avatar asks the named person, and it retires this beat', () => {
     const world = buildWorld(miniTown(), 'asker-self');
     enrollPlayer(world, { home: 'backroom' });
-    world.npcs['you']!.edges = [{ to: 'ada', kind: 'friend', trust: 0.8 }]; // the avatar must trust to ask
     world.scheduleOverrides['ada'] = [
       { fromDay: 0, toDay: null, from: 0, to: 1440, venue: 'backroom', source: 'enemy' },
     ];
-    // A 'self' task, as the logged ask verb enqueues it — the avatar's word opens the beat.
+    // A 'self' task as the logged ask verb enqueues it — carrying the named addressee (rider 11R).
     world.inquiries['you'] = [
-      { about: { subject: 'cyn' }, from: 'self', expiresDay: 5, asked: [], answersHeard: 0 },
+      { about: { subject: 'cyn' }, from: 'self', expiresDay: 1, asked: [], answersHeard: 0, addressee: 'ada' },
     ];
     step(world, STANDARD_RULES);
-    expect(world.chronicle.some((e) => e.kind === 'asking' && e.speaker === 'you')).toBe(true);
+    const asking = world.chronicle.find((e) => e.kind === 'asking' && e.speaker === 'you');
+    expect(asking).toMatchObject({ addressedTo: 'ada' }); // the named person, no trust edge required now
+    expect(world.inquiries['you'] ?? []).toHaveLength(0); // consumed at the firing beat
   });
 });

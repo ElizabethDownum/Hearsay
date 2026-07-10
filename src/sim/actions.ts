@@ -111,8 +111,15 @@ export function applySell(world: WorldState, buyer: EntityId, family: RumorId, t
   world.pendingSell = { buyer, family, price, claimId: best.claimId! };
 }
 
-/** The avatar asks a circle-mate about a family/subject. Enqueues a 'self' inquiry task — the one
- *  place the avatar is a volitional asker (runAskPhase consumes it; it still never auto-answers). */
+/**
+ * The avatar asks a named circle-mate about a family/subject — a FAMILY-1 speech act (like tell), not
+ * family-2 dispatch (rider 11R). Enqueues a 'self' inquiry task RECORDING the addressee `to` (validated
+ * in-circle just above): `runAskPhase` will address exactly them this same beat, never trust-repicking
+ * or substituting, and consume the task at that firing beat. There is therefore NO 2-day / 2-answer
+ * tail for player asks — `expiresDay` is only the tightest safety net (swept tonight) for a task that
+ * could never fire; the normal path retires it the instant it fires. NPC inquiry-task semantics are
+ * untouched (they place no addressee). It still never auto-answers — the human's testimony is not sim-driven.
+ */
 export function applyAsk(world: WorldState, to: EntityId, about: InquiryKey, tick: Tick): void {
   if (world.playerId === null) throw new Error('ask: no player is enrolled');
   if (world.playerVenue === null) throw new Error('ask: the avatar is nowhere');
@@ -123,7 +130,7 @@ export function applyAsk(world: WorldState, to: EntityId, about: InquiryKey, tic
     throw new Error(`ask: '${to}' is not in the avatar's circle this beat`);
   }
   const tasks = world.inquiries[world.playerId] ?? (world.inquiries[world.playerId] = []);
-  tasks.push({ about, from: 'self', expiresDay: dayOf(tick) + 2, asked: [], answersHeard: 0 });
+  tasks.push({ about, from: 'self', expiresDay: dayOf(tick) + 1, asked: [], answersHeard: 0, addressee: to });
 }
 
 /** Recruitment disposition floor by handle — the trust the recruit establishes toward the player.

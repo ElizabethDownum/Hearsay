@@ -28,7 +28,7 @@ export interface Session {
   readonly world: WorldState;
   readonly log: Action[];
   /**
-   * Queue a verb for the next legal tick (beat-aligned for tell/ask; next tick otherwise). At most
+   * Queue a verb for the next legal tick (beat-aligned for tell/ask/sell; next tick otherwise). At most
    * ONE avatar speech verb (tell | ask | sell) may be queued per conversation beat — a second is
    * REFUSED here (note 9), before the sim ever sees it. This is the composer-layer gate that keeps
    * the sim free of a cross-verb per-beat guard; the sim's own per-verb guards (tell-vs-tell,
@@ -83,12 +83,16 @@ function isTerminal(world: WorldState): boolean {
 }
 
 /**
- * The next legal tick for a verb. Tell/ask fire only on conversation beats, so they roll forward to
- * the next beat (this beat if already aligned, else strictly future). Everything else takes effect
- * at the very next tick to be simulated (the current, not-yet-stepped `world.tick`).
+ * The next legal tick for a verb. The three speech verbs (tell/ask/sell) fire only on conversation
+ * beats — applyTell/applyAsk/applySell each throw off-beat — so they roll forward to the next beat
+ * (this beat if already aligned, else strictly future). Everything else takes effect at the very next
+ * tick to be simulated (the current, not-yet-stepped `world.tick`). Folding `sell` in here (T11 carry
+ * (i)) means a mid-beat sell now QUEUES for the next beat rather than toast-failing on applySell's own
+ * beat guard — and its queued tick IS the target beat, so the one-speech-per-beat latch keys off that
+ * beat exactly as it does for tell/ask.
  */
 function queuedTickFor(intent: ActionIntent, now: Tick): Tick {
-  if (intent.kind === 'tell' || intent.kind === 'ask') return nextBeat(now);
+  if (intent.kind === 'tell' || intent.kind === 'ask' || intent.kind === 'sell') return nextBeat(now);
   return now;
 }
 

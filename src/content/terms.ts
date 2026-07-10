@@ -55,7 +55,7 @@ export const TERMS: Record<string, TermDef> = {
   // ── your verbs (the planner's logged actions) ──
   'verb-travel':     { id: 'verb-travel', label: 'Travel', short: 'Move your avatar to a venue. Takes effect on the very next tick the sim steps.', entry: null },
   'verb-tell':       { id: 'verb-tell', label: 'Tell', short: 'Speak a story to a circle-mate, under full physics. Fires on the next conversation beat.', entry: null },
-  'verb-ask':        { id: 'verb-ask', label: 'Ask', short: 'Ask a circle-mate about a story or a person. Fires on the next beat — and asking is observable.', entry: null },
+  'verb-ask':        { id: 'verb-ask', label: 'Ask', short: 'Ask the circle-mate you name about a story or a person — fires next beat, addressed to exactly them, and observable.', entry: null },
   'verb-post':       { id: 'verb-post', label: 'Post informant', short: 'Assign an informant to a venue. They keep the mid-day post from the next day onward.', entry: null },
   'verb-note':       { id: 'verb-note', label: 'Margin note', short: 'Pin a private note to anything. Read by nothing in the town — a hunch, never evidence.', entry: null },
   'verb-recruit':    { id: 'verb-recruit', label: 'Recruit', short: 'Bring an in-circle NPC onto your roster through one of the four MICE handles. Priced in coin.', entry: null },

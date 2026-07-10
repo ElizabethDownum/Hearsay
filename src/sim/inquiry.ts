@@ -94,6 +94,41 @@ function usableTask(world: WorldState, askerId: EntityId, day: number): InquiryT
 }
 
 /**
+ * Rider 11R — the avatar's ask fires as a FAMILY-1 speech act. It addresses exactly the person the
+ * human named (`task.addressee`, validated in-circle by applyAsk this same tick), never trust-repicked
+ * and never substituted; the named addressee answers ONLY if still free this beat (the one-speech-per-
+ * beat law — if they already spoke, the asking still happened and simply goes unanswered). The task is
+ * CONSUMED at this firing beat regardless of the outcome — no answersHeard tail, no next-beat re-fire —
+ * so after the tick there is zero player-ask residue in `world.inquiries`. The NPC/enemy dispatch loop
+ * (`runAskPhase` below) is untouched: this path runs ONLY for the avatar's own self-task.
+ */
+function firePlayerAsk(
+  world: WorldState, circle: Circle, member: EntityId, task: InquiryTask, t: Tick, rules: Rules,
+  askings: Asking[], answers: Utterance[], spoke: Set<EntityId>,
+): void {
+  const addressee = task.addressee;
+  // A player self-task always carries its addressee (applyAsk records it). A nameless one is malformed
+  // — never fire a substitute; just consume it so it leaves no residue. (Also narrows the type below.)
+  if (addressee === undefined) { retireTask(world, member, task); return; }
+  const asking: Asking = {
+    tick: t, venue: circle.venue, circleMembers: [...circle.members],
+    speaker: member, addressedTo: addressee, about: task.about, authority: false,
+  };
+  askings.push(asking);
+  spoke.add(member);
+  // Answered only if the named addressee has not already spoken this beat. If they have, there is NO
+  // substitution to anyone else — the asking is on the record either way, and the task is still consumed.
+  if (!spoke.has(addressee)) {
+    const answer = chooseAnswer(world, addressee, asking, t, rules);
+    if (answer) {
+      answers.push(answer);
+      spoke.add(addressee);
+    }
+  }
+  retireTask(world, member, task); // consumed at the firing beat — zero residue
+}
+
+/**
  * The ask/answer phase for one circle. One speech per beat: returns who spoke so
  * the tell phase can skip them. Bookkeeping (asked, answersHeard, retirement) happens here.
  */
@@ -107,12 +142,19 @@ export function runAskPhase(
 
   for (const member of circle.members) {
     if (spoke.has(member)) continue;
+
+    // The avatar's word opens the beat — but ONLY its OWN logged question (a 'self' task the ask verb
+    // placed), never an enemy interrogation conscripted onto it (P7 note 3: find the self task, don't
+    // trust usableTask's first-usable). That ask is a speech act (rider 11R), handled apart from the
+    // NPC dispatch below; the avatar never runs the trust-repick / 2-answer-tail machinery.
+    if (member === world.playerId) {
+      const selfTask = (world.inquiries[member] ?? []).find((task) => task.from === 'self');
+      if (selfTask) firePlayerAsk(world, circle, member, selfTask, t, rules, askings, answers, spoke);
+      continue;
+    }
+
     const task = usableTask(world, member, day);
     if (!task) continue;
-    // The avatar asks ONLY the questions the human logged (a 'self' task placed by the ask verb) —
-    // it is never auto-selected, and never conscripted into the enemy's interrogations even if one
-    // is queued against it. With an empty queue this is byte-identical to the old unconditional skip.
-    if (member === world.playerId && task.from !== 'self') continue;
     const eligible = circle.members
       .filter((m) => m !== member && !task.asked.includes(m) && !spoke.has(m))
       .filter((m) => task.from === 'enemy' || trustBetween(world, member, m) > 0)

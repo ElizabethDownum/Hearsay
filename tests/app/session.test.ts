@@ -247,6 +247,62 @@ describe('I-1 — the speech-act latch: at most one avatar speech verb per beat,
   });
 });
 
+// ── (11R) the avatar ask is a speech act: live ≡ replay with an ask in the log ─────────────
+describe('11R — an ask in the log replays byte-identically (live ≡ replay)', () => {
+  it('(t5) a session that queues an ask + advances 2 days hashes equal to a fresh loadSession', () => {
+    const session = newSession(SEED);
+    const usurper = session.world.scenario!.cast.usurper;
+    const spot = findCoCircle(session.world, 1);
+    const target = spot.npcs[0]!;
+
+    session.submit({ kind: 'goTo', venue: spot.venue });
+    advanceTo(session, spot.tick);
+    const ask = session.submit({ kind: 'ask', to: target, about: { subject: usurper } });
+    expect(ask.queuedFor).toBe(spot.tick);
+
+    // Fire the beat: the ask is a speech act, addressed to exactly the named person (11R).
+    session.advance(spot.tick + 1 - session.world.tick);
+    expect(session.world.chronicle.some(
+      (e) => e.kind === 'asking' && e.speaker === 'you' && e.addressedTo === target,
+    )).toBe(true);
+
+    session.advance(at(2, 0) - session.world.tick);
+    expect(session.world.scenario!.status).toBe('running');
+
+    const save = session.save();
+    expect(save.log.some((a) => a.kind === 'ask')).toBe(true);
+
+    const replay = loadSession(save, at(2, 0));
+    expect(hashWorld(replay.world)).toBe(hashWorld(session.world));
+  });
+});
+
+// ── (T11 carry (i)) sell joins the beat-align branch — a mid-beat sell rolls forward ────────
+describe('T11 carry (i) — a mid-beat SELL submission beat-aligns like tell/ask', () => {
+  it('rolls a mid-beat sell forward to the next beat, and its queued tick latches the TARGET beat', () => {
+    const session = newSession(SEED);
+    const usurper = session.world.scenario!.cast.usurper;
+    const spot = findCoCircle(session.world, 1);
+    const buyer = spot.npcs[0]!;
+
+    session.submit({ kind: 'goTo', venue: spot.venue });
+    advanceTo(session, spot.tick - 1); // land one tick BEFORE the beat (mid-beat)
+    expect(minuteOfDay(session.world.tick) % CONVERSATION_BEAT).not.toBe(0);
+
+    // Family need not be held: submit defers validation, and this test never advances to applySell.
+    const { queuedFor } = session.submit({ kind: 'sell', family: 'f-any', buyer });
+    expect(queuedFor).toBe(spot.tick);                        // rolled forward to the next beat
+    expect(queuedFor).toBeGreaterThan(session.world.tick);    // strictly future
+    expect(minuteOfDay(queuedFor) % CONVERSATION_BEAT).toBe(0);
+
+    // The rolled-forward sell latches the TARGET beat, not the submission beat (the speech-latch keys
+    // off the queued tick): speechQueuedForBeat sees it, and a same-beat tell is refused.
+    expect(session.speechQueuedForBeat(session.world.tick)).toBe(true);
+    const tell = session.submit({ kind: 'tell', to: buyer, spec: poison(usurper) });
+    expect(tell.refused).toBe(true);
+  });
+});
+
 // ── (d) endings pause: advance stops at a terminal status change, death tick exact ────────
 describe('advance halts at a terminal status change — the death tick is exact, never overshot', () => {
   it('a hands-off Coronation stops at lost-clock on the coronation dawn, not one tick past', { timeout: 30000 }, () => {
