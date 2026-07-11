@@ -1,6 +1,6 @@
 # Hearsay — Game Design Document
 
-**Status: APPROVED (2026-07-03).** All four brainstorm parts approved in discussion; Ellie's end-to-end review complete with two amendments folded in (Counter-Sketch board; explicit multi-hop propagation) — see the resolutions log.
+**Status: APPROVED (2026-07-03; Plan 11 Part 5 approved 2026-07-11).** All four original brainstorm parts approved in discussion; Ellie's end-to-end review complete with two amendments folded in (Counter-Sketch board; explicit multi-hop propagation). Part 5 consolidates the later directive-network and tick-law design — see the resolutions log.
 **Date started:** 2026-07-03 · **Designers:** Ellie + Claude
 **Stack decision:** TypeScript (pure deterministic sim core) + canvas town view + React UI panels; browser during dev; Electron + steamworks.js for eventual Steam release. Controller support is a future requirement — input abstraction layer and focus-navigable UI conventions from day one.
 **Parked sibling concept:** Warden-Cartographer (Vale × Terra Incognita fusion) — see `docs/game-ideas/2026-07-03-warden-cartographer-concept.md`. Shares ~60% engine skeleton.
@@ -214,8 +214,200 @@ Save = **seed + action log** (+ periodic snapshots purely for fast loading). Buy
 
 **Build order:** sim core + rumor physics headless first, proven by tests and bot campaigns before any real UI (substrate-first) → Evidence Board → town view → content width.
 
+## Part 5 — Direct play and the directive network (Plan 11; approved 2026-07-11)
+
+### Driver when present; director at a distance
+
+Hearsay has two player postures, separated by presence rather than by UI mode:
+
+- **Driver — direct play.** When the avatar is physically present, the player gets maximum control of
+  the avatar's own moment: choose a person in the current circle and take a direct action. A requested
+  interaction pauses at the next conversation beat only after prior setup has fired and the current
+  choices have been composed. The chosen action executes against that same offered state before
+  autonomous NPC action. The player owns what the avatar does, never what another person does.
+- **Director, not controller — dispatch.** The player gives assets missions, priorities, context, and
+  authority, then loses control of execution. Remote asset activity never pauses, interrupts, or
+  live-notifies the player. The player learns about it only through a later report, a missed deadline,
+  personally observed consequences, or another legitimate channel. If the avatar happens to be in the
+  room when an asset acts, the action is observed under ordinary perception; any resulting player choice
+  is the avatar's response, never retroactive control of the asset.
+
+**Named principle: driver when present; director at a distance.** The directive UI may show what the
+player issued, the clock-derived due/overdue state, received reports, and known consequences. It never
+shows the engine's live execution state or hidden reason.
+
+### Directives are outcome briefs, not remote-control tasks
+
+The initial extensible mission vocabulary is:
+
+- **`learn`** — observe or investigate a person, place, or subject;
+- **`shape`** — spread, suppress, or redirect information; and
+- **`sound-out`** — explore recruitment or cooperation.
+
+Every mission uses one orthogonal brief envelope. The player independently chooses delivery channel,
+target/payload, specificity and advisory guidance, priority/urgency, authority relied upon, requested
+discretion, active timeframe, report expectation, and whether to share the purpose — the **why**. No
+single pressure or compliance slider collapses those decisions.
+
+Specific details are information supplied to the asset, never a must-do itinerary. “Mary should be at
+the tavern at 6” may be useful guidance; Mary may not be there, or acting then may look suspicious. The
+asset has authority inside its own sphere and late-binds method to the situation it can actually observe.
+It may refuse, defer, attempt literally, adapt toward the purpose, or abort. High trust does not grant
+the player control; it changes how the asset interprets and spends discretion. Sharing the why buys
+informed initiative at the cost of compartmentalization. Withholding it contains damage but may produce
+literal, misguided, or malicious compliance.
+
+**Named principles:** *you set the mission; the asset owns the moment* and *you control the handoff,
+not the hands.*
+
+### The brief itself travels through information physics
+
+A directive is information, so it must genuinely reach its recipient:
+
+- **Direct delivery** reaches the addressed asset without an intermediary mutation, but the meeting and
+  speech are observable under the normal circle/perception laws.
+- **Relayed delivery** moves hop by hop through real people on their schedules. Each intermediary may
+  delay, distort, omit, betray, or fail to deliver it; traits and turncoat behavior apply. The player
+  knows what was entrusted to the first carrier, not what eventually arrived.
+- When richer written/dead-drop directives are added, exact wording may be stabilized only by
+  accepting the physical artifact's delay, access, and forensic risks. It will never be an
+  instantaneous command bus.
+
+The asset evaluates the **received brief**, after every lawful relay mutation, not the pristine brief
+the player authored. Return reports travel through the same physics in reverse and may mutate again.
+Delivery confirmation is itself information that must be observed or reported.
+
+There is **no privileged network**. A turncoat remains an ostensible asset of one principal while
+secretly serving and reporting to another; both channels use ordinary asset physics. It is not an
+automatic leak pipe. It reports to a real handler through the same direct/relay machinery and can be
+delayed, distorted, observed, intercepted, or fail. Enemy directives likewise have to reach their
+assets; the same evaluator governs both sides. Existing generic weekly compartment leaks remain
+digest-inert: content reaches the enemy only through a real delivery event. The v1 enemy remains
+instrument-blind by the standing ruling — a strategic weakness, not a transport exception.
+
+**Named principle: same network physics, either direction.** Anything that can go well or badly for the
+player can go well or badly for the enemy.
+
+### One received-brief evaluator, separate outcomes
+
+One pure deterministic evaluator consumes the received brief plus the recipient's relationship, MICE
+handle/incentive, traits, local observations, circle composition, perceived scrutiny, and hidden
+allegiance. It returns separate internal outcomes — never a scalar compliance score:
+
+1. **Interpretation** — what mission the asset believes it received.
+2. **Commitment** — refuse, defer, or attempt.
+3. **Initiative** — literal versus adaptive execution.
+4. **Risk posture** — how much exposure the asset tolerates.
+5. **Method** — the locally chosen action.
+6. **Timing** — when to act and when/how to report.
+7. **Disclosure** — independently selected report fields: outcome, reason, evidence, source, uncertainty.
+8. **Candor** — ordinary, guarded, omissive, or doctored expression through the normal trait chain.
+
+The brief's independent levers influence the relevant outcomes independently; relationship and context
+interpret them. Disclosure and fidelity remain **one edge read in two directions**: the same reasons an
+asset serves faithfully affect what it tells its principal. The framework is shared across player and
+enemy relationships, while values may differ materially by relationship and handle.
+
+### The audit changes the channel
+
+Comparing what was entrusted, what was done, and what came back is a primary trait and turncoat
+deduction tool. Traits influence interpretation, method, and reporting most freely while an asset
+believes the player is not onto them. As perceived scrutiny rises, assets may become guarded; turncoats
+especially clamp down, reduce revealing distortions, omit, delay, or perform more carefully. That
+behavioral change is a clue, never proof — loyal, frightened, offended, and coerced assets may also
+guard themselves.
+
+Perceived scrutiny is a hidden NPC belief derived only from treatment and events that NPC could observe:
+pressure, repeated questioning, changed tasking, exclusion, confrontation, or similar in-world facts.
+Private player tags, codex hypotheses, and true suspicion never enter it. Scrutiny decays over time when
+normal treatment resumes; overt confrontations may persist longer than subtle probes. No player-facing
+selector exposes the value.
+
+**Named principle: the audit changes the channel.** The player's probe enters the experiment, and the
+result must be interpreted in context.
+
+### Tick law and causal presentation
+
+Every tick is evaluated in five phases:
+
+1. **Prior setup** due from earlier ticks fires first.
+2. **Offered player action** executes against the state in which it was offered.
+3. **Direct responses** to that action occur with causal provenance communicated.
+4. **Autonomous NPC action** occurs; purposeful behavior may be a clue but is not falsely labeled as a
+   direct response to the player.
+5. **Unplanned environment** resolves last.
+
+On NPC-only ticks, the player phase is absent and NPC action shares one simultaneous semantic tier:
+deterministic serialization is permitted, meaningful actor privilege is not. The nightly order already
+pinned by shipped mechanics (including wages, turncoats, enemy work, vignettes, and scenario resolution)
+must be audited and preserved unless Part 5 explicitly changes a dependency.
+
+The local requested-beat pause is the offer/execution identity mechanism. A mid-beat interaction request
+does not freeze stale future choices; it asks the game to pause at the next eligible beat. Prior setup
+fires, the local offer is composed and frozen, then the player chooses. Remote directive execution never
+opens this pause.
+
+### Red herrings: make the enemy spend its own attention
+
+Plan 11 ships both ratified forms:
+
+- **Decoy work:** send a person the player believes is already watched on real but menial work while a
+  channel the player believes is less exposed performs the consequential mission.
+- **Known-turncoat play:** entrust a believable brief to an asset the player suspects will physically
+  relay it to the enemy; “the best cover story is the one your own asset believes.”
+
+The enemy never reads player directives. A runaround judgment must be derived from its own evidence and
+its own wasted nights: scarce watch/interrogation effort spent on a subject that repeatedly yields no
+corroborating result may reduce short-term priority and drop a tail, while the apparent deliberate
+runaround can increase longer-term suspicion. Both consequences are exploitable and observable in
+principle. Recruiting someone already under investigation means inheriting their existing file.
+
+Red herrings are the player-side mirror of counter-spin: each side feeds the other's evidence stream.
+Exact thresholds and exposure-ceiling retuning belong to the measured Plan 10 balance pass; Plan 11
+ships complete mechanics, not tuned final numbers.
+
+### Recruitment approaches are acts; hesitation is ambiguous
+
+Recruitment is no longer a hidden-state validation probe. A personal approach is family-1 direct play
+and is itself a real, observable, witnessable act. `sound-out` is the family-2 remote mission: its asset
+may refuse, defer, or abort without ever approaching the target. If the asset does make an approach,
+that act is observable and may travel, but its attribution is only what the target and bystanders
+actually learned — perhaps the intermediary, perhaps the spymaster if that purpose was disclosed. The
+composer never hides either action based on secret eligibility.
+
+The outward lifecycle is identical across eligible, ineligible, loyal, unwilling, enemy-linked, and
+during-wait-compromised candidates. Any may accept, refuse, or ask for time and later accept/refuse.
+Ordinary events during the waiting period can change the result, including contact from the enemy and a
+hidden flip. A candidate may report the approach, become a double agent, and later say yes. Honest
+hesitation uses the same visible shape, so hesitation is never a turncoat oracle; a later yes never
+proves loyalty and a no never proves enemy affiliation.
+
+The game records behavior, timing, provenance, and legitimately known context. It never labels the
+hidden reason or grades the player's inference. It is the player's job to determine **why** from the
+surrounding evidence. The warning against placing a new recruit on sensitive routes is emergent
+tradecraft, not a hard safety rule: the player retains full control of their own handoff choices.
+
+### Plan 11 scope boundaries
+
+- **Included:** directive transport and execution for both principals; `learn`/`shape`/`sound-out`;
+  received-brief evaluation; graded disclosure/fidelity; local offer identity and tick phase audit;
+  perceived scrutiny + decay; red herrings/runaround; observable recruitment + hesitant double agents.
+- **Deferred to measurement:** economy, exposure ceilings, pressure reachability, and final thresholds.
+- **Still later/backlog:** enemy instrument-auditing archetype, deeper cutout recruiters/cells, hard route
+  safety automation, and richer written/artifact directive channels beyond the physical seams already
+  available.
+- **Never:** remote live monitoring, hidden-state composer gates, a global command bus, a scalar
+  compliance meter, or UI explanations of an NPC's hidden why.
+
 ## Resolutions log (formerly open questions)
 
+- **Directive network + tick law (Ellie, 2026-07-11) — design resolved; Plan 11:** Part 5 is the
+  canonical resolution of backlog #26/#27/#29/#30. The player is driver when locally present and
+  director-not-controller at a distance; directives are mutable outcome briefs with independent
+  handoff levers; both principals use identical transport/execution/report physics; received-brief
+  decisions remain separate and hidden; perceived scrutiny changes then decays; red herrings consume
+  enemy attention through evidence; recruitment approaches are observable acts with outwardly
+  equivalent hesitation. Balance constants remain Plan 10 work.
 - **Personal exposure severity — resolved:** caught in the act personally = immediate game over; sketch convergence (the slow loss) = a clean campaign loss in v1 (REVISED 2026-07-05 — see the endgame-transformation entry below; formerly "escape-or-turn-the-tables").
 - **Endgame transformation — REVISED (Ellie, 2026-07-05): no fleeing; the slow loss is a loss.** Her reasoning, near-verbatim: this is a one-shot-campaign scope — "if you (the current spymaster) flee, where would you go and what would you do? The mission is already failed." v1: `lost-exposed` ends at the debrief, same as any loss. The post-v1 backlog carries **turn-the-tables verbs** instead of escape: counterintel/blackmail/assassinate the enemy spymaster, or "some other action" like assassinating the coronee. **Parked seed idea (hers):** a persistent seeded multi-mission campaign, where fleeing to cut your losses becomes meaningful — that's where escape lives, if anywhere. Same session, two mechanism ratifications: playback multipliers widen to **0.25×/0.5×/1×/2×/4×** (supersedes the 1×/2×/4× line above), and the v1.1/post-v1 split collapses into **one prioritized backlog** at `docs/backlog.md`.
 - **Counter-Sketch board (Ellie's review amendment #1, 2026-07-03) — resolved:** ships in v1; available day 0, content-gated (blank at start; sources gated, surface never). Enemy-investigation hypothesis cards promoted from the Evidence Board to this surface; debrief gains the counter-sketch overlay; testing gains the mirror-direction no-omniscience property test.
