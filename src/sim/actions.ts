@@ -480,11 +480,20 @@ export function applyDebrief(world: WorldState, asset: EntityId, tick: Tick, rul
   }
 
   // --- Effects (all validation passed) ---
+  // Disclosure (T9 carry / O7): the compelled answer names the asset's OWN source — attribution rides
+  // the SAME mechanic as an ordinary answer (chooseAnswer, inquiry.ts:63-67), never the story's stored
+  // propaganda attribution. The rewrite composes BEFORE the reporting chain (real traits → ego →
+  // doctoring), so a turned asset's debrief is doctored DOWNSTREAM of the disclosed source.
+  const disclosed = {
+    ...belief.claim,
+    attribution: belief.heardFrom === 'injected' || belief.heardFrom === 'witnessed'
+      ? SOMEONE : belief.heardFrom,
+  };
   world.intel.log.push({
     ...blankIntel(), tick, venue: 'safehouse', via: asset,
     kind: 'utterance', overheard: false, speaker: asset, addressedTo: world.playerId,
     mode: 'answer', claimId: belief.claim.id, family: belief.claim.family,
-    reported: reportThrough(world, asset, belief.claim, rules),
+    reported: reportThrough(world, asset, disclosed, rules),
   });
   slideDisposition(world, asset, -0.1); // Amendment #4b's disposition strike — the wage-slide mechanics, reused
   record.strikes += 1;                  // +1 strike, the same ledger wages use

@@ -17,7 +17,7 @@ import { at, dayOf } from '../../src/core/time';
 import { CONVERSATION_BEAT } from '../../src/sim/rumors/propagation';
 import { SOMEONE, type Claim, type EntityId } from '../../src/sim/rumors/claim';
 import type { SketchFeature } from '../../src/sim/enemy/state';
-import type { TownFixture, WorldState } from '../../src/sim/types';
+import type { Belief, TownFixture, WorldState } from '../../src/sim/types';
 import type { GeneratedTown } from '../../src/world/types';
 
 const RULES = STANDARD_RULES;
@@ -299,6 +299,94 @@ describe('debrief — the compelled-independent floors survive compulsion (self-
     const before = hashWorld(w);
     expect(() => applyDebrief(w, 'ann', BEAT, RULES)).toThrow(/nothing|belief store|compel/i);
     expect(hashWorld(w)).toBe(before);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('debrief — attribution discloses the asset\'s OWN source (T9 carry / O7)', () => {
+  /** Seat a belief with an EXPLICIT heardFrom and stored attribution (the divergence control):
+   *  heardFrom is who the asset actually heard it from; claim.attribution is the mutable
+   *  propaganda field the story SAYS it came from — the two need not agree. */
+  function seatSourced(
+    w: WorldState, holder: EntityId, family: string, heardFrom: Belief['heardFrom'],
+    attribution: EntityId, subject: EntityId = 'dot', severity: 1 | 2 | 3 | 4 | 5 = 3,
+    count: number | null = 3,
+  ): Claim {
+    const claim: Claim = {
+      id: `c-${family}`, family, parent: null,
+      subject, predicate: 'stole', object: null, count, severity, place: null, attribution,
+    };
+    w.claims[claim.id] = claim;
+    w.beliefs[holder]![family] = {
+      claim, credence: 0.9, heardFrom, heardAt: 0, firstHeardAt: 0,
+      timesHeard: 1, apparentSources: [], discretion: false, counterSpun: false,
+    };
+    return claim;
+  }
+
+  // 1. PIN — a NAMED-source belief must report the asset's OWN source (heardFrom), NOT the
+  //    story's stored claim.attribution. RED against base (base passes belief.claim through raw).
+  it('reports attribution === heardFrom for a named-source belief, not the stored claim.attribution', () => {
+    const w = world('debrief-disclose-named');
+    makeAsset(w, 'ann', 'money', 0.6);
+    applyMeet(w, 'ann', 0);
+    runUntil(w, BEAT, RULES);
+    // ann HEARD it from bri; the STORY claims it came from cy — the propaganda field diverges.
+    const claim = seatSourced(w, 'ann', 'f-named', 'bri', 'cy');
+
+    const logBefore = w.intel.log.length;
+    applyDebrief(w, 'ann', BEAT, RULES);
+    const added = w.intel.log.slice(logBefore);
+    expect(added).toHaveLength(1);
+    expect(added[0]!.reported!.attribution).toBe('bri');           // the asset's OWN disclosed source
+    expect(added[0]!.reported!.attribution).not.toBe(claim.attribution); // NOT the stored 'cy'
+  });
+
+  // 2. CONTROL — injected/witnessed beliefs (every shape the existing suite seats) disclose SOMEONE.
+  //    A no-op path: green on base AND fixed, proving the fix never touches the existing suite.
+  it('is a no-op for injected/witnessed beliefs — attribution stays SOMEONE', () => {
+    const wi = world('debrief-disclose-injected');
+    makeAsset(wi, 'ann', 'money', 0.6);
+    applyMeet(wi, 'ann', 0);
+    runUntil(wi, BEAT, RULES);
+    applyInject(wi, 'ann', spec); // heardFrom 'injected', attribution SOMEONE — the existing-suite shape
+    let logBefore = wi.intel.log.length;
+    applyDebrief(wi, 'ann', BEAT, RULES);
+    expect(wi.intel.log.slice(logBefore)[0]!.reported!.attribution).toBe(SOMEONE);
+
+    const ww = world('debrief-disclose-witnessed');
+    makeAsset(ww, 'ann', 'money', 0.6);
+    applyMeet(ww, 'ann', 0);
+    runUntil(ww, BEAT, RULES);
+    seatSourced(ww, 'ann', 'f-wit', 'witnessed', SOMEONE); // ground-truth secret — attribution SOMEONE
+    logBefore = ww.intel.log.length;
+    applyDebrief(ww, 'ann', BEAT, RULES);
+    expect(ww.intel.log.slice(logBefore)[0]!.reported!.attribution).toBe(SOMEONE);
+  });
+
+  // 3. COMPOSITION GUARD — the disclosure rewrite composes BEFORE the reporting chain, so a turned
+  //    asset's named-source debrief is doctored (minimizer) DOWNSTREAM of the rewrite: doctoring
+  //    lands on the DISCLOSED claim (attribution = heardFrom), never the stored propaganda one.
+  it('composes the disclosure before the reporting chain — a turned asset\'s debrief is doctored downstream of it', () => {
+    const w = world('debrief-disclose-turned');
+    makeAsset(w, 'ann', 'money', 0.6);
+    findAsset(w, 'ann')!.turned = true; // a player asset CAN be turned (see debrief-flip) — minimizer fires
+    applyMeet(w, 'ann', 0);
+    runUntil(w, BEAT, RULES);
+    const claim = seatSourced(w, 'ann', 'f-turned', 'bri', 'cy', 'dot', 4, 4); // severity 4, count 4
+
+    const logBefore = w.intel.log.length;
+    applyDebrief(w, 'ann', BEAT, RULES);
+    const reported = w.intel.log.slice(logBefore)[0]!.reported!;
+
+    expect(reported.attribution).toBe('bri'); // disclosed source survives the chain (minimizer leaves it)
+    expect(reported.severity).toBe(3);        // minimizer walked 4 -> 3 (doctored downstream of the rewrite)
+    expect(reported.count).toBe(2);           // minimizer halved 4 -> 2
+    // Exactly reportThrough of the DISCLOSED claim (attribution rewritten to heardFrom)...
+    const disclosed: Claim = { ...claim, attribution: 'bri' };
+    expect(reported).toEqual(reportThrough(w, 'ann', disclosed, RULES));
+    // ...and NOT reportThrough of the STORED claim (proves the rewrite ordering, not just doctoring).
+    expect(reported).not.toEqual(reportThrough(w, 'ann', claim, RULES));
   });
 });
 
