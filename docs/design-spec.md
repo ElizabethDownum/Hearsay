@@ -372,8 +372,10 @@ Recruitment is no longer a hidden-state validation probe. A personal approach is
 and is itself a real, observable, witnessable act. `sound-out` is the family-2 remote mission: its asset
 may refuse, defer, or abort without ever approaching the target. If the asset does make an approach,
 that act is observable and may travel, but its attribution is only what the target and bystanders
-actually learned — perhaps the intermediary, perhaps the spymaster if that purpose was disclosed. The
-composer never hides either action based on secret eligibility.
+actually learned — perhaps the intermediary, perhaps the spymaster if that purpose was disclosed.
+`sound-out` may learn willingness or arrange a meeting; it never enrolls the target. Final recruitment
+still belongs to the player's direct moment, preserving deferred backlog #23 (cutout recruiters/deeper
+cells). The composer never hides either action based on secret eligibility.
 
 The outward lifecycle is identical across eligible, ineligible, loyal, unwilling, enemy-linked, and
 during-wait-compromised candidates. Any may accept, refuse, or ask for time and later accept/refuse.
