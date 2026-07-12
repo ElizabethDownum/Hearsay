@@ -6,6 +6,7 @@ import {
 } from './actions';
 import type { InquiryKey } from './perception';
 import type { Rules } from './rules';
+import { isTerminal } from './scenario/referee';
 import { step } from './step';
 import type { TownFixture, WorldState } from './types';
 import type { EntityId, RumorId, VenueId } from './rumors/claim';
@@ -243,11 +244,13 @@ export function runLogOn(
   validateLog(log);
   let i = 0;
   while (world.tick < untilTick) {
+    if (isTerminal(world)) break;
     while (i < log.length && log[i]!.tick === world.tick) {
       applyAction(world, log[i]!, rules);
       i += 1;
     }
     step(world, rules);
+    if (isTerminal(world)) break;
   }
   return world;
 }

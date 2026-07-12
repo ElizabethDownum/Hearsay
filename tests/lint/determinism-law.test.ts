@@ -24,6 +24,38 @@ function violations(code: string, rules: Linter.RulesRecord): number {
 const isOn = (entry: unknown): boolean =>
   Array.isArray(entry) ? entry[0] === 2 || entry[0] === 'error' : entry === 2 || entry === 'error';
 
+function stripComments(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/\/\/[^\n]*/g, '');
+}
+
+function topLevelStatements(src: string, keyword: 'export' | 'import'): string[] {
+  const flattened = stripComments(src).replace(/\s+/g, ' ').trim();
+  const re = new RegExp(`\\b${keyword}\\b[^;]*(?:;|$)`, 'g');
+  return (flattened.match(re) ?? []).map((s) => s.trim()).filter((s) => s.length > 0);
+}
+
+function engineCrossings(src: string): string[] {
+  return [...topLevelStatements(src, 'import'), ...topLevelStatements(src, 'export')].filter((statement) =>
+    /['"][^'"]*(?:\/src\/sim\/|\/src\/world\/|\/src\/bots\/|\/src\/harness\/)/.test(statement) &&
+    !/^(?:import|export)\s+type\b/.test(statement));
+}
+
+function listFilesRecursive(dir: string): string[] {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const files: string[] = [];
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...listFilesRecursive(full));
+    } else if (entry.isFile()) {
+      files.push(full);
+    }
+  }
+  return files;
+}
+
 describe('determinism law — every prong fires (red) and clean code passes (green)', () => {
   it('bans Math.random / Date.now / argless new Date in engine code', async () => {
     const rules = await determinismRulesFor('src/core/rng.ts');
@@ -90,6 +122,33 @@ describe('determinism law — new Plan-6 dirs are really covered by the src/sim/
     const rules = await importRulesFor(file);
     expect(violations("import { Y } from '../../../app/src/main';", rules)).toBeGreaterThan(0);
   }, 15000);
+});
+
+describe('input hatch law — app/src/input/** crossings are type-only', () => {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const repoRoot = path.resolve(here, '../..');
+  const inputRoot = path.join(repoRoot, 'app/src/input');
+  const inputFiles = listFilesRecursive(inputRoot).filter((file) => /\.(ts|tsx)$/.test(file));
+
+  it('enumerates the known input surface', () => {
+    expect(inputFiles.map((file) => path.relative(repoRoot, file).replace(/\\/g, '/'))).toContain('app/src/input/actions.ts');
+  });
+
+  it.each(inputFiles.map((file) => path.relative(repoRoot, file).replace(/\\/g, '/')))('%s keeps engine crossings type-only', (relativeFile) => {
+    const source = fs.readFileSync(path.join(repoRoot, relativeFile), 'utf8');
+    for (const statement of engineCrossings(source)) {
+      expect(statement).toMatch(/^(?:import|export)\s+type\b/);
+    }
+  });
+
+  it('self-probes the crossing helper on legal, legal, and illegal forms', () => {
+    expect(engineCrossings("import { step } from '../../../src/sim/step';"))
+      .toEqual(["import { step } from '../../../src/sim/step';"]);
+    expect(engineCrossings("import type { Action } from '../../../src/sim/campaign';"))
+      .toEqual([]);
+    expect(engineCrossings("import '../../../src/sim/step';"))
+      .toHaveLength(1);
+  });
 });
 
 describe('no-omniscience law — the enemy never imports WorldState', () => {
@@ -197,26 +256,6 @@ describe('townview law — the unfenced barrel can never smuggle an engine value
   const here = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.resolve(here, '../..');
   const townviewSource = fs.readFileSync(path.join(repoRoot, 'app/src/townview.ts'), 'utf8');
-
-  // Comments must not fool the scan (e.g. a commented-out `export const foo = 1;` in a future
-  // edit's diff noise should never count as a real statement either way), so block and line
-  // comments are stripped before anything else runs.
-  function stripComments(src: string): string {
-    return src
-      .replace(/\/\*[\s\S]*?\*\//g, ' ') // block comments (incl. this file's own header doc)
-      .replace(/\/\/[^\n]*/g, '');       // line comments
-  }
-
-  // Flatten to one line so a statement that wraps multiple source lines (e.g. a multi-line
-  // `export type {\n  Foo,\n} from '...';`) is still captured whole, then split on the keyword's
-  // own statement boundary (the next `;`, or end of file for a trailing statement with no
-  // semicolon). This is a scan, not a parser — cheap and deliberately over-strict, which is
-  // exactly right for a file whose entire job is to carry nothing but type re-exports.
-  function topLevelStatements(src: string, keyword: 'export' | 'import'): string[] {
-    const flattened = stripComments(src).replace(/\s+/g, ' ').trim();
-    const re = new RegExp(`\\b${keyword}\\b[^;]*(?:;|$)`, 'g');
-    return (flattened.match(re) ?? []).map((s) => s.trim()).filter((s) => s.length > 0);
-  }
 
   it('finds real export statements (the scan itself is not vacuous)', () => {
     expect(topLevelStatements(townviewSource, 'export').length).toBeGreaterThan(0);

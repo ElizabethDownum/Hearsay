@@ -317,4 +317,16 @@ describe('advance halts at a terminal status change — the death tick is exact,
     session.advance(TICKS_PER_DAY);
     expect(session.world.tick).toBe(deathTick);
   });
+
+  it('loadSession stops at the same terminal death tick as live advance', { timeout: 30000 }, () => {
+    const live = newSession(SEED);
+    live.advance(at(CORONATION.days + 5, 0));
+    const deathTick = at(CORONATION.days, 0);
+    expect(live.world.tick).toBe(deathTick);
+
+    const replay = loadSession(live.save(), at(CORONATION.days + 5, 0));
+    expect(replay.world.scenario!.status).toBe('lost-clock');
+    expect(replay.world.tick).toBe(deathTick);
+    expect(hashWorld(replay.world)).toBe(hashWorld(live.world));
+  });
 });

@@ -4,7 +4,7 @@ import { STANDARD_RULES } from '../../../src/content/rules';
 import { CORONATION } from '../../../src/content/scenarios/coronation';
 import { generateValidTown } from '../../../src/world/serve';
 import { worldFromTown, attachPlayer } from '../../../src/world/attach';
-import { attachScenario } from '../../../src/sim/scenario/referee';
+import { attachScenario, isTerminal } from '../../../src/sim/scenario/referee';
 import { applyAction, runLogOn, type Action } from '../../../src/sim/campaign';
 import { CONVERSATION_BEAT } from '../../../src/sim/rumors/propagation';
 import { step } from '../../../src/sim/step';
@@ -75,11 +75,6 @@ function stageWorld(seed: string): WorldState {
   attachPlayer(world, town);
   attachScenario(world, town, CORONATION);
   return world;
-}
-
-/** True once the campaign has resolved — any status that is not 'running' (won / lost-*). */
-function isTerminal(world: WorldState): boolean {
-  return world.scenario !== null && world.scenario.status !== 'running';
 }
 
 /**

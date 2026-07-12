@@ -17,6 +17,10 @@ export function attachScenario(world: WorldState, town: GeneratedTown, def: Scen
   };
 }
 
+export function isTerminal(world: WorldState): boolean {
+  return world.scenario !== null && world.scenario.status !== 'running';
+}
+
 function quorumOf(win: WinCondition): number {
   switch (win.kind) {
     case 'council-turns': return win.quorum;
