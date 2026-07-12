@@ -1,6 +1,7 @@
 import { ESLint, Linter } from 'eslint';
 import fs from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 import { fileURLToPath } from 'node:url';
 
 // The determinism law is only real if every prong PROVABLY fires. We pull the
@@ -24,22 +25,48 @@ function violations(code: string, rules: Linter.RulesRecord): number {
 const isOn = (entry: unknown): boolean =>
   Array.isArray(entry) ? entry[0] === 2 || entry[0] === 'error' : entry === 2 || entry === 'error';
 
-function stripComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\/\/[^\n]*/g, '');
+function parseSource(src: string): ts.SourceFile {
+  return ts.createSourceFile('probe.ts', src, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+}
+
+function normalizedStatementText(statement: ts.Statement, sourceFile: ts.SourceFile): string {
+  return statement.getText(sourceFile).replace(/\s+/g, ' ').trim();
+}
+
+function hasExportModifier(statement: ts.Statement): boolean {
+  return ts.canHaveModifiers(statement)
+    && (ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) ?? false);
 }
 
 function topLevelStatements(src: string, keyword: 'export' | 'import'): string[] {
-  const flattened = stripComments(src).replace(/\s+/g, ' ').trim();
-  const re = new RegExp(`\\b${keyword}\\b[^;]*(?:;|$)`, 'g');
-  return (flattened.match(re) ?? []).map((s) => s.trim()).filter((s) => s.length > 0);
+  const sourceFile = parseSource(src);
+  return sourceFile.statements
+    .filter((statement) => keyword === 'import'
+      ? ts.isImportDeclaration(statement)
+      : ts.isExportDeclaration(statement) || ts.isExportAssignment(statement) || hasExportModifier(statement))
+    .map((statement) => normalizedStatementText(statement, sourceFile));
+}
+
+function isEngineSpecifier(moduleSpecifier: ts.Expression): boolean {
+  return ts.isStringLiteral(moduleSpecifier)
+    && /(?:\/src\/sim\/|\/src\/world\/|\/src\/bots\/|\/src\/harness\/)/.test(moduleSpecifier.text);
 }
 
 function engineCrossings(src: string): string[] {
-  return [...topLevelStatements(src, 'import'), ...topLevelStatements(src, 'export')].filter((statement) =>
-    /['"][^'"]*(?:\/src\/sim\/|\/src\/world\/|\/src\/bots\/|\/src\/harness\/)/.test(statement) &&
-    !/^(?:import|export)\s+type\b/.test(statement));
+  const sourceFile = parseSource(src);
+  return sourceFile.statements.flatMap((statement) => {
+    if (ts.isImportDeclaration(statement)) {
+      return isEngineSpecifier(statement.moduleSpecifier) && statement.importClause?.isTypeOnly !== true
+        ? [normalizedStatementText(statement, sourceFile)]
+        : [];
+    }
+    if (ts.isExportDeclaration(statement)) {
+      return statement.moduleSpecifier && isEngineSpecifier(statement.moduleSpecifier) && !statement.isTypeOnly
+        ? [normalizedStatementText(statement, sourceFile)]
+        : [];
+    }
+    return [];
+  });
 }
 
 function listFilesRecursive(dir: string): string[] {
@@ -148,6 +175,16 @@ describe('input hatch law — app/src/input/** crossings are type-only', () => {
       .toEqual([]);
     expect(engineCrossings("import '../../../src/sim/step';"))
       .toHaveLength(1);
+    // ASI bypass (the reviewed Important finding): the value import must be caught.
+    expect(engineCrossings(
+      "import type { Action } from '../../../src/sim/campaign'\nimport { step } from '../../../src/sim/step'\n",
+    )).toEqual(["import { step } from '../../../src/sim/step'"]);
+    // Multi-line value import fires.
+    expect(engineCrossings("import {\n  step,\n} from '../../../src/sim/step';")).toHaveLength(1);
+    // Multi-line type-only import is legal.
+    expect(engineCrossings("import type {\n  Action,\n} from '../../../src/sim/campaign';")).toEqual([]);
+    // Mixed clause is a VALUE import (isTypeOnly false) and must fire.
+    expect(engineCrossings("import { type Action, step } from '../../../src/sim/step';")).toHaveLength(1);
   });
 });
 
