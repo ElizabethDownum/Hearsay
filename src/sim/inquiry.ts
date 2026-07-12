@@ -86,6 +86,35 @@ function usableTask(world: WorldState, askerId: EntityId, day: number): InquiryT
   return null;
 }
 
+export interface OrdinaryAskOffer {
+  actor: EntityId;
+  taskIndex: number;
+  preferred: EntityId[];
+}
+
+/** Pure phase-4 selection input: one usable inquiry and its trust-ranked addressee list per NPC. */
+export function collectOrdinaryAskOffers(
+  world: WorldState, circle: Circle, t: Tick,
+): OrdinaryAskOffer[] {
+  const day = dayOf(t);
+  const members = [...circle.members].sort();
+  const offers: OrdinaryAskOffer[] = [];
+  for (const actor of members) {
+    if (actor === world.playerId) continue;
+    const tasks = world.inquiries[actor] ?? [];
+    const taskIndex = tasks.findIndex((task) => day < task.expiresDay && task.answersHeard < 2);
+    if (taskIndex < 0) continue;
+    const task = tasks[taskIndex]!;
+    const preferred = members
+      .filter((candidate) => candidate !== actor && !task.asked.includes(candidate))
+      .filter((candidate) => task.from === 'enemy' || trustBetween(world, actor, candidate) > 0)
+      .sort((a, b) =>
+        trustBetween(world, actor, b) - trustBetween(world, actor, a) || a.localeCompare(b));
+    if (preferred.length > 0) offers.push({ actor, taskIndex, preferred });
+  }
+  return offers;
+}
+
 /**
  * Rider 11R — the avatar's ask fires as a FAMILY-1 speech act. It addresses exactly the person the
  * human named (`task.addressee`, validated in-circle by applyAsk this same tick), never trust-repicked
@@ -104,7 +133,7 @@ function firePlayerAsk(
   // — never fire a substitute; just consume it so it leaves no residue. (Also narrows the type below.)
   if (addressee === undefined) { retireTask(world, member, task); return; }
   const asking: Asking = {
-    tick: t, venue: circle.venue, circleMembers: [...circle.members],
+    tick: t, venue: circle.venue, circleMembers: [...circle.members].sort(),
     speaker: member, addressedTo: addressee, about: task.about, authority: false,
   };
   askings.push(asking);
@@ -156,7 +185,7 @@ export function runAskPhase(
     if (eligible.length === 0) continue;
     const addressee = eligible[0]!;
     const asking: Asking = {
-      tick: t, venue: circle.venue, circleMembers: [...circle.members],
+      tick: t, venue: circle.venue, circleMembers: [...circle.members].sort(),
       speaker: member, addressedTo: addressee, about: task.about,
       authority: task.from === 'enemy',
     };

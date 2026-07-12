@@ -113,7 +113,9 @@ describe('five-phase tick transaction', () => {
   it('rejects stale frame ticks and offer tokens without mutating the world', () => {
     const world = staged();
     const frame = prepareTick(world, RULES);
-    expect(frame.circles).toEqual(circlesAt(world, world.tick));
+    expect(frame.circles).toEqual(circlesAt(world, world.tick).map((circle) => ({
+      ...circle, members: [...circle.members].sort(),
+    })));
 
     const beforeToken = hashWorld(world);
     expect(() => finishTick(world, RULES, { ...frame, offerToken: 'offer-stale' })).toThrow(/offer token/i);

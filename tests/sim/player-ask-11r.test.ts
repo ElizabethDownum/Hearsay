@@ -8,6 +8,8 @@ import { runAskPhase } from '../../src/sim/inquiry';
 import { step, runUntil } from '../../src/sim/step';
 import { circlesAt, type Circle } from '../../src/sim/agents';
 import { hashWorld } from '../../src/sim/hash';
+import { cloneSerializable } from '../../src/sim/hash';
+import { collectCircleIntents, realizeCircleIntents } from '../../src/sim/phases';
 import { at } from '../../src/core/time';
 import { SOMEONE, type EntityId } from '../../src/sim/rumors/claim';
 import type { WorldState } from '../../src/sim/types';
@@ -110,11 +112,7 @@ describe('11R — the avatar ask honors the addressee', () => {
   });
 });
 
-// (t4) NPC + enemy inquiry dispatch is byte-unchanged vs base. The hash below was captured on the
-// pre-11R base (acf2f7b) and MUST stay equal after the change — proof the NPC path never moved.
-describe('11R — NPC / enemy inquiry dispatch is byte-identical to base', () => {
-  const NPC_ENEMY_PIN = 3062497362; // captured on the pre-11R base (acf2f7b); must not move
-
+describe('11R — NPC / enemy inquiry dispatch is order-invariant and replay-stable', () => {
   const build = (): WorldState => {
     const world = buildWorld(miniTown(), 'ask-11r-t4');
     // An NPC self-asker (the reactions-style dispatch task) with real answerers — exercises the
@@ -129,9 +127,30 @@ describe('11R — NPC / enemy inquiry dispatch is byte-identical to base', () =>
     return world;
   };
 
-  it('(t4) an NPC-asker + enemy-interrogation run hashes to the pinned base value', () => {
-    const world = build();
-    runUntil(world, at(2, 0), RULES);
-    expect(hashWorld(world)).toBe(NPC_ENEMY_PIN);
+  const normalize = <T>(value: T): T => cloneSerializable(value);
+  const runNpcEnemyFrame = (world: WorldState, members: EntityId[]) => {
+    const frame = collectCircleIntents(
+      world, { venue: 'square', members }, 0, RULES, [], new Set(),
+    );
+    return realizeCircleIntents(world, frame, 0, RULES);
+  };
+  const replayOf = (world: WorldState): WorldState => cloneSerializable(world);
+
+  it('(t4) NPC and enemy asks ignore member source order and remain serializable', () => {
+    const worldA = build();
+    const worldB = build();
+    expect(normalize(runNpcEnemyFrame(worldA, ['ada', 'dov', 'cyn'])))
+      .toEqual(normalize(runNpcEnemyFrame(worldB, ['cyn', 'dov', 'ada'])));
+    expect(hashWorld(worldB)).toBe(hashWorld(worldA));
+    expect(hashWorld(replayOf(worldA))).toBe(hashWorld(worldA));
+    const all = [...worldA.chronicle, ...worldB.chronicle];
+    expect(all.filter((event) => event.kind === 'asking' && !event.authority)).toHaveLength(0);
+
+    const full = build();
+    runUntil(full, at(2, 0), RULES);
+    expect(full.chronicle.filter((event) => event.kind === 'asking' && !event.authority).length)
+      .toBeGreaterThan(0);
+    expect(full.chronicle.filter((event) => event.kind === 'asking' && event.authority).length)
+      .toBeGreaterThan(0);
   });
 });

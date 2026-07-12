@@ -4,18 +4,19 @@ import { CIRCLE_SIZE, positionOf, type Circle } from './agents';
 import { captureEvidence, runEnemyDay } from './counterintel';
 import { captureIntel } from './fieldwork';
 import { cloneSerializable, stableStringify } from './hash';
-import { expireInquiries, runAskPhase, runPlayerAskPhase } from './inquiry';
+import { chooseAnswer, collectOrdinaryAskOffers, expireInquiries, runPlayerAskPhase } from './inquiry';
 import { deliverCouriers } from './network/couriers';
 import { payWagesNightly } from './network/roster';
 import { runTurncoatPass } from './network/turncoats';
 import { observationsFor, type Asking, type TickEvents, type Utterance } from './perception';
 import { reactToSelfRumor } from './reactions';
-import { chooseTelling, ingest, CONVERSATION_BEAT } from './rumors/propagation';
-import { mintClaim, type EntityId, type VenueId } from './rumors/claim';
+import { ingest, realizeTelling, selectTelling, CONVERSATION_BEAT } from './rumors/propagation';
+import { mintClaim, type EntityId, type RumorId, type VenueId } from './rumors/claim';
 import { scenarioNightly } from './scenario/referee';
 import { runVignettes } from './vignettes/engine';
 import type { Rules } from './rules';
 import type { ScheduleOverride, WorldState } from './types';
+import { trustBetween } from './world';
 
 export interface ScheduledSetup {
   id: string;
@@ -32,6 +33,223 @@ export interface PreparedTick {
   positions: Record<EntityId, VenueId>;
   circles: Circle[];
   offerToken: string;
+}
+
+export type NpcAutonomousIntent =
+  | { kind: 'recruitment-answer'; actor: EntityId; ref: string; rank: 0 }
+  | { kind: 'network-forward'; actor: EntityId; ref: string; rank: 1 }
+  | { kind: 'directive-act'; actor: EntityId; ref: string; rank: 2 | 4 | 6 }
+  | { kind: 'drop-pickup'; actor: EntityId; ref: string; rank: 3 }
+  | { kind: 'ordinary-ask'; actor: EntityId; ref: string; rank: 5;
+      taskIndex: number; preferred: EntityId[] }
+  | { kind: 'ordinary-tell'; actor: EntityId; ref: string; rank: 7;
+      family: RumorId; addressedTo: EntityId };
+
+export interface CircleIntentFrame {
+  circle: Circle;
+  candidates: NpcAutonomousIntent[];
+  selected: NpcAutonomousIntent[];
+  answeredDirectly: EntityId[];
+}
+
+export interface NpcIntentRealization<Extra = never> {
+  askings: Asking[];
+  answers: Utterance[];
+  tellings: Utterance[];
+  extras: Extra[];
+}
+
+export type RealizeExtraIntent<Extra = never> = (
+  world: WorldState,
+  intent: Exclude<NpcAutonomousIntent, { kind: 'ordinary-ask' } | { kind: 'ordinary-tell' }>,
+  circle: Circle,
+  t: Tick,
+  rules: Rules,
+) => NpcIntentRealization<Extra>;
+
+const canonicalCircle = (circle: Circle): Circle => ({
+  venue: circle.venue,
+  members: [...circle.members].sort(),
+});
+
+const compareIntent = (a: NpcAutonomousIntent, b: NpcAutonomousIntent): number =>
+  a.rank - b.rank || a.kind.localeCompare(b.kind) || a.ref.localeCompare(b.ref);
+
+/** Purely collect one circle's complete offers from the shared pre-action world. */
+export function collectCircleIntents(
+  world: WorldState,
+  circle: Circle,
+  t: Tick,
+  rules: Rules,
+  extra: readonly NpcAutonomousIntent[],
+  answeredDirectly: ReadonlySet<EntityId>,
+): CircleIntentFrame {
+  const canonical = canonicalCircle(circle);
+  const candidates: NpcAutonomousIntent[] = collectOrdinaryAskOffers(world, canonical, t)
+    .map((offer) => ({
+      kind: 'ordinary-ask' as const,
+      actor: offer.actor,
+      ref: String(offer.taskIndex).padStart(10, '0'),
+      rank: 5 as const,
+      taskIndex: offer.taskIndex,
+      preferred: [...offer.preferred],
+    }));
+
+  for (const actor of canonical.members) {
+    if (actor === world.playerId) continue;
+    const offer = selectTelling(world, actor, canonical, t, rules);
+    if (offer !== null) {
+      candidates.push({
+        kind: 'ordinary-tell', actor, ref: `${offer.family}:${offer.addressedTo}`, rank: 7,
+        family: offer.family, addressedTo: offer.addressedTo,
+      });
+    }
+  }
+  candidates.push(...extra
+    .filter((intent) => canonical.members.includes(intent.actor) && intent.actor !== world.playerId)
+    .map((intent) => cloneSerializable(intent)));
+  candidates.sort((a, b) => a.actor.localeCompare(b.actor) || compareIntent(a, b));
+
+  const selected: NpcAutonomousIntent[] = [];
+  for (const actor of [...new Set(candidates.map((candidate) => candidate.actor))].sort()) {
+    const winner = candidates.filter((candidate) => candidate.actor === actor).sort(compareIntent)[0];
+    if (winner !== undefined) selected.push(cloneSerializable(winner));
+  }
+  return {
+    circle: canonical,
+    candidates,
+    selected,
+    answeredDirectly: [...answeredDirectly].sort(),
+  };
+}
+
+const uninstalledExtra: RealizeExtraIntent<never> = (_world, intent) => {
+  switch (intent.kind) {
+    case 'network-forward':
+      throw new Error('phase4: network-forward handler not installed');
+    case 'directive-act':
+      throw new Error('phase4: directive-act handler not installed');
+    case 'drop-pickup':
+      throw new Error('phase4: drop-pickup handler not installed');
+    case 'recruitment-answer':
+      throw new Error('phase4: recruitment-answer handler not installed');
+    default: {
+      const exhaustive: never = intent;
+      return exhaustive;
+    }
+  }
+};
+
+/** Realize selections without allowing response speech to consume an NPC's autonomous slot. */
+export function realizeCircleIntents<Extra = never>(
+  world: WorldState,
+  frame: CircleIntentFrame,
+  t: Tick,
+  rules: Rules,
+  realizeExtra?: RealizeExtraIntent<Extra>,
+): NpcIntentRealization<Extra> {
+  const circle = canonicalCircle(frame.circle);
+  const askings: Asking[] = [];
+  const answers: Utterance[] = [];
+  const tellings: Utterance[] = [];
+  const extras: Extra[] = [];
+  const selectedAsks = frame.selected
+    .filter((intent): intent is Extract<NpcAutonomousIntent, { kind: 'ordinary-ask' }> =>
+      intent.kind === 'ordinary-ask')
+    .sort((a, b) => a.actor.localeCompare(b.actor));
+  const realizedAsks: {
+    asking: Asking;
+    taskIndex: number;
+  }[] = [];
+
+  for (const intent of selectedAsks) {
+    const task = world.inquiries[intent.actor]?.[intent.taskIndex];
+    if (task === undefined) continue;
+    const addressedTo = intent.preferred.find((id) =>
+      circle.members.includes(id) && id !== intent.actor && !task.asked.includes(id));
+    if (addressedTo === undefined) continue;
+    const asking: Asking = {
+      tick: t,
+      venue: circle.venue,
+      circleMembers: [...circle.members],
+      speaker: intent.actor,
+      addressedTo,
+      about: task.about,
+      authority: task.from === 'enemy',
+    };
+    askings.push(asking);
+    task.asked.push(addressedTo);
+    realizedAsks.push({ asking, taskIndex: intent.taskIndex });
+  }
+
+  const answeredDirectly = new Set(frame.answeredDirectly);
+  const answerWinners = new Map<EntityId, { asking: Asking; taskIndex: number }>();
+  for (const realized of realizedAsks) {
+    const answerer = realized.asking.addressedTo;
+    if (answeredDirectly.has(answerer)) continue;
+    const current = answerWinners.get(answerer);
+    if (current === undefined) {
+      answerWinners.set(answerer, realized);
+      continue;
+    }
+    const nextTrust = trustBetween(world, answerer, realized.asking.speaker);
+    const currentTrust = trustBetween(world, answerer, current.asking.speaker);
+    if (nextTrust > currentTrust ||
+      (nextTrust === currentTrust && realized.asking.speaker < current.asking.speaker)) {
+      answerWinners.set(answerer, realized);
+    }
+  }
+  for (const [answerer, winner] of [...answerWinners.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    const answer = chooseAnswer(world, answerer, winner.asking, t, rules);
+    if (answer === null) continue;
+    answers.push(answer);
+    const tasks = world.inquiries[winner.asking.speaker] ?? [];
+    const task = tasks[winner.taskIndex];
+    if (task === undefined) continue;
+    task.answersHeard += 1;
+    if (task.answersHeard >= 2) {
+      const remaining = tasks.filter((_, index) => index !== winner.taskIndex);
+      if (remaining.length === 0) delete world.inquiries[winner.asking.speaker];
+      else world.inquiries[winner.asking.speaker] = remaining;
+    }
+  }
+
+  const extraHandler = realizeExtra ?? (uninstalledExtra as RealizeExtraIntent<Extra>);
+  const selectedExtras = frame.selected
+    .filter((intent): intent is Exclude<NpcAutonomousIntent,
+      { kind: 'ordinary-ask' } | { kind: 'ordinary-tell' }> =>
+      intent.kind !== 'ordinary-ask' && intent.kind !== 'ordinary-tell')
+    .sort((a, b) => a.actor.localeCompare(b.actor));
+  for (const intent of selectedExtras) {
+    const realized = extraHandler(world, intent, circle, t, rules);
+    askings.push(...realized.askings.map((asking) => ({
+      ...asking, circleMembers: [...asking.circleMembers].sort(),
+    })));
+    answers.push(...realized.answers.map((answer) => ({
+      ...answer, circleMembers: [...answer.circleMembers].sort(),
+    })));
+    tellings.push(...realized.tellings.map((telling) => ({
+      ...telling, circleMembers: [...telling.circleMembers].sort(),
+    })));
+    extras.push(...realized.extras);
+  }
+
+  const selectedTellings = frame.selected
+    .filter((intent): intent is Extract<NpcAutonomousIntent, { kind: 'ordinary-tell' }> =>
+      intent.kind === 'ordinary-tell')
+    .sort((a, b) => a.actor.localeCompare(b.actor));
+  const answeredFamilies = new Set(answers.map((answer) =>
+    `${answer.speaker}:${answer.claim.family}`));
+  for (const intent of selectedTellings) {
+    // A same-family answer and autonomous telling both remain observable, but the answer path must
+    // not manufacture a retell cooldown. The independent telling reuses that already-spoken family
+    // without turning the causally compelled answer into a cooldown write.
+    const telling = realizeTelling(world, intent.actor, {
+      family: intent.family, addressedTo: intent.addressedTo,
+    }, circle, t, rules, !answeredFamilies.has(`${intent.actor}:${intent.family}`));
+    if (telling !== null) tellings.push(telling);
+  }
+  return { askings, answers, tellings, extras };
 }
 
 function applySetup(world: WorldState, setup: ScheduledSetup): void {
@@ -86,7 +304,7 @@ function circlesFromPositions(
     const rng = new Rng(world.seed, `circles:${venue}:${dayOf(tick)}:${hour}`);
     const shuffled = rng.shuffle([...ids].sort());
     for (let i = 0; i < shuffled.length; i += CIRCLE_SIZE) {
-      circles.push({ venue, members: shuffled.slice(i, i + CIRCLE_SIZE) });
+      circles.push({ venue, members: shuffled.slice(i, i + CIRCLE_SIZE).sort() });
     }
   }
   return circles;
@@ -98,7 +316,7 @@ function offerTokenFor(world: WorldState, tick: Tick, circles: Circle[], prior: 
     venue: world.playerVenue,
     circle: world.playerId === null
       ? []
-      : (circles.find((circle) => circle.members.includes(world.playerId!))?.members ?? []),
+      : [...(circles.find((circle) => circle.members.includes(world.playerId!))?.members ?? [])].sort(),
     priorIds: prior.map((setup) => setup.id),
   };
   return `offer-${fnv1a32(stableStringify(offerBasis))}`;
@@ -157,7 +375,7 @@ function resolvePlayerSpeech(
       const claim = mintClaim(world, { ...world.pendingTell.spec, family, parent: null });
       world.claims[claim.id] = claim;
       utterances.push({
-        tick, venue: offered.venue, circleMembers: offered.members,
+        tick, venue: offered.venue, circleMembers: [...offered.members].sort(),
         speaker: world.playerId, addressedTo: world.pendingTell.to, claim, mode: 'telling',
       });
     }
@@ -175,7 +393,7 @@ function resolvePlayerSpeech(
         timesHeard: 1, apparentSources: [world.playerId], discretion: false, counterSpun: false,
       };
       utterances.push({
-        tick, venue: offered.venue, circleMembers: offered.members,
+        tick, venue: offered.venue, circleMembers: [...offered.members].sort(),
         speaker: world.playerId, addressedTo: buyer, claim, mode: 'telling',
       });
     }
@@ -188,24 +406,47 @@ function resolvePlayerSpeech(
   return directAsk.spoke;
 }
 
+export function resolveAutonomousPhase(
+  world: WorldState,
+  rules: Rules,
+  tick: Tick,
+  circles: Circle[],
+  answeredDirectly: ReadonlySet<EntityId>,
+  extra: readonly NpcAutonomousIntent[] = [],
+): NpcIntentRealization {
+  if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) {
+    return { askings: [], answers: [], tellings: [], extras: [] };
+  }
+  const orderedCircles = circles
+    .map(canonicalCircle)
+    .sort((a, b) => a.venue.localeCompare(b.venue) ||
+      a.members.join('\0').localeCompare(b.members.join('\0')));
+  // Every frame is collected before any realization mutates the live world.
+  const frames = orderedCircles
+    .filter((circle) => circle.members.length >= 2)
+    .map((circle) => collectCircleIntents(world, circle, tick, rules, extra, answeredDirectly));
+  const result: NpcIntentRealization = { askings: [], answers: [], tellings: [], extras: [] };
+  for (const frame of frames) {
+    const realized = realizeCircleIntents(world, frame, tick, rules);
+    result.askings.push(...realized.askings);
+    result.answers.push(...realized.answers);
+    result.tellings.push(...realized.tellings);
+  }
+  return result;
+}
+
 function resolveNpcSpeech(
   world: WorldState, rules: Rules, tick: Tick, circles: Circle[],
   utterances: Utterance[], askings: Asking[], alreadySpoke: readonly EntityId[],
 ): void {
-  if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) return;
-  for (const circle of circles) {
-    if (circle.members.length < 2) continue;
-    const phase = runAskPhase(world, circle, tick, rules, alreadySpoke);
-    askings.push(...phase.askings);
-    utterances.push(...phase.answers);
-    const spoke = new Set(phase.spoke);
-    for (const member of circle.members) {
-      if (spoke.has(member) || alreadySpoke.includes(member) || member === world.playerId) continue;
-      const utterance = chooseTelling(world, member, circle, tick, rules);
-      if (utterance) utterances.push(utterance);
-    }
-  }
-  utterances.push(...deliverCouriers(world, tick, rules));
+  const phase = resolveAutonomousPhase(world, rules, tick, circles, new Set(alreadySpoke));
+  askings.push(...phase.askings);
+  utterances.push(...phase.answers, ...phase.tellings);
+  // Transitional Plan-8 courier loop. Task 9 replaces it with directive-act candidates.
+  utterances.push(...deliverCouriers(world, tick, rules).map((utterance) => ({
+    ...utterance,
+    circleMembers: [...utterance.circleMembers].sort(),
+  })));
 }
 
 function recordAndIngest(
@@ -216,6 +457,7 @@ function recordAndIngest(
       kind: 'telling', tick: utterance.tick, venue: utterance.venue, speaker: utterance.speaker,
       addressedTo: utterance.addressedTo, claimId: utterance.claim.id,
       heardBy: utterance.circleMembers.filter((member) => member !== utterance.speaker)
+        .sort()
         .map((id) => ({ id, addressed: id === utterance.addressedTo })),
       mode: utterance.mode,
     });
@@ -225,6 +467,7 @@ function recordAndIngest(
       kind: 'asking', tick: asking.tick, venue: asking.venue, speaker: asking.speaker,
       addressedTo: asking.addressedTo, about: asking.about, authority: asking.authority,
       heardBy: asking.circleMembers.filter((member) => member !== asking.speaker)
+        .sort()
         .map((id) => ({ id, addressed: id === asking.addressedTo })),
     });
   }

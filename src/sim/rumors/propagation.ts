@@ -87,10 +87,15 @@ function passesGates(teller: Npc, belief: Belief, world: WorldState, t: Tick, ru
   return true;
 }
 
-/** Best (belief, addressee) above threshold; deterministic lexicographic tie-break. */
-export function chooseTelling(
+export interface TellingOffer {
+  family: string;
+  addressedTo: EntityId;
+}
+
+/** Pure best (belief, addressee) selection above threshold. */
+export function selectTelling(
   world: WorldState, tellerId: EntityId, circle: Circle, t: Tick, rules: Rules,
-): Utterance | null {
+): TellingOffer | null {
   const teller = world.npcs[tellerId]!;
   const store = world.beliefs[tellerId] ?? {}; // invariant: buildWorld seeds a store for every NPC
   let best: { score: number; family: string; addressee: EntityId; belief: Belief } | null = null;
@@ -106,21 +111,39 @@ export function chooseTelling(
       }
     }
   }
-  if (!best) return null;
+  return best === null ? null : { family: best.family, addressedTo: best.addressee };
+}
 
+/** Realize a previously selected telling without re-running offer selection. */
+export function realizeTelling(
+  world: WorldState, tellerId: EntityId, offer: TellingOffer,
+  circle: Circle, t: Tick, rules: Rules, recordCooldown = true,
+): Utterance | null {
+  const belief = world.beliefs[tellerId]?.[offer.family];
+  if (!belief || !circle.members.includes(offer.addressedTo)) return null;
+
+  const teller = world.npcs[tellerId]!;
   const tellerTraits = teller.traits.flatMap((id) => (rules.traits[id] ? [rules.traits[id]!] : []));
-  const delta = applyTraits(tellerTraits, best.belief.claim, traitContextOf(teller, world));
+  const delta = applyTraits(tellerTraits, belief.claim, traitContextOf(teller, world));
   const outgoing = mintClaim(world, {
-    ...best.belief.claim, ...delta,
-    family: best.belief.claim.family, parent: best.belief.claim.id,
+    ...belief.claim, ...delta,
+    family: belief.claim.family, parent: belief.claim.id,
   });
   world.claims[outgoing.id] = outgoing;
-  world.lastTold[`${tellerId}:${best.family}`] = t;
+  if (recordCooldown) world.lastTold[`${tellerId}:${offer.family}`] = t;
 
   return {
-    tick: t, venue: circle.venue, circleMembers: [...circle.members],
-    speaker: tellerId, addressedTo: best.addressee, claim: outgoing, mode: 'telling',
+    tick: t, venue: circle.venue, circleMembers: [...circle.members].sort(),
+    speaker: tellerId, addressedTo: offer.addressedTo, claim: outgoing, mode: 'telling',
   };
+}
+
+/** Compatibility composition for callers that still select and realize in one operation. */
+export function chooseTelling(
+  world: WorldState, tellerId: EntityId, circle: Circle, t: Tick, rules: Rules,
+): Utterance | null {
+  const offer = selectTelling(world, tellerId, circle, t, rules);
+  return offer === null ? null : realizeTelling(world, tellerId, offer, circle, t, rules);
 }
 
 /** The minimal slice of a heard utterance a mind ingests — what perception hands over. */

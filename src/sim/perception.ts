@@ -55,7 +55,7 @@ export function observationsFor(observer: EntityId, events: TickEvents): Observa
   const myVenue = events.positions[observer];
 
   if (myVenue !== undefined) {
-    for (const [actor, venue] of Object.entries(events.positions)) {
+    for (const [actor, venue] of Object.entries(events.positions).sort(([a], [b]) => a.localeCompare(b))) {
       if (actor !== observer && venue === myVenue) {
         observations.push({ kind: 'presence', tick: events.tick, venue: myVenue, actor });
       }

@@ -8,11 +8,154 @@ import { SOMEONE } from '../../src/sim/rumors/claim';
 import type { Asking } from '../../src/sim/perception';
 import type { WorldState } from '../../src/sim/types';
 import { hashWorld } from '../../src/sim/hash';
+import {
+  collectCircleIntents,
+  realizeCircleIntents,
+  type NpcAutonomousIntent,
+} from '../../src/sim/phases';
 import { miniTown } from './helpers/minitown';
 
 const RULES = STANDARD_RULES;
 
 describe('asking', () => {
+  const seededSimultaneousWorld = (seed: string): WorldState => {
+    const world = buildWorld(miniTown(), seed);
+    applyInject(world, 'ada', { subject: 'dov', predicate: 'stole', object: null,
+      count: null, severity: 3, place: null, attribution: SOMEONE });
+    world.beliefs.ada!.f0!.apparentSources = ['bez', 'cyn'];
+    world.beliefs.ada!.f0!.credence = 0.9;
+    world.inquiries.dov = [{
+      about: { family: 'f0' }, from: 'self', expiresDay: 2, asked: [], answersHeard: 0,
+    }];
+    return world;
+  };
+
+  it('collects canonically without mutation and realizes answer plus independent telling', () => {
+    const worldA = seededSimultaneousWorld('simultaneous-order');
+    const worldB = JSON.parse(JSON.stringify(worldA)) as WorldState;
+    const circleA = { venue: 'square', members: ['ada', 'bez', 'cyn', 'dov'] };
+    const circleB = { venue: 'square', members: [...circleA.members].reverse() };
+    const beforeA = hashWorld(worldA);
+    const beforeB = hashWorld(worldB);
+
+    const frameA = collectCircleIntents(worldA, circleA, 0, RULES, [], new Set());
+    const frameB = collectCircleIntents(worldB, circleB, 0, RULES, [], new Set());
+    expect(hashWorld(worldA)).toBe(beforeA);
+    expect(hashWorld(worldB)).toBe(beforeB);
+    expect(frameB).toEqual(frameA);
+
+    const eventsA = realizeCircleIntents(worldA, frameA, 0, RULES);
+    const eventsB = realizeCircleIntents(worldB, frameB, 0, RULES);
+    expect(eventsB).toEqual(eventsA);
+    expect(hashWorld(worldB)).toBe(hashWorld(worldA));
+    expect(eventsA.askings.filter((a) => a.speaker === 'dov')).toHaveLength(1);
+    expect(eventsA.answers.filter((u) => u.speaker === 'ada' && u.addressedTo === 'dov')).toHaveLength(1);
+    expect(eventsA.tellings.filter((u) => u.speaker === 'ada')).toHaveLength(1);
+    expect(eventsA.tellings[0]!.circleMembers).toEqual(['ada', 'bez', 'cyn', 'dov']);
+  });
+
+  it('selects one same-actor intent by rank, kind, and ref', () => {
+    const world = seededSimultaneousWorld('simultaneous-rank');
+    const circle = { venue: 'square', members: ['ada', 'bez', 'cyn', 'dov'] };
+    const extra: NpcAutonomousIntent[] = [
+      { kind: 'directive-act', actor: 'ada', ref: 'd9', rank: 2 },
+      { kind: 'network-forward', actor: 'ada', ref: '0000000000:0000000010', rank: 1 },
+      { kind: 'network-forward', actor: 'ada', ref: '0000000000:0000000002', rank: 1 },
+      { kind: 'ordinary-tell', actor: 'ada', ref: 'f9:bez', rank: 7,
+        family: 'f9', addressedTo: 'bez' },
+    ];
+    const frame = collectCircleIntents(world, circle, 0, RULES, extra, new Set());
+    expect(frame.selected.filter((intent) => intent.actor === 'ada')).toEqual([
+      { kind: 'network-forward', actor: 'ada', ref: '0000000000:0000000002', rank: 1 },
+    ]);
+  });
+
+  it.each([
+    [
+      { kind: 'network-forward', actor: 'bez', ref: '0000000000:0000000002', rank: 1 },
+      'phase4: network-forward handler not installed',
+    ],
+    [
+      { kind: 'directive-act', actor: 'bez', ref: 'd2', rank: 2 },
+      'phase4: directive-act handler not installed',
+    ],
+    [
+      { kind: 'drop-pickup', actor: 'bez', ref: 'drop-payload-2', rank: 3 },
+      'phase4: drop-pickup handler not installed',
+    ],
+    [
+      { kind: 'recruitment-answer', actor: 'bez', ref: 'approach-2', rank: 0 },
+      'phase4: recruitment-answer handler not installed',
+    ],
+  ] as const)('names the uninstalled %s arm', (intent, message) => {
+    const world = seededSimultaneousWorld(`uninstalled-${intent.kind}`);
+    const frame = collectCircleIntents(
+      world, { venue: 'square', members: ['ada', 'bez', 'cyn', 'dov'] },
+      0, RULES, [intent], new Set(),
+    );
+    expect(frame.selected).toContainEqual(intent);
+    expect(() => realizeCircleIntents(world, frame, 0, RULES)).toThrow(message);
+  });
+
+  it('resolves competing askers by answerer trust, then honors answeredDirectly', () => {
+    const build = (): WorldState => {
+      const world = seededSimultaneousWorld('simultaneous-answer');
+      world.inquiries.bez = [{
+        about: { family: 'f0' }, from: 'self', expiresDay: 2, asked: [], answersHeard: 0,
+      }];
+      return world;
+    };
+    const circle = { venue: 'square', members: ['dov', 'cyn', 'bez', 'ada'] };
+
+    const world = build();
+    const result = realizeCircleIntents(
+      world, collectCircleIntents(world, circle, 0, RULES, [], new Set()), 0, RULES,
+    );
+    expect(result.askings.filter((asking) => asking.addressedTo === 'ada')).toHaveLength(2);
+    expect(result.answers.filter((answer) => answer.speaker === 'ada')).toHaveLength(1);
+    expect(result.answers.find((answer) => answer.speaker === 'ada')!.addressedTo).toBe('bez');
+
+    const directWorld = build();
+    const directResult = realizeCircleIntents(
+      directWorld,
+      collectCircleIntents(directWorld, circle, 0, RULES, [], new Set(['ada'])),
+      0,
+      RULES,
+    );
+    expect(directResult.askings.filter((asking) => asking.addressedTo === 'ada')).toHaveLength(2);
+    expect(directResult.answers.filter((answer) => answer.speaker === 'ada')).toHaveLength(0);
+    expect(directResult.tellings.filter((telling) => telling.speaker === 'ada')).toHaveLength(1);
+  });
+
+  it('keeps cooldowns for different-family and non-answering autonomous tellings', () => {
+    const world = seededSimultaneousWorld('simultaneous-cooldown-controls');
+    world.beliefs.ada!.f0!.credence = 0.6;
+    applyInject(world, 'ada', { subject: 'bez', predicate: 'stole', object: null,
+      count: null, severity: 5, place: null, attribution: SOMEONE });
+    world.beliefs.ada!.f1!.apparentSources = ['bez', 'cyn'];
+    world.beliefs.ada!.f1!.credence = 0.95;
+    applyInject(world, 'cyn', { subject: 'bez', predicate: 'stole', object: null,
+      count: null, severity: 5, place: null, attribution: SOMEONE });
+    world.beliefs.cyn!.f2!.credence = 0.95;
+
+    const frame = collectCircleIntents(
+      world, { venue: 'square', members: ['dov', 'cyn', 'bez', 'ada'] },
+      0, RULES, [], new Set(),
+    );
+    expect(frame.selected).toContainEqual(expect.objectContaining({
+      kind: 'ordinary-tell', actor: 'ada', family: 'f1',
+    }));
+    expect(frame.selected).toContainEqual(expect.objectContaining({
+      kind: 'ordinary-tell', actor: 'cyn', family: 'f2',
+    }));
+
+    const result = realizeCircleIntents(world, frame, 0, RULES);
+    expect(result.answers).toContainEqual(expect.objectContaining({ speaker: 'ada' }));
+    expect(world.lastTold['ada:f0']).toBeUndefined();
+    expect(world.lastTold['ada:f1']).toBe(0);
+    expect(world.lastTold['cyn:f2']).toBe(0);
+  });
+
   it('an asker spends their beat asking (not telling), the chronicle records it, bystanders observe it', () => {
     const world = buildWorld(miniTown(), 'inq-1');
     applyInject(world, 'ada', { subject: 'dov', predicate: 'stole', object: null,
