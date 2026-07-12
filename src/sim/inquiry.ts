@@ -126,12 +126,12 @@ function firePlayerAsk(
  * the tell phase can skip them. Bookkeeping (asked, answersHeard, retirement) happens here.
  */
 export function runAskPhase(
-  world: WorldState, circle: Circle, t: Tick, rules: Rules,
+  world: WorldState, circle: Circle, t: Tick, rules: Rules, alreadySpoke: readonly EntityId[] = [],
 ): { askings: Asking[]; answers: Utterance[]; spoke: EntityId[] } {
   const day = dayOf(t);
   const askings: Asking[] = [];
   const answers: Utterance[] = [];
-  const spoke = new Set<EntityId>();
+  const spoke = new Set<EntityId>(alreadySpoke);
 
   for (const member of circle.members) {
     if (spoke.has(member)) continue;
@@ -172,6 +172,20 @@ export function runAskPhase(
     }
     if (task.answersHeard >= 2) retireTask(world, member, task);
   }
+  return { askings, answers, spoke: [...spoke] };
+}
+
+/** Resolve only the avatar's causally direct ask/answer against its offered circle. */
+export function runPlayerAskPhase(
+  world: WorldState, circle: Circle | undefined, t: Tick, rules: Rules,
+): { askings: Asking[]; answers: Utterance[]; spoke: EntityId[] } {
+  if (!circle || world.playerId === null) return { askings: [], answers: [], spoke: [] };
+  const task = (world.inquiries[world.playerId] ?? []).find((candidate) => candidate.from === 'self');
+  if (!task) return { askings: [], answers: [], spoke: [] };
+  const askings: Asking[] = [];
+  const answers: Utterance[] = [];
+  const spoke = new Set<EntityId>();
+  firePlayerAsk(world, circle, world.playerId, task, t, rules, askings, answers, spoke);
   return { askings, answers, spoke: [...spoke] };
 }
 

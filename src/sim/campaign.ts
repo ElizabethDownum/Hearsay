@@ -7,7 +7,7 @@ import {
 import type { InquiryKey } from './perception';
 import type { Rules } from './rules';
 import { isTerminal } from './scenario/referee';
-import { step } from './step';
+import { finishTick, prepareTick } from './phases';
 import type { TownFixture, WorldState } from './types';
 import type { EntityId, RumorId, VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
@@ -234,8 +234,8 @@ function validateLog(log: ActionLog): void {
 }
 
 /**
- * Deterministic replay: actions with tick === world.tick apply immediately
- * before that tick steps, in log order. Same world + same log + same untilTick = same world.
+ * Deterministic replay: actions with tick === world.tick apply in the prepared tick's player phase,
+ * in log order. Same world + same log + same untilTick = same world.
  * The seam enemy-attached worlds (worldFromTown) replay through.
  */
 export function runLogOn(
@@ -243,14 +243,18 @@ export function runLogOn(
 ): WorldState {
   validateLog(log);
   let i = 0;
-  while (world.tick < untilTick) {
-    if (isTerminal(world)) break;
-    while (i < log.length && log[i]!.tick === world.tick) {
-      applyAction(world, log[i]!, rules);
-      i += 1;
+  while (world.tick < untilTick && !isTerminal(world)) {
+    const frame = prepareTick(world, rules);
+    if (i < log.length && log[i]!.tick === world.tick) {
+      finishTick(world, rules, frame, () => {
+        while (i < log.length && log[i]!.tick === world.tick) {
+          applyAction(world, log[i]!, rules);
+          i += 1;
+        }
+      });
+    } else {
+      finishTick(world, rules, frame);
     }
-    step(world, rules);
-    if (isTerminal(world)) break;
   }
   return world;
 }

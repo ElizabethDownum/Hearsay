@@ -7,6 +7,7 @@ import type { InquiryKey } from './perception';
 import type { IntelState } from '../intel/entry';
 import type { ScenarioState } from './scenario/types';
 import type { NetworkState } from './network/types';
+import type { ScheduledSetup } from './phases';
 
 export type { IntelEntry, IntelState, InformantSpec, HypothesisCard, CodexHypothesis, TagNote } from '../intel/entry';
 export type { ScenarioState, ScenarioStatus, ScenarioDef, ScenarioCast, WinCondition, Resolution } from './scenario/types';
@@ -195,6 +196,8 @@ export interface WorldState {
   /** Pending questions per asker — the one investigation machinery's work queue. */
   inquiries: Record<EntityId, InquiryTask[]>;
   scheduleOverrides: Record<EntityId, ScheduleOverride[]>;
+  /** Prior setup committed by an earlier tick; absent until the first item is scheduled. */
+  scheduledSetup?: ScheduledSetup[];
   enemy: EnemyState;
   /** Latch keys of vignettes already fired — `${defId}:${a}:${b ?? '-'}` (pillar 7, replay-stable). */
   vignettesFired: string[];

@@ -1,4 +1,4 @@
-import { stableStringify, hashWorld } from '../../src/sim/hash';
+import { cloneSerializable, stableStringify, hashWorld } from '../../src/sim/hash';
 import { buildWorld, enrollPlayer } from '../../src/sim/world';
 import { miniTown } from './helpers/minitown';
 import { TESTFORD } from '../../src/content/fixtures/testford';
@@ -39,6 +39,14 @@ describe('stableStringify', () => {
     expect(() => stableStringify(undefined)).toThrow(/undefined/);
     expect(() => stableStringify([1, undefined])).toThrow(/undefined/);
     expect(() => stableStringify({ a: undefined })).toThrow(/undefined/);
+  });
+
+  it('cloneSerializable makes a detached stable JSON data copy', () => {
+    const source = { z: [{ b: 2, a: 1 }] };
+    const clone = cloneSerializable(source);
+    expect(clone).toEqual(source);
+    expect(clone).not.toBe(source);
+    expect(clone.z).not.toBe(source.z);
   });
 });
 

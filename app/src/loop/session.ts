@@ -7,7 +7,7 @@ import { worldFromTown, attachPlayer } from '../../../src/world/attach';
 import { attachScenario, isTerminal } from '../../../src/sim/scenario/referee';
 import { applyAction, runLogOn, type Action } from '../../../src/sim/campaign';
 import { CONVERSATION_BEAT } from '../../../src/sim/rumors/propagation';
-import { step } from '../../../src/sim/step';
+import { finishTick, prepareTick } from '../../../src/sim/phases';
 import type { WorldState } from '../../../src/sim/types';
 
 /**
@@ -118,22 +118,26 @@ function makeSession(seed: string, world: WorldState, log: Action[]): Session {
       let firstError: unknown = null;
       while (world.tick < target) {
         if (isTerminal(world)) break; // never step a resolved campaign
-        const now = world.tick;
-        // Apply every queued action due this tick, in insertion order — the runLogOn inner loop.
-        for (let i = 0; i < queue.length; ) {
-          if (queue[i]!.tick !== now) { i += 1; continue; }
-          const action = queue[i]!;
-          queue.splice(i, 1); // drop from the queue BEFORE applying, so a throw never retries it
-          try {
-            applyAction(world, action, STANDARD_RULES); // validation is deferred to here (test (c))
-            log.push(action);           // ...and ONLY a successfully-applied action enters the save
-          } catch (err) {
-            // A failed verb never enters the log; the batch still finishes so the world always
-            // lands on a clean tick boundary (never mid-tick), keeping log↔world replay airtight.
-            if (firstError === null) firstError = err;
+        const frame = prepareTick(world, STANDARD_RULES);
+        const hasDueAction = queue.some((action) => action.tick === world.tick);
+        const applyDueActions = (): void => {
+          // Apply every queued action due this tick, in insertion order — the runLogOn inner loop.
+          for (let i = 0; i < queue.length; ) {
+            if (queue[i]!.tick !== world.tick) { i += 1; continue; }
+            const action = queue[i]!;
+            queue.splice(i, 1); // drop from the queue BEFORE applying, so a throw never retries it
+            try {
+              applyAction(world, action, STANDARD_RULES); // validation is deferred to here (test (c))
+              log.push(action);           // ...and ONLY a successfully-applied action enters the save
+            } catch (err) {
+              // A failed verb never enters the log; the batch still finishes so the world always
+              // lands on a clean tick boundary (never mid-tick), keeping log↔world replay airtight.
+              if (firstError === null) firstError = err;
+            }
           }
-        }
-        step(world, STANDARD_RULES);
+        };
+        if (hasDueAction) finishTick(world, STANDARD_RULES, frame, applyDueActions);
+        else finishTick(world, STANDARD_RULES, frame);
         if (isTerminal(world)) break; // the referee latched this tick — stop exactly on the death tick
       }
       if (firstError !== null) throw firstError; // surface the failure to the caller (test (c))

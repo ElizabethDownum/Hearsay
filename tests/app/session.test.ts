@@ -10,6 +10,7 @@ import { CONVERSATION_BEAT } from '../../src/sim/rumors/propagation';
 import { SOMEONE, type EntityId } from '../../src/sim/rumors/claim';
 import type { WorldState } from '../../src/sim/types';
 import type { InjectSpec } from '../../src/sim/actions';
+import { scheduleSetup } from '../../src/sim/phases';
 
 const SEED = 'cor-1';
 
@@ -111,6 +112,26 @@ describe('submit + advance reproduces runLogOn exactly — live ≡ replay', () 
 
 // ── (c) beat alignment + validation is deferred to advance-time, failures DROP from the save ─
 describe('submit beat-alignment + advance-time validation', () => {
+  it('applies due prior setup before validating a queued player action', () => {
+    const session = newSession(SEED);
+    const target = Object.keys(session.world.npcs).find((id) => id !== session.world.playerId)!;
+    scheduleSetup(session.world, {
+      id: 'session-fuse', due: CONVERSATION_BEAT, kind: 'schedule-override', actor: target, ref: 'test',
+      override: {
+        fromDay: 0, toDay: 1, from: 0, to: 1440,
+        venue: session.world.playerVenue!, source: 'vignette',
+      },
+    });
+    session.advance(1);
+    const usurper = session.world.scenario!.cast.usurper;
+    const tell = session.submit({ kind: 'tell', to: target, spec: poison(usurper) });
+    expect(tell.queuedFor).toBe(CONVERSATION_BEAT);
+    expect(() => session.advance(CONVERSATION_BEAT)).not.toThrow();
+    expect(session.world.chronicle.some(
+      (e) => e.kind === 'telling' && e.speaker === 'you' && e.addressedTo === target,
+    )).toBe(true);
+  });
+
   it('a tell submitted mid-beat queues for the NEXT beat and validates + fires there', () => {
     const session = newSession(SEED);
     const usurper = session.world.scenario!.cast.usurper;

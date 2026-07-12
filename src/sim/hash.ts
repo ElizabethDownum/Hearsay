@@ -13,6 +13,11 @@ export function stableStringify(value: unknown): string {
   return `{${entries.join(',')}}`;
 }
 
+/** A detached JSON-data copy whose object-key order is deterministic. */
+export function cloneSerializable<T>(value: T): T {
+  return JSON.parse(stableStringify(value)) as T;
+}
+
 export function hashWorld(world: WorldState): number {
   return fnv1a32(stableStringify(world));
 }

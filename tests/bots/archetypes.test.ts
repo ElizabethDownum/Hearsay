@@ -1,12 +1,13 @@
 import { patientWhisperer, blitzCrier, cannyWhisperer, bestConnected, bestConnectedAvoiding } from '../../src/bots/archetypes';
-import { runBotCampaign } from '../../src/bots/runner';
-import { runCampaign } from '../../src/sim/campaign';
+import { runBotCampaign, runBotCampaignOn } from '../../src/bots/runner';
+import { runCampaign, runLogOn, type Action } from '../../src/sim/campaign';
 import { buildWorld } from '../../src/sim/world';
 import { TESTFORD } from '../../src/content/fixtures/testford';
 import { miniTown } from '../sim/helpers/minitown';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { hashWorld } from '../../src/sim/hash';
 import { TICKS_PER_DAY } from '../../src/core/time';
+import { scheduleSetup } from '../../src/sim/phases';
 
 describe('bots', () => {
   it('bestConnected: edge count desc, lexicographic tie-break', () => {
@@ -52,6 +53,25 @@ describe('bots', () => {
     const live = runBotCampaign(TESTFORD, STANDARD_RULES, 'bot-3', patientWhisperer, 3);
     const replayed = runCampaign(TESTFORD, STANDARD_RULES, live.save, 3 * TICKS_PER_DAY);
     expect(hashWorld(replayed)).toBe(hashWorld(live.world));
+  });
+
+  it('bot live drive and replay share the phase transaction when setup is due', () => {
+    const build = () => {
+      const world = buildWorld(miniTown(), 'bot-phases');
+      scheduleSetup(world, {
+        id: 'bot-fuse', due: 1, kind: 'schedule-override', actor: 'ada', ref: 'test',
+        override: { fromDay: 0, toDay: 1, from: 0, to: 1440, venue: 'backroom', source: 'vignette' },
+      });
+      return world;
+    };
+    const spec = { subject: 'someone' as const, predicate: 'stole', object: null,
+      count: null, severity: 3 as const, place: null, attribution: 'someone' as const };
+    const bot = { name: 'phase-bot', decide: (_world: unknown, _rules: unknown, day: number): Action[] =>
+      day === 0 ? [{ tick: 1, kind: 'inject', target: 'ada', spec }] : [] };
+
+    const live = runBotCampaignOn(build(), STANDARD_RULES, bot, 1);
+    const replay = runLogOn(build(), STANDARD_RULES, live.save.log, TICKS_PER_DAY);
+    expect(hashWorld(live.world)).toBe(hashWorld(replay));
   });
 
   it('a bot returning an action outside its day is rejected loudly', () => {

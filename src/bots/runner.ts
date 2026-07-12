@@ -1,7 +1,7 @@
 import { TICKS_PER_DAY } from '../core/time';
 import { applyAction, type Action, type Save } from '../sim/campaign';
+import { finishTick, prepareTick } from '../sim/phases';
 import type { Rules } from '../sim/rules';
-import { step } from '../sim/step';
 import type { TownFixture, WorldState } from '../sim/types';
 import { buildWorld } from '../sim/world';
 import type { Bot } from './archetypes';
@@ -32,11 +32,17 @@ export function runBotCampaignOn(
     log.push(...actions);
     let i = 0;
     while (world.tick < dayEnd) {
-      while (i < actions.length && actions[i]!.tick === world.tick) {
-        applyAction(world, actions[i]!, rules);
-        i += 1;
+      const frame = prepareTick(world, rules);
+      if (i < actions.length && actions[i]!.tick === world.tick) {
+        finishTick(world, rules, frame, () => {
+          while (i < actions.length && actions[i]!.tick === world.tick) {
+            applyAction(world, actions[i]!, rules);
+            i += 1;
+          }
+        });
+      } else {
+        finishTick(world, rules, frame);
       }
-      step(world, rules);
     }
   }
   return { save: { seed: world.seed, log }, world };
