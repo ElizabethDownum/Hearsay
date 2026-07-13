@@ -67,6 +67,9 @@ function staged(seed = 'tick-phases'): WorldState {
   return world;
 }
 
+// Fixture reality: Testford contains mara and rafe (not miniTown's ada/bez/cyn/dov).
+// `elsewhere` is deliberately test-created by staged().
+
 const moveMara = (venue: string, id = 'fuse-mara'): ScheduledSetup => ({
   id,
   due: 15,
@@ -97,6 +100,18 @@ describe('five-phase tick transaction', () => {
     });
     expect(sawPlayerPhase).toBe(true);
     expect(world.scheduledSetup).toBeUndefined();
+  });
+
+  it('a due setup can replace mara with rafe in the offered Testford circle', () => {
+    const world = staged('tick-phases-replacement');
+    const avatarVenue = world.playerVenue!;
+    scheduleSetup(world, moveMara('elsewhere'));
+    scheduleSetup(world, { ...moveMara(avatarVenue, 'fuse-rafe'), actor: 'rafe' });
+    runUntil(world, 15, RULES);
+    const frame = prepareTick(world, RULES);
+    const offered = frame.circles.find((circle) => circle.members.includes(world.playerId!))!;
+    expect(offered.members).not.toContain('mara');
+    expect(offered.members).toContain('rafe');
   });
 
   it('stores a deep copy and rejects duplicate ids and due-now/past setup', () => {

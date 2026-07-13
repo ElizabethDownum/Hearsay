@@ -11,18 +11,15 @@ import { newSession } from '../../app/src/loop/session';
 import { TERMS } from '../../src/content/terms';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { webView, type WebView } from '../../src/intel/web';
-import { at, TICKS_PER_DAY } from '../../src/core/time';
-import { CONVERSATION_BEAT } from '../../src/sim/rumors/propagation';
-import { venueAt, CIRCLE_SIZE } from '../../src/sim/agents';
-import { canEnter, venueOpensFor } from '../../src/sim/actions';
-import { SOMEONE, type EntityId } from '../../src/sim/rumors/claim';
+import { at } from '../../src/core/time';
+import { venueOpensFor } from '../../src/sim/actions';
+import { SOMEONE } from '../../src/sim/rumors/claim';
 import type { InjectSpec } from '../../src/sim/actions';
 import type { IntelEntry } from '../../src/intel/types';
 import type { PlayerView, NetworkView } from '../../src/sim/fieldwork';
-import type { Venue, WorldState } from '../../src/sim/types';
+import type { Venue } from '../../src/sim/types';
 
 const ECON = STANDARD_RULES.economy;
-const EMPTY_NET: NetworkView = { assets: [], drops: [] };
 
 // Static server-render (react-dom/server, no DOM, no browser) — the honest way to pin what a
 // props-only panel puts on the page, per the no-UI-automation guardrail.
@@ -90,72 +87,19 @@ const plannerView: PlayerView = {
   scenario: null,
 };
 
-describe('DayPlanner — family-based asking from board clusters', () => {
-  it('with cluster families, the ask composer offers family mode (registered label) and the family ids', () => {
+describe('DayPlanner — requested local moment', () => {
+  it('renders one request button, no local submit buttons, and props-fed offered names', () => {
     const page = html(createElement(DayPlanner, {
-      view: plannerView, paused: true, clusterFamilies: ['f6', 'f9'], net: EMPTY_NET, coin: 20, economy: ECON, onVerb: noop,
+      view: plannerView, paused: true, coin: 20, economy: ECON, onVerb: noop,
+      onRequestLocal: noop, offeredNames: ['ada', 'bez'], localPending: false,
     }));
-    // The ask "about" select offers a family <option> whose text is the registered label.
-    expect(page).toContain('<option value="family"');
-    expect(page).toContain(`>${TERMS['family']!.label}<`); // the option text speaks registered language
-    expect(page).toContain('>f6<');
-    expect(page).toContain('>f9<');
-  });
-
-  it('with no clusters yet, only subject mode is offered', () => {
-    const page = html(createElement(DayPlanner, {
-      view: plannerView, paused: true, clusterFamilies: [], net: EMPTY_NET, coin: 20, economy: ECON, onVerb: noop,
-    }));
-    // Precise marker (the sell composer legitimately mentions <Term id="family"> elsewhere): the ask
-    // composer offers NO family <option> when the board holds no clusters.
-    expect(page).not.toContain('<option value="family"');
-  });
-});
-
-// ── Task 11: one speech-act per beat (T10 review carry, note 9) — tell/ask/sell mutually exclusive ──
-
-describe('DayPlanner — one avatar speech verb per beat', () => {
-  it('in the default (tell) mode, only the tell submit is live; ask and sell submits are greyed', () => {
-    const page = html(createElement(DayPlanner, {
-      view: plannerView, paused: true, clusterFamilies: ['f6'], net: EMPTY_NET, coin: 20, economy: ECON, onVerb: noop,
-    }));
-    // tell is the active mode → its submit is enabled; the other two speech submits carry `disabled`.
-    expect(page).not.toContain('aria-label="submit tell" disabled');
-    expect(page).toContain('aria-label="submit ask" disabled');
-    expect(page).toContain('aria-label="submit sell" disabled');
-  });
-
-  it('I-1: once the beat holds a queued speech act (speechLatched), ALL THREE submits grey — even the active tell', () => {
-    // The composition root derives speechLatched from the SESSION queue (survives a panel remount),
-    // so the toggle-then-resubmit defeat is closed at the render layer too: toggling to sell can no
-    // longer re-open a submit, because the latch greys every speech submit regardless of the mode.
-    const page = html(createElement(DayPlanner, {
-      view: plannerView, paused: true, clusterFamilies: ['f6'], net: EMPTY_NET, coin: 20, economy: ECON, onVerb: noop,
-      speechLatched: true,
-    }));
-    expect(page).toContain('aria-label="submit tell" disabled'); // the active mode is greyed too
-    expect(page).toContain('aria-label="submit ask" disabled');
-    expect(page).toContain('aria-label="submit sell" disabled');
-  });
-});
-
-// ── Task 11: recruit/host greying on player-known seams; costs render through <Term> ──────────────
-
-describe('DayPlanner — network verb composers gate on player-known seams', () => {
-  it('recruit greys when the treasury cannot cover the handle cost (term-registered reason)', () => {
-    const page = html(createElement(DayPlanner, {
-      view: plannerView, paused: true, clusterFamilies: [], net: EMPTY_NET, coin: 0, economy: ECON, onVerb: noop,
-    }));
-    // ada is an in-circle non-asset → a recruit candidate; coin 0 < any handle cost → greyed.
-    expect(page).toContain('aria-label="submit recruit" disabled');
-    expect(page).toContain(`>${TERMS['treasury']!.label}<`); // the reason names the treasury via <Term>
-  });
-
-  it('recruit is live once the treasury can cover the money handle', () => {
-    const page = html(createElement(DayPlanner, {
-      view: plannerView, paused: true, clusterFamilies: [], net: EMPTY_NET, coin: 50, economy: ECON, onVerb: noop,
-    }));
-    expect(page).not.toContain('aria-label="submit recruit" disabled');
+    expect(page).toContain('aria-label="request local interaction"');
+    expect(page).toContain('ada');
+    expect(page).toContain('bez');
+    expect(page).not.toContain('aria-label="submit tell"');
+    expect(page).not.toContain('aria-label="submit ask"');
+    expect(page).not.toContain('aria-label="submit sell"');
+    expect(page).not.toContain('aria-label="submit recruit"');
   });
 });
 
@@ -219,30 +163,25 @@ describe('VERB_TERM — every verb kind names a registered term', () => {
 
 // ── RUN A re-verification (persistent): the usurper's checkmark renders from the LIVE fold ───────
 
-/** Deterministic day-0 probe (session.test.ts's findCoCircle, compacted): an ACCESSIBLE venue+beat
- *  where the avatar is guaranteed co-circled with >=1 non-observer npc — staging, never physics.
- *  Prefers a tavern (the evening gossip hub) so a whispered mark actually circulates back into the
- *  player's feed; the P8 access law shut the pre-dawn home circles this run used to open in. */
-function findCoCircle(world: WorldState, minNpcs: number): { venue: string; tick: number; npcs: EntityId[] } {
-  const guardIds = new Set(world.enemy.observers.map((o) => o.id));
-  const others = Object.values(world.npcs).filter((n) => n.id !== world.playerId);
-  const candidates: { venue: string; tick: number; npcs: EntityId[] }[] = [];
-  for (let t = CONVERSATION_BEAT; t < TICKS_PER_DAY; t += CONVERSATION_BEAT) {
-    const byVenue = new Map<string, EntityId[]>();
-    for (const n of others) {
-      const v = venueAt(n, t, world.scheduleOverrides[n.id] ?? []);
-      (byVenue.get(v) ?? byVenue.set(v, []).get(v)!).push(n.id);
-    }
-    for (const [venue, ids] of [...byVenue].sort(([a], [b]) => a.localeCompare(b))) {
-      if (!world.venues[venue]) continue;
-      if (!canEnter(world, venue)) continue;              // ...that the avatar's standing opens (P8 access law)
-      if (ids.some((id) => guardIds.has(id))) continue;
-      if (ids.length >= minNpcs && ids.length + 1 <= CIRCLE_SIZE) candidates.push({ venue, tick: t, npcs: [...ids].sort() });
-    }
-  }
-  const spot = candidates.find((c) => c.venue.startsWith('tavern-')) ?? candidates[0];
-  if (!spot) throw new Error('probe: no accessible co-circle venue found on day 0');
-  return spot;
+/** Deterministically stage a real offered circle around an enrolled reporting channel. */
+function requestStagedPanelOffer() {
+  const session = newSession('cor-1');
+  const guards = new Set(session.world.enemy.observers.map((observer) => observer.id));
+  const target = session.world.intel.informants.map((informant) => informant.id)
+    .find((id) => !guards.has(id));
+  expect(target).toBeDefined();
+  const venue = 'panel-offer-room';
+  session.world.venues[venue] = { id: venue, district: 'd0', access: 'public' };
+  session.world.scheduleOverrides[target!] = [{
+    fromDay: 0, toDay: 1, from: 0, to: 1440, venue, source: 'vignette',
+  }];
+  session.submit({ kind: 'goTo', venue });
+  session.advance(7);
+  expect(session.requestLocalInteraction()).toEqual({ requestedFor: 15, refused: false });
+  expect(session.advance(20)).toEqual({ advanced: 8, stopped: 'local-offer' });
+  const offer = session.localOffer()!;
+  expect(offer.circleMembers).toContain(target);
+  return { session, offer, target: target! };
 }
 
 function damagingFamilies(log: readonly IntelEntry[]): Set<string> {
@@ -256,17 +195,21 @@ function damagingFamilies(log: readonly IntelEntry[]): Set<string> {
 
 describe('RUN A re-verified — seed cor-1, tell poison on the usurper, three days: the mark renders', () => {
   it('webView folds principalsTouched=[usurper] and WebViewPanel renders his gilt checkmark', () => {
-    const session = newSession('cor-1');
+    const { session, offer, target } = requestStagedPanelOffer();
     const usurper = session.world.scenario!.cast.usurper;
     const council = session.world.scenario!.cast.council;
-    const spot = findCoCircle(session.world, 1);
     const spec: InjectSpec = {
       subject: usurper, predicate: 'poisoned', object: SOMEONE,
       count: null, severity: 5, place: null, attribution: SOMEONE,
     };
-    session.submit({ kind: 'goTo', venue: spot.venue });
-    session.advance(spot.tick - session.world.tick);
-    session.submit({ kind: 'tell', to: spot.npcs[0]!, spec });
+    session.chooseLocal(offer.token, { kind: 'tell', to: target, spec });
+    session.advance(1);
+    expect(session.world.chronicle.some(
+      (event) => event.kind === 'telling' && event.speaker === 'you' && event.addressedTo === target,
+    )).toBe(true);
+    expect(session.world.intel.log.some(
+      (entry) => entry.kind === 'utterance' && entry.reported?.subject === usurper,
+    )).toBe(true);
     session.advance(at(3, 0) - session.world.tick);
 
     const log = session.world.intel.log;
@@ -305,8 +248,8 @@ describe('DayPlanner — canGo offers exactly the doors venueOpensFor opens (O8 
   for (const station of [null, 'noble', 'lowlife'] as const) {
     it(`station=${station ?? 'null'}: every door's button/greyed state matches venueOpensFor`, () => {
       const page = html(createElement(DayPlanner, {
-        view: viewFor(station), paused: true, clusterFamilies: [],
-        net: EMPTY_NET, coin: 100, economy: ECON, onVerb: noop,
+        view: viewFor(station), paused: true, coin: 100, economy: ECON, onVerb: noop,
+        onRequestLocal: noop, offeredNames: [], localPending: false,
       }));
       for (const v of testVenues) {
         // Engine truth: pre-station (null) opens everything (P7 behavior); else the access law.

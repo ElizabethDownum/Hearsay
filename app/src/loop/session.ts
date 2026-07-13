@@ -7,140 +7,232 @@ import { worldFromTown, attachPlayer } from '../../../src/world/attach';
 import { attachScenario, isTerminal } from '../../../src/sim/scenario/referee';
 import { applyAction, runLogOn, type Action } from '../../../src/sim/campaign';
 import { CONVERSATION_BEAT } from '../../../src/sim/rumors/propagation';
-import { finishTick, prepareTick } from '../../../src/sim/phases';
+import { finishTick, prepareTick, type PreparedTick } from '../../../src/sim/phases';
+import type { EntityId, VenueId } from '../../../src/sim/rumors/claim';
 import type { WorldState } from '../../../src/sim/types';
 
-/**
- * The campaign as seed + log — so the browser game IS a save file (DOM-free: testable in vitest,
- * no React). `submit` queues a verb for its next legal tick; `advance` steps N ticks, applying the
- * queue exactly as `runLogOn` does (apply-at-tick, in queue order, THEN step). A fresh `loadSession`
- * of the saved log replays byte-identically — the plan's load-bearing invariant.
- */
-/**
- * The outcome of `submit`. `refused` is set (and NOTHING is queued) when the one-speech-act-per-beat
- * latch turns away a second speech verb for a beat that already holds one (note 9). `queuedFor` still
- * reports the beat the verb WOULD have targeted, so a caller can name it in a toast either way.
- */
 export interface SubmitResult { queuedFor: Tick; refused?: boolean; }
+
+type PlannedLocalActionKind =
+  | 'tell' | 'ask' | 'sell' | 'recruit' | 'debrief'
+  | 'assignInformant' | 'courier' | 'meet' | 'host' | 'directive';
+export type LocalActionKind = Extract<Action['kind'], PlannedLocalActionKind>;
+
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+export type ActionIntent = DistributiveOmit<Action, 'tick'>;
+export type LocalActionIntent = Extract<ActionIntent, { kind: LocalActionKind }>;
+export type NonLocalActionIntent = Exclude<ActionIntent, LocalActionIntent>;
+
+export interface LocalOffer {
+  tick: Tick;
+  venue: VenueId;
+  circleMembers: EntityId[];
+  token: string;
+}
+
+export interface AdvanceResult {
+  advanced: number;
+  stopped: 'complete' | 'terminal' | 'local-offer';
+}
+
+export type RequestLocalResult =
+  | { requestedFor: Tick; refused: false }
+  | { requestedFor: Tick; refused: true };
 
 export interface Session {
   readonly seed: string;
   readonly world: WorldState;
   readonly log: Action[];
-  /**
-   * Queue a verb for the next legal tick (beat-aligned for tell/ask/sell; next tick otherwise). At most
-   * ONE avatar speech verb (tell | ask | sell) may be queued per conversation beat — a second is
-   * REFUSED here (note 9), before the sim ever sees it. This is the composer-layer gate that keeps
-   * the sim free of a cross-verb per-beat guard; the sim's own per-verb guards (tell-vs-tell,
-   * sell-vs-sell) stay only as defense-in-depth for hand-built log replays.
-   */
-  submit(intent: ActionIntent): SubmitResult;
-  /**
-   * Whether a speech verb is already queued for the conversation beat a speech verb submitted at
-   * `now` would land on. The composer reads this to grey ALL speech submits at once. It survives a
-   * panel remount and clears only on beat advance, because the latch lives in this session's queue
-   * (not in React state): the queued speech verb drains when its beat is stepped, freeing the slot.
-   */
+  submit(intent: NonLocalActionIntent): SubmitResult;
+  requestLocalInteraction(): RequestLocalResult;
+  cancelLocalInteraction(): void;
+  localOffer(): LocalOffer | null;
+  chooseLocal(token: string, intent: LocalActionIntent): SubmitResult;
   speechQueuedForBeat(now: Tick): boolean;
-  /** Step N ticks, applying queued actions runLogOn-style (apply-at-tick, then step). Halts at a terminal status. */
-  advance(ticks: number): void;
+  advance(ticks: number): AdvanceResult;
   save(): { seed: string; log: Action[] };
 }
 
-/** The three avatar speech verbs — mutually exclusive within a conversation beat (note 9). The sim
- *  guards only tell-vs-tell and sell-vs-sell (per-verb pending flags), so the session is the sole
- *  cross-verb gate: tell→toggle→sell must not be able to queue two acts for one beat. */
-const SPEECH_KINDS = new Set<ActionIntent['kind']>(['tell', 'ask', 'sell']);
-const isSpeechKind = (kind: ActionIntent['kind']): boolean => SPEECH_KINDS.has(kind);
+const LOCAL_KINDS = new Set<string>([
+  'tell', 'ask', 'sell', 'recruit', 'debrief', 'assignInformant', 'courier', 'meet', 'host', 'directive',
+]);
+const SPEECH_KINDS = new Set<string>(['tell', 'ask', 'sell']);
 
-/** The next conversation beat on or after `now` (this tick if already beat-aligned). */
 function nextBeat(now: Tick): Tick {
   const offset = (CONVERSATION_BEAT - (minuteOfDay(now) % CONVERSATION_BEAT)) % CONVERSATION_BEAT;
   return now + offset;
 }
 
-/**
- * An Action minus its `tick` — computed by `submit`, not supplied by the caller. Distributive so
- * each variant keeps its own discriminated shape; a plain `Omit<Action, 'tick'>` over a union
- * collapses to just `{ kind }` and would reject `venue`, `to`, `spec`, … as excess properties.
- */
-type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
-export type ActionIntent = DistributiveOmit<Action, 'tick'>;
+function queuedTickFor(intent: ActionIntent, now: Tick): Tick {
+  if (LOCAL_KINDS.has(intent.kind)) return nextBeat(now);
+  return now;
+}
 
-/** The proven Coronation staging pipeline (coronation.e2e buildFull): serve → world → avatar → referee. */
+function localParticipants(intent: LocalActionIntent): EntityId[] {
+  const value = intent as unknown as {
+    kind: string; to?: EntityId; buyer?: EntityId; target?: EntityId; asset?: EntityId;
+    informant?: EntityId; invitees?: EntityId[]; viaDrop?: string | null;
+    outboundVia?: EntityId[]; recipient?: EntityId;
+  };
+  switch (value.kind) {
+    case 'tell': case 'ask': return [value.to!];
+    case 'sell': return [value.buyer!];
+    case 'recruit': return [value.target!];
+    case 'debrief': case 'meet': return [value.asset!];
+    case 'host': return [...(value.invitees ?? [])];
+    case 'assignInformant': return [value.informant!];
+    case 'courier': return value.viaDrop === null ? [value.asset!] : [];
+    case 'directive': return [value.outboundVia?.[0] ?? value.recipient!];
+    default: return [];
+  }
+}
+
 function stageWorld(seed: string): WorldState {
   const { town } = generateValidTown(seed, STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT, STANDARD_RULES);
-  // Composition root: pass rules so live campaigns start at STANDARD_ECONOMY.startingCoin (20).
   const world = worldFromTown(town, seed, STANDARD_RULES);
   attachPlayer(world, town);
   attachScenario(world, town, CORONATION);
   return world;
 }
 
-/**
- * The next legal tick for a verb. The three speech verbs (tell/ask/sell) fire only on conversation
- * beats — applyTell/applyAsk/applySell each throw off-beat — so they roll forward to the next beat
- * (this beat if already aligned, else strictly future). Everything else takes effect at the very next
- * tick to be simulated (the current, not-yet-stepped `world.tick`). Folding `sell` in here (T11 carry
- * (i)) means a mid-beat sell now QUEUES for the next beat rather than toast-failing on applySell's own
- * beat guard — and its queued tick IS the target beat, so the one-speech-per-beat latch keys off that
- * beat exactly as it does for tell/ask.
- */
-function queuedTickFor(intent: ActionIntent, now: Tick): Tick {
-  if (intent.kind === 'tell' || intent.kind === 'ask' || intent.kind === 'sell') return nextBeat(now);
-  return now;
+interface PendingOffer {
+  frame: PreparedTick;
+  offer: LocalOffer;
+  action: Action | null;
 }
 
 function makeSession(seed: string, world: WorldState, log: Action[]): Session {
   const queue: Action[] = [];
+  let requestedFor: Tick | null = null;
+  let pendingOffer: PendingOffer | null = null;
+  let nextOfferSerial = 0;
+
+  const pendingTick = (): Tick | null => pendingOffer?.offer.tick ?? requestedFor;
+
+  const applyQueued = (): unknown => {
+    let firstError: unknown = null;
+    for (let i = 0; i < queue.length;) {
+      if (queue[i]!.tick !== world.tick) { i += 1; continue; }
+      const action = queue[i]!;
+      queue.splice(i, 1);
+      try {
+        applyAction(world, action, STANDARD_RULES);
+        log.push(action);
+      } catch (error) {
+        if (firstError === null) firstError = error;
+      }
+    }
+    return firstError;
+  };
+
   return {
     seed,
     world,
     log,
-    submit(intent: ActionIntent): SubmitResult {
-      const tick = queuedTickFor(intent, world.tick);
-      // One speech act per beat (note 9): refuse a second tell/ask/sell landing on a beat that
-      // already holds a queued speech verb. The refusal is BEFORE the sim ever validates the verb —
-      // and because the queue lives here, the latch survives a composer remount and clears only when
-      // the queued speech verb drains at its beat (advance), never on a bare pause/unpause.
-      if (isSpeechKind(intent.kind) && queue.some((q) => isSpeechKind(q.kind) && q.tick === tick)) {
-        return { queuedFor: tick, refused: true };
+    submit(intent: NonLocalActionIntent): SubmitResult {
+      if (LOCAL_KINDS.has((intent as ActionIntent).kind)) {
+        throw new Error('session: local actions require a requested-beat offer');
       }
+      const pending = pendingTick();
+      if (pending !== null) return { queuedFor: pending, refused: true };
+      const tick = queuedTickFor(intent, world.tick);
       queue.push({ ...intent, tick } as Action);
       return { queuedFor: tick };
     },
+    requestLocalInteraction(): RequestLocalResult {
+      const existing = pendingTick();
+      if (existing !== null) return { requestedFor: existing, refused: true };
+      const next = nextBeat(world.tick);
+      if (queue.some((action) => action.tick === next)) return { requestedFor: next, refused: true };
+      requestedFor = next;
+      return { requestedFor: next, refused: false };
+    },
+    cancelLocalInteraction(): void {
+      requestedFor = null;
+      pendingOffer = null;
+    },
+    localOffer(): LocalOffer | null {
+      if (!pendingOffer) return null;
+      return { ...pendingOffer.offer, circleMembers: [...pendingOffer.offer.circleMembers] };
+    },
+    chooseLocal(token: string, intent: LocalActionIntent): SubmitResult {
+      if (!pendingOffer || pendingOffer.offer.token !== token) {
+        throw new Error('session: stale or invalid local offer token');
+      }
+      if (pendingOffer.action !== null) throw new Error('session: local offer already chosen');
+      const members = new Set(pendingOffer.offer.circleMembers);
+      for (const participant of localParticipants(intent)) {
+        if (!members.has(participant)) throw new Error(`session: local participant '${participant}' is not in the offered circle`);
+      }
+      pendingOffer.action = { ...intent, tick: pendingOffer.offer.tick } as Action;
+      return { queuedFor: pendingOffer.offer.tick };
+    },
     speechQueuedForBeat(now: Tick): boolean {
       const beat = nextBeat(now);
-      return queue.some((q) => isSpeechKind(q.kind) && q.tick === beat);
+      return pendingOffer?.action !== null
+        && pendingOffer?.action !== undefined
+        && pendingOffer.action.tick === beat
+        && SPEECH_KINDS.has(pendingOffer.action.kind);
     },
-    advance(ticks: number): void {
+    advance(ticks: number): AdvanceResult {
+      const start = world.tick;
       const target = world.tick + ticks;
       let firstError: unknown = null;
+
       while (world.tick < target) {
-        if (isTerminal(world)) break; // never step a resolved campaign
+        if (isTerminal(world)) return { advanced: world.tick - start, stopped: 'terminal' };
+
+        if (pendingOffer) {
+          if (pendingOffer.action === null) {
+            return { advanced: world.tick - start, stopped: 'local-offer' };
+          }
+          const held = pendingOffer;
+          finishTick(world, STANDARD_RULES, held.frame, () => {
+            try {
+              applyAction(world, held.action!, STANDARD_RULES);
+              log.push(held.action!);
+            } catch (error) {
+              firstError = error;
+            }
+          });
+          pendingOffer = null;
+          if (firstError !== null) throw firstError;
+          if (isTerminal(world)) return { advanced: world.tick - start, stopped: 'terminal' };
+          continue;
+        }
+
+        if (requestedFor === world.tick) {
+          const frame = prepareTick(world, STANDARD_RULES);
+          const player = world.playerId;
+          if (player === null || frame.positions[player] === undefined) {
+            throw new Error('session: cannot offer a local interaction without a placed avatar');
+          }
+          const circle = frame.circles.find((candidate) => candidate.members.includes(player));
+          pendingOffer = {
+            frame,
+            offer: {
+              tick: frame.tick,
+              venue: frame.positions[player]!,
+              circleMembers: (circle?.members ?? []).filter((id) => id !== player).sort(),
+              token: `${frame.offerToken}#${nextOfferSerial++}`,
+            },
+            action: null,
+          };
+          requestedFor = null;
+          return { advanced: world.tick - start, stopped: 'local-offer' };
+        }
+
         const frame = prepareTick(world, STANDARD_RULES);
         const hasDueAction = queue.some((action) => action.tick === world.tick);
-        const applyDueActions = (): void => {
-          // Apply every queued action due this tick, in insertion order — the runLogOn inner loop.
-          for (let i = 0; i < queue.length; ) {
-            if (queue[i]!.tick !== world.tick) { i += 1; continue; }
-            const action = queue[i]!;
-            queue.splice(i, 1); // drop from the queue BEFORE applying, so a throw never retries it
-            try {
-              applyAction(world, action, STANDARD_RULES); // validation is deferred to here (test (c))
-              log.push(action);           // ...and ONLY a successfully-applied action enters the save
-            } catch (err) {
-              // A failed verb never enters the log; the batch still finishes so the world always
-              // lands on a clean tick boundary (never mid-tick), keeping log↔world replay airtight.
-              if (firstError === null) firstError = err;
-            }
-          }
-        };
-        if (hasDueAction) finishTick(world, STANDARD_RULES, frame, applyDueActions);
-        else finishTick(world, STANDARD_RULES, frame);
-        if (isTerminal(world)) break; // the referee latched this tick — stop exactly on the death tick
+        if (hasDueAction) {
+          finishTick(world, STANDARD_RULES, frame, () => { firstError = applyQueued(); });
+        } else {
+          finishTick(world, STANDARD_RULES, frame);
+        }
+        if (firstError !== null) throw firstError;
+        if (isTerminal(world)) return { advanced: world.tick - start, stopped: 'terminal' };
       }
-      if (firstError !== null) throw firstError; // surface the failure to the caller (test (c))
+      return { advanced: world.tick - start, stopped: isTerminal(world) ? 'terminal' : 'complete' };
     },
     save(): { seed: string; log: Action[] } {
       return { seed, log: [...log] };
@@ -148,12 +240,10 @@ function makeSession(seed: string, world: WorldState, log: Action[]): Session {
   };
 }
 
-/** A brand-new Coronation campaign at tick 0. */
 export function newSession(seed: string): Session {
   return makeSession(seed, stageWorld(seed), []);
 }
 
-/** Regrow a campaign from its save by replaying the log up to `untilTick` (deterministic rebuild). */
 export function loadSession(save: { seed: string; log: Action[] }, untilTick: Tick): Session {
   const world = stageWorld(save.seed);
   runLogOn(world, STANDARD_RULES, save.log, untilTick);

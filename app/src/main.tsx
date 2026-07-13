@@ -4,7 +4,7 @@ import './theme.css';
 
 // ── Composition root: engine VALUE imports are legal ONLY here and in loop/** (the composition-root
 // fence). Everything below the panels boundary receives props; nothing there reaches the engine. ──
-import { newSession, type ActionIntent } from './loop/session';
+import { newSession, type NonLocalActionIntent } from './loop/session';
 import { makeClock } from './loop/clock';
 import { KEYMAP, VERB_TERM, type UIAction } from './input/actions';
 import { TERMS } from '../../src/content/terms';
@@ -113,6 +113,7 @@ function App() {
   const [webNpc, setWebNpc] = useState<string | null>(null);
   const [ledgerVia, setLedgerVia] = useState<string>('self');
   const [toast, setToast] = useState<string>('');
+  const [localRequested, setLocalRequested] = useState(false);
 
   const session = sessionRef.current;
   const world = session.world;
@@ -129,7 +130,13 @@ function App() {
       if (sessionRef.current.world.scenario && sessionRef.current.world.scenario.status !== 'running') return;
       const ticks = clockRef.current.onFrame(dt);
       if (ticks <= 0) return;
-      try { sessionRef.current.advance(ticks); } catch (err) { setToast(err instanceof Error ? err.message : String(err)); }
+      try {
+        const result = sessionRef.current.advance(ticks);
+        if (result.stopped === 'local-offer') {
+          clockRef.current.speed = 0;
+          setSpeed(0);
+        }
+      } catch (err) { setToast(err instanceof Error ? err.message : String(err)); }
       force();
     };
     raf = requestAnimationFrame(frame);
@@ -161,18 +168,23 @@ function App() {
     () => computeLayout(playerView(sessionRef.current.world).map, sessionRef.current.seed), [],
   );
 
-  const submitVerb = (intent: ActionIntent) => {
+  const submitVerb = (intent: NonLocalActionIntent) => {
     const { queuedFor, refused } = session.submit(intent);
     // The toast speaks registered language (jargon law): the verb's TERMS label, never a raw kind.
     setToast(refused
-      // The one-speech-act-per-beat latch turned this away (note 9) — say so honestly, don't claim it queued.
-      ? `${TERMS[VERB_TERM[intent.kind]]!.label} refused — one speech act per beat (already queued for ${fmtTick(queuedFor)})`
+      ? `${TERMS[VERB_TERM[intent.kind]]!.label} refused — a local interaction is pending for ${fmtTick(queuedFor)}`
       : `${TERMS[VERB_TERM[intent.kind]]!.label} queued for ${fmtTick(queuedFor)} — unpause to fire`);
     force();
   };
   const addTag = (target: string, text: string) =>
     submitVerb({ kind: 'tag', op: 'add', id: `tag-${tagId.current++}`, target, text });
   const removeTag = (id: string) => submitVerb({ kind: 'tag', op: 'remove', id, target: null, text: null });
+  const requestLocal = () => {
+    const result = session.requestLocalInteraction();
+    setLocalRequested(!result.refused);
+    if (!result.refused) setToast(`Local moment requested for ${fmtTick(result.requestedFor)} — unpause to reach it`);
+    force();
+  };
 
   const status = world.scenario?.status;
   if (status && status !== 'running') return <EndingScreen status={status} />;
@@ -192,14 +204,11 @@ function App() {
   // "family from board clusters"): the families the player can ask about are the clusters the
   // board shows, so family-asking unlocks with clustering (assist >= 1), exactly like the board.
   const board = boardView(log, assist, STANDARD_RULES);
-  const clusterFamilies = (board.clusters ?? []).map((c) => c.family);
   // The network surface (Task 11): the roster/treasury/courier folds, all through epistemic selectors.
   const net = networkView(world);
   const courierRoutes = courierRouteView(world);
   const stipendDay = nextStipendDay(view.scenario?.day ?? dayOf(world.tick));
-  // One speech act per beat (note 9): true once a tell/ask/sell is queued for the current beat. Read
-  // from the session queue (not panel state) so the greying survives the planner tab remounting.
-  const speechLatched = session.speechQueuedForBeat(world.tick);
+  const localOffer = session.localOffer();
 
   return (
     <main style={{ fontFamily: 'var(--font-text)', maxWidth: 1200, margin: '0 auto', padding: 16 }}>
@@ -223,6 +232,7 @@ function App() {
       </div>
 
       {toast && <p className="desk-note" role="status">{toast} <button className="desk-btn" onClick={() => setToast('')}>×</button></p>}
+      {localOffer && <p className="desk-note" role="status">Choose your action in this moment</p>}
 
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 380px', minWidth: 320 }}>
@@ -258,9 +268,11 @@ function App() {
           )}
           {panel === 'planner' && (
             <DayPlanner
-              view={view} paused={speed === 0} clusterFamilies={clusterFamilies}
-              net={net} coin={world.coin} economy={STANDARD_RULES.economy} onVerb={submitVerb}
-              speechLatched={speechLatched} />
+              view={view} paused={speed === 0}
+              coin={world.coin} economy={STANDARD_RULES.economy} onVerb={submitVerb}
+              onRequestLocal={requestLocal}
+              offeredNames={localOffer?.circleMembers.map((id) => world.npcs[id]?.name ?? id) ?? []}
+              localPending={localRequested || localOffer !== null} />
           )}
           {panel === 'network' && <Network view={net} />}
           {panel === 'treasury' && <Treasury coin={world.coin} stipendDay={stipendDay} economy={STANDARD_RULES.economy} />}
