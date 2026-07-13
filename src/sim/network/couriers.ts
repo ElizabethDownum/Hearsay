@@ -49,7 +49,7 @@ export function deliverCouriers(world: WorldState, t: Tick, rules: Rules): Utter
     const delta = applyTraits(traits, base, traitContextOf(world.npcs[run.asset]!, world));
     const claim = mintClaim(world, { ...run.spec, ...delta, family, parent: null });
     world.claims[claim.id] = claim;
-    recordFact(world, run.asset, { kind: 'carried-story', ref: family });
+    recordFact(world, 'player', run.asset, { kind: 'carried-story', ref: family });
 
     delivered.push({
       tick: t, venue: circle.venue, circleMembers: [...circle.members],

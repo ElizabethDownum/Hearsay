@@ -25,7 +25,7 @@ export function captureEvidence(world: WorldState, events: TickEvents, rules: Ru
           tick: obs.tick, venue: obs.venue, observer: spec.id, overheard: obs.overheard,
           speaker: obs.speaker, addressedTo: obs.addressedTo, kind: 'utterance', mode: obs.mode,
           claimId: obs.claim.id, family: obs.claim.family,
-          reported: reportThrough(world, spec.id, obs.claim, rules), about: null,
+          reported: reportThrough(world, spec.id, obs.claim, rules, 'enemy'), about: null,
         });
       } else if (obs.kind === 'asking') {
         world.enemy.evidence.push({

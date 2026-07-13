@@ -78,7 +78,7 @@ describe('meet — pull one asset to the safehouse for the next beat (rung 3)', 
     expect(own[0]!.from % 15).toBe(0);
     expect(own[0]!.to - own[0]!.from).toBe(15);
     // The visit is on the record — contact tracing's handle.
-    expect(compartmentOf(w, 'ann')).toContainEqual({ tick: 0, kind: 'met-asset', ref: 'you' });
+    expect(compartmentOf(w, 'player', 'ann')).toContainEqual({ tick: 0, kind: 'met-asset', ref: 'you' });
   });
 
   it('a GUARANTEED 2-person circle forms at the meet beat, and the asset RETURNS to schedule after', () => {
@@ -125,7 +125,7 @@ describe('meet — pull one asset to the safehouse for the next beat (rung 3)', 
     const a = runLogOn(build(), RULES, log, at(0, 2));
     const b = runLogOn(build(), RULES, log, at(0, 2));
     expect(hashWorld(a)).toBe(hashWorld(b));
-    expect(compartmentOf(a, 'ann').some((f) => f.kind === 'met-asset')).toBe(true);
+    expect(compartmentOf(a, 'player', 'ann').some((f) => f.kind === 'met-asset')).toBe(true);
     // an unknown kind still throws (the union's default-throw is preserved).
     expect(() => applyAction(build(), { tick: 0, kind: 'teleport' } as unknown as Action, RULES)).toThrow(/unknown action kind/);
   });
@@ -147,7 +147,7 @@ describe('host — the controlled room (rung 4)', () => {
       const own = w.scheduleOverrides[id]!.filter((o) => o.source === 'player');
       expect(own).toHaveLength(1);
       expect(own[0]!).toEqual({ fromDay: 1, toDay: 2, from: 1080, to: 1200, venue: 'salon', source: 'player' });
-      expect(compartmentOf(w, id)).toContainEqual({ tick: at(0, 10), kind: 'attended-hosting', ref: 'salon' });
+      expect(compartmentOf(w, 'player', id)).toContainEqual({ tick: at(0, 10), kind: 'attended-hosting', ref: 'salon' });
     }
     expect(w.coin).toBe(coin0 - STANDARD_ECONOMY.salonEvent);
   });

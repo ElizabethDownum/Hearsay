@@ -7,7 +7,7 @@ import type { TraitId } from './rumors/traits';
 import type { Rules } from './rules';
 import type { Belief, IntelEntry, ScheduleOverride, Venue, WorldState } from './types';
 import type { Mice } from './network/types';
-import { canAfford, debitCoin, dispositionOf, findAsset, setDispositionEdge, slideDisposition } from './network/roster';
+import { assetFor, canAfford, debitCoin, dispositionOf, setDispositionEdge, slideDisposition } from './network/roster';
 import { recordFact } from './network/compartment';
 import { blankIntel } from './fieldwork';
 import { reportThrough } from './reporting';
@@ -175,7 +175,7 @@ export function applyRecruit(
   // The embodied spymaster (Task 7) is nobody's asset — his own gate; recruiting HIS asset is Task 8's
   // turncoat flow, a different verb. Both refuse with the SAME message as the guard/cast exclusions.
   if (world.network.spymaster === target) throw new Error(RECRUIT_EXCLUDED);
-  if (findAsset(world, target)) throw new Error(RECRUIT_EXCLUDED);
+  if (assetFor(world, 'player', target)) throw new Error(RECRUIT_EXCLUDED);
 
   // Co-circle basis (recruitment is a conversation — the same validation shape as tell).
   const circle = circlesAt(world, tick).find((c) => c.members.includes(world.playerId!));
@@ -205,7 +205,7 @@ export function applyRecruit(
   // --- Effects (all validation passed; edges-only writes keep the fixture clone sound) ---
   debitCoin(world, cost);
   world.network.assets.push({ id: target, mice, wagePaidThroughDay: dayOf(tick), strikes: 0, facts: [] });
-  recordFact(world, target, { kind: 'recruited-by', ref: 'player' }); // tick-stamped from world.tick (=== tick)
+  recordFact(world, 'player', target, { kind: 'recruited-by', ref: 'player' }); // tick-stamped from world.tick (=== tick)
   setDispositionEdge(world, target, RECRUIT_DISPOSITION[mice]);
   world.intel.informants.push({ id: target, assignedVenue: null });
 }
@@ -290,11 +290,11 @@ export function applyCourier(
   if (viaDrop === null) {
     // A face handoff is a meeting: the courier's compartment records having met the avatar (ONE
     // direction — the avatar keeps no compartment). This is the `met-asset` that the drop path lacks.
-    recordFact(world, asset, { kind: 'met-asset', ref: world.playerId });
+    recordFact(world, 'player', asset, { kind: 'met-asset', ref: world.playerId });
   } else {
     const drop = world.network.drops.find((d) => d.id === viaDrop)!;
     if (!drop.knownBy.includes(asset)) drop.knownBy.push(asset);
-    recordFact(world, asset, { kind: 'knows-drop', ref: viaDrop });
+    recordFact(world, 'player', asset, { kind: 'knows-drop', ref: viaDrop });
   }
   world.network.pendingCouriers.push({ asset, spec, target, viaDrop, queuedTick: tick });
 }
@@ -334,7 +334,7 @@ export function applyMeet(world: WorldState, asset: EntityId, tick: Tick): void 
   // Prepend (not the assignInformant REPLACE): a meet is a transient pull, so it takes precedence for
   // its one beat over any standing player override, which resumes automatically once the window passes.
   world.scheduleOverrides[asset] = [override, ...(world.scheduleOverrides[asset] ?? [])];
-  recordFact(world, asset, { kind: 'met-asset', ref: world.playerId }); // the visit, on the record
+  recordFact(world, 'player', asset, { kind: 'met-asset', ref: world.playerId }); // the visit, on the record
 }
 
 /** The room a standing HOSTS in (rung 4): noble → the salon, lowlife → any back-room. Stricter than the
@@ -395,7 +395,7 @@ export function applyHost(
       from: HOST_EVENT.from, to: HOST_EVENT.to, venue, source: 'player',
     };
     world.scheduleOverrides[id] = [override, ...(world.scheduleOverrides[id] ?? [])];
-    recordFact(world, id, { kind: 'attended-hosting', ref: venue }); // the guest list, on the record
+    recordFact(world, 'player', id, { kind: 'attended-hosting', ref: venue }); // the guest list, on the record
   }
 }
 
@@ -493,7 +493,7 @@ export function applyDebrief(world: WorldState, asset: EntityId, tick: Tick, rul
     ...blankIntel(), tick, venue: 'safehouse', via: asset,
     kind: 'utterance', overheard: false, speaker: asset, addressedTo: world.playerId,
     mode: 'answer', claimId: belief.claim.id, family: belief.claim.family,
-    reported: reportThrough(world, asset, disclosed, rules),
+    reported: reportThrough(world, asset, disclosed, rules, 'player'),
   });
   slideDisposition(world, asset, -0.1); // Amendment #4b's disposition strike — the wage-slide mechanics, reused
   record.strikes += 1;                  // +1 strike, the same ledger wages use

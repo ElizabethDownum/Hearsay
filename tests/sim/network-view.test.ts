@@ -46,7 +46,7 @@ describe('networkView — the roster surface exposes ONLY player-known bookkeepi
     const world = stage('nv-facts');
     const asset = world.network.assets[0]!;
     world.tick = at(2, 0);
-    recordFact(world, asset.id, { kind: 'carried-story', ref: 'f-secret-carried' });
+    recordFact(world, 'player', asset.id, { kind: 'carried-story', ref: 'f-secret-carried' });
     const view = networkView(world);
     const row = view.assets.find((a) => a.id === asset.id)!;
     expect(row.factsCount).toBe(asset.facts.length);            // a number, not the list

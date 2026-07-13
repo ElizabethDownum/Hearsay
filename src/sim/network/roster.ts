@@ -2,18 +2,24 @@ import { dayOf } from '../../core/time';
 import type { EntityId } from '../rumors/claim';
 import type { Rules } from '../rules';
 import type { WorldState } from '../types';
-import type { AssetRecord } from './types';
+import type { AssetRecord, Principal } from './types';
 import { trustBetween } from '../world';
 
-/**
- * The asset record for `id` on either roster — the player's side first, then the enemy's mirror
- * (Task 7). One machinery: recording facts and reading dispositions work the same on both sides.
- * Returns null when `id` is nobody's asset.
- */
-export function findAsset(world: WorldState, id: EntityId): AssetRecord | null {
-  return world.network.assets.find((a) => a.id === id)
-    ?? world.network.enemyAssets.find((a) => a.id === id)
-    ?? null;
+/** Principal-explicit roster access: dual membership is lawful and never resolved by search order. */
+export function rosterFor(world: WorldState, principal: Principal): AssetRecord[] {
+  return principal === 'player' ? world.network.assets : world.network.enemyAssets;
+}
+
+export function assetFor(world: WorldState, principal: Principal, id: EntityId): AssetRecord | null {
+  return rosterFor(world, principal).find((a) => a.id === id) ?? null;
+}
+
+export function isTurnedAgainst(world: WorldState, principal: Principal, id: EntityId): boolean {
+  return assetFor(world, principal, id)?.turned === true;
+}
+
+export function principalActor(world: WorldState, principal: Principal): EntityId | null {
+  return principal === 'player' ? world.playerId : world.network.spymaster;
 }
 
 /**
@@ -23,17 +29,6 @@ export function findAsset(world: WorldState, id: EntityId): AssetRecord | null {
  */
 export function dispositionOf(world: WorldState, asset: EntityId): number {
   return world.playerId === null ? 0 : trustBetween(world, asset, world.playerId);
-}
-
-/**
- * Is `id` a PLAYER-side asset that has turned (Plan 8 Task 8)? The ONE predicate the doctoring
- * composition (reportThrough's minimizer overlay) and the channel filter (captureIntel's presence/
- * authority-asking drop) share — never duplicated, so both channels doctor by the same rule. Reads
- * the player roster only: an enemy-side walk-in (`enemyAssets` turned) is the OTHER direction and
- * never doctors the player's own channel.
- */
-export function isTurnedAsset(world: WorldState, id: EntityId): boolean {
-  return world.network.assets.some((a) => a.id === id && a.turned === true);
 }
 
 /**

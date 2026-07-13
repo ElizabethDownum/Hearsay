@@ -3,7 +3,7 @@ import { watchfordWorld } from '../sim/helpers/watchford-world';
 import { enrollPlayer } from '../../src/sim/world';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { runTurncoatPass } from '../../src/sim/network/turncoats';
-import { dispositionOf, findAsset, setDispositionEdge, slideDisposition } from '../../src/sim/network/roster';
+import { assetFor, dispositionOf, setDispositionEdge, slideDisposition } from '../../src/sim/network/roster';
 import { captureIntel, networkView } from '../../src/sim/fieldwork';
 import { informantLedger } from '../../src/intel/ledger';
 import { at } from '../../src/core/time';
@@ -51,7 +51,7 @@ function stageTwoChannels(seed: string): WorldState {
   setDispositionEdge(world, 'mira', 0.75); // the loyal channel — well clear of the flip line
   setDispositionEdge(world, 'sten', 0.5);
 
-  const sten = findAsset(world, 'sten')!;
+  const sten = assetFor(world, 'player', 'sten')!;
   for (let i = 0; i < 3; i++) { sten.strikes += 1; slideDisposition(world, 'sten', -0.05); } // 3 strikes: 0.5 → 0.35
   world.enemy.sketch.push(identifyFeature('sten'));           // the enemy named him
   world.tick = at(1, 8);                                      // a plain (non-rest) tick — no weekly emissions
@@ -65,8 +65,8 @@ describe('canary vs turncoat e2e — the audit loop closes by diffing your own c
 
     // The flip happened BY MECHANISM, and only to the identified, eroded asset.
     expect(dispositionOf(world, 'sten')).toBeCloseTo(0.35, 10); // strikes eroded him under the line
-    expect(findAsset(world, 'sten')!.turned).toBe(true);        // …and the nightly pass latched it
-    expect(findAsset(world, 'mira')!.turned).toBeFalsy();       // mira: never identified → loyal
+    expect(assetFor(world, 'player', 'sten')!.turned).toBe(true);        // …and the nightly pass latched it
+    expect(assetFor(world, 'player', 'mira')!.turned).toBeFalsy();       // mira: never identified → loyal
 
     // The CANARY: ONE event both channels witness — a juicy story (count 8, sev 5), a guard sighting
     // (gale co-located → a watch sighting), and an authority asking to each. Same input, two channels.
@@ -125,7 +125,7 @@ describe('canary vs turncoat e2e — the audit loop closes by diffing your own c
     expect(net.assets.map((a) => a.id)).toContain('sten');
     for (const a of net.assets) expect(Object.keys(a)).not.toContain('turned');
     const before = JSON.stringify(networkView(world));
-    findAsset(world, 'sten')!.turned = false; // pretend the flag flipped back — the player's view can't tell
+    assetFor(world, 'player', 'sten')!.turned = false; // pretend the flag flipped back — the player's view can't tell
     expect(JSON.stringify(networkView(world))).toBe(before);
   });
 });

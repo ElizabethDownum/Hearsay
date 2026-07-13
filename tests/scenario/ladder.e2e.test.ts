@@ -10,7 +10,7 @@ import { step } from '../../src/sim/step';
 import { runTurncoatPass } from '../../src/sim/network/turncoats';
 import { runEnemyDay } from '../../src/sim/counterintel';
 import { enemyDigest } from '../../src/sim/enemy/digest';
-import { findAsset } from '../../src/sim/network/roster';
+import { assetFor } from '../../src/sim/network/roster';
 import { compartmentOf } from '../../src/sim/network/compartment';
 import { at, dayOf } from '../../src/core/time';
 import { STANCE } from '../../src/sim/rumors/propagation';
@@ -161,7 +161,7 @@ describe('full-ladder e2e — the ladder climbs, the books balance', () => {
     runLogOn(world, RULES, CAMPAIGN, at(8, 0)); // through day 7
 
     // ── Rung 1 (recruit, money): cass is on the roster, recruited-by:player, coin debited. ──────────
-    const cass = findAsset(world, 'cass');
+    const cass = assetFor(world, 'player', 'cass');
     expect(cass, 'cass recruited').toBeTruthy();
     expect(cass!.mice).toBe('money');
 
@@ -170,7 +170,7 @@ describe('full-ladder e2e — the ladder climbs, the books balance', () => {
 
     // ── Rung 3 (courier): the payload was DELIVERED to nell — she now holds the coronation-axis family
     //    (the carried-story fact names it; her belief store carries it). Delivery = real schedule work.
-    const carried = compartmentOf(world, 'cass').find((f) => f.kind === 'carried-story');
+    const carried = compartmentOf(world, 'player', 'cass').find((f) => f.kind === 'carried-story');
     expect(carried, 'the courier delivered (carried-story recorded)').toBeTruthy();
     const family = carried!.ref;
     expect(world.beliefs['nell']![family], 'nell received the couriered story').toBeTruthy();
@@ -178,14 +178,14 @@ describe('full-ladder e2e — the ladder climbs, the books balance', () => {
 
     // ── Compartment records COMPLETE: recruited-by:player, knows-drop:d1 (the drop leg), carried-story
     //    (the delivery). Exactly the chain interrogation would read — no more, no less. ──────────────
-    const facts = compartmentOf(world, 'cass').map((f) => `${f.kind}:${f.ref}`).sort();
+    const facts = compartmentOf(world, 'player', 'cass').map((f) => `${f.kind}:${f.ref}`).sort();
     expect(facts).toEqual([`carried-story:${family}`, 'knows-drop:d1', 'recruited-by:player'].sort());
 
     // ── Rung 4 (host): the back-room evening seated its invitees for the next evening + an
     //    attended-hosting fact on each — a guest list that is evidence when compartments crack. ──────
     for (const id of ['ida', 'obs']) {
       expect(world.scheduleOverrides[id]!.some((o) => o.venue === 'back-room-d0' && o.source === 'player')).toBe(true);
-      expect(compartmentOf(world, id)).toContainEqual({ tick: at(7, 8), kind: 'attended-hosting', ref: 'back-room-d0' });
+      expect(compartmentOf(world, 'player', id)).toContainEqual({ tick: at(7, 8), kind: 'attended-hosting', ref: 'back-room-d0' });
     }
 
     // ── The coin books balance to the EXACT expected integer, DERIVED through the full flow (O4). If
@@ -227,7 +227,7 @@ describe('full-ladder e2e — the ladder climbs, the books balance', () => {
   it('a walk-in comes in after the anti-spymaster rumor — his asset ewan flips, then volunteers a real tip', () => {
     const { world } = stageLadder('ladder-walkin');
     const spymaster = world.network.spymaster!; // sly
-    expect(findAsset(world, 'ewan')!.turned).toBeFalsy(); // his loyal asset, before the rumor lands
+    expect(assetFor(world, 'enemy', 'ewan')!.turned).toBeFalsy(); // his loyal asset, before the rumor lands
 
     // The anti-spymaster rumor campaign lands on ewan (STAGED to BELIEVE — the flip's real precondition;
     // organic propagation to BELIEVE is out of a bounded campaign's reach; disclosed in the report).
@@ -237,7 +237,7 @@ describe('full-ladder e2e — the ladder climbs, the books balance', () => {
     // The nightly turncoat pass: ewan believes damaging-sly at BELIEVE → he volunteers as a walk-in.
     world.tick = at(1, 8);
     runTurncoatPass(world, RULES);
-    expect(findAsset(world, 'ewan')!.turned).toBe(true); // the walk-in flipped, by mechanism
+    expect(assetFor(world, 'enemy', 'ewan')!.turned).toBe(true); // the walk-in flipped, by mechanism
 
     // On the next rest-day he volunteers a REAL tip — a subject-bearing sketch feature arrives as a hint
     // in the PLAYER's own intel (the amendment-#4 infiltration channel), never a fabricated one.

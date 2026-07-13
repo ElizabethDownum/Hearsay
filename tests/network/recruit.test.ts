@@ -13,7 +13,7 @@ import { applyAction, runLogOn, type Action } from '../../src/sim/campaign';
 import { circlesAt } from '../../src/sim/agents';
 import { runUntil, step } from '../../src/sim/step';
 import { reportThrough } from '../../src/sim/reporting';
-import { dispositionOf, findAsset, payWagesNightly } from '../../src/sim/network/roster';
+import { assetFor, dispositionOf, payWagesNightly } from '../../src/sim/network/roster';
 import { compartmentOf } from '../../src/sim/network/compartment';
 import { hashWorld } from '../../src/sim/hash';
 import { blankIntel } from '../../src/sim/fieldwork';
@@ -81,11 +81,11 @@ describe('MICE recruit — money: coin buys fast', () => {
 
     applyAction(world, { tick: t, kind: 'recruit', target, mice: 'money', leverageFamily: null }, RULES);
 
-    const rec = findAsset(world, target)!;
+    const rec = assetFor(world, 'player', target)!;
     expect(rec.mice).toBe('money');
     expect(rec.strikes).toBe(0);
     expect(rec.wagePaidThroughDay).toBe(dayOf(t));
-    expect(compartmentOf(world, target)).toEqual([{ tick: t, kind: 'recruited-by', ref: 'player' }]);
+    expect(compartmentOf(world, 'player', target)).toEqual([{ tick: t, kind: 'recruited-by', ref: 'player' }]);
     expect(dispositionOf(world, target)).toBe(0.6);
     expect(trustBetween(world, target, 'you')).toBe(0.6);
     expect(world.intel.informants.some((i) => i.id === target)).toBe(true);
@@ -103,7 +103,7 @@ describe('MICE recruit — money: coin buys fast', () => {
       .toThrow(/treasury/);
 
     expect(hashWorld(world)).toBe(before); // no asset, no informant, no edge, no fact, coin untouched
-    expect(findAsset(world, target)).toBeNull();
+    expect(assetFor(world, 'player', target)).toBeNull();
     expect(world.intel.informants.some((i) => i.id === target)).toBe(false);
   });
 });
@@ -137,7 +137,7 @@ describe('MICE recruit — ideology: loyal to the cause', () => {
     });
     applyAction(world, { tick: t, kind: 'recruit', target, mice: 'ideology', leverageFamily: null }, RULES);
 
-    expect(findAsset(world, target)!.mice).toBe('ideology');
+    expect(assetFor(world, 'player', target)!.mice).toBe('ideology');
     expect(dispositionOf(world, target)).toBe(0.7);
     expect(world.coin).toBe(20 - STANDARD_ECONOMY.recruitCost.ideology);
   });
@@ -168,7 +168,7 @@ describe('MICE recruit — coercion: dirt you hold (0.5, they do not love you)',
     });
     applyAction(world, { tick: t, kind: 'recruit', target, mice: 'coercion', leverageFamily: 'lev-1' }, RULES);
 
-    expect(findAsset(world, target)!.mice).toBe('coercion');
+    expect(assetFor(world, 'player', target)!.mice).toBe('coercion');
     expect(dispositionOf(world, target)).toBe(0.5);
     expect(world.coin).toBe(20 - STANDARD_ECONOMY.recruitCost.coercion);
   });
@@ -182,7 +182,7 @@ describe('MICE recruit — ego: no gate, chronic exaggeration overlay (one mecha
     const id = Object.keys(world.npcs).sort().find((n) =>
       n !== 'you' && !guardIds.has(n) && n !== town.cast!.usurper && !town.cast!.council.includes(n)
       && n !== world.network.spymaster && !assetIds.has(n) && !world.npcs[n]!.traits.includes('exaggerator')
-      && reportThrough(world, n, asClaim(spec), RULES).count === spec.count);
+      && reportThrough(world, n, asClaim(spec), RULES, 'player').count === spec.count);
     if (!id) throw new Error('egoTarget: none found');
     return id;
   }
@@ -197,15 +197,15 @@ describe('MICE recruit — ego: no gate, chronic exaggeration overlay (one mecha
     const target = egoTarget(world, town, dirt2);
     expect(world.npcs[target]!.traits).not.toContain('exaggerator'); // the canary: they are NOT natural exaggerators
     const t = pinnedCircleMate(world, target);
-    const base = reportThrough(world, target, asClaim(dirt2), RULES);
+    const base = reportThrough(world, target, asClaim(dirt2), RULES, 'player');
     expect(base.count).toBe(dirt2.count); // their real traits leave the count untouched
 
     applyAction(world, { tick: t, kind: 'recruit', target, mice: 'ego', leverageFamily: null }, RULES);
-    expect(findAsset(world, target)!.mice).toBe('ego');
+    expect(assetFor(world, 'player', target)!.mice).toBe('ego');
     expect(dispositionOf(world, target)).toBe(0.6);
     expect(world.coin).toBe(20 - STANDARD_ECONOMY.recruitCost.ego);
 
-    const after = reportThrough(world, target, asClaim(dirt2), RULES);
+    const after = reportThrough(world, target, asClaim(dirt2), RULES, 'player');
     // Report diff: the count doubles and severity climbs by one even though they lack exaggerator.
     expect(after.count).toBe(base.count! * 2);
     expect(after.severity).toBe(Math.min(5, base.severity + 1));
@@ -222,11 +222,11 @@ describe('MICE recruit — ego: no gate, chronic exaggeration overlay (one mecha
     const { world, town } = stage('rec-ego-ctrl');
     const target = egoTarget(world, town, dirt2);
     const t = pinnedCircleMate(world, target);
-    const base = reportThrough(world, target, asClaim(dirt2), RULES);
+    const base = reportThrough(world, target, asClaim(dirt2), RULES, 'player');
 
     applyAction(world, { tick: t, kind: 'recruit', target, mice: 'money', leverageFamily: null }, RULES);
 
-    expect(reportThrough(world, target, asClaim(dirt2), RULES)).toEqual(base);
+    expect(reportThrough(world, target, asClaim(dirt2), RULES, 'player')).toEqual(base);
   });
 });
 
@@ -246,11 +246,11 @@ describe('MICE recruit — ego × natural-exaggerator stacking (O2)', () => {
 
     // r0 = her report as a NON-ego (money) asset — her REAL chain already exaggerates ONCE.
     world.network.assets = [{ id: target, mice: 'money', wagePaidThroughDay: 0, strikes: 0, facts: [] }];
-    const r0 = reportThrough(world, target, claim, RULES);
+    const r0 = reportThrough(world, target, claim, RULES, 'player');
 
     // rE = her report as an EGO asset — the overlay adds ONE MORE registered exaggerator pass, composed LAST.
     world.network.assets = [{ id: target, mice: 'ego', wagePaidThroughDay: 0, strikes: 0, facts: [] }];
-    const rE = reportThrough(world, target, claim, RULES);
+    const rE = reportThrough(world, target, claim, RULES, 'player');
 
     // BY MECHANISM: rE is EXACTLY the registered exaggerator transform composed onto r0 — the natural
     // composition of two lawful transforms (NOT the ×4/+2 constants asserted as such). This is the KEEP.
@@ -404,7 +404,7 @@ describe('recruit routing — save = seed + action log', () => {
     const a = runLogOn(build(), RULES, log, at(3, 0));
     const b = runLogOn(build(), RULES, log, at(3, 0));
     expect(hashWorld(a)).toBe(hashWorld(b));
-    expect(findAsset(a, found.target)!.mice).toBe('money');
+    expect(assetFor(a, 'player', found.target)!.mice).toBe('money');
   });
 });
 
@@ -439,9 +439,9 @@ describe('wages — auto-debit on the rest-day nightly (never a refusal)', () =>
     payWagesNightly(world, RULES);
 
     expect(world.coin).toBe(0);
-    expect(findAsset(world, 'anselm')!.strikes).toBe(0);
+    expect(assetFor(world, 'player', 'anselm')!.strikes).toBe(0);
     expect(dispositionOf(world, 'anselm')).toBe(0.6);
-    expect(findAsset(world, 'mara')!.strikes).toBe(1);
+    expect(assetFor(world, 'player', 'mara')!.strikes).toBe(1);
     expect(dispositionOf(world, 'mara')).toBeCloseTo(0.55, 10);
   });
 });

@@ -9,8 +9,7 @@ import { STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT } from '../../src/content/gen
 import { generateValidTown } from '../../src/world/serve';
 import { worldFromTown, attachPlayer } from '../../src/world/attach';
 import { runTurncoatPass } from '../../src/sim/network/turncoats';
-import { applyRecruit } from '../../src/sim/actions';
-import { dispositionOf, findAsset, setDispositionEdge } from '../../src/sim/network/roster';
+import { assetFor, dispositionOf, setDispositionEdge } from '../../src/sim/network/roster';
 import { recordFact } from '../../src/sim/network/compartment';
 import { captureIntel, playerView, networkView, courierRouteView, blankIntel } from '../../src/sim/fieldwork';
 import { reportThrough } from '../../src/sim/reporting';
@@ -24,6 +23,7 @@ import type { TraitContext } from '../../src/sim/rumors/traits';
 import type { ReportedClaim, SketchFeature } from '../../src/sim/enemy/state';
 import type { Belief, WorldState } from '../../src/sim/types';
 import type { GeneratedTown } from '../../src/world/types';
+import type { AssetRecord } from '../../src/sim/network/types';
 import type { TickEvents } from '../../src/sim/perception';
 
 const RULES = STANDARD_RULES;
@@ -81,8 +81,8 @@ describe('turncoat flips — a secret crossing a broken trust edge, both directi
     runTurncoatPass(world, RULES);
     runTurncoatPass(control, RULES);
 
-    expect(findAsset(world, asset)!.turned).toBe(true);        // both conditions met → turned
-    expect(findAsset(control, asset)!.turned).toBeFalsy();     // eroded but not identified → loyal
+    expect(assetFor(world, 'player', asset)!.turned).toBe(true);        // both conditions met → turned
+    expect(assetFor(control, 'player', asset)!.turned).toBeFalsy();     // eroded but not identified → loyal
   });
 
   it('(a) trust still holding: identified but disposition >= 0.4 stays loyal', () => {
@@ -91,7 +91,7 @@ describe('turncoat flips — a secret crossing a broken trust edge, both directi
     setDispositionEdge(world, asset, 0.55);          // above the flip line
     world.enemy.sketch.push(identifyFeature(asset)); // identified all the same
     runTurncoatPass(world, RULES);
-    expect(findAsset(world, asset)!.turned).toBeFalsy();
+    expect(assetFor(world, 'player', asset)!.turned).toBeFalsy();
   });
 
   it('(b) his-side: an enemy asset BELIEVING a damaging spymaster claim flips to a walk-in; below BELIEVE does not', () => {
@@ -101,12 +101,12 @@ describe('turncoat flips — a secret crossing a broken trust edge, both directi
 
     world.beliefs[hisAsset]!['f-anti'] = damagingSpymasterBelief(spymaster, STANCE.BELIEVE); // exactly at BELIEVE
     runTurncoatPass(world, RULES);
-    expect(findAsset(world, hisAsset)!.turned).toBe(true);
+    expect(assetFor(world, 'enemy', hisAsset)!.turned).toBe(true);
 
     const { world: twin } = stage('turn-b');
     twin.beliefs[hisAsset]!['f-anti'] = damagingSpymasterBelief(spymaster, 0.6); // repeating, not believing
     runTurncoatPass(twin, RULES);
-    expect(findAsset(twin, hisAsset)!.turned).toBeFalsy();
+    expect(assetFor(twin, 'enemy', hisAsset)!.turned).toBeFalsy();
   });
 
   it('the flip writes ONLY roster bookkeeping — never a trust edge (Task 4 SET-not-max carry)', () => {
@@ -116,7 +116,7 @@ describe('turncoat flips — a secret crossing a broken trust edge, both directi
     world.enemy.sketch.push(identifyFeature(asset));
     const edgeBefore = stableStringify(world.npcs[asset]!.edges);
     runTurncoatPass(world, RULES);
-    expect(findAsset(world, asset)!.turned).toBe(true);
+    expect(assetFor(world, 'player', asset)!.turned).toBe(true);
     expect(stableStringify(world.npcs[asset]!.edges)).toBe(edgeBefore); // disposition untouched by the flip
     expect(dispositionOf(world, asset)).toBe(0.3);
   });
@@ -202,13 +202,13 @@ describe('doctored channel — divergence IS the catchable signature (same event
     };
 
     // Doctoring after REAL traits: a plain turned asset = minimizer(realTraits(claim)).
-    set(null, false); const r0 = pick7(reportThrough(world, npc, claim, RULES));
-    set(null, true); const rT = pick7(reportThrough(world, npc, claim, RULES));
+    set(null, false); const r0 = pick7(reportThrough(world, npc, claim, RULES, 'player'));
+    set(null, true); const rT = pick7(reportThrough(world, npc, claim, RULES, 'player'));
     expect(rT).toEqual(applyMini(r0));
 
     // Doctoring after the EGO overlay after real traits: turned+ego = minimizer(exaggerator(real)).
-    set('ego', false); const rE = pick7(reportThrough(world, npc, claim, RULES));
-    set('ego', true); const rET = pick7(reportThrough(world, npc, claim, RULES));
+    set('ego', false); const rE = pick7(reportThrough(world, npc, claim, RULES, 'player'));
+    set('ego', true); const rET = pick7(reportThrough(world, npc, claim, RULES, 'player'));
     expect(rET).toEqual(applyMini(rE));
   });
 });
@@ -222,7 +222,7 @@ describe('the weekly leak — his intelligence grows on your compartments (rest-
     asset.turned = true;
     // Give the asset a second fact so we can watch the cadence advance oldest-first.
     world.tick = at(2, 0);
-    recordFact(world, asset.id, { kind: 'carried-story', ref: 'f-carried' });
+    recordFact(world, 'player', asset.id, { kind: 'carried-story', ref: 'f-carried' });
     const facts = [...asset.facts]; // [recruited-by@0, carried-story@day2]
     expect(facts).toHaveLength(2);
     const evBefore = world.enemy.evidence.length;
@@ -343,7 +343,7 @@ describe('the pass is wired into the nightly — AFTER wages, BEFORE vignettes',
     // The missed wage slid 0.42 → 0.37 (< 0.4), and the turncoat pass — running AFTER wages — flipped
     // them the SAME night. Had it run before wages, 0.42 would still hold and they'd stay loyal.
     expect(dispositionOf(world, asset)).toBeCloseTo(0.37, 5);
-    expect(findAsset(world, asset)!.turned).toBe(true);
+    expect(assetFor(world, 'player', asset)!.turned).toBe(true);
   });
 });
 
@@ -373,10 +373,16 @@ describe('turncoats are invisible player-side — the flag is not the game', () 
       const before = stableStringify(playerView(world));
       const beforeNet = stableStringify(networkView(world));       // T11: the roster surface is invisible too
       const beforeCourier = stableStringify(courierRouteView(world)); // M-2: …and the courier overlay too
-      for (const a of [...world.network.assets, ...world.network.enemyAssets]) a.turned = true;
-      expect(stableStringify(playerView(world))).toBe(before);
-      expect(stableStringify(networkView(world))).toBe(beforeNet);
-      expect(stableStringify(courierRouteView(world))).toBe(beforeCourier);
+      const assertInvisible = (): void => {
+        expect(stableStringify(playerView(world))).toBe(before);
+        expect(stableStringify(networkView(world))).toBe(beforeNet);
+        expect(stableStringify(courierRouteView(world))).toBe(beforeCourier);
+      };
+      for (const a of world.network.assets) a.turned = true;
+      assertInvisible();
+      for (const a of world.network.assets) delete a.turned;
+      for (const a of world.network.enemyAssets) a.turned = true;
+      assertInvisible();
     }
   });
 
@@ -409,33 +415,77 @@ describe('turncoats are invisible player-side — the flag is not the game', () 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// O6 (T8 Minor a): reportThrough's turncoat doctoring is CHANNEL-AGNOSTIC — it fires whoever calls it
-// (the player's captureIntel OR the enemy's captureEvidence). That is safe ONLY because a player-side
-// asset can never be an enemy observer: applyRecruit refuses every observer, so player-roster ∩
-// enemy-observers = ∅ and captureEvidence never routes a doctored report on the enemy's own channel.
-describe('O6 — the invariant that keeps channel-agnostic doctoring off the enemy channel', () => {
-  it('no player asset is ever an enemy observer, and recruit ENFORCES it by refusing every observer', () => {
-    const { world, town } = stage('o6-invariant');
-    const observerIds = new Set(world.enemy.observers.map((o) => o.id));
-    expect(observerIds.size).toBeGreaterThan(0); // non-vacuous: there ARE observers (guards + his assets)
+describe('principal-aware report channels — dual membership is lawful', () => {
+  const STORY: Claim = {
+    id: 'c-story', family: 'f-story', parent: null, subject: 'otto', predicate: 'stole',
+    object: null, count: 8, severity: 5, place: null, attribution: SOMEONE,
+  };
+  const asset = (id: EntityId, overrides: Partial<AssetRecord> = {}): AssetRecord => ({
+    id, mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [], ...overrides,
+  });
+  const literalReporterWorld = (): WorldState => buildWorld(WATCHFORD, 'dual-reporter');
 
-    // (1) The invariant holds in the staged world: player-roster ∩ enemy-observers = ∅.
-    for (const a of world.network.assets) {
-      expect(observerIds.has(a.id), `player asset ${a.id} must not be an enemy observer`).toBe(false);
-    }
-    // (2) It is ENFORCED, not incidental: recruiting ANY observer refuses (guards AND his enemy-net
-    //     assets, which worldFromTown makes observers) — the wall that keeps a turned asset out of the
-    //     enemy's own reporting channel. captureEvidence only ever reports through his OBSERVERS.
-    for (const o of world.enemy.observers) {
-      expect(() => applyRecruit(world, o.id, 'money', null, 0, RULES)).toThrow(/cannot be recruited/);
-      expect(world.network.assets.some((a) => a.id === o.id)).toBe(false); // zero residue — no observer joined the roster
-    }
-    // (3) His enemy-net assets specifically: observers, and never player assets (a walk-in never
-    //     becomes a PLAYER asset that could then doctor his channel — the OTHER direction entirely).
-    for (const id of town.enemyNet!.assets) {
-      expect(observerIds.has(id)).toBe(true);
-      expect(world.network.assets.some((a) => a.id === id)).toBe(false);
-    }
+  it('a dual-roster player-side turncoat doctors only the player audience', () => {
+    const world = literalReporterWorld();
+    world.network.assets.push(asset('mira', { turned: true }));
+    world.network.enemyAssets.push(asset('mira'));
+
+    const toEnemy = reportThrough(world, 'mira', STORY, RULES, 'enemy');
+    const toPlayer = reportThrough(world, 'mira', STORY, RULES, 'player');
+    expect(toPlayer.count).toBe(Math.max(1, Math.floor(toEnemy.count! / 2)));
+    expect(toPlayer.severity).toBe(toEnemy.severity - 1);
+    expect(reportThrough(world, 'mira', STORY, RULES, 'enemy')).toEqual(toEnemy);
+  });
+
+  it('a dual-roster enemy-side turncoat doctors only the enemy audience', () => {
+    const world = literalReporterWorld();
+    world.network.assets.push(asset('mira'));
+    world.network.enemyAssets.push(asset('mira', { turned: true }));
+    const toPlayer = reportThrough(world, 'mira', STORY, RULES, 'player');
+    const toEnemy = reportThrough(world, 'mira', STORY, RULES, 'enemy');
+    expect(toEnemy.count).toBe(Math.max(1, Math.floor(toPlayer.count! / 2)));
+    expect(toEnemy.severity).toBe(toPlayer.severity - 1);
+  });
+
+  it('a dual-roster player-side ego handle exaggerates only for the player audience', () => {
+    const world = literalReporterWorld();
+    world.network.assets.push(asset('mira', { mice: 'ego' }));
+    world.network.enemyAssets.push(asset('mira'));
+
+    const toPlayer = reportThrough(world, 'mira', STORY, RULES, 'player');
+    const toEnemy = reportThrough(world, 'mira', STORY, RULES, 'enemy');
+    expect(toPlayer.count).toBe(toEnemy.count! * 2);
+    expect(toPlayer.severity).toBe(Math.min(5, toEnemy.severity + 1));
+    expect(toEnemy.count).toBe(8);
+    expect(toEnemy.severity).toBe(5);
+  });
+
+  it('a dual-roster enemy-side ego handle exaggerates only for the enemy audience', () => {
+    const world = literalReporterWorld();
+    world.network.assets.push(asset('mira'));
+    world.network.enemyAssets.push(asset('mira', { mice: 'ego' }));
+
+    const toPlayer = reportThrough(world, 'mira', STORY, RULES, 'player');
+    const toEnemy = reportThrough(world, 'mira', STORY, RULES, 'enemy');
+    expect(toEnemy.count).toBe(toPlayer.count! * 2);
+    expect(toEnemy.severity).toBe(Math.min(5, toPlayer.severity + 1));
+    expect(toPlayer.count).toBe(8);
+    expect(toPlayer.severity).toBe(5);
+  });
+
+  it('composes real traits before opposing audience-scoped ego and turned overlays', () => {
+    const world = literalReporterWorld();
+    world.network.assets.push(asset('gale', { mice: 'ego' }));
+    world.network.enemyAssets.push(asset('gale', { turned: true }));
+
+    // STORY 8/5; gale's registered exaggerator => 16/5. Player ego => 32/5.
+    // The enemy record has no ego, then its minimizer => 8/4.
+    const toPlayer = reportThrough(world, 'gale', STORY, RULES, 'player');
+    const toEnemy = reportThrough(world, 'gale', STORY, RULES, 'enemy');
+    expect(toPlayer.count).toBe(32);
+    expect(toPlayer.severity).toBe(5);
+    expect(toEnemy.count).toBe(8);
+    expect(toEnemy.severity).toBe(4);
   });
 });
 

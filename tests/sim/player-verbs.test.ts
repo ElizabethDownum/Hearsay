@@ -136,7 +136,7 @@ describe('player verbs — the avatar speaks under full physics', () => {
     const spec = poison(SOMEONE);
     const bare = bareOf(asClaim(spec));
     const distorts = (id: EntityId): boolean =>
-      JSON.stringify(bareOf(reportThrough(world, id, asClaim(spec), RULES))) !== JSON.stringify(bare);
+      JSON.stringify(bareOf(reportThrough(world, id, asClaim(spec), RULES, 'player'))) !== JSON.stringify(bare);
     // Pick a distorting informant when one exists — that is the canary's whole point (a fingerprint).
     const X = informants.find(distorts) ?? informants[0]!;
 
@@ -151,7 +151,7 @@ describe('player verbs — the avatar speaks under full physics', () => {
     expect(back).toBeDefined(); // X filed a report of what YOU told them
 
     const claim = world.claims[tellingBy(world, 'you')!.claimId]!;
-    expect(back!.reported).toEqual(reportThrough(world, X, claim, RULES)); // BY MECHANISM: X's trait-filtered view
+    expect(back!.reported).toEqual(reportThrough(world, X, claim, RULES, 'player')); // BY MECHANISM: X's trait-filtered view
     if (distorts(X)) {
       expect(back!.reported).not.toEqual(bareOf(claim)); // a trait-carrying X visibly distorts
     }

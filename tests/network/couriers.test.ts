@@ -10,7 +10,7 @@ import { runUntil } from '../../src/sim/step';
 import { deliverCouriers } from '../../src/sim/network/couriers';
 import { reportThrough } from '../../src/sim/reporting';
 import { compartmentOf } from '../../src/sim/network/compartment';
-import { findAsset } from '../../src/sim/network/roster';
+import { assetFor } from '../../src/sim/network/roster';
 import { hashWorld } from '../../src/sim/hash';
 import { at, dayOf, minuteOfDay } from '../../src/core/time';
 import { CONVERSATION_BEAT } from '../../src/sim/rumors/propagation';
@@ -90,7 +90,7 @@ describe('courier delivery — the real schedule intersection does the walking',
 
     // Delivered EXACTLY at the computed intersection: the carried-story fact stamps that tick,
     // and the target now holds the freshly-minted family.
-    const carried = compartmentOf(world, 'anselm').filter((f) => f.kind === 'carried-story');
+    const carried = compartmentOf(world, 'player', 'anselm').filter((f) => f.kind === 'carried-story');
     expect(carried).toHaveLength(1);
     expect(carried[0]!.tick).toBe(expected);
     const family = carried[0]!.ref;
@@ -110,7 +110,7 @@ describe('courier delivery — the real schedule intersection does the walking',
 
     // One beat SHORT of the intersection: nothing delivered, the run still pending.
     runUntil(world, expected, RULES);
-    expect(compartmentOf(world, 'anselm').some((f) => f.kind === 'carried-story')).toBe(false);
+    expect(compartmentOf(world, 'player', 'anselm').some((f) => f.kind === 'carried-story')).toBe(false);
     expect(world.network.pendingCouriers).toHaveLength(1);
   });
 });
@@ -129,7 +129,7 @@ describe('courier delivery — trait-transformed BY THE ASSET on the way out (co
     const expected = firstCoCircle(world, 'mara', 'rafe', taskTick);
     runUntil(world, expected + 1, RULES);
 
-    const family = compartmentOf(world, 'mara').find((f) => f.kind === 'carried-story')!.ref;
+    const family = compartmentOf(world, 'player', 'mara').find((f) => f.kind === 'carried-story')!.ref;
     const delivered = world.beliefs['rafe']![family]!.claim;
     expect(delivered.count).toBe(spec.count! * 2);      // 4 — doubled
     expect(delivered.severity).toBe(spec.severity + 1); // 3 — bumped by one
@@ -147,18 +147,18 @@ describe('courier delivery — trait-transformed BY THE ASSET on the way out (co
     const taskTick = at(0, 12);
     runUntil(world, taskTick, RULES);
     applyAction(world, { tick: taskTick, kind: 'recruit', target: 'anselm', mice: 'ego', leverageFamily: null }, RULES);
-    expect(findAsset(world, 'anselm')!.mice).toBe('ego');
+    expect(assetFor(world, 'player', 'anselm')!.mice).toBe('ego');
 
     const spec: InjectSpec = { subject: 'tomas', predicate: 'stole', object: null, count: 4, severity: 2, place: null, attribution: SOMEONE };
     // Their REPORT of this very claim WOULD inflate (the ego overlay is live on their channel)...
-    expect(reportThrough(world, 'anselm', asClaim(spec), RULES).count).toBe(spec.count! * 2); // 8
+    expect(reportThrough(world, 'anselm', asClaim(spec), RULES, 'player').count).toBe(spec.count! * 2); // 8
 
     // ...but the courier TELLING carries the payload with their REAL firmware only (anselm: literalist +
     // moralizer, both inert on a no-sinVersion 'stole' count) — so the delivered count is UNCHANGED.
     applyCourier(world, 'anselm', spec, 'dara', null, taskTick, RULES);
     const expected = firstCoCircle(world, 'anselm', 'dara', taskTick);
     runUntil(world, expected + 1, RULES);
-    const family = compartmentOf(world, 'anselm').find((f) => f.kind === 'carried-story')!.ref;
+    const family = compartmentOf(world, 'player', 'anselm').find((f) => f.kind === 'carried-story')!.ref;
     expect(world.beliefs['dara']![family]!.claim.count).toBe(spec.count); // 4 — NOT doubled
   });
 });
@@ -173,7 +173,7 @@ describe('courier handoff — face vs drop record EXACTLY different facts (compa
     const t = at(0, 8);
     runUntil(wf, t, RULES);
     applyCourier(wf, 'mara', spec, 'rafe', null, t, RULES);
-    const face = compartmentOf(wf, 'mara');
+    const face = compartmentOf(wf, 'player', 'mara');
     expect(face.some((f) => f.kind === 'met-asset' && f.ref === 'you')).toBe(true); // met the avatar
     expect(face.some((f) => f.kind === 'knows-drop')).toBe(false);
 
@@ -184,7 +184,7 @@ describe('courier handoff — face vs drop record EXACTLY different facts (compa
     applySetDrop(wd, 'drop-1', 'market', RULES);
     wd.playerVenue = 'chapel'; // the avatar is elsewhere — irrelevant to a drop, which is the point
     applyCourier(wd, 'mara', spec, 'rafe', 'drop-1', 0, RULES);
-    const drop = compartmentOf(wd, 'mara');
+    const drop = compartmentOf(wd, 'player', 'mara');
     expect(drop.some((f) => f.kind === 'met-asset')).toBe(false);
     expect(drop.some((f) => f.kind === 'knows-drop' && f.ref === 'drop-1')).toBe(true);
     expect(wd.network.drops.find((d) => d.id === 'drop-1')!.knownBy).toContain('mara'); // the drop remembers who touched it
@@ -242,7 +242,7 @@ describe('courier expiry — a run undelivered after 3 days lapses, and the coin
 
     runUntil(world, at(3, 0, 1), RULES); // through the first day-3 beat, where the 3-day clock lapses
     expect(world.network.pendingCouriers).toHaveLength(0);                                  // expired, removed
-    expect(compartmentOf(world, 'dara').some((f) => f.kind === 'carried-story')).toBe(false); // never delivered
+    expect(compartmentOf(world, 'player', 'dara').some((f) => f.kind === 'carried-story')).toBe(false); // never delivered
     expect(world.coin).toBe(coinAfterTask); // NO refund — and no rest-day nightly falls in days 0-2 to move coin
   });
 });
@@ -267,7 +267,7 @@ describe('courier heat — a guard hearing the delivery attributes the CARRIER, 
     expect(captured.every((e) => e.speaker !== 'you')).toBe(true);
 
     // The chain: interrogating the carrier reads their compartment — the story they carried, and who tasked them.
-    const chain = compartmentOf(world, 'anselm');
+    const chain = compartmentOf(world, 'player', 'anselm');
     expect(chain.some((f) => f.kind === 'carried-story')).toBe(true);
     expect(chain.some((f) => f.kind === 'recruited-by' && f.ref === 'player')).toBe(true);
     expect(chain.some((f) => f.kind === 'met-asset' && f.ref === 'you')).toBe(true); // the face handoff, on the record
@@ -324,7 +324,7 @@ describe('courier preconditions — validate-before-mutate refusals', () => {
     expect(() => applyCourier(world, 'mara', spec, 'rafe', null, t, RULES)).toThrow(/treasury|cover/);
     expect(hashWorld(world)).toBe(before);
     expect(world.network.pendingCouriers).toHaveLength(0);
-    expect(compartmentOf(world, 'mara').some((f) => f.kind === 'met-asset')).toBe(false);
+    expect(compartmentOf(world, 'player', 'mara').some((f) => f.kind === 'met-asset')).toBe(false);
   });
 });
 
@@ -361,8 +361,8 @@ describe('courier delivery — same-beat distinct-family minting (O5b)', () => {
     expect(new Set(families).size).toBe(2);
     expect(families).toEqual([`f${before}`, `f${before + 1}`]);
     // …and each courier's compartment recorded its OWN carried family, distinct from the other's.
-    const f1 = compartmentOf(world, 'a1').find((f) => f.kind === 'carried-story')!.ref;
-    const f2 = compartmentOf(world, 'a2').find((f) => f.kind === 'carried-story')!.ref;
+    const f1 = compartmentOf(world, 'player', 'a1').find((f) => f.kind === 'carried-story')!.ref;
+    const f2 = compartmentOf(world, 'player', 'a2').find((f) => f.kind === 'carried-story')!.ref;
     expect(f1).not.toBe(f2);
   });
 });
@@ -389,6 +389,6 @@ describe('courier routing — save = seed + action log', () => {
     const a = runLogOn(build(), RULES, log, at(1, 6));
     const b = runLogOn(build(), RULES, log, at(1, 6));
     expect(hashWorld(a)).toBe(hashWorld(b));
-    expect(compartmentOf(a, 'anselm').some((f) => f.kind === 'carried-story')).toBe(true); // the delivery replayed
+    expect(compartmentOf(a, 'player', 'anselm').some((f) => f.kind === 'carried-story')).toBe(true); // the delivery replayed
   });
 });

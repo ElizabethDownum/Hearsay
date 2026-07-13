@@ -2,13 +2,15 @@ import type { Tick } from '../../core/time';
 import type { EntityId, RumorId, VenueId } from '../rumors/claim';
 import type { InjectSpec } from '../actions';
 
+export type Principal = 'player' | 'enemy';
+
 /** The four recruitment handles (spec's MICE). `null` marks a dossier freebie (a legacy loyalist). */
 export type Mice = 'money' | 'ideology' | 'coercion' | 'ego';
 
 /**
  * One fact an asset learned through USE — the mechanical compartment interrogation reads back.
  * Facts are the record, never summaries: who recruited them, which drops they know, which ops
- * they carried. The record is only what the player's actions actually exposed.
+ * they carried. The record is only what that principal's actions actually exposed.
  */
 export interface CompartmentFact {
   tick: Tick;

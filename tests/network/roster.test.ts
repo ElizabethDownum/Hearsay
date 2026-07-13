@@ -80,6 +80,39 @@ describe('attach migration — the two dossier freebies become roster AssetRecor
   });
 });
 
+describe('worldFromTown — enemy assets carry real relationship edges to the spymaster', () => {
+  it('adds a 0.75 friend edge when the asset has no spymaster edge', () => {
+    const town = townFor('enemy-edge-missing');
+    const assetId = town.enemyNet!.assets[0]!;
+    const spymaster = town.enemyNet!.spymaster;
+    const fixtureAsset = town.fixture.npcs.find((n) => n.id === assetId)!;
+    fixtureAsset.edges = fixtureAsset.edges.filter((e) => e.to !== spymaster);
+    expect(fixtureAsset.edges.some((e) => e.to === spymaster)).toBe(false);
+
+    const world = worldFromTown(town, 'enemy-edge-missing');
+    expect(world.npcs[assetId]!.edges.find((e) => e.to === spymaster)).toEqual({
+      to: spymaster, kind: 'friend', trust: 0.75,
+    });
+    expect(fixtureAsset.edges.some((e) => e.to === spymaster)).toBe(false); // edges-only clone is detached
+  });
+
+  it('reuses a pre-existing 0.20 edge unchanged', () => {
+    const town = townFor('enemy-edge-existing');
+    const assetId = town.enemyNet!.assets[0]!;
+    const spymaster = town.enemyNet!.spymaster;
+    const fixtureAsset = town.fixture.npcs.find((n) => n.id === assetId)!;
+    fixtureAsset.edges = fixtureAsset.edges.filter((e) => e.to !== spymaster);
+    fixtureAsset.edges.push({
+      to: spymaster, kind: 'friend', trust: 0.20,
+    });
+
+    const world = worldFromTown(town, 'enemy-edge-existing');
+    expect(world.npcs[assetId]!.edges.filter((e) => e.to === spymaster)).toEqual([
+      { to: spymaster, kind: 'friend', trust: 0.20 },
+    ]);
+  });
+});
+
 describe('network state — serializable, hashed, replay-stable', () => {
   it('network participates in the state hash — a lone strike difference hashes differently', () => {
     const town = townFor('net-hash');

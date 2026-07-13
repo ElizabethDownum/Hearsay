@@ -2,12 +2,13 @@ import { dayOf, minuteOfDay, type Tick } from '../core/time';
 import { circlesAt, positionOf } from './agents';
 import { observationsFor, type TickEvents } from './perception';
 import { reportThrough } from './reporting';
-import { isTurnedAsset } from './network/roster';
+import { isTurnedAgainst } from './network/roster';
 import { CONVERSATION_BEAT } from './rumors/propagation';
 import type { Rules } from './rules';
 import type { IntelEntry, WorldState } from './types';
 import type { Claim, EntityId, VenueId } from './rumors/claim';
 import type { Mice } from './network/types';
+import type { Principal } from './network/types';
 import type { TownMap } from './enemy/state';
 import type { ScenarioStatus } from './scenario/types';
 import { buildTownMap } from './world';
@@ -26,11 +27,17 @@ export function blankIntel(): Omit<IntelEntry, 'tick' | 'venue' | 'via' | 'kind'
 
 /** How a claim reaches the log: the avatar hears it raw (`self`), an informant reports it
  *  through their traits. The single fork for the two player-controlled channels. */
-function heardClaim(world: WorldState, via: 'self' | EntityId, claim: Claim, rules: Rules) {
+function heardClaim(
+  world: WorldState,
+  via: 'self' | EntityId,
+  claim: Claim,
+  rules: Rules,
+  audience: Principal,
+) {
   return via === 'self'
     ? (({ subject, predicate, object, count, severity, place, attribution }) =>
         ({ subject, predicate, object, count, severity, place, attribution }))(claim)
-    : reportThrough(world, via, claim, rules);
+    : reportThrough(world, via, claim, rules, audience);
 }
 
 /**
@@ -57,7 +64,7 @@ export function captureIntel(world: WorldState, events: TickEvents, rules: Rules
     // watch sightings (kind 'presence' at watch posts) and authority-backed askings — so the enemy's
     // activity goes unreported to the player. Story reports are NOT dropped: they minimize in
     // reportThrough (one mechanic). The DIVERGENCE from a loyal channel is the only tell — no flag.
-    const doctored = source.via !== 'self' && isTurnedAsset(world, source.via);
+    const doctored = source.via !== 'self' && isTurnedAgainst(world, 'player', source.via);
     const feed = observationsFor(source.id, events);
     for (const obs of feed.observations) {
       if (obs.kind === 'utterance') {
@@ -65,7 +72,7 @@ export function captureIntel(world: WorldState, events: TickEvents, rules: Rules
           ...blankIntel(), tick: obs.tick, venue: obs.venue, via: source.via,
           kind: 'utterance', overheard: obs.overheard, speaker: obs.speaker, addressedTo: obs.addressedTo,
           mode: obs.mode, claimId: obs.claim.id, family: obs.claim.family,
-          reported: heardClaim(world, source.via, obs.claim, rules),
+          reported: heardClaim(world, source.via, obs.claim, rules, 'player'),
         });
       } else if (obs.kind === 'asking') {
         if (doctored && obs.authority) continue;   // authority askings OMITTED from a turned channel

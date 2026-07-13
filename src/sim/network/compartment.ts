@@ -1,7 +1,7 @@
 import type { EntityId } from '../rumors/claim';
 import type { WorldState } from '../types';
-import type { CompartmentFact } from './types';
-import { findAsset } from './roster';
+import type { CompartmentFact, Principal } from './types';
+import { assetFor } from './roster';
 
 /**
  * Record a fact an asset learned through USE. The tick is stamped from `world.tick` (never supplied),
@@ -9,9 +9,14 @@ import { findAsset } from './roster';
  * never recorded twice — but the same content at a different tick is a distinct event and is kept.
  * Throws if `asset` is on no roster (a fact can only be recorded against a real asset).
  */
-export function recordFact(world: WorldState, asset: EntityId, fact: Omit<CompartmentFact, 'tick'>): void {
-  const record = findAsset(world, asset);
-  if (!record) throw new Error(`recordFact: '${asset}' is not an asset on any roster`);
+export function recordFact(
+  world: WorldState,
+  principal: Principal,
+  asset: EntityId,
+  fact: Omit<CompartmentFact, 'tick'>,
+): void {
+  const record = assetFor(world, principal, asset);
+  if (!record) throw new Error(`recordFact: '${asset}' is not a ${principal} asset`);
   const full: CompartmentFact = { tick: world.tick, kind: fact.kind, ref: fact.ref };
   const dup = record.facts.some((f) => f.tick === full.tick && f.kind === full.kind && f.ref === full.ref);
   if (dup) return;
@@ -23,8 +28,8 @@ export function recordFact(world: WorldState, asset: EntityId, fact: Omit<Compar
  * it was learned. Returned as byte-copies: reading the compartment can never mutate the record. A
  * non-asset yields nothing (they know nothing about your network).
  */
-export function compartmentOf(world: WorldState, asset: EntityId): CompartmentFact[] {
-  const record = findAsset(world, asset);
+export function compartmentOf(world: WorldState, principal: Principal, asset: EntityId): CompartmentFact[] {
+  const record = assetFor(world, principal, asset);
   if (!record) return [];
   return record.facts.map((f) => ({ tick: f.tick, kind: f.kind, ref: f.ref }));
 }

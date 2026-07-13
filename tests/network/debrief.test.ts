@@ -11,7 +11,7 @@ import { applyAction, runLogOn, type Action } from '../../src/sim/campaign';
 import { runUntil } from '../../src/sim/step';
 import { chooseAnswer } from '../../src/sim/inquiry';
 import { reportThrough } from '../../src/sim/reporting';
-import { dispositionOf, findAsset } from '../../src/sim/network/roster';
+import { assetFor, dispositionOf } from '../../src/sim/network/roster';
 import { hashWorld } from '../../src/sim/hash';
 import { at, dayOf } from '../../src/core/time';
 import { CONVERSATION_BEAT } from '../../src/sim/rumors/propagation';
@@ -149,7 +149,7 @@ describe('debrief — extraction bypasses discretion exactly once per debrief', 
     expect(entry.addressedTo).toBe('you');
     expect(entry.family).toBe('f-held');
     expect(entry.claimId).toBe('c-held');
-    expect(entry.reported).toEqual(reportThrough(w, 'ann', claim, RULES)); // rides the SAME channel
+    expect(entry.reported).toEqual(reportThrough(w, 'ann', claim, RULES, 'player')); // rides the SAME channel
   });
 });
 
@@ -163,10 +163,10 @@ describe('debrief — trust slide exact (zero new constants)', () => {
     applyInject(w, 'ann', spec); // something in their belief store to extract
 
     expect(dispositionOf(w, 'ann')).toBe(0.6);
-    expect(findAsset(w, 'ann')!.strikes).toBe(0);
+    expect(assetFor(w, 'player', 'ann')!.strikes).toBe(0);
     applyDebrief(w, 'ann', BEAT, RULES);
     expect(dispositionOf(w, 'ann')).toBeCloseTo(0.5, 10);
-    expect(findAsset(w, 'ann')!.strikes).toBe(1);
+    expect(assetFor(w, 'player', 'ann')!.strikes).toBe(1);
   });
 });
 
@@ -231,7 +231,7 @@ describe('debrief joins the Action union', () => {
     const a = runLogOn(build(), RULES, log, at(0, 2));
     const b = runLogOn(build(), RULES, log, at(0, 2));
     expect(hashWorld(a)).toBe(hashWorld(b));
-    expect(findAsset(a, 'ann')!.strikes).toBe(1);
+    expect(assetFor(a, 'player', 'ann')!.strikes).toBe(1);
   });
 });
 
@@ -370,7 +370,7 @@ describe('debrief — attribution discloses the asset\'s OWN source (T9 carry / 
   it('composes the disclosure before the reporting chain — a turned asset\'s debrief is doctored downstream of it', () => {
     const w = world('debrief-disclose-turned');
     makeAsset(w, 'ann', 'money', 0.6);
-    findAsset(w, 'ann')!.turned = true; // a player asset CAN be turned (see debrief-flip) — minimizer fires
+    assetFor(w, 'player', 'ann')!.turned = true; // a player asset CAN be turned (see debrief-flip) — minimizer fires
     applyMeet(w, 'ann', 0);
     runUntil(w, BEAT, RULES);
     const claim = seatSourced(w, 'ann', 'f-turned', 'bri', 'cy', 'dot', 4, 4); // severity 4, count 4
@@ -384,9 +384,9 @@ describe('debrief — attribution discloses the asset\'s OWN source (T9 carry / 
     expect(reported.count).toBe(2);           // minimizer halved 4 -> 2
     // Exactly reportThrough of the DISCLOSED claim (attribution rewritten to heardFrom)...
     const disclosed: Claim = { ...claim, attribution: 'bri' };
-    expect(reported).toEqual(reportThrough(w, 'ann', disclosed, RULES));
+    expect(reported).toEqual(reportThrough(w, 'ann', disclosed, RULES, 'player'));
     // ...and NOT reportThrough of the STORED claim (proves the rewrite ordering, not just doctoring).
-    expect(reported).not.toEqual(reportThrough(w, 'ann', claim, RULES));
+    expect(reported).not.toEqual(reportThrough(w, 'ann', claim, RULES, 'player'));
   });
 });
 
@@ -437,7 +437,7 @@ describe("debrief — the strike compounds into Task 8's flip precondition (inte
       tick = nextBeat;
     }
     expect(dispositionOf(hot, asset)).toBeCloseTo(0.35, 10);
-    expect(findAsset(hot, asset)!.strikes).toBe(4);
+    expect(assetFor(hot, 'player', asset)!.strikes).toBe(4);
     expect(dispositionOf(cold, asset)).toBe(0.75); // the twin, never debriefed, untouched
 
     // Cross the next nightly on both worlds — the SAME Task 8 pass, unmodified.
@@ -445,7 +445,7 @@ describe("debrief — the strike compounds into Task 8's flip precondition (inte
     runUntil(hot, nextDayStart, RULES);
     runUntil(cold, nextDayStart, RULES);
 
-    expect(findAsset(hot, asset)!.turned).toBe(true);   // eroded by debrief + identified -> flips
-    expect(findAsset(cold, asset)!.turned).toBeFalsy();  // identified but never eroded -> stays loyal
+    expect(assetFor(hot, 'player', asset)!.turned).toBe(true);   // eroded by debrief + identified -> flips
+    expect(assetFor(cold, 'player', asset)!.turned).toBeFalsy();  // identified but never eroded -> stays loyal
   });
 });

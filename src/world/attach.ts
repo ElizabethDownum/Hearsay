@@ -22,7 +22,10 @@ export function worldFromTown(town: GeneratedTown, seed: string, rules?: Rules):
   // The embodied spymaster (Task 7): his civilian assets grow the enemy's coverage beyond the
   // guards through the SAME observer machinery (vigilance 0.5 flat), and his id is the world-side
   // handle the runEnemyDay budget spend / applyRecruit read. His assets also join the enemy-side
-  // roster mirror as AssetRecords (one machinery — Task 8 reads them). Skipped for a hand-built town
+  // roster mirror as AssetRecords (one machinery — Task 8 reads them). Their relationship to the
+  // embodied spymaster is a real edge, symmetrically with attachPlayer's asset→player edge. buildWorld
+  // clones NPCs shallowly and edges deeply; these edge-only writes preserve that clone discipline.
+  // Skipped for a hand-built town
   // with no enemyNet (undefined) or a validator-rejected null.
   if (town.enemyNet) {
     world.network.spymaster = town.enemyNet.spymaster;
@@ -32,6 +35,10 @@ export function worldFromTown(town: GeneratedTown, seed: string, rules?: Rules):
         id, mice: null, wagePaidThroughDay: 0, strikes: 0,
         facts: [{ tick: 0, kind: 'recruited-by', ref: town.enemyNet.spymaster }],
       });
+      const asset = world.npcs[id];
+      if (asset && !asset.edges.some((e) => e.to === town.enemyNet!.spymaster)) {
+        asset.edges.push({ to: town.enemyNet.spymaster, kind: 'friend', trust: 0.75 });
+      }
     }
   }
   for (const secret of [...town.secrets].sort((a, b) => a.id.localeCompare(b.id))) {
