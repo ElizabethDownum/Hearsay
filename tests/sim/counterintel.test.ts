@@ -30,27 +30,34 @@ function eventsWith(world: ReturnType<typeof watchfordWorld>, u: Partial<TickEve
 describe('vigilance and addressing', () => {
   it('a dull guard misses boring overheard talk; the same words addressed to him are always recorded', () => {
     const worldA = watchfordWorld('cap-1');
+    worldA.network.spymaster = 'otto';
     captureEvidence(worldA, eventsWith(worldA, {}), STANDARD_RULES);
     // owes-money-to: juiciness 0.35 < 1 - 0.3 → hugo (overhearing) records nothing
     expect(worldA.enemy.evidence).toHaveLength(0);
 
     const worldB = watchfordWorld('cap-2');
+    worldB.network.spymaster = 'otto';
     captureEvidence(worldB, eventsWith(worldB, { addressedTo: 'hugo' }), STANDARD_RULES);
-    expect(worldB.enemy.evidence).toHaveLength(1);
-    expect(worldB.enemy.evidence[0]!).toMatchObject({ observer: 'hugo', overheard: false, kind: 'utterance' });
+    expect(worldB.enemy.evidence).toHaveLength(0);
+    expect(worldB.network.directiveState!.heldObservations).toMatchObject([
+      { observer: 'hugo', principal: 'enemy', deliveredAt: null },
+    ]);
   });
 
   it('juicy talk clears a dull ear: stole (0.8) ≥ 1 − 0.3', () => {
     const world = watchfordWorld('cap-3');
+    world.network.spymaster = 'otto';
     const events = eventsWith(world, { claim: claimOf(world, 'stole', 3) });
     captureEvidence(world, events, STANDARD_RULES);
-    expect(world.enemy.evidence).toHaveLength(1);
+    expect(world.enemy.evidence).toHaveLength(0);
+    expect(world.network.directiveState!.heldObservations).toHaveLength(1);
   });
 });
 
 describe('reports pass through trait physics', () => {
   it("an exaggerator guard's report doubles counts and bumps severity — the true claim is untouched", () => {
     const world = watchfordWorld('cap-4');
+    world.network.spymaster = 'gale';
     const claim = claimOf(world, 'stole', 3);
     const events: TickEvents = {
       tick: world.tick, positions: {}, askings: [],
@@ -69,6 +76,7 @@ describe('reports pass through trait physics', () => {
 describe('capture is lawful — feeds only', () => {
   it('a telling in a circle containing no observer leaves zero evidence', () => {
     const world = watchfordWorld('cap-5');
+    world.network.spymaster = 'sten'; // embodied handler exists, but is outside this circle
     const claim = claimOf(world, 'stole', 5);
     const events: TickEvents = {
       tick: world.tick, positions: {}, askings: [],
@@ -81,14 +89,15 @@ describe('capture is lawful — feeds only', () => {
 
   it('askings are always evidence', () => {
     const world = watchfordWorld('cap-6');
+    world.network.spymaster = 'otto';
     const events: TickEvents = {
       tick: world.tick, positions: {}, utterances: [],
       askings: [{ tick: world.tick, venue: 'square-w1', circleMembers: ['hugo', 'quill', 'rosa'],
         speaker: 'quill', addressedTo: 'rosa', about: { family: 'f0' }, authority: false }],
     };
     captureEvidence(world, events, STANDARD_RULES);
-    expect(world.enemy.evidence).toHaveLength(1);
-    expect(world.enemy.evidence[0]!).toMatchObject({ kind: 'asking', claimId: null, family: 'f0' });
+    expect(world.enemy.evidence).toHaveLength(0);
+    expect(world.network.directiveState!.heldObservations).toHaveLength(1);
   });
 });
 
@@ -96,6 +105,7 @@ describe('integration through step', () => {
   it('a juicy injection into Watchford leaves guard evidence within a day, deterministically', () => {
     const run = () => {
       const world = watchfordWorld('cap-7');
+      world.network.spymaster = 'gale';
       applyInject(world, 'mira', { subject: 'otto', predicate: 'stole', object: null,
         count: 2, severity: 4, place: null, attribution: SOMEONE });
       runUntil(world, at(1, 0), STANDARD_RULES);

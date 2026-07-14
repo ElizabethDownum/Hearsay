@@ -2,6 +2,7 @@ import type { Tick } from '../core/time';
 import {
   applyAsk, applyAssignInformant, applyCard, applyCodex, applyCourier, applyDebrief, applyGoTo, applyHost,
   applyInject, applyMeet, applyRecruit, applySell, applySetDrop, applyTag, applyTell,
+  applyDirective,
   type InjectSpec,
 } from './actions';
 import type { InquiryKey } from './perception';
@@ -12,6 +13,7 @@ import type { TownFixture, WorldState } from './types';
 import type { EntityId, RumorId, VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
 import type { Mice } from './network/types';
+import type { DirectiveBrief, DirectiveHandoff } from './directives/types';
 import { buildWorld } from './world';
 
 export interface InjectAction {
@@ -138,11 +140,19 @@ export interface SellAction {
   buyer: EntityId;
 }
 
+export interface DirectiveAction {
+  tick: Tick;
+  kind: 'directive';
+  recipient: EntityId;
+  handoff: DirectiveHandoff;
+  brief: DirectiveBrief;
+}
+
 /** The player's recorded verbs — the entire save-relevant intent surface. */
 export type Action =
   | InjectAction | GoToAction | TellAction | AskAction | AssignInformantAction | CodexAction | CardAction
   | TagAction | RecruitAction | SetDropAction | CourierAction | MeetAction | HostAction | DebriefAction
-  | SellAction;
+  | SellAction | DirectiveAction;
 export type ActionLog = Action[];
 
 /** A complete campaign: the world regrows from these two values alone. */
@@ -215,6 +225,9 @@ export function applyAction(world: WorldState, action: Action, rules?: Rules): v
     case 'sell':
       if (!rules) throw new Error('applyAction: sell requires rules (economy prices)');
       applySell(world, action.buyer, action.family, action.tick, rules);
+      break;
+    case 'directive':
+      applyDirective(world, action.recipient, action.handoff, action.brief, action.tick);
       break;
     default: {
       // Saves are untrusted JSON — an unknown kind must fail loudly, never silently no-op.

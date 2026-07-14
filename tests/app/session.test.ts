@@ -371,7 +371,7 @@ describe('advance result and remote activity', () => {
         .find((members) => members.length >= 2);
       if (!pair) continue;
       const [asset, target] = pair;
-      session.world.network.pendingCouriers.push({ asset: asset!, target: target!, queuedTick: 0, viaDrop: null,
+      session.world.network.pendingCouriers.push({ planId: 'plan-0', asset: asset!, target: target!, queuedTick: 0, viaDrop: null,
         spec: { subject: target!, predicate: 'stole', object: null, count: 1, severity: 2, place: null, attribution: SOMEONE } });
       staged = true;
     }

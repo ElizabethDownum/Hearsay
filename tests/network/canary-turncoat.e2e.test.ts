@@ -5,6 +5,8 @@ import { STANDARD_RULES } from '../../src/content/rules';
 import { runTurncoatPass } from '../../src/sim/network/turncoats';
 import { assetFor, dispositionOf, setDispositionEdge, slideDisposition } from '../../src/sim/network/roster';
 import { captureIntel, networkView } from '../../src/sim/fieldwork';
+import { queueUnqueuedFieldReports } from '../../src/sim/directives/field-reports';
+import { realizeNetworkForward } from '../../src/sim/directives/transport';
 import { informantLedger } from '../../src/intel/ledger';
 import { at } from '../../src/core/time';
 import { SOMEONE, type Claim, type EntityId } from '../../src/sim/rumors/claim';
@@ -45,7 +47,7 @@ function stageTwoChannels(seed: string): WorldState {
   const world = watchfordWorld(seed);
   enrollPlayer(world, { home: 'square-w0' }); // the avatar plays no part in the canary feed below
   for (const id of ['mira', 'sten']) {
-    world.intel.informants.push({ id, assignedVenue: null });
+    world.intel.informants.push({ id, assignedVenue: 'square-w0' });
     world.network.assets.push({ id, mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [{ tick: 0, kind: 'recruited-by', ref: 'player' }] });
   }
   setDispositionEdge(world, 'mira', 0.75); // the loyal channel — well clear of the flip line
@@ -85,6 +87,16 @@ describe('canary vs turncoat e2e — the audit loop closes by diffing your own c
       ],
     };
     captureIntel(world, feed, RULES);
+    expect(world.intel.log).toHaveLength(0); // remote observation alone is not player knowledge
+    queueUnqueuedFieldReports(world);
+    for (const message of [...world.network.directiveState!.messages]) {
+      const speech = realizeNetworkForward(world, message.id, {
+        venue: 'square-w0', members: [message.origin, 'you'],
+      }, message.availableAfter, RULES)!;
+      captureIntel(world, {
+        tick: speech.tick, positions: {}, utterances: [], askings: [], networkSpeeches: [speech],
+      }, RULES);
+    }
 
     const loyal = world.intel.log.filter((e) => e.via === 'mira');
     const turned = world.intel.log.filter((e) => e.via === 'sten');

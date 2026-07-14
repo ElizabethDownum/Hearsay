@@ -58,12 +58,11 @@ describe('informant coverage is window-scoped (controller rider)', () => {
     expect(view.occupantsByVenue['post']).toBeUndefined();
   });
 
-  it('playerView: the assigned venue IS covered inside the post window (scout is posted there)', () => {
+  it('playerView: even an operational post never grants live remote occupancy', () => {
     const world = postedWorld();
     world.tick = IN_WINDOW;
     const view = playerView(world);
-    expect(view.occupantsByVenue['post']).toBeDefined();
-    expect(view.occupantsByVenue['post']).toContain('mark');
+    expect(view.occupantsByVenue['post']).toBeUndefined();
   });
 
   // Positive control: captureIntel already keys coverage on the informant's ACTUAL position
@@ -88,6 +87,7 @@ describe('informant coverage is window-scoped (controller rider)', () => {
 
   it('captureIntel: an event at the assigned venue is NOT captured through the informant when it is off-post', () => {
     const world = buildWorld(riderFixture(), 'rider-cap-out');
+    enrollPlayer(world, { home: 'safehouse' });
     world.intel.informants.push({ id: 'scout', assignedVenue: 'post' });
     captureIntel(world, utteranceAt(world, 'elsewhere', OUT_OF_WINDOW), STANDARD_RULES);
     expect(world.intel.log.filter((e) => e.via === 'scout' && e.kind === 'utterance')).toHaveLength(0);
@@ -95,8 +95,10 @@ describe('informant coverage is window-scoped (controller rider)', () => {
 
   it('captureIntel: the same event IS captured through the informant while posted at the venue', () => {
     const world = buildWorld(riderFixture(), 'rider-cap-in');
+    enrollPlayer(world, { home: 'safehouse' });
     world.intel.informants.push({ id: 'scout', assignedVenue: 'post' });
     captureIntel(world, utteranceAt(world, 'post', IN_WINDOW), STANDARD_RULES);
-    expect(world.intel.log.filter((e) => e.via === 'scout' && e.kind === 'utterance').length).toBeGreaterThan(0);
+    expect(world.intel.log.filter((e) => e.via === 'scout' && e.kind === 'utterance')).toHaveLength(0);
+    expect(world.network.directiveState!.heldObservations).toHaveLength(1);
   });
 });

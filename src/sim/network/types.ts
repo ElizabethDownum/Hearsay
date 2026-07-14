@@ -1,6 +1,7 @@
 import type { Tick } from '../../core/time';
 import type { EntityId, RumorId, VenueId } from '../rumors/claim';
 import type { InjectSpec } from '../actions';
+import type { DirectiveState } from '../directives/types';
 
 export type Principal = 'player' | 'enemy';
 
@@ -57,6 +58,8 @@ export interface DeadDrop { id: string; venue: VenueId; knownBy: EntityId[] }
  * walking). Consumed deterministically; expires 3 days after tasking, undelivered, with NO refund.
  */
 export interface CourierTasking {
+  /** Player-known planning-mark correlation; allocated append-only before the task is queued. */
+  planId: string;
   asset: EntityId;
   spec: InjectSpec;
   target: EntityId;
@@ -85,6 +88,8 @@ export interface NetworkState {
   pendingCouriers: CourierTasking[];
   /** Plan 8 Task 10 — the brokerage's dedupe key: one sale per (family, buyer) pair, ever. */
   sales: { family: RumorId; buyer: EntityId }[];
+  /** Plan 11 is lazy: untouched worlds serialize exactly as before. */
+  directiveState?: DirectiveState;
 }
 
 /** A fresh, empty network compartment — the neutral world-init value (buildWorld seeds this). */

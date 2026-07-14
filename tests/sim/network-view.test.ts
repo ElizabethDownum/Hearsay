@@ -6,7 +6,7 @@ import { STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT } from '../../src/content/gen
 import {
   networkView, courierRouteView, playerView, STRIKE_BAR_PENALTY,
 } from '../../src/sim/fieldwork';
-import { recordFact } from '../../src/sim/network/compartment';
+import { recordFact, recordPlayerKnownFact } from '../../src/sim/network/compartment';
 import { blankIntel } from '../../src/sim/fieldwork';
 import { at } from '../../src/core/time';
 import { stableStringify } from '../../src/sim/hash';
@@ -38,18 +38,21 @@ describe('networkView — the roster surface exposes ONLY player-known bookkeepi
     // The exact player-known field set — wages (wagePaidThroughDay), strikes, assignment, facts-COUNT.
     const first = view.assets[0]!;
     expect(Object.keys(first).sort()).toEqual(
-      ['assignedVenue', 'dispositionBar', 'factsCount', 'id', 'mice', 'strikes', 'wagePaidThroughDay'].sort(),
+      ['requestedVenue', 'dispositionBar', 'factsCount', 'id', 'mice', 'strikes', 'wagePaidThroughDay'].sort(),
     );
   });
 
-  it('exposes the COUNT of compartment facts, never their content', () => {
+  it('counts only player-known compartment indexes, never remote raw facts or their content', () => {
     const world = stage('nv-facts');
     const asset = world.network.assets[0]!;
+    const knownBefore = networkView(world).assets.find((a) => a.id === asset.id)!.factsCount;
     world.tick = at(2, 0);
     recordFact(world, 'player', asset.id, { kind: 'carried-story', ref: 'f-secret-carried' });
+    expect(networkView(world).assets.find((a) => a.id === asset.id)!.factsCount).toBe(knownBefore);
+    recordPlayerKnownFact(world, asset.id, { kind: 'met-asset', ref: 'you' });
     const view = networkView(world);
     const row = view.assets.find((a) => a.id === asset.id)!;
-    expect(row.factsCount).toBe(asset.facts.length);            // a number, not the list
+    expect(row.factsCount).toBe(knownBefore + 1);              // a number, not the raw list
     // The content (kinds + refs) never leaks into the view's serialization.
     const json = stableStringify(view);
     expect(json).not.toContain('carried-story');
@@ -70,12 +73,13 @@ describe('networkView — the roster surface exposes ONLY player-known bookkeepi
     expect(networkView(world).assets.find((a) => a.id === asset.id)!.dispositionBar).toBe(0);
   });
 
-  it('carries the player-placed informant posting as the assignment', () => {
+  it('carries the latest requested post, never the operational assignment', () => {
     const world = stage('nv-assign');
     const asset = world.network.assets[0]!;
     const inf = world.intel.informants.find((i) => i.id === asset.id)!;
     inf.assignedVenue = 'safehouse';
-    expect(networkView(world).assets.find((a) => a.id === asset.id)!.assignedVenue).toBe('safehouse');
+    world.intel.requestedPosts = [{ informant: asset.id, venue: 'market', authoredAt: world.tick }];
+    expect(networkView(world).assets.find((a) => a.id === asset.id)!.requestedVenue).toBe('market');
   });
 });
 
@@ -99,7 +103,7 @@ describe('courierRouteView — your own planning marks, from PLAYER-KNOWN data o
     object: null, count: 1, severity: 3, place: null, attribution: SOMEONE,
   };
 
-  it('is empty when no courier is in flight', () => {
+  it('is empty when no player planning mark is open', () => {
     const world = stage('cr-empty');
     expect(courierRouteView(world)).toEqual([]);
   });
@@ -108,7 +112,7 @@ describe('courierRouteView — your own planning marks, from PLAYER-KNOWN data o
     const world = stage('cr-face');
     const asset = world.network.assets[0]!.id;
     const target = Object.keys(world.npcs).find((id) => id !== asset && id !== world.playerId)!;
-    world.intel.informants.find((i) => i.id === asset)!.assignedVenue = 'safehouse';
+    world.intel.requestedPosts = [{ informant: asset, venue: 'safehouse', authoredAt: at(1, 0) }];
     // The target was last SEEN (in the player's own intel) at some public venue.
     const seenVenue = world.enemy.map.venues.find((v) => v.access === 'public')!.id;
     world.intel.log.push({
@@ -116,7 +120,8 @@ describe('courierRouteView — your own planning marks, from PLAYER-KNOWN data o
       kind: 'utterance', overheard: true, speaker: target, addressedTo: 'x',
       mode: 'telling', claimId: STORY.id, family: STORY.family, reported: STORY,
     });
-    world.network.pendingCouriers.push({ asset, spec: STORY, target, viaDrop: null, queuedTick: at(1, 0) });
+    world.intel.courierPlans = [{ id: 'plan-0', asset, target, from: 'safehouse', to: seenVenue,
+      authoredAt: at(1, 0), acknowledgedAt: null }];
 
     const routes = courierRouteView(world);
     expect(routes).toHaveLength(1);
@@ -134,7 +139,8 @@ describe('courierRouteView — your own planning marks, from PLAYER-KNOWN data o
       kind: 'utterance', overheard: true, speaker: target, addressedTo: 'x',
       mode: 'telling', claimId: STORY.id, family: STORY.family, reported: STORY,
     });
-    world.network.pendingCouriers.push({ asset, spec: STORY, target, viaDrop: 'drop-1', queuedTick: at(1, 0) });
+    world.intel.courierPlans = [{ id: 'plan-0', asset, target, from: pub, to: pub,
+      authoredAt: at(1, 0), acknowledgedAt: null }];
     expect(courierRouteView(world)[0]).toMatchObject({ from: pub, to: pub });
   });
 
@@ -143,8 +149,9 @@ describe('courierRouteView — your own planning marks, from PLAYER-KNOWN data o
     const asset = world.network.assets[0]!.id;
     // A target the player has zero intel on — its real position is world truth, off-limits.
     const target = Object.keys(world.npcs).find((id) => id !== asset && id !== world.playerId)!;
-    world.intel.informants.find((i) => i.id === asset)!.assignedVenue = 'safehouse';
-    world.network.pendingCouriers.push({ asset, spec: STORY, target, viaDrop: null, queuedTick: at(1, 0) });
+    world.intel.requestedPosts = [{ informant: asset, venue: 'safehouse', authoredAt: at(1, 0) }];
+    world.intel.courierPlans = [{ id: 'plan-0', asset, target, from: 'safehouse', to: null,
+      authoredAt: at(1, 0), acknowledgedAt: null }];
     expect(courierRouteView(world)).toEqual([]); // destination unknown → no mark drawn
   });
 });

@@ -54,13 +54,13 @@ describe('captureIntel — the player senses through its own sources', () => {
     expect(e.reported!.severity).toBe(3);
   });
 
-  // 2. An informant's report passes through the informant's firmware — gale exaggerates.
-  it('an informant reports through its traits — gale doubles the count; the true claim is untouched', () => {
+  // 2. Remote informants hold first; their traits apply only when a physical report is spoken.
+  it('a remote informant holds the observation without changing player intel', () => {
     const world = withAvatar('intel-2');
-    world.intel.informants.push({ id: 'gale', assignedVenue: null });
+    world.intel.informants.push({ id: 'gale', assignedVenue: 'square-w0' });
     const claim = stole(world, 2, 3);
     const events: TickEvents = {
-      tick: world.tick, positions: {}, askings: [],
+      tick: world.tick, positions: { you: 'home-gs', gale: 'square-w0' }, askings: [],
       utterances: [{
         tick: world.tick, venue: 'square-w0', circleMembers: ['gale', 'mira', 'otto'],
         speaker: 'mira', addressedTo: 'otto', claim, mode: 'telling',
@@ -68,11 +68,11 @@ describe('captureIntel — the player senses through its own sources', () => {
     };
     captureIntel(world, events, STANDARD_RULES);
 
-    expect(world.intel.log).toHaveLength(1);
-    const e = world.intel.log[0]!;
-    expect(e.via).toBe('gale');
-    expect(e.reported!.count).toBe(4);       // exaggerator: 2 × 2
-    expect(e.reported!.severity).toBe(4);    // exaggerator: 3 + 1
+    expect(world.intel.log).toHaveLength(0);
+    expect(world.network.directiveState!.heldObservations).toHaveLength(1);
+    expect(world.network.directiveState!.heldObservations[0]).toMatchObject({
+      principal: 'player', observer: 'gale', deliveredAt: null,
+    });
     expect(world.claims[claim.id]!.count).toBe(2);      // the ground truth never moved
     expect(world.claims[claim.id]!.severity).toBe(3);
   });

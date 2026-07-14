@@ -12,6 +12,7 @@ import { reportThrough } from '../../src/sim/reporting';
 import { compartmentOf } from '../../src/sim/network/compartment';
 import { assetFor } from '../../src/sim/network/roster';
 import { hashWorld } from '../../src/sim/hash';
+import { appendCourierPlan } from '../../src/sim/fieldwork';
 import { at, dayOf, minuteOfDay } from '../../src/core/time';
 import { CONVERSATION_BEAT } from '../../src/sim/rumors/propagation';
 import { SOMEONE, type Claim, type EntityId } from '../../src/sim/rumors/claim';
@@ -251,6 +252,7 @@ describe('courier heat — a guard hearing the delivery attributes the CARRIER, 
   it('the guard captures the COURIER as speaker (not the avatar); interrogation would read carried-story + recruited-by:player', () => {
     const world = testWorld('courier-heat');
     world.enemy.observers.push({ id: 'cole', vigilance: 1 }); // a guard on the northside-chapel beat
+    world.network.spymaster = 'cole'; // embodied handler hears this delivery in person
     const t = at(0, 12);
     runUntil(world, t, RULES);
     // Recruit anselm for real so recruited-by:player is genuinely on the record (the chain the enemy pulls).
@@ -348,8 +350,8 @@ describe('courier delivery — same-beat distinct-family minting (O5b)', () => {
     const mk = (subject: string): InjectSpec => ({ subject, predicate: 'stole', object: null, count: 2, severity: 3, place: null, attribution: SOMEONE });
     const t = at(0, 8);       // a conversation beat
     const queued = at(0, 7);  // strictly before t, same day (no expiry, delivery fires t > queuedTick)
-    world.network.pendingCouriers.push({ asset: 'a1', spec: mk('t2'), target: 't1', viaDrop: null, queuedTick: queued });
-    world.network.pendingCouriers.push({ asset: 'a2', spec: mk('t1'), target: 't2', viaDrop: null, queuedTick: queued });
+    world.network.pendingCouriers.push({ planId: 'plan-0', asset: 'a1', spec: mk('t2'), target: 't1', viaDrop: null, queuedTick: queued });
+    world.network.pendingCouriers.push({ planId: 'plan-1', asset: 'a2', spec: mk('t1'), target: 't2', viaDrop: null, queuedTick: queued });
 
     const before = world.claimCounter;
     const delivered = deliverCouriers(world, t, RULES);
@@ -364,6 +366,27 @@ describe('courier delivery — same-beat distinct-family minting (O5b)', () => {
     const f1 = compartmentOf(world, 'player', 'a1').find((f) => f.kind === 'carried-story')!.ref;
     const f2 = compartmentOf(world, 'player', 'a2').find((f) => f.kind === 'carried-story')!.ref;
     expect(f1).not.toBe(f2);
+  });
+});
+
+describe('courier planning ids', () => {
+  const mark = {
+    asset: 'mara', target: 'rafe', from: 'market', to: 'market',
+    authoredAt: 0, acknowledgedAt: null,
+  } as const;
+
+  it('allocates from append-only length and survives JSON round-trip', () => {
+    const world = testWorld('courier-plan-json');
+    expect(appendCourierPlan(world, mark)).toBe('plan-0');
+    const copy = JSON.parse(JSON.stringify(world)) as WorldState;
+    expect(appendCourierPlan(copy, { ...mark, authoredAt: 15 })).toBe('plan-1');
+    expect(copy.intel.courierPlans!.map((row) => row.id)).toEqual(['plan-0', 'plan-1']);
+  });
+
+  it('refuses a malformed substrate that would collide with the next length id', () => {
+    const world = testWorld('courier-plan-collision');
+    world.intel.courierPlans = [{ id: 'plan-1', ...mark }];
+    expect(() => appendCourierPlan(world, mark)).toThrow(/duplicate id 'plan-1'/);
   });
 });
 

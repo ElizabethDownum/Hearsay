@@ -120,7 +120,7 @@ describe('I-1 fix — two interrogations never merge into one circle (schedule-a
 
 // ── I-2 fixture: two watchable districts (w0, w1) plus one origin-vague feature (required for
 // ANY watch to fire at all) — mirrors combinedEvidence's own construction, adapted to real npcs. ──
-function watchEv(over: Partial<EvidenceEntry>): EvidenceEntry {
+function watchEv(over: Partial<Extract<EvidenceEntry, { kind: 'utterance' }>>): EvidenceEntry {
   return {
     tick: 480, venue: 'square-w0', observer: 'gale', overheard: true,
     speaker: 'ann', addressedTo: 'bea', kind: 'utterance', mode: 'telling',

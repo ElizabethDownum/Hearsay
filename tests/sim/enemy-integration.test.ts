@@ -38,6 +38,7 @@ describe('the full trace chain — interrogation walks a citizen to the guard po
   // compulsion). This is the faithful realization of the brief's intended mechanism.
   it('interrogation → authority asking at the invitational venue → compelled vague answer → evidence → origin-vague + carrier-profile', () => {
     const world = watchfordWorld('trace-1');
+    world.network.spymaster = 'gale';
     // hop zero: seed rosa with an injected damaging story. heardFrom 'injected' ⇒
     // when disclosed under interrogation her attribution is SOMEONE (she names nobody).
     applyInject(world, 'rosa', stole);
@@ -87,6 +88,7 @@ describe('the full trace chain — interrogation walks a citizen to the guard po
   // square, NOT the guard post — because gale meets mira before the override window.
   it('geometry finding — a co-located target is exhausted at the public square before the override fires', () => {
     const world = watchfordWorld('trace-mira');
+    world.network.spymaster = 'gale';
     applyInject(world, 'mira', stole);
     applyEnemyDecision(world, {
       day: 0, features: [], inquiries: [], watches: [],
@@ -125,6 +127,7 @@ describe('watches are visible — the Counter-Sketch feed', () => {
 
     // WITH the watch: hugo (a w1 guard) is posted to square-w0 from day 1.
     const world = watchfordWorld(seed);
+    world.network.spymaster = 'gale';
     inject(world);
     applyEnemyDecision(world, watch);
     let miraSawHugo = 0;
@@ -150,6 +153,7 @@ describe('watches are visible — the Counter-Sketch feed', () => {
 
     // CONTROL: identical world, no watch applied. hugo never reaches square-w0.
     const control = watchfordWorld(seed);
+    control.network.spymaster = 'gale';
     inject(control);
     let controlSawHugo = 0;
     driveCollecting(control, at(5, 0), (events) => {
@@ -165,6 +169,17 @@ describe('watches are visible — the Counter-Sketch feed', () => {
     // (The retuned window {960,1140} now spans the 960 cooldown-burst that the old {1080,1200}
     // missed — w0 tellings cluster at 480/720/960/1200 — so the coverage gain lands from day 1's
     // window onward, not a day late. The delta assertion below stays a pure existence check.)
+    // Hugo did capture at the post. Because Gale shares square-w0 during the continuing watch,
+    // the normal network-forward phase has already completed their physical report contact by the
+    // end of this five-day drive; the retained held row records both capture and later delivery.
+    const hugoReport = world.network.directiveState!.heldObservations.find((row) =>
+      row.principal === 'enemy' && row.observer === 'hugo'
+      && row.content.kind === 'raw' && row.content.observation.kind === 'utterance'
+      && row.content.observation.venue === 'square-w0');
+    expect(hugoReport).toBeDefined();
+    expect(hugoReport!.queuedIn).not.toBeNull();
+    expect(hugoReport!.deliveredAt).not.toBeNull();
+    expect(hugoReport!.deliveredAt!).toBeGreaterThan(hugoReport!.observedAt);
     const hugoW0 = (w: ReturnType<typeof watchfordWorld>): number =>
       w.enemy.evidence.filter((e) => e.observer === 'hugo' && e.venue === 'square-w0').length;
     expect(hugoW0(world)).toBeGreaterThanOrEqual(1);
@@ -175,6 +190,7 @@ describe('watches are visible — the Counter-Sketch feed', () => {
 /** Two juicy damaging stories, one nightly digest per elapsed day — the emergent beat. */
 function emergentProbe(seed: string): ReturnType<typeof watchfordWorld> {
   const world = watchfordWorld(seed);
+  world.network.spymaster = 'gale';
   applyInject(world, 'mira', stole);
   applyInject(world, 'quill', { subject: 'hugo', predicate: 'is-having-an-affair-with', object: 'rosa',
     count: null, severity: 3, place: null, attribution: SOMEONE });

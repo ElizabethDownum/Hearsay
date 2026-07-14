@@ -8,26 +8,27 @@ import { at } from '../../src/core/time';
 import { stableStringify } from '../../src/sim/hash';
 import type { ScenarioState } from '../../src/sim/scenario/types';
 
-describe('playerView — the epistemic selector: presence appears only under live coverage', () => {
+describe('playerView — the epistemic selector: only avatar-local presence is live', () => {
   // (a) coverage law
-  it('occupants are present for playerVenue and an informant post, absent for a known-occupied uncovered venue', () => {
+  it('remote requested/operational posts never become present-tense occupancy', () => {
     const world = watchfordWorld('pv-a');
     enrollPlayer(world, { home: 'home-gs' });
     world.playerVenue = 'home-gs';
     // hugo is posted (as an informant) to square-w1, a venue its body actually occupies at 10:00 —
     // so the post is LIVE (controller rider: coverage rides the actual post, not all-day assignedVenue).
     world.intel.informants.push({ id: 'hugo', assignedVenue: 'square-w1' });
+    world.intel.requestedPosts = [{ informant: 'hugo', venue: 'square-w1', authoredAt: 1 }];
     world.tick = at(0, 10); // 10:00 — both squares are staffed under WATCHFORD's allDay schedules
 
     const view = playerView(world);
 
-    expect(view.informants).toEqual([{ id: 'hugo', assignedVenue: 'square-w1' }]);
-    expect(view.occupantsByVenue['square-w1']!.slice().sort()).toEqual(['hugo', 'quill', 'rosa']);
+    expect(view.informants).toEqual([{ id: 'hugo', requestedVenue: 'square-w1' }]);
+    expect(view.occupantsByVenue['square-w1']).toBeUndefined();
     expect(view.occupantsByVenue['home-gs']).toEqual(['you']);
     // square-w0 is known-occupied (gale, mira, otto, sten all really stand there) but nobody has
     // been posted there and it isn't the avatar's own venue — no key, not even an empty array.
     expect(view.occupantsByVenue['square-w0']).toBeUndefined();
-    expect(Object.keys(view.occupantsByVenue).sort()).toEqual(['home-gs', 'square-w1']);
+    expect(Object.keys(view.occupantsByVenue).sort()).toEqual(['home-gs']);
   });
 
   // (b) unassigned informant
@@ -40,7 +41,7 @@ describe('playerView — the epistemic selector: presence appears only under liv
     world.tick = at(0, 10);
 
     const view = playerView(world);
-    expect(view.informants).toEqual([{ id: 'sten', assignedVenue: null }]);
+    expect(view.informants).toEqual([{ id: 'sten', requestedVenue: null }]);
     expect(view.occupantsByVenue['square-w0']).toBeUndefined();
     expect(Object.keys(view.occupantsByVenue)).toEqual(['home-gs']);
   });

@@ -9,6 +9,8 @@ import { applyTell } from '../../src/sim/actions';
 import { step } from '../../src/sim/step';
 import { runTurncoatPass } from '../../src/sim/network/turncoats';
 import { runEnemyDay } from '../../src/sim/counterintel';
+import { captureIntel } from '../../src/sim/fieldwork';
+import { realizeNetworkForward } from '../../src/sim/directives/transport';
 import { enemyDigest } from '../../src/sim/enemy/digest';
 import { assetFor } from '../../src/sim/network/roster';
 import { compartmentOf } from '../../src/sim/network/compartment';
@@ -245,6 +247,14 @@ describe('full-ladder e2e — the ladder climbs, the books balance', () => {
     const logBefore = world.intel.log.length;
     world.tick = at(6, 23, 59); // a rest-day nightly (the weekly emission cadence)
     runTurncoatPass(world, RULES);
+    expect(world.intel.log).toHaveLength(logBefore); // queued truth is not yet player knowledge
+    const message = world.network.directiveState!.messages.at(-1)!;
+    const speech = realizeNetworkForward(world, message.id, {
+      venue: 'safehouse', members: ['ewan', world.playerId!],
+    }, message.availableAfter, RULES)!;
+    captureIntel(world, {
+      tick: speech.tick, positions: {}, utterances: [], askings: [], networkSpeeches: [speech],
+    }, RULES);
     const hint = world.intel.log.slice(logBefore).find((e) => e.kind === 'hint' && e.via === 'ewan');
     expect(hint, 'the walk-in volunteered a tip').toBeTruthy();
     expect(hint!.hintAbout).toBe('cass');
@@ -270,7 +280,7 @@ describe('full-ladder e2e — the ladder climbs, the books balance', () => {
     // logs are byte-identical). The digest can't see his mind; the world-side budget seam can.
     const stageBudget = (seed: string, scandal: boolean): WorldState => {
       const { world } = stageLadder(seed);
-      const gilEv = (over: Partial<EvidenceEntry>): EvidenceEntry => ({
+      const gilEv = (over: Partial<Extract<EvidenceEntry, { kind: 'utterance' }>>): EvidenceEntry => ({
         tick: 480, venue: 'market', observer: 'gil', overheard: true, speaker: 'cass', addressedTo: 'nell',
         kind: 'utterance', mode: 'telling', claimId: 'e1', family: 'fX', reported: dmg('vane', SOMEONE), about: null, ...over,
       });

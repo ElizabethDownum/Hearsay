@@ -14,13 +14,29 @@ export function recordFact(
   principal: Principal,
   asset: EntityId,
   fact: Omit<CompartmentFact, 'tick'>,
-): void {
+): number {
   const record = assetFor(world, principal, asset);
   if (!record) throw new Error(`recordFact: '${asset}' is not a ${principal} asset`);
   const full: CompartmentFact = { tick: world.tick, kind: fact.kind, ref: fact.ref };
   const dup = record.facts.some((f) => f.tick === full.tick && f.kind === full.kind && f.ref === full.ref);
-  if (dup) return;
+  if (dup) return record.facts.findIndex((f) =>
+    f.tick === full.tick && f.kind === full.kind && f.ref === full.ref);
   record.facts.push(full);
+  return record.facts.length - 1;
+}
+
+/** Record a fact in a player-witnessed moment and mark exactly that compartment index as known. */
+export function recordPlayerKnownFact(
+  world: WorldState,
+  asset: EntityId,
+  fact: Omit<CompartmentFact, 'tick'>,
+): number {
+  const factIndex = recordFact(world, 'player', asset, fact);
+  const known = world.intel.knownAssetFacts ?? (world.intel.knownAssetFacts = []);
+  if (!known.some((row) => row.asset === asset && row.factIndex === factIndex)) {
+    known.push({ asset, factIndex, receivedAt: world.tick });
+  }
+  return factIndex;
 }
 
 /**

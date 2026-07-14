@@ -41,7 +41,7 @@ const MAP: TownMap = {
   ],
 };
 
-function e(over: Partial<EvidenceEntry>): EvidenceEntry {
+function e(over: Partial<Extract<EvidenceEntry, { kind: 'utterance' }>>): EvidenceEntry {
   return {
     tick: 500, venue: 'square-w0', observer: 'gale', overheard: true,
     speaker: 'mira', addressedTo: 'otto', kind: 'utterance', mode: 'telling',

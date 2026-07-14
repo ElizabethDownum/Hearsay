@@ -1,5 +1,6 @@
 import type { Tick } from '../core/time';
 import type { Claim, EntityId, RumorId, VenueId } from './rumors/claim';
+import type { NetworkSpeech, SpokenNetworkPayload } from './directives/types';
 
 export interface Utterance {
   tick: Tick;
@@ -31,6 +32,7 @@ export interface TickEvents {
   positions: Record<EntityId, VenueId>;
   utterances: Utterance[];
   askings: Asking[];
+  networkSpeeches?: NetworkSpeech[];
 }
 
 export type Observation =
@@ -38,7 +40,9 @@ export type Observation =
   | { kind: 'utterance'; tick: Tick; venue: VenueId; speaker: EntityId;
       addressedTo: EntityId; claim: Claim; overheard: boolean; mode: 'telling' | 'answer' }
   | { kind: 'asking'; tick: Tick; venue: VenueId; speaker: EntityId;
-      addressedTo: EntityId; about: InquiryKey; overheard: boolean; authority: boolean };
+      addressedTo: EntityId; about: InquiryKey; overheard: boolean; authority: boolean }
+  | { kind: 'network-speech'; tick: Tick; venue: VenueId; speaker: EntityId;
+      addressedTo: EntityId; messageId: string; spoken: SpokenNetworkPayload; overheard: boolean };
 
 export interface ObservationFeed {
   observer: EntityId;
@@ -78,6 +82,17 @@ export function observationsFor(observer: EntityId, events: TickEvents): Observa
         kind: 'asking', tick: a.tick, venue: a.venue,
         speaker: a.speaker, addressedTo: a.addressedTo, about: a.about,
         overheard: a.addressedTo !== observer, authority: a.authority,
+      });
+    }
+  }
+
+  for (const speech of events.networkSpeeches ?? []) {
+    if (speech.speaker !== observer && speech.circleMembers.includes(observer)) {
+      observations.push({
+        kind: 'network-speech', tick: speech.tick, venue: speech.venue,
+        speaker: speech.speaker, addressedTo: speech.addressedTo,
+        messageId: speech.messageId, spoken: speech.spoken,
+        overheard: speech.addressedTo !== observer,
       });
     }
   }

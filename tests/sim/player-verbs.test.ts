@@ -17,6 +17,8 @@ import { at } from '../../src/core/time';
 import { SOMEONE, type Claim, type EntityId } from '../../src/sim/rumors/claim';
 import type { GeneratedTown } from '../../src/world/types';
 import type { AskingRecord, InstitutionRecord, TellingRecord, WorldState } from '../../src/sim/types';
+import { captureEvidence } from '../../src/sim/counterintel';
+import { realizeNetworkForward } from '../../src/sim/directives/transport';
 
 const RULES = STANDARD_RULES;
 
@@ -128,7 +130,7 @@ describe('player verbs — the avatar speaks under full physics', () => {
   });
 
   // (c) the canary flows (amendment #4 proof-of-life)
-  it('the canary flows: an informant told alone reports your story back through their own firmware', () => {
+  it('the canary flows: an operational informant told alone physically reports through their firmware', () => {
     const { world } = stage('cor-1', { scenario: false });
     const informants = world.intel.informants.map((i) => i.id);
     expect(informants.length).toBeGreaterThan(0);
@@ -141,6 +143,7 @@ describe('player verbs — the avatar speaks under full physics', () => {
     const X = informants.find(distorts) ?? informants[0]!;
 
     pinTo(world, X, 'safehouse');
+    world.intel.informants.find((row) => row.id === X)!.assignedVenue = 'safehouse';
     const circle = circlesAt(world, 0).find((c) => c.venue === 'safehouse')!;
     expect(new Set(circle.members)).toEqual(new Set(['you', X])); // told ALONE (2-person circle)
 
@@ -148,7 +151,9 @@ describe('player verbs — the avatar speaks under full physics', () => {
     runUntil(world, at(1, 0), RULES); // run a day
 
     const back = world.intel.log.find((e) => e.via === X && e.kind === 'utterance' && e.speaker === 'you');
-    expect(back).toBeDefined(); // X filed a report of what YOU told them
+    expect(back).toBeDefined(); // X spoke a physical field report on a later contact
+    expect(world.intel.network?.some((row) =>
+      row.speaker === X && row.spoken.kind === 'field-report')).toBe(true);
 
     const claim = world.claims[tellingBy(world, 'you')!.claimId]!;
     expect(back!.reported).toEqual(reportThrough(world, X, claim, RULES, 'player')); // BY MECHANISM: X's trait-filtered view
@@ -160,7 +165,8 @@ describe('player verbs — the avatar speaks under full physics', () => {
   // (d) caught in the act
   it('caught in the act: a guard overhearing the avatar speak ends the campaign that very tick', () => {
     const { world, town } = stage('cor-2', { scenario: true });
-    const observer = world.enemy.observers[0]!; // a real guard, with a real vigilance
+    const observer = world.enemy.observers.find((candidate) =>
+      candidate.id !== world.network.spymaster)!; // a remote real guard, with real vigilance
     const g = observer.id;
     const guardIds = new Set(world.enemy.observers.map((o) => o.id));
     const bystander = Object.keys(world.npcs).filter((id) => id !== 'you' && !guardIds.has(id)).sort()[0]!;
@@ -187,6 +193,27 @@ describe('player verbs — the avatar speaks under full physics', () => {
     );
     expect(arrest).toBeDefined();
     expect(arrest).toMatchObject({ subject: 'you', actors: [g] });
+    expect(world.enemy.evidence.some((entry) =>
+      entry.kind === 'utterance' && entry.observer === g && entry.speaker === 'you')).toBe(false);
+
+    const held = world.network.directiveState!.heldObservations.find((row) =>
+      row.principal === 'enemy' && row.observer === g
+      && row.content.kind === 'raw' && row.content.observation.kind === 'utterance'
+      && row.content.observation.speaker === 'you');
+    expect(held).toBeDefined();
+    expect(held!.deliveredAt).toBeNull();
+    const message = world.network.directiveState!.messages.find((candidate) =>
+      candidate.payload.kind === 'field-report'
+      && candidate.payload.sourceObservationIds.includes(held!.id))!;
+    const handler = world.network.spymaster!;
+    const speech = realizeNetworkForward(world, message.id, {
+      venue: 'safehouse', members: [g, handler],
+    }, message.availableAfter, RULES)!;
+    captureEvidence(world, {
+      tick: speech.tick, positions: {}, utterances: [], askings: [], networkSpeeches: [speech],
+    }, RULES);
+    expect(world.enemy.evidence.some((entry) =>
+      entry.kind === 'utterance' && entry.observer === g && entry.speaker === 'you')).toBe(true);
 
     // Status is data — the world keeps stepping if the driver steps it, and the ending stays latched.
     const before = world.tick;

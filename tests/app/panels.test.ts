@@ -108,8 +108,8 @@ describe('DayPlanner — requested local moment', () => {
 describe('Network — the roster surface renders player-known bookkeeping only', () => {
   const netView: NetworkView = {
     assets: [
-      { id: 'gale', mice: 'money', strikes: 2, wagePaidThroughDay: 3, assignedVenue: 'tavern-0', factsCount: 4, dispositionBar: 0.6 },
-      { id: 'mira', mice: null, strikes: 0, wagePaidThroughDay: 6, assignedVenue: null, factsCount: 1, dispositionBar: 1 },
+      { id: 'gale', mice: 'money', strikes: 2, wagePaidThroughDay: 3, requestedVenue: 'tavern-0', factsCount: 4, dispositionBar: 0.6 },
+      { id: 'mira', mice: null, strikes: 0, wagePaidThroughDay: 6, requestedVenue: null, factsCount: 1, dispositionBar: 1 },
     ],
     drops: [{ id: 'drop-a', venue: 'square-0' }],
   };
@@ -172,6 +172,7 @@ function requestStagedPanelOffer() {
   expect(target).toBeDefined();
   const venue = 'panel-offer-room';
   session.world.venues[venue] = { id: venue, district: 'd0', access: 'public' };
+  session.world.intel.informants.find((informant) => informant.id === target)!.assignedVenue = venue;
   session.world.scheduleOverrides[target!] = [{
     fromDay: 0, toDay: 1, from: 0, to: 1440, venue, source: 'vignette',
   }];
@@ -207,6 +208,10 @@ describe('RUN A re-verified — seed cor-1, tell poison on the usurper, three da
     expect(session.world.chronicle.some(
       (event) => event.kind === 'telling' && event.speaker === 'you' && event.addressedTo === target,
     )).toBe(true);
+    expect(session.world.intel.log.some(
+      (entry) => entry.kind === 'utterance' && entry.reported?.subject === usurper,
+    )).toBe(false); // the operational informant has observed it, but has not reported yet
+    session.advance(15); // next physical beat: target hands the held field report to the avatar
     expect(session.world.intel.log.some(
       (entry) => entry.kind === 'utterance' && entry.reported?.subject === usurper,
     )).toBe(true);

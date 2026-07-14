@@ -17,6 +17,7 @@ import { watchfordWorld } from './helpers/watchford-world';
 describe('sketch fair-cop — every feature traces to a chronicle record the observer heard', () => {
   it('holds over an emergent multi-day Watchford world', () => {
     const world = watchfordWorld('faircop-1');
+    world.network.spymaster = 'gale'; // embodied handler's own heard feed drives the fair-cop chain
     applyInject(world, 'mira', { subject: 'otto', predicate: 'stole', object: null,
       count: 2, severity: 4, place: null, attribution: SOMEONE });
     applyInject(world, 'quill', { subject: 'hugo', predicate: 'is-having-an-affair-with', object: 'rosa',

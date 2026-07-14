@@ -152,16 +152,34 @@ describe('suggestTraits — the family candidates, sorted', () => {
 });
 
 describe('the flagship — a real Watchford field day locks gale as an exaggerator', () => {
-  // Probed the real intel log FIRST (see task report): seed 'codex-int', avatar parked at
-  // square-w0 (self-only capture, no informant), a single 'met-secretly-with' inject to mira on
-  // day 0. mira moralizes it to 'is-having-an-affair-with' before it reaches gale; gale (a genuine
-  // exaggerator) receives (count 2, sev 3) and re-tells the doubled (count 4, sev 4) version three
-  // times in the day-3 horizon. Three observed receive→emit pairs → the three-confirm lock, and it
-  // is ground-truth-correct: gale's real traits are [exaggerator, literalist].
+  // A staged real-room field day: the avatar watches four one-beat Mira/Gale contacts. At 480 Mira
+  // gives Gale the moralized count-2 version; at 720/960/1200 Gale emits the count-4 version after
+  // the exact 240-tick cooldown. Outside those contacts they are separated, so the vehicle creates
+  // exactly the three observable receive→emit pairs required by the lock law.
   function build() {
     const world = watchfordWorld('codex-int');
     enrollPlayer(world, { home: 'home-gs' });
     world.playerVenue = 'square-w0';
+    const fieldWindows = [480, 720, 960, 1200].map((from) => ({
+      fromDay: 0, toDay: 1, from, to: from + 15,
+      venue: 'square-w0', source: 'vignette' as const,
+    }));
+    world.scheduleOverrides.gale = [
+      ...fieldWindows,
+      { fromDay: 0, toDay: null, from: 0, to: 1440, venue: 'home-gs', source: 'vignette' },
+    ];
+    world.scheduleOverrides.mira = [
+      ...fieldWindows.map((window) => ({ ...window })),
+      { fromDay: 0, toDay: null, from: 0, to: 1440, venue: 'home-mo', source: 'vignette' },
+    ];
+    // Otto would otherwise be Mira's higher-relevance addressee; Sten would make five occupants
+    // and split the witnessed room. Keep both real NPCs at the other square for this field probe.
+    world.scheduleOverrides.otto = [{
+      fromDay: 0, toDay: null, from: 0, to: 1440, venue: 'square-w1', source: 'vignette',
+    }];
+    world.scheduleOverrides.sten = [{
+      fromDay: 0, toDay: null, from: 0, to: 1440, venue: 'square-w1', source: 'vignette',
+    }];
     return world;
   }
   const injectLog: ActionLog = [{

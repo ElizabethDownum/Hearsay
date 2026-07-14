@@ -8,6 +8,7 @@ import type { IntelState } from '../intel/entry';
 import type { ScenarioState } from './scenario/types';
 import type { NetworkState } from './network/types';
 import type { ScheduledSetup } from './phases';
+import type { NetworkSpeech } from './directives/types';
 
 export type { IntelEntry, IntelState, InformantSpec, HypothesisCard, CodexHypothesis, TagNote } from '../intel/entry';
 export type { ScenarioState, ScenarioStatus, ScenarioDef, ScenarioCast, WinCondition, Resolution } from './scenario/types';
@@ -117,7 +118,19 @@ export interface VignetteRecord {
   a: EntityId;
   b: EntityId | null;
 }
-export type ChronicleEntry = TellingRecord | InjectRecord | AskingRecord | InstitutionRecord | VignetteRecord;
+export interface NetworkSpeechRecord {
+  kind: 'network-speech';
+  tick: Tick;
+  venue: VenueId;
+  speaker: EntityId;
+  addressedTo: EntityId;
+  messageId: string;
+  spoken: NetworkSpeech['spoken'];
+  cause: NetworkSpeech['cause'];
+  heardBy: { id: EntityId; addressed: boolean }[];
+}
+export type ChronicleEntry = TellingRecord | InjectRecord | AskingRecord | InstitutionRecord
+  | VignetteRecord | NetworkSpeechRecord;
 
 export interface InquiryTask {
   about: InquiryKey;

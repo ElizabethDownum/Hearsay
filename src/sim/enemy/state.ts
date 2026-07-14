@@ -1,6 +1,8 @@
 import type { Tick } from '../../core/time';
 import type { ClaimId, EntityId, PredicateId, RumorId, VenueId } from '../rumors/claim';
 import { SOMEONE } from '../rumors/claim';
+import type { DirectiveId, SpokenNetworkPayload } from '../directives/types';
+import type { CompartmentFact } from '../network/types';
 
 /** An enemy asset: an NPC id + how sharp their sampling is (0..1]. */
 export interface ObserverSpec { id: EntityId; vigilance: number }
@@ -23,29 +25,36 @@ export interface ReportedClaim {
 
 export type InquiryKeyData = { family: RumorId } | { subject: EntityId };
 
-export interface EvidenceEntry {
+export interface NetworkEvidence {
+  messageId: string;
+  sourceDirectiveId: DirectiveId | null;
+  spoken: SpokenNetworkPayload;
+}
+
+export interface EvidenceBase {
   tick: Tick;
   venue: VenueId;
   observer: EntityId;
   overheard: boolean;
   speaker: EntityId;
   addressedTo: EntityId;
-  kind: 'utterance' | 'asking';
-  /** For utterances: was this ordinary gossip or a compelled/queried answer? null for askings. */
-  mode: 'telling' | 'answer' | null;
-  claimId: ClaimId | null;    // null for askings
-  family: RumorId | null;     // null for subject-keyed askings
-  reported: ReportedClaim | null;
-  about: InquiryKeyData | null; // for askings
-  /**
-   * Plan 8 Task 8 — a turned player-side asset's WEEKLY leak: one compartment fact handed to the
-   * enemy through a lawful in-fiction channel (the turncoat meets their handler; this is inside
-   * testimony, not overheard gossip). Present ONLY on leak entries; every capture-sourced entry
-   * leaves it undefined (so pre-Task-8 evidence hashes unchanged). The digest is BLIND to it — the
-   * fold reads `family`/`reported` (both null on a leak), so the no-omniscience pillar is unmoved.
-   */
-  leaked?: { from: EntityId; fact: { tick: Tick; kind: string; ref: string } };
 }
+
+export type EvidenceEntry =
+  | (EvidenceBase & {
+      kind: 'utterance'; mode: 'telling' | 'answer'; claimId: ClaimId; family: RumorId;
+      reported: ReportedClaim; about: null; network?: never; leaked?: never;
+    })
+  | (EvidenceBase & {
+      kind: 'asking'; mode: null; claimId: null; family: RumorId | null;
+      reported: null; about: InquiryKeyData; network?: never; leaked?: never;
+    })
+  | (EvidenceBase & {
+      kind: 'network'; mode: null; claimId: ClaimId | null; family: RumorId | null;
+      reported: ReportedClaim | null; about: InquiryKeyData | null;
+      network: NetworkEvidence;
+      leaked?: { from: EntityId; fact: CompartmentFact };
+    });
 
 export interface SketchFeature {
   id: string;

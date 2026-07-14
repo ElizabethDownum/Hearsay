@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { buildWorld } from '../../src/sim/world';
+import { buildWorld, enrollPlayer } from '../../src/sim/world';
 import { WATCHFORD } from '../../src/content/fixtures/watchford';
 import { watchfordWorld } from '../sim/helpers/watchford-world';
 import { STANDARD_RULES } from '../../src/content/rules';
@@ -12,6 +12,9 @@ import { runTurncoatPass } from '../../src/sim/network/turncoats';
 import { assetFor, dispositionOf, setDispositionEdge } from '../../src/sim/network/roster';
 import { recordFact } from '../../src/sim/network/compartment';
 import { captureIntel, playerView, networkView, courierRouteView, blankIntel } from '../../src/sim/fieldwork';
+import { captureEvidence } from '../../src/sim/counterintel';
+import { realizeNetworkForward } from '../../src/sim/directives/transport';
+import { queueUnqueuedFieldReports } from '../../src/sim/directives/field-reports';
 import { reportThrough } from '../../src/sim/reporting';
 import { runUntil } from '../../src/sim/step';
 import { STANCE } from '../../src/sim/rumors/propagation';
@@ -127,7 +130,8 @@ describe('doctored channel — divergence IS the catchable signature (same event
   /** Build a Watchford world whose informant `mira` is a player asset with the given `turned` flag. */
   function withMira(seed: string, turned: boolean): WorldState {
     const world = watchfordWorld(seed);
-    world.intel.informants.push({ id: 'mira', assignedVenue: null });
+    enrollPlayer(world, { home: 'home-gs' });
+    world.intel.informants.push({ id: 'mira', assignedVenue: 'square-w0' });
     world.network.assets.push({ id: 'mira', mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [], turned });
     return world;
   }
@@ -158,6 +162,16 @@ describe('doctored channel — divergence IS the catchable signature (same event
     const turnedW = withMira('doc-turned', true);
     captureIntel(loyalW, feed(), RULES);
     captureIntel(turnedW, feed(), RULES);
+    for (const world of [loyalW, turnedW]) {
+      queueUnqueuedFieldReports(world);
+      const message = world.network.directiveState!.messages[0]!;
+      const speech = realizeNetworkForward(world, message.id, {
+        venue: 'home-gs', members: ['mira', 'you'],
+      }, message.availableAfter, RULES)!;
+      captureIntel(world, {
+        tick: speech.tick, positions: {}, utterances: [], askings: [], networkSpeeches: [speech],
+      }, RULES);
+    }
 
     const loyal = loyalW.intel.log.filter((e) => e.via === 'mira');
     const turned = turnedW.intel.log.filter((e) => e.via === 'mira');
@@ -214,8 +228,8 @@ describe('doctored channel — divergence IS the catchable signature (same event
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe('the weekly leak — his intelligence grows on your compartments (rest-day cadence)', () => {
-  it('a turned asset leaks the OLDEST unleaked compartment fact to enemy evidence, once per rest-day week', () => {
+describe('the weekly leak — a compartment fact travels by physical speech (rest-day cadence)', () => {
+  it('queues the oldest fact weekly and changes enemy evidence only when the spymaster hears it', () => {
     const { world } = stage('leak-1');
     const spymaster = world.network.spymaster!;
     const asset = world.network.assets[0]!;
@@ -230,12 +244,21 @@ describe('the weekly leak — his intelligence grows on your compartments (rest-
     // Rest-day nightly (day 6): the oldest fact leaks.
     world.tick = at(6, 23, 59);
     runTurncoatPass(world, RULES);
-    expect(world.enemy.evidence).toHaveLength(evBefore + 1);
+    expect(world.enemy.evidence).toHaveLength(evBefore);
+    const message1 = world.network.directiveState!.messages.at(-1)!;
+    expect(message1.payload).toMatchObject({ kind: 'compartment-fact', fact: facts[0] });
+    const speech1 = realizeNetworkForward(world, message1.id, {
+      venue: Object.keys(world.venues)[0]!, members: [asset.id, spymaster],
+    }, message1.availableAfter, RULES)!;
+    captureEvidence(world, {
+      tick: speech1.tick, positions: {}, utterances: [], askings: [], networkSpeeches: [speech1],
+    }, RULES);
     const leak1 = world.enemy.evidence.at(-1)!;
     expect(leak1.leaked).toBeTruthy();
     expect(leak1.leaked!.from).toBe(asset.id);
     expect(leak1.leaked!.fact).toEqual(facts[0]); // oldest = recruited-by@0
-    expect(leak1.observer).toBe(asset.id);        // compartment sourcing: the entry attests to them
+    expect(leak1.observer).toBe(spymaster);       // principal actor learned it through their own feed
+    expect(leak1.speaker).toBe(asset.id);         // the turncoat is the physical source
     expect(leak1.addressedTo).toBe(spymaster);
     expect(asset.leakedThrough).toBe(1);
 
@@ -247,7 +270,15 @@ describe('the weekly leak — his intelligence grows on your compartments (rest-
     // The next rest-day nightly (day 13) leaks the NEXT fact.
     world.tick = at(13, 23, 59);
     runTurncoatPass(world, RULES);
-    expect(world.enemy.evidence).toHaveLength(evBefore + 2);
+    expect(world.enemy.evidence).toHaveLength(evBefore + 1);
+    const message2 = world.network.directiveState!.messages.at(-1)!;
+    expect(message2.payload).toMatchObject({ kind: 'compartment-fact', fact: facts[1] });
+    const speech2 = realizeNetworkForward(world, message2.id, {
+      venue: Object.keys(world.venues)[0]!, members: [asset.id, spymaster],
+    }, message2.availableAfter, RULES)!;
+    captureEvidence(world, {
+      tick: speech2.tick, positions: {}, utterances: [], askings: [], networkSpeeches: [speech2],
+    }, RULES);
     expect(world.enemy.evidence.at(-1)!.leaked!.fact).toEqual(facts[1]);
     expect(asset.leakedThrough).toBe(2);
 
@@ -265,20 +296,39 @@ describe('the weekly leak — his intelligence grows on your compartments (rest-
     expect(world.enemy.evidence).toHaveLength(evBefore);
   });
 
-  it('a leak entry is inert to the digest — family and reported stay null (no-omniscience unmoved)', () => {
+  it('an unheard leak is inert to the digest — no evidence is created by queueing', () => {
     const { world } = stage('leak-inert');
     world.network.assets[0]!.turned = true;
     world.tick = at(6, 23, 59);
     runTurncoatPass(world, RULES);
-    const leak = world.enemy.evidence.find((e) => e.leaked)!;
-    expect(leak.family).toBeNull();
-    expect(leak.reported).toBeNull();
+    expect(world.enemy.evidence.some((e) => e.leaked)).toBe(false);
+    expect(world.network.directiveState!.messages).toHaveLength(1);
+  });
+
+  it('without handler contact the leak cursor stays zero and later rest days cannot duplicate it', () => {
+    const { world } = stage('leak-pending-cursor');
+    const asset = world.network.assets[0]!;
+    asset.turned = true;
+    recordFact(world, 'player', asset.id, { kind: 'carried-story', ref: 'f-second' });
+
+    world.tick = at(6, 23, 59);
+    runTurncoatPass(world, RULES);
+    expect(asset.leakedThrough ?? 0).toBe(0);
+    expect(world.network.directiveState!.messages).toHaveLength(1);
+    expect(world.network.directiveState!.messages[0]!.payload).toMatchObject({
+      kind: 'compartment-fact', asset: asset.id, factIndex: 0,
+    });
+
+    world.tick = at(13, 23, 59);
+    runTurncoatPass(world, RULES);
+    expect(asset.leakedThrough ?? 0).toBe(0);
+    expect(world.network.directiveState!.messages).toHaveLength(1);
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe('walk-ins from his broken ranks — a REAL sketch feature, weekly', () => {
-  it('a walk-in reveals a real subject-bearing sketch feature via a hint entry, once per rest-day week', () => {
+describe('walk-ins from his broken ranks — a real sketch feature travels by speech', () => {
+  it('queues a tip weekly and creates a hint only after the avatar hears it', () => {
     const { world } = stage('walk-1');
     const walkIn = world.network.enemyAssets[0]!;
     walkIn.turned = true;
@@ -292,6 +342,14 @@ describe('walk-ins from his broken ranks — a REAL sketch feature, weekly', () 
     // Rest-day nightly (day 6): the oldest un-revealed feature is volunteered.
     world.tick = at(6, 23, 59);
     runTurncoatPass(world, RULES);
+    expect(world.intel.log).toHaveLength(logBefore);
+    const message1 = world.network.directiveState!.messages.at(-1)!;
+    const speech1 = realizeNetworkForward(world, message1.id, {
+      venue: Object.keys(world.venues)[0]!, members: [walkIn.id, world.playerId!],
+    }, message1.availableAfter, RULES)!;
+    captureIntel(world, {
+      tick: speech1.tick, positions: {}, utterances: [], askings: [], networkSpeeches: [speech1],
+    }, RULES);
     expect(world.intel.log).toHaveLength(logBefore + 1);
     const hint = world.intel.log.at(-1)!;
     expect(hint.kind).toBe('hint');
@@ -310,6 +368,14 @@ describe('walk-ins from his broken ranks — a REAL sketch feature, weekly', () 
     // The next rest-day week reveals the NEXT feature.
     world.tick = at(13, 23, 59);
     runTurncoatPass(world, RULES);
+    expect(world.intel.log).toHaveLength(logBefore + 1);
+    const message2 = world.network.directiveState!.messages.at(-1)!;
+    const speech2 = realizeNetworkForward(world, message2.id, {
+      venue: Object.keys(world.venues)[0]!, members: [walkIn.id, world.playerId!],
+    }, message2.availableAfter, RULES)!;
+    captureIntel(world, {
+      tick: speech2.tick, positions: {}, utterances: [], askings: [], networkSpeeches: [speech2],
+    }, RULES);
     expect(world.intel.log).toHaveLength(logBefore + 2);
     expect(world.intel.log.at(-1)!.hintAbout).toBe(subjB);
     expect(walkIn.revealedThrough).toBe(2);
@@ -322,6 +388,27 @@ describe('walk-ins from his broken ranks — a REAL sketch feature, weekly', () 
     const logBefore = world.intel.log.length;
     runTurncoatPass(world, RULES);
     expect(world.intel.log).toHaveLength(logBefore);
+  });
+
+  it('without avatar contact the reveal cursor stays zero and later rest days cannot duplicate it', () => {
+    const { world } = stage('walk-pending-cursor');
+    const walkIn = world.network.enemyAssets[0]!;
+    walkIn.turned = true;
+    const subject = world.network.assets[0]!.id;
+    world.enemy.sketch.push(identifyFeature(subject, 'sf-pending'));
+
+    world.tick = at(6, 23, 59);
+    runTurncoatPass(world, RULES);
+    expect(walkIn.revealedThrough ?? 0).toBe(0);
+    expect(world.network.directiveState!.messages).toHaveLength(1);
+    expect(world.network.directiveState!.messages[0]!.payload).toMatchObject({
+      kind: 'sketch-tip', asset: walkIn.id, featureId: 'sf-pending', subject,
+    });
+
+    world.tick = at(13, 23, 59);
+    runTurncoatPass(world, RULES);
+    expect(walkIn.revealedThrough ?? 0).toBe(0);
+    expect(world.network.directiveState!.messages).toHaveLength(1);
   });
 });
 
@@ -355,7 +442,7 @@ describe('turncoats are invisible player-side — the flag is not the game', () 
       world.tick = at(1, 8); // a live tick with circles populated
 
       // M-2: seed a NON-VACUOUS courier route so the flip actually exercises courierRouteView's
-      // output. Its inputs are pendingCouriers / drops / informants / intel.log (via lastKnownVenue)
+      // output. Its input is the player's append-only courier planning substrate
       // — never `turned`; but an empty overlay would make the byte-identity check below prove
       // nothing. A drop-handoff run sets out from the drop's venue; the target's `to` comes from a
       // single intel row placing them — both PLAYER-KNOWN, same fence as the other two selectors.
@@ -363,10 +450,10 @@ describe('turncoats are invisible player-side — the flag is not the game', () 
       const someVenue = Object.keys(world.venues)[0]!;
       const targetNpc = Object.keys(world.npcs).find((id) => id !== world.playerId && id !== asset)!;
       world.network.drops.push({ id: 'd-flip', venue: someVenue, knownBy: [] });
-      world.network.pendingCouriers.push({
-        asset, target: targetNpc, viaDrop: 'd-flip', queuedTick: world.tick,
-        spec: { subject: SOMEONE, predicate: 'stole', object: null, count: null, severity: 3, place: null, attribution: SOMEONE },
-      });
+      world.intel.courierPlans = [{
+        id: 'plan-0', asset, target: targetNpc, from: someVenue, to: someVenue,
+        authoredAt: world.tick, acknowledgedAt: null,
+      }];
       world.intel.log.push({ ...blankIntel(), tick: world.tick, venue: someVenue, via: 'self', kind: 'utterance', overheard: false, speaker: targetNpc });
       expect(courierRouteView(world)).toHaveLength(1); // the route is real — the assertion below is not vacuous
 
@@ -510,8 +597,9 @@ describe('determinism + replay — turncoat physics are entropy-free', () => {
     runUntil(b, at(7, 0), RULES);
 
     expect(hashWorld(a)).toBe(hashWorld(b));                       // byte-identical replay
-    expect(a.enemy.evidence.length).toBeGreaterThan(evA);         // the leak fired (non-vacuous)
-    expect(a.intel.log.some((e) => e.kind === 'hint' && e.via === a.network.enemyAssets[0]!.id)).toBe(true);
-    expect(logA).toBeLessThan(a.intel.log.length);                // the walk-in reveal fired
+    expect(a.enemy.evidence).toHaveLength(evA);                   // no speech heard yet
+    expect(a.intel.log).toHaveLength(logA);                       // no speech heard yet
+    expect(a.network.directiveState!.messages.map((m) => m.payload.kind).sort())
+      .toEqual(['compartment-fact', 'sketch-tip']);                // both emissions fired (non-vacuous)
   });
 });

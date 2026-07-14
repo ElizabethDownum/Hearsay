@@ -226,6 +226,7 @@ describe('the hosted tell — no guard invited is NEVER caught, by mechanism', (
   it('an observer EXISTS but is not in the event circle → captureEvidence yields nothing on the avatar', () => {
     const w = world('host-safe', 'noble');
     w.enemy.observers.push({ id: 'greg', vigilance: 1 }); // a real guard, kept at his post — NOT invited
+    w.network.spymaster = 'greg'; // embodied handler is real but remains outside the event circle
     makeAsset(w, 'ann');
     applyHost(w, 'salon', ['ann'], at(0, 10), RULES);
 
@@ -252,6 +253,7 @@ describe('the hosted tell — no guard invited is NEVER caught, by mechanism', (
   it('CONTROL (fair-cop): invite the guard-observer → the same tell IS captured (the test can fail)', () => {
     const w = world('host-caught', 'noble');
     w.enemy.observers.push({ id: 'greg', vigilance: 1 });
+    w.network.spymaster = 'greg'; // the invited guard is also the embodied receiving principal
     makeAsset(w, 'greg'); // trust-edged so he clears the host gate — a guard at your salon is a blunder
     applyHost(w, 'salon', ['greg'], at(0, 10), RULES);
 

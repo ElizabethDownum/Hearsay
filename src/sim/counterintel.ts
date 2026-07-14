@@ -1,5 +1,5 @@
 import { dayOf } from '../core/time';
-import { observationsFor, type TickEvents } from './perception';
+import { observationsFor, type Observation, type TickEvents } from './perception';
 import { juiciness, STANCE } from './rumors/propagation';
 import { reportThrough } from './reporting';
 import { enemyDigest, pressureFor } from './enemy/digest';
@@ -7,35 +7,115 @@ import { exposureStatus } from './scenario/exposure';
 import type { Rules } from './rules';
 import type { EnemyDecision } from './enemy/state';
 import type { WorldState } from './types';
+import { stableStringify } from './hash';
+import {
+  holdFieldObservation, holdObservedFieldReportItems, ingestObservedFieldReport,
+} from './directives/field-reports';
+import type { ObserverSpec } from './enemy/state';
+
+export function noticedByObserver(spec: ObserverSpec, observation: Observation, rules: Rules): boolean {
+  if (observation.kind === 'utterance') {
+    return !observation.overheard || juiciness(observation.claim, rules) >= 1 - spec.vigilance;
+  }
+  return observation.kind === 'asking' || observation.kind === 'network-speech';
+}
+
+function sourceDirectiveId(world: WorldState, messageId: string): string | null {
+  const payload = world.network.directiveState?.messages.find((message) => message.id === messageId)?.payload;
+  if (!payload) return null;
+  if (payload.kind === 'directive') return payload.version.directiveId;
+  if (payload.kind === 'directive-report') return payload.directiveId;
+  if (payload.kind === 'handler-brief') return payload.sourceDirectiveId;
+  return null;
+}
+
+function ingestEnemyObservation(
+  world: WorldState, observer: string, observation: Observation, rules: Rules,
+): void {
+  if (observation.kind === 'utterance') {
+    world.enemy.evidence.push({
+      tick: observation.tick, venue: observation.venue, observer,
+      overheard: observation.overheard, speaker: observation.speaker,
+      addressedTo: observation.addressedTo, kind: 'utterance', mode: observation.mode,
+      claimId: observation.claim.id, family: observation.claim.family,
+      reported: reportThrough(world, observer, observation.claim, rules, 'enemy'), about: null,
+    });
+  } else if (observation.kind === 'asking') {
+    world.enemy.evidence.push({
+      tick: observation.tick, venue: observation.venue, observer,
+      overheard: observation.overheard, speaker: observation.speaker,
+      addressedTo: observation.addressedTo, kind: 'asking', mode: null,
+      claimId: null, family: 'family' in observation.about ? observation.about.family : null,
+      reported: null, about: observation.about,
+    });
+  } else if (observation.kind === 'network-speech') {
+    const duplicate = world.enemy.evidence.some((entry) => entry.kind === 'network'
+      && entry.tick === observation.tick && entry.observer === observer
+      && entry.speaker === observation.speaker
+      && entry.network.messageId === observation.messageId);
+    if (duplicate) return;
+    const leaked = observation.spoken.kind === 'compartment-fact'
+      ? { from: observation.spoken.asset, fact: { ...observation.spoken.fact } }
+      : undefined;
+    world.enemy.evidence.push({
+      tick: observation.tick, venue: observation.venue, observer,
+      overheard: observation.overheard, speaker: observation.speaker,
+      addressedTo: observation.addressedTo, kind: 'network', mode: null,
+      claimId: null, family: null, reported: null, about: null,
+      network: {
+        messageId: observation.messageId,
+        sourceDirectiveId: sourceDirectiveId(world, observation.messageId),
+        spoken: JSON.parse(stableStringify(observation.spoken)),
+      },
+      ...(leaked ? { leaked } : {}),
+    });
+    ingestObservedFieldReport(world, 'enemy', {
+      tick: observation.tick, venue: observation.venue, circleMembers: [],
+      speaker: observation.speaker, addressedTo: observation.addressedTo,
+      messageId: observation.messageId, spoken: observation.spoken, cause: null,
+    });
+  }
+}
 
 /**
  * The enemy's ONLY sensory input. Reads observers' feeds (never world state directly),
  * applies the vigilance rule, and appends to the evidence log the digest will consume.
  */
 export function captureEvidence(world: WorldState, events: TickEvents, rules: Rules): void {
-  for (const spec of world.enemy.observers) {
+  const spymaster = world.network.spymaster;
+  if (spymaster !== null && world.npcs[spymaster]) {
+    for (const observation of observationsFor(spymaster, events).observations) {
+      ingestEnemyObservation(world, spymaster, observation, rules);
+    }
+    for (const speech of events.networkSpeeches ?? []) {
+      if (speech.speaker !== spymaster) continue;
+      ingestEnemyObservation(world, spymaster, {
+        kind: 'network-speech', tick: speech.tick, venue: speech.venue,
+        speaker: speech.speaker, addressedTo: speech.addressedTo,
+        messageId: speech.messageId, spoken: speech.spoken, overheard: false,
+      }, rules);
+    }
+  }
+  if (spymaster === null) return;
+
+  const candidates: { spec: ObserverSpec; observation: Observation }[] = [];
+  for (const spec of [...world.enemy.observers].sort((a, b) => a.id.localeCompare(b.id))) {
+    if (spec.id === spymaster) continue;
     const observer = world.npcs[spec.id];
     if (!observer) continue;
-    const feed = observationsFor(spec.id, events);
-    for (const obs of feed.observations) {
-      if (obs.kind === 'utterance') {
-        const noticed = !obs.overheard || juiciness(obs.claim, rules) >= 1 - spec.vigilance;
-        if (!noticed) continue;
-        world.enemy.evidence.push({
-          tick: obs.tick, venue: obs.venue, observer: spec.id, overheard: obs.overheard,
-          speaker: obs.speaker, addressedTo: obs.addressedTo, kind: 'utterance', mode: obs.mode,
-          claimId: obs.claim.id, family: obs.claim.family,
-          reported: reportThrough(world, spec.id, obs.claim, rules, 'enemy'), about: null,
-        });
-      } else if (obs.kind === 'asking') {
-        world.enemy.evidence.push({
-          tick: obs.tick, venue: obs.venue, observer: spec.id, overheard: obs.overheard,
-          speaker: obs.speaker, addressedTo: obs.addressedTo, kind: 'asking', mode: null,
-          claimId: null, family: 'family' in obs.about ? obs.about.family : null,
-          reported: null, about: obs.about,
-        });
-      }
+    for (const observation of observationsFor(spec.id, events).observations) {
+      if (noticedByObserver(spec, observation, rules)) candidates.push({ spec, observation });
     }
+  }
+  candidates.sort((a, b) => a.spec.id.localeCompare(b.spec.id)
+    || stableStringify(a.observation).localeCompare(stableStringify(b.observation)));
+  for (const { spec, observation } of candidates) {
+    if (observation.kind === 'network-speech'
+      && holdObservedFieldReportItems(world, 'enemy', spec.id, observation, [spymaster])) continue;
+    holdFieldObservation(
+      world, 'enemy', spec.id, { kind: 'raw', observation }, null,
+      [spymaster], null, [],
+    );
   }
 }
 

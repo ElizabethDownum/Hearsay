@@ -8,10 +8,14 @@ import type { Rules } from './rules';
 import type { Belief, IntelEntry, ScheduleOverride, Venue, WorldState } from './types';
 import type { Mice } from './network/types';
 import { assetFor, canAfford, debitCoin, dispositionOf, setDispositionEdge, slideDisposition } from './network/roster';
-import { recordFact } from './network/compartment';
-import { blankIntel } from './fieldwork';
+import { recordPlayerKnownFact } from './network/compartment';
+import { appendCourierPlan, blankIntel, latestPlayerKnownVenue } from './fieldwork';
 import { reportThrough } from './reporting';
 import { confirmableUnderCompulsion } from './inquiry';
+import { cloneSerializable } from './hash';
+import { queueNetworkMessage } from './directives/transport';
+import { allocateDirectiveId, allocateVersionId, ensureDirectiveState } from './directives/state';
+import type { DirectiveBrief, DirectiveHandoff } from './directives/types';
 
 export interface InjectSpec {
   subject: Claim['subject'];
@@ -21,6 +25,83 @@ export interface InjectSpec {
   severity: Claim['severity'];
   place: Claim['place'];
   attribution: Claim['attribution'];
+}
+
+/** Author one player-side outcome brief. Delivery is a separate physical phase. */
+export function applyDirective(
+  world: WorldState,
+  recipient: EntityId,
+  handoff: DirectiveHandoff,
+  brief: DirectiveBrief,
+  tick: Tick,
+): void {
+  const principalId = world.playerId;
+  if (principalId === null) throw new Error('directive: no player is enrolled');
+  if (!world.npcs[recipient]) throw new Error(`directive: unknown recipient '${recipient}'`);
+  if (!assetFor(world, 'player', recipient)) {
+    throw new Error(`directive: '${recipient}' is not one of your assets`);
+  }
+  if (brief.mission.kind === 'sound-out') {
+    throw new Error('directive: sound-out missions land with recruitment (Task 11)');
+  }
+  if (brief.active.from > brief.active.until) throw new Error('directive: active range is reversed');
+  if (brief.active.until < tick) throw new Error('directive: active range has expired');
+  if (brief.reportBy !== null
+    && (brief.reportBy < brief.active.from || brief.reportBy > brief.active.until)) {
+    throw new Error('directive: reportBy must fall inside the active range');
+  }
+
+  const validateRelayRoute = (label: string, route: readonly EntityId[]): void => {
+    const seen = new Set<EntityId>();
+    for (const id of route) {
+      if (!world.npcs[id] || !assetFor(world, 'player', id)) {
+        throw new Error(`directive: ${label} route actor '${id}' is not one of your assets`);
+      }
+      if (id === principalId || id === recipient) {
+        throw new Error(`directive: ${label} route contains illegal self/final hop '${id}'`);
+      }
+      if (seen.has(id)) throw new Error(`directive: duplicate ${label} route actor '${id}'`);
+      seen.add(id);
+    }
+  };
+  validateRelayRoute('outbound', handoff.outboundVia);
+  validateRelayRoute('report', handoff.reportVia);
+  const firstHop = handoff.outboundVia[0] ?? recipient;
+  const circle = circlesAt(world, tick).find((candidate) => candidate.members.includes(principalId));
+  if (!circle || !circle.members.includes(firstHop)) {
+    throw new Error(`directive: first handoff '${firstHop}' is not in the offered circle`);
+  }
+
+  const state = ensureDirectiveState(world);
+  const directiveId = allocateDirectiveId(state);
+  const version = {
+    id: allocateVersionId(state),
+    parent: null,
+    directiveId,
+    brief: cloneSerializable(brief),
+    claimedIssuer: principalId,
+    replyRoute: brief.report === 'none' ? null : [...handoff.reportVia, principalId],
+    changedBy: null,
+    changes: [],
+  };
+  state.records.push({
+    id: directiveId,
+    principal: 'player',
+    principalId,
+    recipient,
+    issuedAt: tick,
+    handoff: cloneSerializable(handoff),
+    authored: cloneSerializable(version),
+    received: null,
+    decision: null,
+    execution: null,
+    receivedReports: [],
+  });
+  queueNetworkMessage(
+    world, 'player', principalId, [...handoff.outboundVia, recipient],
+    { kind: 'directive', version }, tick, brief.active.until,
+    { kind: 'player-action', action: 'directive', tick },
+  );
 }
 
 /** Player tells a rumor to one NPC. Hop zero — the town owns the rest. */
@@ -205,7 +286,7 @@ export function applyRecruit(
   // --- Effects (all validation passed; edges-only writes keep the fixture clone sound) ---
   debitCoin(world, cost);
   world.network.assets.push({ id: target, mice, wagePaidThroughDay: dayOf(tick), strikes: 0, facts: [] });
-  recordFact(world, 'player', target, { kind: 'recruited-by', ref: 'player' }); // tick-stamped from world.tick (=== tick)
+  recordPlayerKnownFact(world, target, { kind: 'recruited-by', ref: 'player' });
   setDispositionEdge(world, target, RECRUIT_DISPOSITION[mice]);
   world.intel.informants.push({ id: target, assignedVenue: null });
 }
@@ -290,13 +371,20 @@ export function applyCourier(
   if (viaDrop === null) {
     // A face handoff is a meeting: the courier's compartment records having met the avatar (ONE
     // direction — the avatar keeps no compartment). This is the `met-asset` that the drop path lacks.
-    recordFact(world, 'player', asset, { kind: 'met-asset', ref: world.playerId });
+    recordPlayerKnownFact(world, asset, { kind: 'met-asset', ref: world.playerId });
   } else {
     const drop = world.network.drops.find((d) => d.id === viaDrop)!;
     if (!drop.knownBy.includes(asset)) drop.knownBy.push(asset);
-    recordFact(world, 'player', asset, { kind: 'knows-drop', ref: viaDrop });
+    recordPlayerKnownFact(world, asset, { kind: 'knows-drop', ref: viaDrop });
   }
-  world.network.pendingCouriers.push({ asset, spec, target, viaDrop, queuedTick: tick });
+  const from = viaDrop === null
+    ? latestPlayerKnownVenue(world, asset)
+    : (world.network.drops.find((drop) => drop.id === viaDrop)?.venue ?? null);
+  const planId = appendCourierPlan(world, {
+    asset, target, from, to: latestPlayerKnownVenue(world, target),
+    authoredAt: tick, acknowledgedAt: null,
+  });
+  world.network.pendingCouriers.push({ planId, asset, spec, target, viaDrop, queuedTick: tick });
 }
 
 /** The invitee cap on a hosted event (spec, rung 4) — you pick the circle, but a room seats only so many. */
@@ -334,7 +422,7 @@ export function applyMeet(world: WorldState, asset: EntityId, tick: Tick): void 
   // Prepend (not the assignInformant REPLACE): a meet is a transient pull, so it takes precedence for
   // its one beat over any standing player override, which resumes automatically once the window passes.
   world.scheduleOverrides[asset] = [override, ...(world.scheduleOverrides[asset] ?? [])];
-  recordFact(world, 'player', asset, { kind: 'met-asset', ref: world.playerId }); // the visit, on the record
+  recordPlayerKnownFact(world, asset, { kind: 'met-asset', ref: world.playerId });
 }
 
 /** The room a standing HOSTS in (rung 4): noble → the salon, lowlife → any back-room. Stricter than the
@@ -395,7 +483,7 @@ export function applyHost(
       from: HOST_EVENT.from, to: HOST_EVENT.to, venue, source: 'player',
     };
     world.scheduleOverrides[id] = [override, ...(world.scheduleOverrides[id] ?? [])];
-    recordFact(world, 'player', id, { kind: 'attended-hosting', ref: venue }); // the guest list, on the record
+    recordPlayerKnownFact(world, id, { kind: 'attended-hosting', ref: venue });
   }
 }
 
@@ -563,6 +651,8 @@ export function applyAssignInformant(
   const spec = world.intel.informants.find((i) => i.id === informant);
   if (!spec) throw new Error(`assignInformant: '${informant}' is not an informant`);
   if (venue !== null && !world.venues[venue]) throw new Error(`assignInformant: unknown venue '${venue}'`);
+  const requested = world.intel.requestedPosts ?? (world.intel.requestedPosts = []);
+  requested.push({ informant, venue, authoredAt: tick });
   spec.assignedVenue = venue;
   const kept = (world.scheduleOverrides[informant] ?? []).filter((o) => o.source !== 'player');
   if (venue !== null) {

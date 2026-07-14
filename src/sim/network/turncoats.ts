@@ -1,13 +1,12 @@
 import { dayOfWeek, REST_DAY } from '../../core/time';
-import { positionOf } from '../agents';
 import { STANCE } from '../rumors/propagation';
-import { blankIntel } from '../fieldwork';
 import { dispositionOf } from './roster';
 import type { EntityId } from '../rumors/claim';
-import type { EvidenceEntry } from '../enemy/state';
 import type { AssetRecord } from './types';
 import type { Rules } from '../rules';
 import type { WorldState } from '../types';
+import { queueNetworkMessage } from '../directives/transport';
+import { strictNextBeat } from '../directives/state';
 
 /**
  * The trust line a secret crosses to become a turncoat (spec: "a turncoat is a secret crossing a
@@ -98,60 +97,58 @@ function believesDamagingSpymasterClaim(
 const byId = (a: AssetRecord, b: AssetRecord): number => a.id.localeCompare(b.id);
 
 /**
- * Each turned player-side asset hands the enemy its OLDEST unleaked compartment fact (facts are
- * tick-ordered append-only, so `facts[leakedThrough]` is the oldest not-yet-given). The fact becomes
- * an enemy evidence entry — inside testimony, NOT overheard gossip: it carries the fact in `leaked`,
- * with `family`/`reported` null, so the digest fold is blind to it (no-omniscience unmoved).
+ * Each turned player-side asset prepares its OLDEST unleaked compartment fact (facts are tick-ordered
+ * append-only). It enters enemy evidence only if the embodied spymaster physically hears the queued
+ * compartment-fact speech; queueing alone is not principal knowledge.
  */
 function weeklyLeaks(world: WorldState): void {
   const spymaster = world.network.spymaster;
+  if (spymaster === null) return;
   for (const asset of [...world.network.assets].sort(byId)) {
     if (!asset.turned) continue;
     const leakedThrough = asset.leakedThrough ?? 0;
     if (leakedThrough >= asset.facts.length) continue; // nothing left to give up
+    const pending = world.network.directiveState?.messages.some((message) =>
+      message.payload.kind === 'compartment-fact'
+      && message.payload.asset === asset.id
+      && message.payload.factIndex === leakedThrough
+      && message.deliveredAt === null && message.failedAt === null);
+    if (pending) continue;
     const fact = asset.facts[leakedThrough]!;
-    const npc = world.npcs[asset.id];
-    const venue = npc ? positionOf(world, npc, world.tick) : 'safehouse';
-    const entry: EvidenceEntry = {
-      tick: world.tick, venue, observer: asset.id, overheard: false,
-      speaker: asset.id, addressedTo: spymaster ?? asset.id,
-      kind: 'utterance', mode: 'answer', claimId: null, family: null, reported: null, about: null,
-      leaked: { from: asset.id, fact: { tick: fact.tick, kind: fact.kind, ref: fact.ref } },
-    };
-    world.enemy.evidence.push(entry);
-    asset.leakedThrough = leakedThrough + 1;
+    queueNetworkMessage(world, 'enemy', asset.id, [spymaster], {
+      kind: 'compartment-fact', principal: 'player', asset: asset.id,
+      factIndex: leakedThrough, fact: { ...fact },
+    }, strictNextBeat(world.tick), null, null);
   }
 }
 
 /**
  * Each walk-in volunteers one REAL sketch feature — the infiltration deep-read channel (spec's
  * "observable in principle"). Reading enemy.sketch here is lawful as the CONTENT of a disaffected
- * insider's tip: they are IN his organization, and this WORLD-SIDE pass writes the intel entry — no
- * selector reads the sketch. The no-omniscience boundary runs the OTHER way here: the PLAYER receives
- * enemy-internal truth through a lawful in-fiction channel (documented like the T7 budget seam).
+ * insider's tip: they are IN his organization, and this WORLD-SIDE pass queues a physical tip — no
+ * selector reads the sketch and no player intel changes until the avatar hears the speech.
  *
  * Reveals subject-bearing features (the enemy's identifications of PEOPLE — origin-vague / carrier-
- * profile), oldest un-revealed first, as a `hint` row (via the walk-in's id) indistinguishable in
- * shape from a dossier hint. Deterministic: features are consumed in sketch order.
+ * profile), oldest un-revealed first. Deterministic: features are consumed in sketch order.
  */
 function weeklyWalkInReveals(world: WorldState): void {
-  const venue = world.venues['safehouse'] ? 'safehouse' : null;
+  const player = world.playerId;
+  if (player === null) return;
   for (const walkIn of [...world.network.enemyAssets].sort(byId)) {
     if (!walkIn.turned) continue;
     const subjectFeatures = world.enemy.sketch.filter((f) => f.subject !== null);
     const revealedThrough = walkIn.revealedThrough ?? 0;
     if (revealedThrough >= subjectFeatures.length) continue; // nothing new to reveal this week
     const feature = subjectFeatures[revealedThrough]!;
-    // The tip arrives at the player's private safehouse channel; a safehouse-less staging world falls
-    // back to the walk-in's own position (an enemy asset is always a real NPC, so positionOf is safe).
-    const npc = world.npcs[walkIn.id];
-    world.intel.log.push({
-      ...blankIntel(),
-      tick: world.tick,
-      venue: venue ?? (npc ? positionOf(world, npc, world.tick) : 'safehouse'),
-      via: walkIn.id, kind: 'hint', overheard: false,
-      hintAbout: feature.subject, hintWitness: walkIn.id,
-    });
-    walkIn.revealedThrough = revealedThrough + 1;
+    const pending = world.network.directiveState?.messages.some((message) =>
+      message.payload.kind === 'sketch-tip'
+      && message.payload.asset === walkIn.id
+      && message.payload.featureId === feature.id
+      && message.deliveredAt === null && message.failedAt === null);
+    if (pending) continue;
+    queueNetworkMessage(world, 'player', walkIn.id, [player], {
+      kind: 'sketch-tip', principal: 'enemy', asset: walkIn.id, featureId: feature.id,
+      subject: feature.subject, detail: feature.detail,
+    }, strictNextBeat(world.tick), null, null);
   }
 }

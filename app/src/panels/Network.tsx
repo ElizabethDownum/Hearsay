@@ -39,7 +39,7 @@ export function Network({ view }: { view: NetworkView }) {
                   <td><DispositionBar value={a.dispositionBar} strikes={a.strikes} /></td>
                   <td>paid to day {a.wagePaidThroughDay}</td>
                   <td>{a.factsCount}</td>
-                  <td>{a.assignedVenue ?? '—'}</td>
+                  <td>{a.requestedVenue ?? '—'}</td>
                 </tr>
               ))}
             </tbody>

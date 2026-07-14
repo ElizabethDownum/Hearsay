@@ -72,10 +72,6 @@ describe('asking', () => {
 
   it.each([
     [
-      { kind: 'network-forward', actor: 'bez', ref: '0000000000:0000000002', rank: 1 },
-      'phase4: network-forward handler not installed',
-    ],
-    [
       { kind: 'directive-act', actor: 'bez', ref: 'd2', rank: 2 },
       'phase4: directive-act handler not installed',
     ],
@@ -95,6 +91,17 @@ describe('asking', () => {
     );
     expect(frame.selected).toContainEqual(intent);
     expect(() => realizeCircleIntents(world, frame, 0, RULES)).toThrow(message);
+  });
+
+  it('the Task-6 network-forward arm is installed and a stale message ref realizes as a no-op', () => {
+    const world = seededSimultaneousWorld('installed-network-forward');
+    const intent = { kind: 'network-forward' as const, actor: 'bez', ref: 'missing-message', rank: 1 as const };
+    const frame = collectCircleIntents(
+      world, { venue: 'square', members: ['ada', 'bez', 'cyn', 'dov'] },
+      0, RULES, [intent], new Set(),
+    );
+    expect(frame.selected).toContainEqual(intent);
+    expect(realizeCircleIntents(world, frame, 0, RULES).extras).toEqual([]);
   });
 
   it('resolves competing askers by answerer trust, then honors answeredDirectly', () => {

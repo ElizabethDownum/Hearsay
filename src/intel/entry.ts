@@ -3,6 +3,7 @@ import type { ClaimId, EntityId, RumorId, VenueId } from '../sim/rumors/claim';
 import type { TraitId } from '../sim/rumors/traits';
 import type { InquiryKey } from '../sim/perception';
 import type { ReportedClaim } from '../sim/enemy/state';
+import type { MessageId, SpokenNetworkPayload } from '../sim/directives/types';
 
 /** A recruited informant and where the player has posted them (null = unassigned). */
 export interface InformantSpec { id: EntityId; assignedVenue: VenueId | null }
@@ -57,6 +58,29 @@ export interface TagNote {
   updatedTick: Tick;
 }
 
+export interface NetworkIntelEntry {
+  tick: Tick;
+  venue: VenueId;
+  via: 'self' | EntityId;
+  overheard: boolean;
+  speaker: EntityId;
+  addressedTo: EntityId;
+  messageId: MessageId;
+  spoken: SpokenNetworkPayload;
+}
+
+export interface KnownAssetFact { asset: EntityId; factIndex: number; receivedAt: Tick }
+export interface RequestedPost { informant: EntityId; venue: VenueId | null; authoredAt: Tick }
+export interface CourierPlanningMark {
+  id: string;
+  asset: EntityId;
+  target: EntityId;
+  from: VenueId | null;
+  to: VenueId | null;
+  authoredAt: Tick;
+  acknowledgedAt: Tick | null;
+}
+
 /** The player's private knowledge substrate: informants, captured feed, board notes, and margin notes. */
 export interface IntelState {
   informants: InformantSpec[];
@@ -64,4 +88,8 @@ export interface IntelState {
   cards: HypothesisCard[];
   codex: CodexHypothesis[];
   tags: TagNote[];
+  network?: NetworkIntelEntry[];
+  knownAssetFacts?: KnownAssetFact[];
+  requestedPosts?: RequestedPost[];
+  courierPlans?: CourierPlanningMark[];
 }

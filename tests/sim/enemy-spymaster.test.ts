@@ -13,6 +13,8 @@ import { emptyEnemyState, type EnemyState, type EvidenceEntry, type ReportedClai
 import { SOMEONE, type Claim } from '../../src/sim/rumors/claim';
 import { at, dayOf } from '../../src/core/time';
 import { stableStringify } from '../../src/sim/hash';
+import { queueUnqueuedFieldReports } from '../../src/sim/directives/field-reports';
+import { realizeNetworkForward } from '../../src/sim/directives/transport';
 import type { TickEvents } from '../../src/sim/perception';
 import type { Belief, WorldState } from '../../src/sim/types';
 
@@ -62,7 +64,21 @@ describe('worldFromTown — his network is townspeople', () => {
     };
     captureEvidence(world, events, RULES);
 
-    // stole (juiciness 0.8) clears the flat-0.5 ear: 0.8 >= 1 - 0.5. The asset captured it.
+    // stole clears the ear, but remote capture is only a held row until a physical handler contact.
+    expect(world.enemy.evidence.some((e) => e.observer === asset)).toBe(false);
+    expect(world.network.directiveState!.heldObservations).toMatchObject([
+      { principal: 'enemy', observer: asset, deliveredAt: null },
+    ]);
+    queueUnqueuedFieldReports(world);
+    const message = world.network.directiveState!.messages[0]!;
+    const speech = realizeNetworkForward(world, message.id, {
+      venue, members: [asset, town.enemyNet!.spymaster],
+    }, message.availableAfter, RULES)!;
+    captureEvidence(world, {
+      tick: speech.tick, positions: {}, utterances: [], askings: [], networkSpeeches: [speech],
+    }, RULES);
+
+    // The same spoken report now creates the asset-attributed enemy evidence.
     expect(world.enemy.evidence.some((e) => e.observer === asset && e.kind === 'utterance' && e.overheard)).toBe(true);
   });
 });
@@ -81,7 +97,7 @@ const MAP: TownMap = {
   ],
 };
 
-function heard(over: Partial<EvidenceEntry>): EvidenceEntry {
+function heard(over: Partial<Extract<EvidenceEntry, { kind: 'utterance' }>>): EvidenceEntry {
   return {
     tick: 500, venue: 'square-w0', observer: 'gale', overheard: true,
     speaker: 'mira', addressedTo: 'otto', kind: 'utterance', mode: 'telling',

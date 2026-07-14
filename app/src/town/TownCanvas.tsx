@@ -322,7 +322,7 @@ function drawInformants(
   ctx.fillStyle = pal.verdigris;
   const perVenue = new Map<string, number>();
   for (const inf of view.informants) {
-    const venue = inf.assignedVenue;
+    const venue = inf.requestedVenue;
     if (venue === null) continue;
     const p = layout.venues[venue];
     if (!p) continue;

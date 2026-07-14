@@ -12,6 +12,8 @@ import { CONVERSATION_BEAT } from '../../src/sim/rumors/propagation';
 import { SOMEONE, type Claim } from '../../src/sim/rumors/claim';
 import type { TownFixture, WorldState } from '../../src/sim/types';
 import type { GeneratedTown } from '../../src/world/types';
+import { captureEvidence } from '../../src/sim/counterintel';
+import { realizeNetworkForward } from '../../src/sim/directives/transport';
 
 /**
  * Task 10 — the brokerage. `SellAction { tick, kind:'sell', family, buyer }`: buyer must be
@@ -41,6 +43,7 @@ const sellFixture = (): TownFixture => ({
     npc('buyer', 'tavern', [{ to: 'third', kind: 'friend', trust: 0.6 }]),
     npc('third', 'tavern'),
     npc('watchman', 'tavern'),
+    npc('handler', 'safehouse'),
   ],
 });
 
@@ -200,6 +203,7 @@ describe('applySell — selling within guard earshot is caught (the existing cap
   it('the sale is an Utterance like any telling — a guard in circle captures it, and the campaign ends caught', () => {
     const w = sellWorld('sell-caught');
     w.enemy.observers = [{ id: 'watchman', vigilance: 1 }]; // certain capture — isolates the assertion
+    w.network.spymaster = 'handler';
     const townStub = { cast: { usurper: 'nobody', council: [] } } as unknown as GeneratedTown;
     attachScenario(w, townStub, {
       id: 'sell-scn', name: 'Sell Scenario', days: 40,
@@ -210,11 +214,30 @@ describe('applySell — selling within guard earshot is caught (the existing cap
     applySell(w, 'buyer', 'f-caught', 0, RULES);
     runUntil(w, 1, RULES); // the ONE step that processes the sale + capture + the caught check
 
-    expect(w.enemy.evidence.some((e) => e.kind === 'utterance' && e.speaker === w.playerId)).toBe(true);
+    expect(w.enemy.evidence.some((e) => e.kind === 'utterance' && e.speaker === w.playerId)).toBe(false);
     expect(w.scenario!.status).toBe('lost-caught');
     const arrest = w.chronicle.find((c) => c.kind === 'institution' && c.action === 'arrest');
     expect(arrest).toBeDefined();
     expect((arrest as { subject: string }).subject).toBe(w.playerId);
+
+    const held = w.network.directiveState!.heldObservations.find((row) =>
+      row.principal === 'enemy' && row.observer === 'watchman'
+      && row.content.kind === 'raw' && row.content.observation.kind === 'utterance'
+      && row.content.observation.speaker === w.playerId);
+    expect(held).toBeDefined();
+    expect(held!.deliveredAt).toBeNull();
+    const message = w.network.directiveState!.messages.find((candidate) =>
+      candidate.payload.kind === 'field-report'
+      && candidate.payload.sourceObservationIds.includes(held!.id))!;
+    const speech = realizeNetworkForward(w, message.id, {
+      venue: 'safehouse', members: ['watchman', 'handler'],
+    }, message.availableAfter, RULES)!;
+    captureEvidence(w, {
+      tick: speech.tick, positions: {}, utterances: [], askings: [], networkSpeeches: [speech],
+    }, RULES);
+    expect(w.enemy.evidence.some((entry) =>
+      entry.kind === 'utterance' && entry.observer === 'watchman'
+      && entry.speaker === w.playerId)).toBe(true);
   });
 });
 

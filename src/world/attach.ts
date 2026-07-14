@@ -87,6 +87,8 @@ export function attachPlayer(world: WorldState, town: GeneratedTown, station?: '
       id, mice: null, wagePaidThroughDay: 0, strikes: 0,
       facts: [{ tick: 0, kind: 'recruited-by', ref: 'player' }],
     });
+    const known = world.intel.knownAssetFacts ?? (world.intel.knownAssetFacts = []);
+    known.push({ asset: id, factIndex: 0, receivedAt: 0 });
     // Disposition IS the trust edge (asset → player), amendment #4c. P5 wired no such edge —
     // informants were an intel-side id list only — so create it at 0.75 (above the 0.7 confide
     // line) when absent; an existing edge is reused as-is.

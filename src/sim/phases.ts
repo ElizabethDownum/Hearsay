@@ -1,7 +1,7 @@
 import { dayOf, dayOfWeek, minuteOfDay, REST_DAY, type Tick } from '../core/time';
 import { fnv1a32, Rng } from '../core/rng';
 import { CIRCLE_SIZE, positionOf, type Circle } from './agents';
-import { captureEvidence, runEnemyDay } from './counterintel';
+import { captureEvidence, noticedByObserver, runEnemyDay } from './counterintel';
 import { captureIntel } from './fieldwork';
 import { cloneSerializable, stableStringify } from './hash';
 import { chooseAnswer, collectOrdinaryAskOffers, expireInquiries, runPlayerAskPhase } from './inquiry';
@@ -17,6 +17,11 @@ import { runVignettes } from './vignettes/engine';
 import type { Rules } from './rules';
 import type { ScheduleOverride, WorldState } from './types';
 import { trustBetween } from './world';
+import {
+  collectNetworkForwardIntents, deliverNetworkMessages, realizeNetworkForward,
+} from './directives/transport';
+import { queueUnqueuedFieldReports } from './directives/field-reports';
+import type { NetworkSpeech } from './directives/types';
 
 export interface ScheduledSetup {
   id: string;
@@ -123,10 +128,12 @@ export function collectCircleIntents(
   };
 }
 
-const uninstalledExtra: RealizeExtraIntent<never> = (_world, intent) => {
+const defaultExtra: RealizeExtraIntent<NetworkSpeech> = (world, intent, circle, t, rules) => {
   switch (intent.kind) {
-    case 'network-forward':
-      throw new Error('phase4: network-forward handler not installed');
+    case 'network-forward': {
+      const speech = realizeNetworkForward(world, intent.ref, circle, t, rules);
+      return { askings: [], answers: [], tellings: [], extras: speech ? [speech] : [] };
+    }
     case 'directive-act':
       throw new Error('phase4: directive-act handler not installed');
     case 'drop-pickup':
@@ -141,7 +148,7 @@ const uninstalledExtra: RealizeExtraIntent<never> = (_world, intent) => {
 };
 
 /** Realize selections without allowing response speech to consume an NPC's autonomous slot. */
-export function realizeCircleIntents<Extra = never>(
+export function realizeCircleIntents<Extra = NetworkSpeech>(
   world: WorldState,
   frame: CircleIntentFrame,
   t: Tick,
@@ -214,7 +221,7 @@ export function realizeCircleIntents<Extra = never>(
     }
   }
 
-  const extraHandler = realizeExtra ?? (uninstalledExtra as RealizeExtraIntent<Extra>);
+  const extraHandler = realizeExtra ?? (defaultExtra as RealizeExtraIntent<Extra>);
   const selectedExtras = frame.selected
     .filter((intent): intent is Exclude<NpcAutonomousIntent,
       { kind: 'ordinary-ask' } | { kind: 'ordinary-tell' }> =>
@@ -413,7 +420,7 @@ export function resolveAutonomousPhase(
   circles: Circle[],
   answeredDirectly: ReadonlySet<EntityId>,
   extra: readonly NpcAutonomousIntent[] = [],
-): NpcIntentRealization {
+): NpcIntentRealization<NetworkSpeech> {
   if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) {
     return { askings: [], answers: [], tellings: [], extras: [] };
   }
@@ -425,23 +432,27 @@ export function resolveAutonomousPhase(
   const frames = orderedCircles
     .filter((circle) => circle.members.length >= 2)
     .map((circle) => collectCircleIntents(world, circle, tick, rules, extra, answeredDirectly));
-  const result: NpcIntentRealization = { askings: [], answers: [], tellings: [], extras: [] };
+  const result: NpcIntentRealization<NetworkSpeech> = { askings: [], answers: [], tellings: [], extras: [] };
   for (const frame of frames) {
     const realized = realizeCircleIntents(world, frame, tick, rules);
     result.askings.push(...realized.askings);
     result.answers.push(...realized.answers);
     result.tellings.push(...realized.tellings);
+    result.extras.push(...realized.extras);
   }
   return result;
 }
 
 function resolveNpcSpeech(
   world: WorldState, rules: Rules, tick: Tick, circles: Circle[],
-  utterances: Utterance[], askings: Asking[], alreadySpoke: readonly EntityId[],
+  utterances: Utterance[], askings: Asking[], networkSpeeches: NetworkSpeech[],
+  alreadySpoke: readonly EntityId[],
 ): void {
-  const phase = resolveAutonomousPhase(world, rules, tick, circles, new Set(alreadySpoke));
+  const network = collectNetworkForwardIntents(world, tick, circles);
+  const phase = resolveAutonomousPhase(world, rules, tick, circles, new Set(alreadySpoke), network);
   askings.push(...phase.askings);
   utterances.push(...phase.answers, ...phase.tellings);
+  networkSpeeches.push(...phase.extras);
   // Transitional Plan-8 courier loop. Task 9 replaces it with directive-act candidates.
   utterances.push(...deliverCouriers(world, tick, rules).map((utterance) => ({
     ...utterance,
@@ -451,6 +462,7 @@ function resolveNpcSpeech(
 
 function recordAndIngest(
   world: WorldState, rules: Rules, events: TickEvents, utterances: Utterance[], askings: Asking[],
+  networkSpeeches: NetworkSpeech[],
 ): void {
   for (const utterance of utterances) {
     world.chronicle.push({
@@ -472,11 +484,34 @@ function recordAndIngest(
     });
   }
 
-  const preLen = world.enemy.evidence.length;
-  if (utterances.length > 0 || askings.length > 0) captureEvidence(world, events, rules);
+  for (const speech of networkSpeeches) {
+    world.chronicle.push({
+      kind: 'network-speech', tick: speech.tick, venue: speech.venue,
+      speaker: speech.speaker, addressedTo: speech.addressedTo,
+      messageId: speech.messageId, spoken: cloneSerializable(speech.spoken),
+      cause: cloneSerializable(speech.cause),
+      heardBy: speech.circleMembers.filter((member) => member !== speech.speaker)
+        .sort().map((id) => ({ id, addressed: id === speech.addressedTo })),
+    });
+  }
+
+  if (utterances.length > 0 || askings.length > 0 || networkSpeeches.length > 0) {
+    captureEvidence(world, events, rules);
+  }
   if (world.scenario?.status === 'running' && world.playerId !== null) {
-    const caught = world.enemy.evidence.slice(preLen)
-      .find((evidence) => evidence.kind === 'utterance' && evidence.speaker === world.playerId);
+    let caught: { observer: EntityId; venue: VenueId; claimId: string | null } | null = null;
+    for (const spec of [...world.enemy.observers].sort((a, b) => a.id.localeCompare(b.id))) {
+      const observation = observationsFor(spec.id, events).observations.find((candidate) =>
+        (candidate.kind === 'utterance' || candidate.kind === 'network-speech')
+        && candidate.speaker === world.playerId && noticedByObserver(spec, candidate, rules));
+      if (observation) {
+        caught = {
+          observer: spec.id, venue: observation.venue,
+          claimId: observation.kind === 'utterance' ? observation.claim.id : null,
+        };
+        break;
+      }
+    }
     if (caught) {
       const scenario = world.scenario;
       scenario.status = 'lost-caught';
@@ -491,6 +526,7 @@ function recordAndIngest(
   }
 
   captureIntel(world, events, rules);
+  queueUnqueuedFieldReports(world);
   if (utterances.length === 0 && askings.length === 0) return;
   for (const hearerId of Object.keys(world.npcs).sort()) {
     if (hearerId === world.playerId) continue;
@@ -553,6 +589,8 @@ function finishTickInternal(
 
   const utterances: Utterance[] = [];
   const askings: Asking[] = [];
+  const networkSpeeches: NetworkSpeech[] = [];
+  networkSpeeches.push(...deliverNetworkMessages(world, frame, rules, 'player'));
   const directSpeakers = resolvePlayerSpeech(
     world, rules, frame.tick, frame.circles, utterances, askings,
   );
@@ -561,10 +599,14 @@ function finishTickInternal(
   const npcCircles = playerPhase === undefined
     ? preflightCircles
     : circlesFromPositions(world, frame.tick, positions);
-  resolveNpcSpeech(world, rules, frame.tick, npcCircles, utterances, askings, directSpeakers);
+  networkSpeeches.push(...deliverNetworkMessages(world, frame, rules, 'response'));
+  resolveNpcSpeech(
+    world, rules, frame.tick, npcCircles, utterances, askings, networkSpeeches, directSpeakers,
+  );
 
   const events: TickEvents = { tick: frame.tick, positions, utterances, askings };
-  recordAndIngest(world, rules, events, utterances, askings);
+  if (networkSpeeches.length > 0) events.networkSpeeches = networkSpeeches;
+  recordAndIngest(world, rules, events, utterances, askings, networkSpeeches);
   resolveEnvironment(world, rules, frame.tick);
   world.tick = frame.tick + 1;
   return events;
