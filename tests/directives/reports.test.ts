@@ -189,7 +189,9 @@ describe('directive reports', () => {
     (turnedAgainst, playerCandor, enemyCandor) => {
       const world = callerWorld(`directive-report-${turnedAgainst}`, turnedAgainst);
       const playerRecord = receiveThroughProduction(world, 'player', 'd-player');
+      expect(playerRecord.decision?.candor).toBe(playerCandor);
       const enemyRecord = receiveThroughProduction(world, 'enemy', 'd-enemy');
+      expect(enemyRecord.decision?.candor).toBe(enemyCandor);
       executeThroughProduction(world, [playerRecord, enemyRecord]);
 
       expect(playerRecord.decision?.candor).toBe(playerCandor);
