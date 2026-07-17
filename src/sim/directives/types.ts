@@ -3,7 +3,7 @@ import type { InjectSpec } from '../actions';
 import type { ReportedClaim } from '../enemy/state';
 import type { CompartmentFact, Mice, Principal } from '../network/types';
 import type { InquiryKey, Observation } from '../perception';
-import type { ClaimId, EntityId, RumorId, VenueId, SOMEONE } from '../rumors/claim';
+import type { Claim, ClaimId, EntityId, RumorId, VenueId, SOMEONE } from '../rumors/claim';
 
 export type DirectiveId = string;
 export type MessageId = string;
@@ -136,6 +136,16 @@ export interface DirectiveReportPayload {
   evidence: DirectiveReportEvidence[] | null;
   source: EntityId | typeof SOMEONE | null;
   uncertainty: 'low' | 'medium' | 'high' | null;
+}
+
+export interface DirectiveExecutionResult {
+  outcome: string;
+  reason: string;
+  evidence: { kind: 'observation'; text: string }[];
+  source: EntityId | typeof SOMEONE;
+  uncertainty: 'low' | 'medium' | 'high';
+  reportedClaim: Claim | null;
+  factRefs: { asset: EntityId; factIndex: number }[];
 }
 
 export type ReportedFieldObservation =

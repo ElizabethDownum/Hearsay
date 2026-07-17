@@ -79,9 +79,10 @@ export function chooseAnswer(
 }
 
 /** First usable task for an asker, or null. */
-function usableTask(world: WorldState, askerId: EntityId, day: number): InquiryTask | null {
+function usableTask(world: WorldState, askerId: EntityId, day: number, t: Tick): InquiryTask | null {
   for (const task of world.inquiries[askerId] ?? []) {
-    if (day < task.expiresDay && task.answersHeard < 2) return task;
+    if (day < task.expiresDay && task.answersHeard < 2
+      && (task.expiresAt === undefined || t <= task.expiresAt)) return task;
   }
   return null;
 }
@@ -102,7 +103,8 @@ export function collectOrdinaryAskOffers(
   for (const actor of members) {
     if (actor === world.playerId) continue;
     const tasks = world.inquiries[actor] ?? [];
-    const taskIndex = tasks.findIndex((task) => day < task.expiresDay && task.answersHeard < 2);
+    const taskIndex = tasks.findIndex((task) => day < task.expiresDay && task.answersHeard < 2
+      && (task.expiresAt === undefined || t <= task.expiresAt));
     if (taskIndex < 0) continue;
     const task = tasks[taskIndex]!;
     const preferred = members
@@ -175,7 +177,7 @@ export function runAskPhase(
       continue;
     }
 
-    const task = usableTask(world, member, day);
+    const task = usableTask(world, member, day, t);
     if (!task) continue;
     const eligible = circle.members
       .filter((m) => m !== member && !task.asked.includes(m) && !spoke.has(m))

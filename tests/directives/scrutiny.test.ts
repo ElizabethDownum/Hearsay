@@ -55,13 +55,14 @@ describe('perceived scrutiny', () => {
       0, STANDARD_RULES);
     applyDirective(world, 'ada', { outboundVia: [], reportVia: [] },
       { ...RECEIVED_BRIEF, authority: 'compel' }, 0);
-    message = world.network.directiveState!.messages[1]!;
+    message = world.network.directiveState!.messages.filter((candidate) =>
+      candidate.payload.kind === 'directive')[1]!;
     realizeNetworkForward(world, message.id, { venue: 'square', members: ['you', 'ada'] },
       0, STANDARD_RULES);
     expect(perceivedScrutiny(world, 'ada', 'you', 0)).toBeCloseTo(0.40);
   });
 
-  it('binds retasking scrutiny to the message principal when the claimed issuer was mutated', () => {
+  it('binds retasking scrutiny to the retained claimed issuer when the issuer was mutated', () => {
     const world = buildWorld(miniTown(), 'scrutiny-retasking-principal');
     enrollPlayer(world, { home: 'backroom' });
     world.npcs.ada!.schedule = [{ days: 'all', from: 0, to: 1439, venue: 'backroom' }];
@@ -71,13 +72,14 @@ describe('perceived scrutiny', () => {
     if (!circle) throw new Error('expected offered player circle fixture');
     for (let index = 0; index < 2; index += 1) {
       applyDirective(world, 'ada', { outboundVia: [], reportVia: [] }, RECEIVED_BRIEF, 0);
-      const message = world.network.directiveState!.messages[index]!;
+      const message = world.network.directiveState!.messages.filter((candidate) =>
+        candidate.payload.kind === 'directive')[index]!;
       if (message.payload.kind !== 'directive') throw new Error('expected directive fixture');
       message.payload.version.claimedIssuer = 'bez';
       realizeNetworkForward(world, message.id, circle, 0, STANDARD_RULES);
     }
-    expect(perceivedScrutiny(world, 'ada', 'you', 0)).toBeCloseTo(0.10);
-    expect(perceivedScrutiny(world, 'ada', 'bez', 0)).toBe(0);
+    expect(perceivedScrutiny(world, 'ada', 'you', 0)).toBe(0);
+    expect(perceivedScrutiny(world, 'ada', 'bez', 0)).toBeCloseTo(0.10);
   });
 
   it('pruning first or last at a nightly zero-contribution boundary hashes identically', () => {

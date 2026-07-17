@@ -148,12 +148,14 @@ describe('five-phase tick transaction', () => {
     expect(hashWorld(world)).toBe(beforeTick);
   });
 
-  it('names uninstalled setup handlers without partially applying them', () => {
+  it('names a remaining uninstalled setup handler without partially applying it', () => {
     const world = staged();
-    scheduleSetup(world, { ...moveMara('elsewhere', 'future-directive'), kind: 'directive-due', override: null });
+    scheduleSetup(world, {
+      ...moveMara('elsewhere', 'future-recruitment'), kind: 'recruitment-response', override: null,
+    });
     runUntil(world, 15, RULES);
     const before = hashWorld(world);
-    expect(() => prepareTick(world, RULES)).toThrow(/directive-due.*handler not installed/i);
+    expect(() => prepareTick(world, RULES)).toThrow(/recruitment-response.*handler not installed/i);
     expect(hashWorld(world)).toBe(before);
   });
 

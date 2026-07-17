@@ -23,6 +23,11 @@ import {
 import { queueUnqueuedFieldReports } from './directives/field-reports';
 import { pruneScrutiny } from './directives/scrutiny';
 import type { NetworkSpeech } from './directives/types';
+import {
+  attemptDirective, collectDirectiveActIntents, expireDirectiveExecutions,
+  expireDirectiveActsBeforeCollection, markDirectiveDue,
+  recordDirectiveInquiryAnswer, recordDirectiveInquiryAsked,
+} from './directives/execution';
 
 export interface ScheduledSetup {
   id: string;
@@ -136,7 +141,7 @@ const defaultExtra: RealizeExtraIntent<NetworkSpeech> = (world, intent, circle, 
       return { askings: [], answers: [], tellings: [], extras: speech ? [speech] : [] };
     }
     case 'directive-act':
-      throw new Error('phase4: directive-act handler not installed');
+      return attemptDirective(world, intent.ref, circle, t, rules) as NpcIntentRealization<NetworkSpeech>;
     case 'drop-pickup':
       throw new Error('phase4: drop-pickup handler not installed');
     case 'recruitment-answer':
@@ -187,6 +192,9 @@ export function realizeCircleIntents<Extra = NetworkSpeech>(
     };
     askings.push(asking);
     task.asked.push(addressedTo);
+    if (task.id !== undefined && task.directiveId !== undefined) {
+      recordDirectiveInquiryAsked(world, task.id, t);
+    }
     realizedAsks.push({ asking, taskIndex: intent.taskIndex });
   }
 
@@ -211,6 +219,9 @@ export function realizeCircleIntents<Extra = NetworkSpeech>(
     const answer = chooseAnswer(world, answerer, winner.asking, t, rules);
     if (answer === null) continue;
     answers.push(answer);
+    const directiveTask = world.inquiries[winner.asking.speaker]?.[winner.taskIndex];
+    if (directiveTask?.id !== undefined
+      && recordDirectiveInquiryAnswer(world, directiveTask.id, answer, rules)) continue;
     const tasks = world.inquiries[winner.asking.speaker] ?? [];
     const task = tasks[winner.taskIndex];
     if (task === undefined) continue;
@@ -276,7 +287,8 @@ function applySetup(world: WorldState, setup: ScheduledSetup): void {
       return;
     }
     case 'directive-due':
-      throw new Error(`directive-due handler not installed (setup '${setup.id}')`);
+      markDirectiveDue(world, setup.ref, setup.due);
+      return;
     case 'recruitment-response':
       throw new Error(`recruitment-response handler not installed (setup '${setup.id}')`);
   }
@@ -431,7 +443,8 @@ export function resolveAutonomousPhase(
       a.members.join('\0').localeCompare(b.members.join('\0')));
   // Every frame is collected before any realization mutates the live world.
   const frames = orderedCircles
-    .filter((circle) => circle.members.length >= 2)
+    .filter((circle) => circle.members.length >= 2
+      || extra.some((intent) => circle.members.includes(intent.actor)))
     .map((circle) => collectCircleIntents(world, circle, tick, rules, extra, answeredDirectly));
   const result: NpcIntentRealization<NetworkSpeech> = { askings: [], answers: [], tellings: [], extras: [] };
   for (const frame of frames) {
@@ -449,8 +462,12 @@ function resolveNpcSpeech(
   utterances: Utterance[], askings: Asking[], networkSpeeches: NetworkSpeech[],
   alreadySpoke: readonly EntityId[],
 ): void {
+  expireDirectiveActsBeforeCollection(world, tick, rules);
   const network = collectNetworkForwardIntents(world, tick, circles);
-  const phase = resolveAutonomousPhase(world, rules, tick, circles, new Set(alreadySpoke), network);
+  const directives = collectDirectiveActIntents(world, tick, circles);
+  const phase = resolveAutonomousPhase(
+    world, rules, tick, circles, new Set(alreadySpoke), [...network, ...directives],
+  );
   askings.push(...phase.askings);
   utterances.push(...phase.answers, ...phase.tellings);
   networkSpeeches.push(...phase.extras);
@@ -545,6 +562,7 @@ function recordAndIngest(
 }
 
 function resolveEnvironment(world: WorldState, rules: Rules, tick: Tick): void {
+  expireDirectiveExecutions(world, tick, rules);
   if (minuteOfDay(tick) !== 1439) return;
   if (dayOfWeek(tick) === REST_DAY) {
     world.coin += rules.economy.weeklyStipend;

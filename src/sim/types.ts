@@ -133,12 +133,18 @@ export type ChronicleEntry = TellingRecord | InjectRecord | AskingRecord | Insti
   | VignetteRecord | NetworkSpeechRecord;
 
 export interface InquiryTask {
+  /** Directive-created story inquiries use their owning directive id as this unique task id. */
+  id?: string;
   about: InquiryKey;
-  from: 'self' | 'enemy';
+  from: 'self' | 'player' | 'enemy';
   /** Usable while dayOf(t) < expiresDay; swept at end of day. */
   expiresDay: number;
+  /** Optional exact inclusive deadline; legacy day-granular tasks omit it. */
+  expiresAt?: Tick;
   asked: EntityId[];
   answersHeard: number;
+  /** Association handle for directive-owned inquiry lifecycle; absent on legacy tasks. */
+  directiveId?: string;
   /**
    * Rider 11R: the person a PLAYER ask names. Set ONLY by `applyAsk` — the ask verb is a speech act,
    * so `runAskPhase` addresses exactly this person and consumes the task at the firing beat (never

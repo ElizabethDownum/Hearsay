@@ -42,10 +42,12 @@ describe('physical network transport', () => {
     };
     const events = finishTick(value, STANDARD_RULES, frame, () => applyAction(value, action, STANDARD_RULES));
 
-    expect(events.networkSpeeches).toHaveLength(1);
+    expect(events.networkSpeeches).toHaveLength(2);
     expect(events.networkSpeeches![0]).toMatchObject({ speaker: 'you', addressedTo: 'bez' });
+    expect(events.networkSpeeches![1]).toMatchObject({ speaker: 'bez', addressedTo: 'you',
+      spoken: { kind: 'directive-response', response: 'refuse' } });
     expect(value.network.directiveState!.records[0]!.received).toMatchObject({ tick: 0, handoffFrom: 'you' });
-    expect(value.chronicle.filter((entry) => entry.kind === 'network-speech')).toHaveLength(1);
+    expect(value.chronicle.filter((entry) => entry.kind === 'network-speech')).toHaveLength(2);
   });
 
   it('moves a relayed copy at most one hop per beat', () => {

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildWorld } from '../../src/sim/world';
+import { buildWorld, enrollPlayer } from '../../src/sim/world';
 import { step, runUntil } from '../../src/sim/step';
-import { applyInject } from '../../src/sim/actions';
+import { applyDirective, applyInject } from '../../src/sim/actions';
 import { chooseAnswer } from '../../src/sim/inquiry';
+import { markDirectiveDue } from '../../src/sim/directives/execution';
+import { realizeNetworkForward } from '../../src/sim/directives/transport';
+import type { DirectiveBrief } from '../../src/sim/directives/types';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { SOMEONE } from '../../src/sim/rumors/claim';
 import type { Asking } from '../../src/sim/perception';
@@ -72,10 +75,6 @@ describe('asking', () => {
 
   it.each([
     [
-      { kind: 'directive-act', actor: 'bez', ref: 'd2', rank: 2 },
-      'phase4: directive-act handler not installed',
-    ],
-    [
       { kind: 'drop-pickup', actor: 'bez', ref: 'drop-payload-2', rank: 3 },
       'phase4: drop-pickup handler not installed',
     ],
@@ -91,6 +90,37 @@ describe('asking', () => {
     );
     expect(frame.selected).toContainEqual(intent);
     expect(() => realizeCircleIntents(world, frame, 0, RULES)).toThrow(message);
+  });
+
+  it('the Task-8 directive-act arm is installed and realizes a collected due intent', () => {
+    const world = seededSimultaneousWorld('installed-directive-act');
+    enrollPlayer(world, { home: 'square' });
+    world.network.assets.push({
+      id: 'ada', mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [],
+    });
+    const brief: DirectiveBrief = {
+      mission: { kind: 'learn', target: { kind: 'person', id: 'bez' } },
+      priority: 'urgent', authority: 'office', discretion: 'open', specificity: 'guided',
+      guidance: [], active: { from: 0, until: 120 }, report: 'full', reportBy: 120,
+      purpose: 'learn locally',
+    };
+    applyDirective(world, 'ada', { outboundVia: [], reportVia: [] }, brief, 0);
+    const message = world.network.directiveState!.messages[0]!;
+    expect(realizeNetworkForward(
+      world, message.id, { venue: 'square', members: ['you', 'ada'] }, 0, RULES,
+    )).not.toBeNull();
+    const record = world.network.directiveState!.records[0]!;
+    const due = record.decision!.timing.actAt!;
+    world.tick = due;
+    markDirectiveDue(world, record.id, due);
+    const intent = { kind: 'directive-act' as const, actor: 'ada', ref: record.id, rank: 2 as const };
+    const frame = collectCircleIntents(
+      world, { venue: 'square', members: ['ada', 'bez', 'cyn', 'dov'] },
+      due, RULES, [intent], new Set(),
+    );
+    expect(frame.selected).toContainEqual(intent);
+    expect(() => realizeCircleIntents(world, frame, due, RULES)).not.toThrow();
+    expect(record.execution).toMatchObject({ state: 'completed', dueAt: null });
   });
 
   it('the Task-6 network-forward arm is installed and a stale message ref realizes as a no-op', () => {

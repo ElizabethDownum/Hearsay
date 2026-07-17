@@ -2,7 +2,11 @@ import { dayOf } from '../../core/time';
 import { CONVERSATION_BEAT } from '../rumors/propagation';
 import type { EntityId } from '../rumors/claim';
 import type { WorldState } from '../types';
-import type { DirectiveState, ScrutinyCause } from './types';
+import { cloneSerializable } from '../hash';
+import type { Principal } from '../network/types';
+import type {
+  DirectiveState, MessageId, NetworkPayload, NetworkSpeech, ScrutinyCause,
+} from './types';
 
 export const SCRUTINY: Record<ScrutinyCause, { weight: number; decayDays: number }> = {
   questioning: { weight: 0.15, decayDays: 2 },
@@ -56,6 +60,45 @@ export function allocateVersionId(state: DirectiveState): string {
 export function allocateObservationId(state: DirectiveState): string {
   const id = `o${state.nextObservation}`;
   state.nextObservation += 1;
+  return id;
+}
+
+export function validateNetworkRoute(
+  world: WorldState, holder: EntityId, route: readonly EntityId[],
+): void {
+  if (!world.npcs[holder]) throw new Error(`network: unknown holder '${holder}'`);
+  if (route.length === 0) throw new Error('network: route must name at least one recipient');
+  const seen = new Set<EntityId>();
+  for (const id of route) {
+    if (!world.npcs[id]) throw new Error(`network: unknown route actor '${id}'`);
+    if (id === holder) throw new Error(`network: route contains self-hop '${id}'`);
+    if (seen.has(id)) throw new Error(`network: duplicate route actor '${id}'`);
+    seen.add(id);
+  }
+}
+
+/** Allocate transport data without importing the transport realization module (cycle-free queue seam). */
+export function allocateNetworkMessage(
+  world: WorldState,
+  principal: Principal,
+  holder: EntityId,
+  route: EntityId[],
+  payload: NetworkPayload,
+  availableAfter: number,
+  expiresAt: number | null,
+  cause: NetworkSpeech['cause'],
+): MessageId {
+  if (expiresAt !== null && expiresAt < availableAfter) {
+    throw new Error(`network: expiry ${expiresAt} precedes availability ${availableAfter}`);
+  }
+  const state = ensureDirectiveState(world);
+  const id = allocateMessageId(state);
+  state.messages.push({
+    id, principal, createdAt: world.tick, origin: holder, holder, lastFrom: holder,
+    route: [...route], nextHop: 0, availableAfter, payload: cloneSerializable(payload),
+    deliveredAt: null, expiresAt, failedAt: null, processedRelayHops: [],
+    cause: cloneSerializable(cause),
+  });
   return id;
 }
 
