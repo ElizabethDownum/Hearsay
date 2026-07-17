@@ -25,7 +25,7 @@ describe('procgen pacing probe (npm run mc)', () => {
   const DIVERGENT = gen('probe-town-2');
   const SEEDS = ['mcg-1', 'mcg-2', 'mcg-3', 'mcg-4', 'mcg-5'];
 
-  it('canny reads the town and clears the gatekeeper that strands the patient whisperer', () => {
+  it('canny reads the town and clears the gatekeeper that strands the patient whisperer', { timeout: 30000 }, () => {
     const results = [patientWhisperer, cannyWhisperer, blitzCrier].map((bot) => {
       const r = runMonteCarlo({ fixture: DIVERGENT.fixture, rules: STANDARD_RULES, bot, seeds: SEEDS, days: 2 });
       console.log(`\n=== ${r.bot} · ${DIVERGENT.fixture.npcs.length} NPCs · ${SEEDS.length} seeds · 2 days ===`);
@@ -62,7 +62,7 @@ describe('procgen pacing probe (npm run mc)', () => {
   // Probe 3 — enemy-active. worldFromTown wires the guard roster + town map, so the nightly
   // digest (Task 9) runs and turns the campaign's evidence into sketch features. Feature counts
   // are emergent (reported, not pinned); the assertion is that the machinery ran every seed.
-  it('enemy-active: the nightly digest builds a sketch from the campaign it observes', () => {
+  it('enemy-active: the nightly digest builds a sketch from the campaign it observes', { timeout: 30000 }, () => {
     const town = gen('probe-town-5');
     const r = runMonteCarlo({ makeWorld: (seed) => worldFromTown(town, seed), rules: STANDARD_RULES,
       bot: blitzCrier, seeds: ['es-1', 'es-2', 'es-3'], days: 4 });

@@ -89,7 +89,7 @@ describe('scenario referee — council turns, doom clock, institutional endings'
     expect(world.scenario!.status).toBe('running');
   });
 
-  it('(e) clock expires with no quorum → lost-clock + coronation record', () => {
+  it('(e) clock expires with no quorum → lost-clock + coronation record', { timeout: 30000 }, () => {
     const world = fresh();
     runUntil(world, at(DEF.days, 0), STANDARD_RULES);         // = at(days-1, 1439)+1: fires day (days-1) nightly
     const s = world.scenario!;

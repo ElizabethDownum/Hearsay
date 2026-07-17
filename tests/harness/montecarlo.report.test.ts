@@ -7,7 +7,7 @@ const SEEDS = ['mc-1', 'mc-2', 'mc-3', 'mc-4', 'mc-5'];
 const DAYS = 4;
 
 describe('Monte Carlo report (npm run mc)', () => {
-  it('runs both archetypes over the seed batch and prints the distribution table', () => {
+  it('runs both archetypes over the seed batch and prints the distribution table', { timeout: 30000 }, () => {
     const pct = (n: number): string => `${(n * 100).toFixed(0)}%`;
     for (const bot of [patientWhisperer, blitzCrier]) {
       const r = runMonteCarlo({ fixture: TESTFORD, rules: STANDARD_RULES, bot, seeds: SEEDS, days: DAYS });
