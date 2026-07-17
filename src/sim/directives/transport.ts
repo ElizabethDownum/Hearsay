@@ -1,7 +1,7 @@
 import { minuteOfDay, type Tick } from '../../core/time';
 import type { Circle } from '../agents';
 import { cloneSerializable } from '../hash';
-import { isTurnedAgainst, principalActor } from '../network/roster';
+import { assetFor, isTurnedAgainst, principalActor } from '../network/roster';
 import type { Principal } from '../network/types';
 import type { PreparedTick, NpcAutonomousIntent } from '../phases';
 import { CONVERSATION_BEAT } from '../rumors/propagation';
@@ -10,7 +10,10 @@ import type { Rules } from '../rules';
 import type { WorldState } from '../types';
 import { trustBetween } from '../world';
 import { projectFieldReportHop } from './field-reports';
-import { allocateMessageId, ensureDirectiveState, perceivedScrutiny, strictNextBeat } from './state';
+import { allocateMessageId, allocateVersionId, ensureDirectiveState, strictNextBeat } from './state';
+import { perceivedScrutiny, recordScrutiny } from './scrutiny';
+import { projectBrief, projectDirectiveReport, type ProjectionSpeaker } from './mutation';
+import { evaluateReceivedBrief } from './evaluator';
 import type {
   DirectiveAuthority, DirectiveDiscretion, MessageId, NetworkMessage, NetworkPayload,
   NetworkSpeech, SpokenNetworkPayload,
@@ -101,6 +104,75 @@ function sourceDirectiveId(payload: NetworkPayload): string | null {
   }
 }
 
+function projectionSpeaker(world: WorldState, id: EntityId): ProjectionSpeaker {
+  const npc = world.npcs[id]!;
+  const knownFactions: ProjectionSpeaker['knownFactions'] = { [id]: npc.faction };
+  for (const rival of npc.rivals) {
+    const faction = world.npcs[rival]?.faction;
+    if (faction !== undefined) knownFactions[rival] = faction;
+  }
+  return { id, faction: npc.faction, rivals: [...npc.rivals], knownFactions, traits: [...npc.traits] };
+}
+
+function messagePrincipalId(world: WorldState, message: NetworkMessage): EntityId {
+  const actor = principalActor(world, message.principal);
+  if (actor !== null) return actor;
+  if ((message.payload.kind === 'directive' || message.payload.kind === 'handler-brief')
+    && message.payload.version.claimedIssuer !== SOMEONE) return message.payload.version.claimedIssuer;
+  return message.lastFrom;
+}
+
+function allocateProjectedVersionId(world: WorldState): string {
+  const state = ensureDirectiveState(world);
+  const used = new Set<string>();
+  for (const record of state.records) {
+    used.add(record.authored.id);
+    if (record.received) used.add(record.received.version.id);
+  }
+  for (const carried of state.messages) {
+    if (carried.payload.kind === 'directive' || carried.payload.kind === 'handler-brief') {
+      used.add(carried.payload.version.id);
+    }
+  }
+  let id = allocateVersionId(state);
+  while (used.has(id)) id = allocateVersionId(state);
+  return id;
+}
+
+function projectCarriedSpeech(
+  world: WorldState, message: NetworkMessage, rules: Rules, mode: 'relay' | 'handler-report',
+  scrutiny: number,
+): boolean {
+  const payload = message.payload;
+  if (payload.kind === 'directive' || payload.kind === 'handler-brief') {
+    const projected = projectBrief({ version: payload.version,
+      speaker: projectionSpeaker(world, message.holder), lastFrom: message.lastFrom,
+      audience: message.principal,
+      turnedAgainstAudience: isTurnedAgainst(world, message.principal, message.holder),
+      perceivedScrutiny: scrutiny, mode }, rules);
+    if (projected.retell === 'withhold') return false;
+    if (projected.changes.length > 0) {
+      const previous = payload.version;
+      payload.version = {
+        id: allocateProjectedVersionId(world), parent: previous.id,
+        directiveId: previous.directiveId, brief: projected.brief,
+        claimedIssuer: projected.claimedIssuer, replyRoute: projected.replyRoute,
+        changedBy: message.holder, changes: projected.changes,
+      };
+    }
+  } else if (payload.kind === 'directive-report') {
+    const projected = projectDirectiveReport({ report: payload.report,
+      enemyAction: payload.enemyAction, factRefs: payload.factRefs,
+      speaker: projectionSpeaker(world, message.holder),
+      turnedAgainstAudience: isTurnedAgainst(world, message.principal, message.holder),
+      perceivedScrutiny: scrutiny }, rules);
+    payload.report = projected.report;
+    payload.enemyAction = projected.enemyAction;
+    payload.factRefs = projected.factRefs;
+  }
+  return true;
+}
+
 function projectPayload(
   world: WorldState,
   message: NetworkMessage,
@@ -108,6 +180,7 @@ function projectPayload(
   addressedTo: EntityId,
   rules: Rules,
   projectSpeaker = true,
+  atTick: Tick = world.tick,
 ): SpokenNetworkPayload {
   const onwardTo = message.route[message.nextHop + 1] ?? null;
   const payload = message.payload;
@@ -139,7 +212,7 @@ function projectPayload(
     case 'field-report': {
       const rendered = !projectSpeaker && payload.renderedItems !== null
         ? cloneSerializable(payload.renderedItems)
-        : projectFieldReportHop(world, message, speaker, rules);
+        : projectFieldReportHop(world, message, speaker, rules, atTick);
       payload.renderedItems = cloneSerializable(rendered);
       return {
         kind: 'field-report',
@@ -280,13 +353,15 @@ function relayInputFor(
     discretion,
     bystanders: circle.members.filter((id) => id !== message.holder && id !== addressedTo).length,
     turnedAgainstMessagePrincipal: isTurnedAgainst(world, message.principal, message.holder),
-    scrutiny: perceivedScrutiny(world, message.holder, named, atTick),
+    scrutiny: perceivedScrutiny(world, message.holder, messagePrincipalId(world, message), atTick),
   };
 }
 
-function queueBetrayalCopy(world: WorldState, message: NetworkMessage, t: Tick): void {
+function queueBetrayalCopy(
+  world: WorldState, message: NetworkMessage, t: Tick, heldVersion?: NetworkPayload & { kind: 'directive' },
+): void {
   if (message.payload.kind !== 'directive') return;
-  const payload = message.payload;
+  const payload = heldVersion ?? message.payload;
   const other: Principal = message.principal === 'player' ? 'enemy' : 'player';
   const handler = principalActor(world, other);
   if (handler === null || handler === message.holder) return;
@@ -312,7 +387,8 @@ function failExpired(world: WorldState, message: NetworkMessage, t: Tick): void 
 }
 
 function receiveFinal(
-  world: WorldState, message: NetworkMessage, spoken: SpokenNetworkPayload, t: Tick,
+  world: WorldState, message: NetworkMessage, spoken: SpokenNetworkPayload, t: Tick, circle: Circle,
+  rules: Rules,
 ): void {
   const state = ensureDirectiveState(world);
   switch (spoken.kind) {
@@ -326,6 +402,22 @@ function receiveFinal(
       }
       if (record.received === null) {
         const lineage = message.payload.version;
+        const scrutinyPrincipal = messagePrincipalId(world, message);
+        if (spoken.brief.authority === 'compel') {
+          recordScrutiny(world, message.holder, scrutinyPrincipal, 'authority-pressure', t);
+        }
+        if (spoken.claimedIssuer !== SOMEONE
+          && spoken.brief.active.from <= t && t <= spoken.brief.active.until) {
+          const alreadyActive = state.records.some((candidate) => candidate !== record
+            && candidate.principal === message.principal && candidate.recipient === message.holder
+            && candidate.received !== null
+            && candidate.received.version.claimedIssuer === spoken.claimedIssuer
+            && candidate.received.version.brief.active.from <= t
+            && t <= candidate.received.version.brief.active.until);
+          if (alreadyActive) recordScrutiny(
+            world, message.holder, spoken.claimedIssuer, 'retasking', t,
+          );
+        }
         record.received = {
           tick: t,
           version: {
@@ -337,6 +429,29 @@ function receiveFinal(
           handoffFrom: message.lastFrom,
           messageId: message.id,
         };
+        const npc = world.npcs[message.holder]!;
+        const roster = assetFor(world, message.principal, message.holder);
+        const knownFactions: Record<EntityId, typeof npc.faction> = { [npc.id]: npc.faction };
+        for (const rival of npc.rivals) {
+          const faction = world.npcs[rival]?.faction;
+          if (faction !== undefined) knownFactions[rival] = faction;
+        }
+        record.decision = evaluateReceivedBrief({ directiveId: record.id,
+          version: record.received.version, messagePrincipal: message.principal,
+          handoffFrom: message.lastFrom,
+          recipient: { id: npc.id, faction: npc.faction, rivals: [...npc.rivals], knownFactions,
+            traits: [...npc.traits], mice: roster?.mice ?? null,
+            relationshipToIssuer: spoken.claimedIssuer === SOMEONE ? 0
+              : trustBetween(world, npc.id, spoken.claimedIssuer),
+            strikes: roster?.strikes ?? 0,
+            turned: isTurnedAgainst(world, message.principal, npc.id) },
+          local: { tick: t, venue: circle.venue, circleMembers: [...circle.members].sort(),
+            observations: { observer: npc.id, tick: t,
+              observations: circle.members.filter((id) => id !== npc.id).sort().map((id) => ({
+                kind: 'presence' as const, tick: t, venue: circle.venue, actor: id,
+              })) } },
+          perceivedScrutiny: perceivedScrutiny(world, npc.id, scrutinyPrincipal, t),
+          stage: 'receipt' }, rules);
       }
       return;
     }
@@ -414,12 +529,23 @@ function attemptHop(
       message.failedAt = t;
       return null;
     }
-    if (decision === 'betray-and-forward') queueBetrayalCopy(world, message, t);
   }
 
   const hop = message.nextHop;
   const alreadyProcessed = message.processedRelayHops.includes(hop);
-  const spoken = projectPayload(world, message, message.holder, addressedTo, rules, !alreadyProcessed);
+  const betrayalCopy = !alreadyProcessed && decision === 'betray-and-forward'
+    && message.payload.kind === 'directive' ? cloneSerializable(message.payload) : null;
+  const scrutiny = relayInput?.scrutiny
+    ?? perceivedScrutiny(world, message.holder, messagePrincipalId(world, message), t);
+  const projectsBrief = message.payload.kind === 'handler-brief'
+    || (message.payload.kind === 'directive' && !isOriginSend);
+  const projectsReport = message.payload.kind === 'directive-report';
+  if (!alreadyProcessed && (projectsBrief || projectsReport)) {
+    const mode = message.payload.kind === 'handler-brief' ? 'handler-report' : 'relay';
+    if (!projectCarriedSpeech(world, message, rules, mode, scrutiny)) return null;
+  }
+  if (betrayalCopy) queueBetrayalCopy(world, message, t, betrayalCopy);
+  const spoken = projectPayload(world, message, message.holder, addressedTo, rules, !alreadyProcessed, t);
   replaceCarriedContent(message, spoken);
   if (!isOriginSend && !alreadyProcessed) {
     message.processedRelayHops.push(hop);
@@ -448,7 +574,7 @@ function attemptHop(
     spoken,
     cause: cloneSerializable(message.cause),
   };
-  if (final) receiveFinal(world, message, spoken, t);
+  if (final) receiveFinal(world, message, spoken, t, circle, rules);
   return speech;
 }
 

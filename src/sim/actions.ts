@@ -15,6 +15,7 @@ import { confirmableUnderCompulsion } from './inquiry';
 import { cloneSerializable } from './hash';
 import { queueNetworkMessage } from './directives/transport';
 import { allocateDirectiveId, allocateVersionId, ensureDirectiveState } from './directives/state';
+import { recordScrutiny } from './directives/scrutiny';
 import type { DirectiveBrief, DirectiveHandoff } from './directives/types';
 
 export interface InjectSpec {
@@ -212,6 +213,9 @@ export function applyAsk(world: WorldState, to: EntityId, about: InquiryKey, tic
   }
   const tasks = world.inquiries[world.playerId] ?? (world.inquiries[world.playerId] = []);
   tasks.push({ about, from: 'self', expiresDay: dayOf(tick) + 1, asked: [], answersHeard: 0, addressee: to });
+  if (assetFor(world, 'player', to)) {
+    recordScrutiny(world, to, world.playerId, 'questioning', tick);
+  }
 }
 
 /** Recruitment disposition floor by handle — the trust the recruit establishes toward the player.
@@ -585,6 +589,7 @@ export function applyDebrief(world: WorldState, asset: EntityId, tick: Tick, rul
   });
   slideDisposition(world, asset, -0.1); // Amendment #4b's disposition strike — the wage-slide mechanics, reused
   record.strikes += 1;                  // +1 strike, the same ledger wages use
+  recordScrutiny(world, asset, world.playerId, 'authority-pressure', tick);
 }
 
 /** Informant posting window (spec: 15-aligned, mid-day). Exported for the assign law + tests. */

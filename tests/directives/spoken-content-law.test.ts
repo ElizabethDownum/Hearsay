@@ -26,6 +26,8 @@ const VERSION: BriefVersion = {
 function world() {
   const value = buildWorld(miniTown(), 'spoken-law', STANDARD_RULES);
   enrollPlayer(value, { home: 'square' });
+  // This suite pins carried/spoken equality, not the skeptic's voluntary-retelling gate.
+  value.npcs.ada!.traits = ['literalist'];
   for (const id of ['ada', 'bez', 'cyn']) {
     value.network.assets.push({ id, mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [] });
     value.network.enemyAssets.push({ id, mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [] });

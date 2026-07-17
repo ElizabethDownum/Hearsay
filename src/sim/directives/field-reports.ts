@@ -8,8 +8,13 @@ import type { EntityId } from '../rumors/claim';
 import type { WorldState } from '../types';
 import type { Observation } from '../perception';
 import type { Principal } from '../network/types';
-import { isTurnedAgainst } from '../network/roster';
+import { isTurnedAgainst, principalActor } from '../network/roster';
 import { allocateObservationId, ensureDirectiveState, strictNextBeat } from './state';
+import { perceivedScrutiny } from './scrutiny';
+import {
+  candorFor, expressedTraitIds, projectBrief, projectDirectiveReport,
+  type ProjectionSpeaker,
+} from './mutation';
 import type {
   HeldFieldObservation, NetworkMessage, NetworkSpeech, ReportedFieldObservation,
 } from './types';
@@ -175,12 +180,30 @@ function projectReportedObservation(
   reporter: EntityId,
   rules: Rules,
   audience: Principal,
+  atTick: Tick,
 ): ReportedFieldObservation | null {
-  // Turncoat doctoring happens at the spoken projection seam: omitted atoms are never learned by
-  // the principal, while the receipt can still close every source row carried by this packet.
-  const doctored = isTurnedAgainst(world, audience, reporter);
-  if (doctored && (observation.kind === 'presence'
+  const npc = world.npcs[reporter]!;
+  const principal = principalActor(world, audience) ?? reporter;
+  const scrutiny = perceivedScrutiny(world, reporter, principal, atTick);
+  const turned = isTurnedAgainst(world, audience, reporter);
+  const candor = candorFor(turned, scrutiny, npc.traits);
+  if (candor === 'guarded' && (observation.kind === 'presence'
+    || ('overheard' in observation && observation.overheard))) return null;
+  if ((candor === 'omissive' || candor === 'doctored') && (observation.kind === 'presence'
     || (observation.kind === 'asking' && observation.authority))) return null;
+  const allowed = new Set(expressedTraitIds(npc.traits, scrutiny));
+  if (scrutiny < 0.70) allowed.add('exaggerator');
+  if (candor === 'doctored') allowed.add('minimizer');
+  const filteredRules: Rules = { ...rules, traits: Object.fromEntries(
+    Object.entries(rules.traits).filter(([id]) => allowed.has(id)),
+  ) };
+  const knownFactions: ProjectionSpeaker['knownFactions'] = { [reporter]: npc.faction };
+  for (const rival of npc.rivals) {
+    const faction = world.npcs[rival]?.faction;
+    if (faction !== undefined) knownFactions[rival] = faction;
+  }
+  const speaker: ProjectionSpeaker = { id: reporter, faction: npc.faction,
+    rivals: [...npc.rivals], knownFactions, traits: [...npc.traits] };
   switch (observation.kind) {
     case 'utterance':
       return {
@@ -191,7 +214,8 @@ function projectReportedObservation(
         reported: reportThrough(world, reporter, {
           id: observation.claimId, family: observation.family, parent: null,
           ...observation.reported,
-        }, rules, audience),
+        }, filteredRules, audience, { traits: 'apply',
+          turncoat: candor === 'doctored' ? 'apply' : 'skip' }),
       };
     case 'asking':
       return {
@@ -205,13 +229,37 @@ function projectReportedObservation(
         kind: 'presence', observedAt: observation.observedAt,
         venue: observation.venue, actor: observation.actor,
       };
-    case 'network-speech':
+    case 'network-speech': {
+      const spoken = cloneSerializable(observation.spoken);
+      if (spoken.kind === 'directive' || spoken.kind === 'handler-brief') {
+        const projection = projectBrief({ version: {
+          id: `field:${observation.messageId}`, parent: null,
+          directiveId: spoken.kind === 'directive' ? spoken.directiveId
+            : sourceDirectiveFor(world, observation.messageId) ?? observation.messageId,
+          brief: spoken.brief, claimedIssuer: spoken.claimedIssuer,
+          replyRoute: spoken.replyRoute, changedBy: null, changes: [],
+        }, speaker, lastFrom: observation.speaker, audience,
+        turnedAgainstAudience: turned, perceivedScrutiny: scrutiny,
+        mode: 'handler-report' }, rules);
+        if (projection.retell === 'withhold') return null;
+        spoken.brief = projection.brief;
+        spoken.claimedIssuer = projection.claimedIssuer;
+        spoken.replyRoute = projection.replyRoute;
+      } else if (spoken.kind === 'directive-report') {
+        const projection = projectDirectiveReport({ report: spoken.report,
+          enemyAction: spoken.enemyAction, factRefs: spoken.factRefs,
+          speaker, turnedAgainstAudience: turned, perceivedScrutiny: scrutiny }, rules);
+        spoken.report = projection.report;
+        spoken.enemyAction = projection.enemyAction;
+        spoken.factRefs = projection.factRefs;
+      }
       return {
         kind: 'network-speech', observedAt: observation.observedAt, venue: observation.venue,
         speaker: observation.speaker, addressedTo: observation.addressedTo,
         overheard: observation.overheard, messageId: observation.messageId,
-        spoken: cloneSerializable(observation.spoken),
+        spoken,
       };
+    }
   }
 }
 
@@ -220,6 +268,7 @@ export function projectFieldReportHop(
   message: NetworkMessage,
   speaker: EntityId,
   rules: Rules,
+  atTick: Tick = world.tick,
 ): {
   rootFingerprint: string;
   observation: ReportedFieldObservation;
@@ -232,7 +281,7 @@ export function projectFieldReportHop(
   if (payload.renderedItems !== null) {
     return payload.renderedItems.flatMap((item) => {
       const observation = projectReportedObservation(
-        world, item.observation, speaker, rules, message.principal,
+        world, item.observation, speaker, rules, message.principal, atTick,
       );
       return observation === null ? [] : [{
         rootFingerprint: item.rootFingerprint,
@@ -249,7 +298,7 @@ export function projectFieldReportHop(
       throw new Error(`field-report projection: malformed source '${id}'`);
     }
     const observation = projectReportedObservation(
-      world, rawReportedObservation(row), speaker, rules, message.principal,
+      world, rawReportedObservation(row), speaker, rules, message.principal, atTick,
     );
     if (observation === null) continue;
     rendered.push({

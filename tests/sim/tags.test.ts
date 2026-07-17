@@ -8,6 +8,7 @@ import { runUntil } from '../../src/sim/step';
 import { hashWorld, stableStringify } from '../../src/sim/hash';
 import { at } from '../../src/core/time';
 import type { WorldState } from '../../src/sim/types';
+import { perceivedScrutiny, recordScrutiny } from '../../src/sim/directives/scrutiny';
 
 describe('applyTag — margin notes, validation mirrors applyCard verbatim', () => {
   it('add/update/remove happy path; update patches non-null fields only and bumps updatedTick', () => {
@@ -95,6 +96,17 @@ describe('TagAction — wired through applyAction, the Action union, and replay'
 });
 
 describe('sim-blind by property (amendment #5b) — tags never steer a simulated decision', () => {
+  it('private tag and codex mutations leave perceived scrutiny exactly equal', () => {
+    const plain = buildWorld(miniTown(), 'scrutiny-private');
+    const privateNotes = buildWorld(miniTown(), 'scrutiny-private');
+    recordScrutiny(plain, 'ada', 'bez', 'questioning', 0);
+    recordScrutiny(privateNotes, 'ada', 'bez', 'questioning', 0);
+    applyTag(privateNotes, 'add', 'suspect', 'npc:ada', 'possible turncoat', 0);
+    privateNotes.intel.codex.push({ npc: 'ada', trait: 'vaguener', proposedAt: 0 });
+    expect(perceivedScrutiny(privateNotes, 'ada', 'bez', at(1, 0)))
+      .toBe(perceivedScrutiny(plain, 'ada', 'bez', at(1, 0)));
+  });
+
   it('20 tags vs. none: identical worlds run 2 days converge everywhere except intel.tags', () => {
     const build = (): WorldState => {
       const world = buildWorld(miniTown(), 'blind-1');

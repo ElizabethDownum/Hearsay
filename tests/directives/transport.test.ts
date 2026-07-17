@@ -123,8 +123,8 @@ describe('physical network transport', () => {
     }, 0, null, null);
     expect(realizeNetworkForward(value, id, { venue: 'square', members: ['ada', 'bez'] }, 0, STANDARD_RULES))
       .not.toBeNull();
-    recordScrutiny(value, 'bez', 'ada', 'confrontation', 0);
-    recordScrutiny(value, 'bez', 'ada', 'authority-pressure', 0);
+    recordScrutiny(value, 'bez', 'you', 'confrontation', 0);
+    recordScrutiny(value, 'bez', 'you', 'authority-pressure', 0);
     const before = stableStringify(value.network.directiveState!.messages[0]!.payload);
     expect(realizeNetworkForward(value, id, { venue: 'square', members: ['bez', 'cyn'] }, 15, STANDARD_RULES))
       .toBeNull();
@@ -145,6 +145,7 @@ describe('physical network transport', () => {
       claimedIssuer: 'ada', replyRoute: null, changedBy: null, changes: [],
     };
     const held = world();
+    held.npcs.ada!.traits = ['literalist'];
     const heldId = queueNetworkMessage(held, 'player', 'ada', ['bez', 'cyn'], {
       kind: 'handler-brief', sourceDirectiveId: 'd0', version,
     }, 0, null, null);
@@ -224,6 +225,7 @@ describe('physical network transport', () => {
     ];
     for (const payload of payloads) {
       const value = world();
+      value.npcs.ada!.traits = ['literalist'];
       const id = queueNetworkMessage(value, 'player', 'ada', ['bez'], payload, 0, null, null);
       expect(realizeNetworkForward(value, id, { venue: 'square', members: ['ada', 'bez'] }, 0, STANDARD_RULES),
         payload.kind).not.toBeNull();

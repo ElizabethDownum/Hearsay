@@ -34,6 +34,9 @@ export function reportThrough(
   claim: Claim,
   rules: Rules,
   audience: Principal,
+  policy: { traits: 'apply'; turncoat: 'auto' | 'apply' | 'skip' } = {
+    traits: 'apply', turncoat: 'auto',
+  },
 ): ReportedClaim {
   const reporter = world.npcs[reporterId]!;
   const traits = reporter.traits.flatMap((id) => (rules.traits[id] ? [rules.traits[id]!] : []));
@@ -43,7 +46,9 @@ export function reportThrough(
   const chain = [
     ...traits,
     ...(isEgoAsset && exaggerator ? [exaggerator] : []),
-    ...(isTurnedAgainst(world, audience, reporterId) && minimizer ? [minimizer] : []),
+    ...((policy.turncoat === 'apply'
+      || (policy.turncoat === 'auto' && isTurnedAgainst(world, audience, reporterId)))
+      && minimizer ? [minimizer] : []),
   ];
   const filtered = { ...claim, ...applyTraits(chain, claim, traitContextOf(reporter, world)) };
   const { subject, predicate, object, count, severity, place, attribution } = filtered;
