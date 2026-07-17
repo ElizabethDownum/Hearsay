@@ -415,7 +415,7 @@ function receiveFinal(
             && candidate.received.version.brief.active.from <= t
             && t <= candidate.received.version.brief.active.until);
           if (alreadyActive) recordScrutiny(
-            world, message.holder, spoken.claimedIssuer, 'retasking', t,
+            world, message.holder, scrutinyPrincipal, 'retasking', t,
           );
         }
         record.received = {

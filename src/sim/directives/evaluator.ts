@@ -137,8 +137,8 @@ function timing(input: ReceivedBriefInput, commitment: 'refuse' | 'defer' | 'att
     return { commitment: 'refuse', timing: { actAt: null, reportAt: null } };
   }
   let actAt: Tick;
-  if (commitment === 'defer') actAt = beatAtOrAfter(input.local.tick + TICKS_PER_DAY);
-  else if (input.stage === 'execution') actAt = input.local.tick;
+  if (input.stage === 'execution') actAt = input.local.tick;
+  else if (commitment === 'defer') actAt = beatAtOrAfter(input.local.tick + TICKS_PER_DAY);
   else {
     const base = Math.max(strictNextBeat(input.local.tick), beatAtOrAfter(brief.active.from));
     actAt = base + (brief.priority === 'urgent' ? 0

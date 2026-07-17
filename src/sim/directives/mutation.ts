@@ -216,6 +216,7 @@ export function projectDirectiveReport(input: {
     .flatMap((id) => rules.traits[id] ? [rules.traits[id]!] : []);
   if (candor === 'doctored' && rules.traits.minimizer) chain.push(rules.traits.minimizer);
   const uncertaintySeverity = { low: 1, medium: 3, high: 5 } as const;
+  const sourceDisclosed = input.report.source !== null;
   const report = cloneSerializable(input.report);
   const assertion: Claim = { id: 'directive-report', family: 'directive-report', parent: null,
     subject: SOMEONE, predicate: 'directive:report', object: null,
@@ -234,7 +235,7 @@ export function projectDirectiveReport(input: {
     report,
     enemyAction: candor === 'ordinary' || candor === 'guarded'
       ? cloneSerializable(input.enemyAction) : null,
-    factRefs: candor === 'ordinary' && report.source !== null ? cloneSerializable(input.factRefs) : [],
+    factRefs: candor === 'ordinary' && sourceDisclosed ? cloneSerializable(input.factRefs) : [],
   };
 }
 

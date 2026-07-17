@@ -21,6 +21,7 @@ import {
   collectNetworkForwardIntents, deliverNetworkMessages, realizeNetworkForward,
 } from './directives/transport';
 import { queueUnqueuedFieldReports } from './directives/field-reports';
+import { pruneScrutiny } from './directives/scrutiny';
 import type { NetworkSpeech } from './directives/types';
 
 export interface ScheduledSetup {
@@ -554,6 +555,7 @@ function resolveEnvironment(world: WorldState, rules: Rules, tick: Tick): void {
   expireInquiries(world, dayOf(tick));
   runVignettes(world, rules);
   scenarioNightly(world, rules);
+  pruneScrutiny(world, tick);
 }
 
 function finishTickInternal(

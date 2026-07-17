@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { STANDARD_RULES } from '../../src/content/rules';
-import { projectBrief } from '../../src/sim/directives/mutation';
-import type { BriefVersion, DirectiveBrief } from '../../src/sim/directives/types';
+import { projectBrief, projectDirectiveReport } from '../../src/sim/directives/mutation';
+import type {
+  BriefVersion, DirectiveBrief, DirectiveReportPayload, EnemyActionReport,
+} from '../../src/sim/directives/types';
 import { queueNetworkMessage, realizeNetworkForward } from '../../src/sim/directives/transport';
 import { ensureDirectiveState } from '../../src/sim/directives/state';
 import { buildWorld, enrollPlayer } from '../../src/sim/world';
@@ -134,6 +136,67 @@ describe('projectBrief', () => {
     expect(paths).toEqual([...paths].sort());
   });
 
+  it('skips a colliding current version id instead of creating v0 parent v0 self-lineage', () => {
+    const world = buildWorld(miniTown(), 'mutation-lineage-collision', STANDARD_RULES);
+    enrollPlayer(world, { home: 'square' });
+    world.npcs.ada!.traits = ['literalist'];
+    world.npcs.bez!.traits = ['exaggerator'];
+    const state = ensureDirectiveState(world);
+    state.nextVersion = 0;
+    const original = { ...version(), claimedIssuer: 'ada' } as BriefVersion;
+    state.records.push({ id: 'd0', principal: 'player', principalId: 'you', recipient: 'cyn',
+      issuedAt: 0, handoff: { outboundVia: ['ada', 'bez'], reportVia: [] },
+      authored: structuredClone(original), received: null, decision: null, execution: null,
+      receivedReports: [] });
+    const id = queueNetworkMessage(world, 'player', 'you', ['ada', 'bez', 'cyn'], {
+      kind: 'directive', version: original,
+    }, 0, null, null);
+    realizeNetworkForward(world, id, { venue: 'square', members: ['you', 'ada'] },
+      0, STANDARD_RULES);
+    realizeNetworkForward(world, id, { venue: 'square', members: ['ada', 'bez'] },
+      15, STANDARD_RULES);
+    realizeNetworkForward(world, id, { venue: 'square', members: ['bez', 'cyn'] },
+      30, STANDARD_RULES);
+    const payload = state.messages[0]!.payload;
+    expect(payload.kind === 'directive' ? payload.version : null)
+      .toMatchObject({ id: 'v1', parent: 'v0', changedBy: 'bez' });
+    expect(payload.kind === 'directive' ? payload.version.id : null)
+      .not.toBe(payload.kind === 'directive' ? payload.version.parent : null);
+  });
+
+  it('handler-report skeptics withhold one-source copies without allocation or hop processing', () => {
+    const stage = (claimedIssuer: string) => {
+      const world = buildWorld(miniTown(), `mutation-handler-skeptic-${claimedIssuer}`, STANDARD_RULES);
+      enrollPlayer(world, { home: 'square' });
+      world.npcs.ada!.traits = ['literalist'];
+      world.npcs.bez!.traits = ['skeptic'];
+      const state = ensureDirectiveState(world);
+      const id = queueNetworkMessage(world, 'player', 'ada', ['bez', 'cyn'], {
+        kind: 'handler-brief', sourceDirectiveId: 'd0',
+        version: { ...version(), claimedIssuer },
+      }, 0, null, null);
+      realizeNetworkForward(world, id, { venue: 'square', members: ['ada', 'bez'] },
+        0, STANDARD_RULES);
+      return { world, state, id };
+    };
+
+    const one = stage('ada');
+    expect(realizeNetworkForward(one.world, one.id, { venue: 'square', members: ['bez', 'cyn'] },
+      15, STANDARD_RULES)).toBeNull();
+    expect(one.state.nextVersion).toBe(0);
+    expect(one.state.messages[0]).toMatchObject({
+      holder: 'bez', nextHop: 1, processedRelayHops: [], deliveredAt: null,
+    });
+
+    const two = stage('cyn');
+    expect(realizeNetworkForward(two.world, two.id, { venue: 'square', members: ['bez', 'cyn'] },
+      15, STANDARD_RULES)).not.toBeNull();
+    expect(two.state.nextVersion).toBe(0);
+    expect(two.state.messages[0]).toMatchObject({
+      holder: 'cyn', nextHop: 2, processedRelayHops: [1], deliveredAt: 15,
+    });
+  });
+
   it('a one-source skeptic relay withholds without allocating or processing the hop', () => {
     const world = buildWorld(miniTown(), 'mutation-skeptic', STANDARD_RULES);
     enrollPlayer(world, { home: 'square' });
@@ -147,5 +210,67 @@ describe('projectBrief', () => {
       15, STANDARD_RULES)).toBeNull();
     expect(state.nextVersion).toBe(1);
     expect(state.messages[0]).toMatchObject({ holder: 'bez', nextHop: 1, processedRelayHops: [] });
+  });
+});
+
+describe('projectDirectiveReport', () => {
+  const report: DirectiveReportPayload = {
+    outcome: 'done', reason: 'quietly',
+    evidence: [
+      { kind: 'observation', text: 'first' },
+      { kind: 'observation', text: 'second' },
+      { kind: 'observation', text: 'third' },
+      { kind: 'observation', text: 'fourth' },
+    ],
+    source: 'issuer', uncertainty: 'medium',
+  };
+  const enemyAction: EnemyActionReport = {
+    kind: 'watch-worked', subject: 'target', about: null, district: 'd0',
+    scheduleStartDay: 1, guard: 'guard', venue: 'square', workedDay: 2, occurredAt: 30,
+  };
+  const factRefs = [{ asset: 'relay', factIndex: 1 }, { asset: 'issuer', factIndex: 2 }];
+  const project = (traits: string[], turnedAgainstAudience = false, perceivedScrutiny = 0,
+    value: DirectiveReportPayload = report) => projectDirectiveReport({
+      report: value, enemyAction, factRefs, speaker: speaker(traits),
+      turnedAgainstAudience, perceivedScrutiny,
+    }, STANDARD_RULES);
+
+  it('projects attribution and severity/count through the report claim seam without inventing evidence', () => {
+    const attributed = projectDirectiveReport({
+      report: { ...report, source: null }, enemyAction, factRefs,
+      speaker: speaker(['attributor']), turnedAgainstAudience: false, perceivedScrutiny: 0,
+    }, STANDARD_RULES);
+    expect(attributed.report.source).toBe('rival');
+    expect(attributed.factRefs).toEqual([]);
+    expect(project(['vaguener']).report.source).toBe('someone');
+
+    const smaller = project(['minimizer']);
+    expect(smaller.report.uncertainty).toBe('low');
+    expect(smaller.report.evidence).toEqual(report.evidence!.slice(0, 2));
+    expect(smaller.report).toMatchObject({ outcome: 'done', reason: 'quietly' });
+    const larger = project(['exaggerator']);
+    expect(larger.report.uncertainty).toBe('medium');
+    expect(larger.report.evidence).toEqual(report.evidence);
+    for (const uncertainty of ['low', 'medium', 'high'] as const) {
+      expect(project(['literalist'], false, 0, { ...report, uncertainty }).report.uncertainty)
+        .toBe(uncertainty);
+    }
+  });
+
+  it('keeps enemyAction byte-exact only for ordinary/guarded and strips it for omissive/doctored', () => {
+    const ordinary = project(['literalist']);
+    const guarded = project(['literalist'], false, 0.7);
+    expect(ordinary.enemyAction).toEqual(enemyAction);
+    expect(guarded.enemyAction).toEqual(enemyAction);
+    expect(project(['literalist'], true, 0.5).enemyAction).toBeNull();
+    expect(project(['literalist'], true, 0).enemyAction).toBeNull();
+  });
+
+  it('keeps factRefs only for ordinary candor with disclosed source and strips the whole list otherwise', () => {
+    expect(project(['literalist']).factRefs).toEqual(factRefs);
+    expect(project(['literalist'], false, 0.7).factRefs).toEqual([]);
+    expect(project(['literalist'], true, 0.5).factRefs).toEqual([]);
+    expect(project(['literalist'], true, 0).factRefs).toEqual([]);
+    expect(project(['literalist'], false, 0, { ...report, source: null }).factRefs).toEqual([]);
   });
 });

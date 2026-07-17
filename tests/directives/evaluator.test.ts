@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { TICKS_PER_DAY } from '../../src/core/time';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { evaluateReceivedBrief, type ReceivedBriefInput } from '../../src/sim/directives/evaluator';
 import type { BriefVersion, DirectiveBrief } from '../../src/sim/directives/types';
@@ -106,6 +107,36 @@ describe('evaluateReceivedBrief', () => {
         local, recipient }), STANDARD_RULES);
       expect(held.method).toEqual({ kind: 'hold' });
     }
+  });
+
+  it('treats execution timing as descriptive and never reschedules a due defer', () => {
+    const deferred = version({ ...brief, authority: 'request', active: { from: 0, until: 3000 },
+      report: 'none', reportBy: null });
+    const recipient = { ...input().recipient, relationshipToIssuer: 0.4 };
+    const local = { ...input().local, tick: 15 };
+    expect(evaluateReceivedBrief(input({ version: deferred, recipient, local, stage: 'receipt' }),
+      STANDARD_RULES)).toMatchObject({
+      commitment: 'defer', timing: { actAt: 15 + TICKS_PER_DAY, reportAt: null },
+    });
+    expect(evaluateReceivedBrief(input({ version: deferred, recipient, local, stage: 'execution' }),
+      STANDARD_RULES)).toMatchObject({
+      commitment: 'defer', timing: { actAt: 15, reportAt: null },
+    });
+  });
+
+  it('reads avoid-person across the current circle with observed and absent controls', () => {
+    const guidance = [{ kind: 'avoid-person' as const, person: 'bystander' }];
+    const recipient = { ...input().recipient, relationshipToIssuer: 0.5 };
+    const present = { ...input().local, circleMembers: ['recipient', 'bystander', 'alternate'] };
+    const absent = { ...input().local, circleMembers: ['recipient', 'alternate'] };
+    const measured = version({ ...brief, guidance });
+    expect(evaluateReceivedBrief(input({ version: measured, recipient, local: present }), STANDARD_RULES).method)
+      .toEqual({ kind: 'observe', target: { kind: 'person', id: 'alternate' } });
+    expect(evaluateReceivedBrief(input({ version: measured, recipient, local: absent }), STANDARD_RULES).method)
+      .toEqual({ kind: 'observe', target: { kind: 'person', id: 'target' } });
+    const avoidant = version({ ...brief, discretion: 'quiet', guidance });
+    expect(evaluateReceivedBrief(input({ version: avoidant, recipient, local: present }), STANDARD_RULES).method)
+      .toEqual({ kind: 'hold' });
   });
 
   it('player/enemy mirror inputs normalize to identical profiles', () => {

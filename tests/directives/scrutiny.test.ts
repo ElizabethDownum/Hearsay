@@ -4,7 +4,8 @@ import { STANDARD_RULES } from '../../src/content/rules';
 import { perceivedScrutiny, pruneScrutiny, recordScrutiny } from '../../src/sim/directives/scrutiny';
 import { hashWorld } from '../../src/sim/hash';
 import { buildWorld, enrollPlayer } from '../../src/sim/world';
-import { step } from '../../src/sim/step';
+import { stepTransaction } from '../../src/sim/phases';
+import { circlesAt } from '../../src/sim/agents';
 import { miniTown } from '../sim/helpers/minitown';
 import { applyAsk, applyDirective } from '../../src/sim/actions';
 import { realizeNetworkForward } from '../../src/sim/directives/transport';
@@ -60,6 +61,25 @@ describe('perceived scrutiny', () => {
     expect(perceivedScrutiny(world, 'ada', 'you', 0)).toBeCloseTo(0.40);
   });
 
+  it('binds retasking scrutiny to the message principal when the claimed issuer was mutated', () => {
+    const world = buildWorld(miniTown(), 'scrutiny-retasking-principal');
+    enrollPlayer(world, { home: 'backroom' });
+    world.npcs.ada!.schedule = [{ days: 'all', from: 0, to: 1439, venue: 'backroom' }];
+    world.network.assets.push({ id: 'ada', mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [] });
+    const circle = circlesAt(world, 0).find((candidate) => candidate.members.includes('you'));
+    expect(circle?.members).toEqual(expect.arrayContaining(['you', 'ada']));
+    if (!circle) throw new Error('expected offered player circle fixture');
+    for (let index = 0; index < 2; index += 1) {
+      applyDirective(world, 'ada', { outboundVia: [], reportVia: [] }, RECEIVED_BRIEF, 0);
+      const message = world.network.directiveState!.messages[index]!;
+      if (message.payload.kind !== 'directive') throw new Error('expected directive fixture');
+      message.payload.version.claimedIssuer = 'bez';
+      realizeNetworkForward(world, message.id, circle, 0, STANDARD_RULES);
+    }
+    expect(perceivedScrutiny(world, 'ada', 'you', 0)).toBeCloseTo(0.10);
+    expect(perceivedScrutiny(world, 'ada', 'bez', 0)).toBe(0);
+  });
+
   it('pruning first or last at a nightly zero-contribution boundary hashes identically', () => {
     const a = buildWorld(miniTown(), 'scrutiny-order');
     recordScrutiny(a, 'ada', 'bez', 'questioning', 0);
@@ -67,8 +87,17 @@ describe('perceived scrutiny', () => {
     a.tick = at(2, 23, 59);
     b.tick = at(2, 23, 59);
     pruneScrutiny(a, a.tick);
-    step(a, STANDARD_RULES);
-    step(b, STANDARD_RULES);
+    stepTransaction(a, STANDARD_RULES);
+    stepTransaction(b, STANDARD_RULES);
     expect(hashWorld(a)).toBe(hashWorld(b));
+  });
+
+  it('prunes zero-contribution traces inside the production tick transaction', () => {
+    const world = buildWorld(miniTown(), 'scrutiny-transaction-prune');
+    recordScrutiny(world, 'ada', 'bez', 'questioning', 0);
+    world.tick = at(2, 23, 59);
+    expect(world.network.directiveState!.scrutiny).toHaveLength(1);
+    stepTransaction(world, STANDARD_RULES);
+    expect(world.network.directiveState!.scrutiny).toEqual([]);
   });
 });
