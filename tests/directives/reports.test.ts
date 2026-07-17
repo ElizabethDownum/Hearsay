@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { STANDARD_RULES } from '../../src/content/rules';
+import { circlesAt } from '../../src/sim/agents';
+import { attemptDirective, markDirectiveDue } from '../../src/sim/directives/execution';
 import { buildDirectiveReport, queueDirectiveReport } from '../../src/sim/directives/reports';
-import { ensureDirectiveState } from '../../src/sim/directives/state';
-import { realizeNetworkForward } from '../../src/sim/directives/transport';
+import { ensureDirectiveState, recordScrutiny } from '../../src/sim/directives/state';
+import { queueNetworkMessage, realizeNetworkForward } from '../../src/sim/directives/transport';
 import type {
-  DirectiveDecisionProfile, DirectiveExecutionResult, DirectiveRecord,
+  BriefVersion, DirectiveBrief, DirectiveDecisionProfile, DirectiveExecutionResult, DirectiveRecord,
 } from '../../src/sim/directives/types';
+import type { Principal } from '../../src/sim/network/types';
 import { buildWorld, enrollPlayer } from '../../src/sim/world';
 import { SOMEONE } from '../../src/sim/rumors/claim';
 import { miniTown } from '../sim/helpers/minitown';
@@ -39,6 +42,79 @@ function fixture() {
     factRefs: [{ asset: 'ada', factIndex: 0 }],
   };
   return { world, record, profile, result };
+}
+
+const CALLER_BRIEF: DirectiveBrief = {
+  mission: { kind: 'learn', target: { kind: 'person', id: 'bez' } },
+  priority: 'urgent', authority: 'office', discretion: 'open', specificity: 'guided',
+  guidance: [], active: { from: 0, until: 120 }, report: 'full', reportBy: 120, purpose: null,
+};
+
+const SHARED_CLAIM_RESULT: DirectiveExecutionResult = {
+  outcome: 'story emitted', reason: 'same production result',
+  evidence: [{ kind: 'observation', text: 'presence:bez:square:15' }],
+  source: 'ada', uncertainty: 'low',
+  reportedClaim: { id: 'c-mirror', family: 'f-mirror', parent: null, subject: 'bez',
+    predicate: 'stole', object: null, count: 8, severity: 5, place: null, attribution: SOMEONE },
+  factRefs: [],
+};
+
+function callerWorld(seed: string, turnedAgainst: Principal | null) {
+  const town = miniTown();
+  const kept = new Set(['ada', 'bez', 'cyn']);
+  town.npcs = town.npcs.filter((npc) => kept.has(npc.id)).map((npc) => ({
+    ...npc,
+    schedule: [{ days: 'all' as const, from: 0, to: 1439, venue: 'square' }],
+    edges: npc.edges.filter((edge) => kept.has(edge.to)),
+  }));
+  const world = buildWorld(town, seed, STANDARD_RULES);
+  enrollPlayer(world, { home: 'square' });
+  world.network.spymaster = 'cyn';
+  world.npcs.ada!.traits = ['literalist'];
+  world.network.assets.push({ id: 'ada', mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [],
+    ...(turnedAgainst === 'player' ? { turned: true } : {}) });
+  world.network.enemyAssets.push({ id: 'ada', mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [],
+    ...(turnedAgainst === 'enemy' ? { turned: true } : {}) });
+  return world;
+}
+
+function receiveThroughProduction(world: ReturnType<typeof callerWorld>, principal: Principal,
+  directiveId: string): DirectiveRecord {
+  const principalId = principal === 'player' ? 'you' : 'cyn';
+  const version: BriefVersion = {
+    id: `v-${directiveId}`, parent: null, directiveId, brief: structuredClone(CALLER_BRIEF),
+    claimedIssuer: principalId, replyRoute: [principalId], changedBy: null, changes: [],
+  };
+  const record: DirectiveRecord = {
+    id: directiveId, principal, principalId, recipient: 'ada', issuedAt: 0,
+    handoff: { outboundVia: [], reportVia: [] }, authored: structuredClone(version),
+    received: null, decision: null, execution: null, receivedReports: [],
+  };
+  ensureDirectiveState(world).records.push(record);
+  const messageId = queueNetworkMessage(world, principal, principalId, ['ada'],
+    { kind: 'directive', version }, 0, CALLER_BRIEF.active.until, null);
+  const circle = circlesAt(world, 0).find((candidate) =>
+    candidate.members.includes(principalId) && candidate.members.includes('ada'));
+  expect(circle, `${principal} receipt fixture must be physically co-located`).toBeDefined();
+  expect(realizeNetworkForward(world, messageId, circle!, 0, STANDARD_RULES)).not.toBeNull();
+  return record;
+}
+
+function executeThroughProduction(world: ReturnType<typeof callerWorld>, records: DirectiveRecord[]): void {
+  for (const record of [...records].sort((a, b) =>
+    a.decision!.timing.actAt! - b.decision!.timing.actAt!)) {
+    const due = record.decision!.timing.actAt!;
+    world.tick = due;
+    markDirectiveDue(world, record.id, due);
+    const circle = circlesAt(world, due).find((candidate) => candidate.members.includes('ada'));
+    expect(circle, `${record.principal} execution fixture must contain ada`).toBeDefined();
+    attemptDirective(world, record.id, circle!, due, STANDARD_RULES);
+    expect(record.execution?.state).toBe('completed');
+  }
+}
+
+function claimEvidence(built: ReturnType<typeof buildDirectiveReport>) {
+  return built.report.evidence?.find((row) => row.kind === 'claim');
 }
 
 describe('directive reports', () => {
@@ -106,30 +182,45 @@ describe('directive reports', () => {
     ]);
   });
 
-  it('mirrors audience-specific turncoat doctoring and keeps loyal guarded claim evidence resolvable', () => {
-    const player = fixture();
-    player.world.network.assets[0]!.turned = true;
-    player.result.reportedClaim = { id: 'c0', family: 'f0', parent: null, subject: 'bez',
-      predicate: 'stole', object: null, count: 4, severity: 4, place: null, attribution: SOMEONE };
-    const playerCopy = buildDirectiveReport(player.world, player.record,
-      { ...player.profile, candor: 'doctored' }, player.result, STANDARD_RULES);
+  it.each([
+    ['player', 'doctored', 'ordinary'],
+    ['enemy', 'ordinary', 'doctored'],
+  ] as const)('derives the inverse dual-roster report channels when turned against %s',
+    (turnedAgainst, playerCandor, enemyCandor) => {
+      const world = callerWorld(`directive-report-${turnedAgainst}`, turnedAgainst);
+      const playerRecord = receiveThroughProduction(world, 'player', 'd-player');
+      const enemyRecord = receiveThroughProduction(world, 'enemy', 'd-enemy');
+      executeThroughProduction(world, [playerRecord, enemyRecord]);
 
-    const enemy = fixture();
-    enemy.record.principal = 'enemy';
-    enemy.world.network.enemyAssets.push({ id: 'ada', mice: null, wagePaidThroughDay: 0,
-      strikes: 0, facts: [], turned: true });
-    enemy.result.reportedClaim = structuredClone(player.result.reportedClaim);
-    const enemyCopy = buildDirectiveReport(enemy.world, enemy.record,
-      { ...enemy.profile, candor: 'doctored' }, enemy.result, STANDARD_RULES);
-    expect(enemyCopy.report.evidence).toEqual(playerCopy.report.evidence);
+      expect(playerRecord.decision?.candor).toBe(playerCandor);
+      expect(enemyRecord.decision?.candor).toBe(enemyCandor);
+      const playerCopy = buildDirectiveReport(world, playerRecord, playerRecord.decision!,
+        SHARED_CLAIM_RESULT, STANDARD_RULES);
+      const enemyCopy = buildDirectiveReport(world, enemyRecord, enemyRecord.decision!,
+        SHARED_CLAIM_RESULT, STANDARD_RULES);
+      const playerClaim = claimEvidence(playerCopy);
+      const enemyClaim = claimEvidence(enemyCopy);
+      const doctored = turnedAgainst === 'player' ? playerClaim : enemyClaim;
+      const ordinary = turnedAgainst === 'player' ? enemyClaim : playerClaim;
+      expect(ordinary).toMatchObject({ reported: { count: 8, severity: 5 } });
+      expect(doctored).toMatchObject({ reported: { count: 4, severity: 4 } });
+    });
 
-    const guarded = buildDirectiveReport(enemy.world, enemy.record,
-      { ...enemy.profile, candor: 'guarded' }, enemy.result, STANDARD_RULES);
+  it('derives guarded candor for a genuinely loyal high-scrutiny reporter with resolvable claim evidence', () => {
+    const world = callerWorld('directive-report-loyal-guarded', null);
+    recordScrutiny(world, 'ada', 'you', 'confrontation', 0);
+    recordScrutiny(world, 'ada', 'you', 'questioning', 0);
+    const record = receiveThroughProduction(world, 'player', 'd-loyal');
+    executeThroughProduction(world, [record]);
+
+    expect(world.network.assets[0]!.turned).not.toBe(true);
+    expect(world.network.enemyAssets[0]!.turned).not.toBe(true);
+    expect(record.decision?.candor).toBe('guarded');
+    const guarded = buildDirectiveReport(world, record, record.decision!, SHARED_CLAIM_RESULT,
+      STANDARD_RULES);
     expect(guarded.report.source).toBeNull();
-    expect(guarded.report.evidence).toEqual([
-      expect.objectContaining({ kind: 'observation' }),
-      expect.objectContaining({ kind: 'claim', claimId: 'c0' }),
-    ]);
+    expect(claimEvidence(guarded)).toMatchObject({ kind: 'claim', claimId: 'c-mirror',
+      reported: { count: 8, severity: 5 } });
   });
 
   it('direct and relayed twins apply the reporter transform exactly once before relay candor', () => {

@@ -7,6 +7,56 @@ import { buildWorld, enrollPlayer } from '../../src/sim/world';
 import { circlesAt } from '../../src/sim/agents';
 import { miniTown } from '../sim/helpers/minitown';
 
+const STORY_CLAIM = {
+  id: 'c-story-source', family: 'f-story', parent: null, subject: 'cyn', predicate: 'stole',
+  object: null, count: 1, severity: 3, place: null, attribution: 'cyn',
+} as const;
+
+function storyDeadlineFixture(seed: string, answered: boolean) {
+  const fixture = miniTown();
+  const kept = new Set(['ada', 'bez', 'cyn']);
+  fixture.npcs = fixture.npcs.filter((npc) => kept.has(npc.id)).map((npc) => ({
+    ...npc,
+    schedule: [{ days: 'all' as const, from: 0, to: 1439, venue: 'square' }],
+    edges: npc.edges.filter((edge) => kept.has(edge.to)),
+  }));
+  const world = buildWorld(fixture, seed, STANDARD_RULES);
+  enrollPlayer(world, { home: 'square' });
+  world.network.assets.push({ id: 'ada', mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [] });
+  if (answered) {
+    world.beliefs.bez!['f-story'] = {
+      claim: { ...STORY_CLAIM }, credence: 0.8, heardFrom: 'cyn', heardAt: 0,
+      firstHeardAt: 0, timesHeard: 1, apparentSources: ['cyn'], discretion: false,
+      counterSpun: false,
+    };
+  }
+  return world;
+}
+
+const STORY_DEADLINE_ACTION: Action = {
+  tick: 0, kind: 'directive', recipient: 'ada', handoff: { outboundVia: [], reportVia: [] },
+  brief: {
+    mission: { kind: 'learn', target: { kind: 'story', family: 'f-story' } },
+    priority: 'urgent', authority: 'office', discretion: 'open', specificity: 'guided',
+    guidance: [], active: { from: 0, until: 30 }, report: 'full', reportBy: 30,
+    purpose: 'learn the story before the deadline',
+  },
+};
+
+function driveStoryDeadlineLive(seed: string, answered: boolean) {
+  const world = storyDeadlineFixture(seed, answered);
+  while (world.tick < 46) {
+    const frame = prepareTick(world, STANDARD_RULES);
+    finishTick(world, STANDARD_RULES, frame, world.tick === 0 ? () => {
+      const offered = circlesAt(world, world.tick)
+        .find((circle) => circle.members.includes(world.playerId!));
+      expect(offered?.members).toContain('ada');
+      applyAction(world, STORY_DEADLINE_ACTION, STANDARD_RULES);
+    } : undefined);
+  }
+  return world;
+}
+
 describe('learn/shape directive integration', () => {
   it('direct refusal emits one phase-3 response and never queues a second refusal report', () => {
     const world = buildWorld(miniTown(), 'directive-direct-refusal', STANDARD_RULES);
@@ -55,6 +105,48 @@ describe('learn/shape directive integration', () => {
       kind: 'directive-response', report: null,
     });
   });
+
+  it.each([
+    ['the exact-deadline answer', true, 'completed'],
+    ['exact non-day-aligned silence', false, 'aborted'],
+  ] as const)('runs story learn through the tick transaction for %s once in live and replay',
+    (_label, answered, expectedState) => {
+      const seed = answered ? 'story-deadline-answered' : 'story-deadline-silent';
+      const live = driveStoryDeadlineLive(seed, answered);
+      const record = live.network.directiveState!.records[0]!;
+      const askings = live.chronicle.filter((entry) => entry.kind === 'asking'
+        && entry.speaker === 'ada' && 'family' in entry.about && entry.about.family === 'f-story');
+      const answers = live.chronicle.filter((entry): entry is Extract<
+        (typeof live.chronicle)[number], { kind: 'telling' }
+      > => entry.kind === 'telling' && entry.mode === 'answer' && entry.addressedTo === 'ada');
+      const reports = live.network.directiveState!.messages.filter((message) =>
+        message.payload.kind === 'directive-report');
+
+      expect(askings).toHaveLength(1);
+      expect(askings[0]!.tick).toBe(30);
+      expect(record.execution).toMatchObject({ state: expectedState, changedAt: 30, waiting: null });
+      expect(live.inquiries.ada).toBeUndefined();
+      expect(reports).toHaveLength(1);
+      expect(record.receivedReports).toHaveLength(1);
+      if (answered) {
+        expect(answers).toHaveLength(1);
+        expect(answers[0]!.tick).toBe(30);
+        const claimId = answers[0]!.claimId;
+        expect(reports[0]!.payload).toMatchObject({ kind: 'directive-report', report: {
+          outcome: 'answer heard', evidence: [expect.objectContaining({ kind: 'claim', claimId })],
+        } });
+      } else {
+        expect(answers).toHaveLength(0);
+        expect(reports[0]!.payload).toMatchObject({ kind: 'directive-report', report: {
+          outcome: 'refused',
+        } });
+      }
+
+      const replay = runLogOn(storyDeadlineFixture(seed, answered), STANDARD_RULES,
+        [STORY_DEADLINE_ACTION], 46);
+      expect(hashWorld(replay)).toBe(hashWorld(live));
+      expect(replay.network.directiveState!.records[0]!.receivedReports).toHaveLength(1);
+    });
 
   it('direct, relayed, deferred, completed, and missed-deadline records replay exactly', () => {
     const fixture = miniTown();

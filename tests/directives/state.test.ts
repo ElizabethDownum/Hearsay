@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { miniTown } from '../sim/helpers/minitown';
@@ -34,6 +36,23 @@ function world() {
   });
   value.intel.informants.push({ id: 'bez', assignedVenue: null });
   return value;
+}
+
+const stripComments = (source: string): string => source
+  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+function allocationImporters(overrides: Readonly<Record<string, string>> = {}): string[] {
+  const simRoot = join(process.cwd(), 'src/sim');
+  const walk = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
+    const path = join(dir, name);
+    return statSync(path).isDirectory() ? walk(path) : [path];
+  });
+  return walk(simRoot).filter((path) => path.endsWith('.ts'))
+    .filter((path) => relative(simRoot, path).replace(/\\/g, '/') !== 'directives/state.ts')
+    .filter((path) => stripComments(overrides[path] ?? readFileSync(path, 'utf8'))
+      .includes('allocateNetworkMessage'))
+    .map((path) => relative(simRoot, path).replace(/\\/g, '/'))
+    .sort();
 }
 
 describe('lazy directive state', () => {
@@ -118,5 +137,24 @@ describe('lazy directive state', () => {
         .toThrow(error);
       expect(value.network.directiveState).toBeUndefined();
     }
+  });
+});
+
+describe('raw network allocation hatch importer fence', () => {
+  const allowed = ['directives/execution.ts', 'directives/reports.ts', 'directives/transport.ts'];
+
+  it('pins the exact reviewed importer set', () => {
+    expect(allocationImporters()).toEqual(allowed);
+  });
+
+  it('FIRES when a new importer is injected while ignoring comment-only mentions', () => {
+    const actionsPath = join(process.cwd(), 'src/sim/actions.ts');
+    const source = readFileSync(actionsPath, 'utf8');
+    const commentOnly = { [actionsPath]: `${source}\n// allocateNetworkMessage is not an import` };
+    expect(allocationImporters(commentOnly)).toEqual(allowed);
+
+    const injected = { [actionsPath]: `${source}\nimport { allocateNetworkMessage } from './directives/state';` };
+    expect(allocationImporters(injected)).toEqual([...allowed, 'actions.ts'].sort());
+    expect(allocationImporters(injected)).not.toEqual(allowed);
   });
 });
