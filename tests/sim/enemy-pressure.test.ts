@@ -9,6 +9,7 @@ import { SOMEONE } from '../../src/sim/rumors/claim';
 import { at } from '../../src/core/time';
 import { emptyEnemyState, type EnemyState, type EvidenceEntry, type SketchFeature, type TownMap } from '../../src/sim/enemy/state';
 import type { WorldState } from '../../src/sim/types';
+import { stableStringify } from '../../src/sim/hash';
 
 /**
  * Task 10 — exposure escalation tiers (P6 deferral #2). `runEnemyDay` (world-side; reading
@@ -222,8 +223,9 @@ describe('runEnemyDay — twin-world at staged scores (the retune baseline)', ()
     world.tick = at(1, 23, 59);
     for (let i = 0; i < 6; i++) world.intel.informants.push({ id: `ghost${i}`, assignedVenue: null });
     expect(world.enemy.observers).toHaveLength(0);
+    const before = stableStringify(world);
     runEnemyDay(world, RULES);
-    expect(world.enemy.decisions).toHaveLength(0);
+    expect(stableStringify(world)).toBe(before);
   });
 });
 

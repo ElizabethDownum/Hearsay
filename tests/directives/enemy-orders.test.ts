@@ -18,7 +18,7 @@ import type {
 import { emptyEnemyState, type EnemyDecision } from '../../src/sim/enemy/state';
 import { enemyDigest } from '../../src/sim/enemy/digest';
 import { stableStringify } from '../../src/sim/hash';
-import { collectCircleIntents, realizeCircleIntents } from '../../src/sim/phases';
+import { collectCircleIntents, realizeCircleIntents, stepTransaction } from '../../src/sim/phases';
 import type { WorldState } from '../../src/sim/types';
 import { buildWorld, enrollPlayer, trustBetween } from '../../src/sim/world';
 import { CONVERSATION_BEAT } from '../../src/sim/rumors/propagation';
@@ -188,6 +188,84 @@ describe('enemy orders use physical directives', () => {
     const before = stableStringify(state);
     expect(enemyDigest(state, 0, STANDARD_RULES)).toEqual(enemyDigest(state, 0, STANDARD_RULES));
     expect(stableStringify(state)).toBe(before);
+  });
+
+  it('keeps each order group singly reserved across two production digest nights while in transit', () => {
+    const world = enemyWorld(true);
+    world.enemy.observers.push({ id: 'cyn', vigilance: 1 });
+    world.enemy.evidence.push({
+      tick: 0, venue: 'square', observer: 'bez', overheard: false,
+      speaker: 'cyn', addressedTo: 'bez', kind: 'utterance', mode: 'telling',
+      claimId: 'c0', family: 'f1',
+      reported: { subject: 'cyn', predicate: 'stole', object: null, count: 2, severity: 4,
+        place: null, attribution: 'dov' },
+      about: null,
+    });
+    world.enemy.sketch.push(
+      { id: 'sf0', kind: 'origin-vague', day: 0, family: 'f0', subject: 'dov', district: 'd0',
+        detail: 'staged in-transit reservation pin', evidence: [] },
+      { id: 'sf1', kind: 'district-activity', day: 0, family: 'f0', subject: null, district: 'd0',
+        detail: 'staged in-transit reservation pin', evidence: [] },
+    );
+    world.enemy.featureCounter = 2;
+
+    const assertSinglyReserved = (day: number): string[] => {
+      const pending = world.enemy.pendingOrders ?? [];
+      expect(pending.map((row) => row.key).sort()).toEqual([
+        'inquiry:s:dov', 'watch:d0',
+      ]);
+      expect(pending.every((row) => day <= row.reconsiderAfterDay)).toBe(true);
+
+      const directiveIds = pending.flatMap((row) => row.directiveIds).sort();
+      expect(new Set(directiveIds).size).toBe(directiveIds.length);
+      const records = world.network.directiveState!.records;
+      const messages = world.network.directiveState!.messages.filter((message) =>
+        message.payload.kind === 'directive');
+      expect(new Set(records.map((record) => record.id)).size).toBe(records.length);
+      expect(new Set(messages.map((message) => message.id)).size).toBe(messages.length);
+      expect(records.map((record) => record.id).sort()).toEqual(directiveIds);
+      expect(messages.map((message) => message.payload.kind === 'directive'
+        ? message.payload.version.directiveId : '').sort()).toEqual(directiveIds);
+      expect(world.enemy.issuedDirectiveIds?.slice().sort()).toEqual(directiveIds);
+      return directiveIds;
+    };
+
+    const assertSinglyReservedInTransit = (day: number): string[] => {
+      const directiveIds = assertSinglyReserved(day);
+      const state = world.network.directiveState!;
+      expect(state.records.every((record) => record.received === null)).toBe(true);
+      expect(state.messages.every((message) => message.deliveredAt === null
+        && message.failedAt === null && message.nextHop === 0)).toBe(true);
+      return directiveIds;
+    };
+
+    world.tick = TICKS_PER_DAY - 1;
+    stepTransaction(world, STANDARD_RULES);
+    const firstNightDirectiveIds = assertSinglyReservedInTransit(0);
+    const firstTransportExpiry = Math.min(...world.network.directiveState!.messages
+      .map((message) => message.expiresAt ?? Number.POSITIVE_INFINITY));
+    expect(Number.isFinite(firstTransportExpiry)).toBe(true);
+    const firstTransportExpiryDay = Math.floor(firstTransportExpiry / TICKS_PER_DAY);
+
+    for (const day of [firstTransportExpiryDay - 1, firstTransportExpiryDay]) {
+      world.tick = day * TICKS_PER_DAY + TICKS_PER_DAY - 1;
+      stepTransaction(world, STANDARD_RULES);
+      expect(assertSinglyReservedInTransit(day)).toEqual(firstNightDirectiveIds);
+    }
+
+    const failureDay = firstTransportExpiryDay + 1;
+    world.tick = failureDay * TICKS_PER_DAY + TICKS_PER_DAY - 1;
+    stepTransaction(world, STANDARD_RULES);
+    expect(assertSinglyReserved(failureDay)).toEqual(firstNightDirectiveIds);
+    expect(world.network.directiveState!.messages.some((message) =>
+      message.failedAt === failureDay * TICKS_PER_DAY + TICKS_PER_DAY - 1)).toBe(true);
+
+    const firstReconsiderAfterDay = Math.min(...world.enemy.pendingOrders!
+      .map((row) => row.reconsiderAfterDay));
+    expect(firstReconsiderAfterDay).toBeGreaterThan(failureDay);
+    world.tick = firstReconsiderAfterDay * TICKS_PER_DAY + TICKS_PER_DAY - 1;
+    stepTransaction(world, STANDARD_RULES);
+    expect(assertSinglyReserved(firstReconsiderAfterDay)).toEqual(firstNightDirectiveIds);
   });
 
   it('keeps a failed in-transit group reserved, then permits reissue only after reconsiderAfterDay', () => {
