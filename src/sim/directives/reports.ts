@@ -107,13 +107,6 @@ export function settleEnemyOrderReport(
   if (record.principal !== 'enemy' || correlation.kind !== 'enemy-order') return;
   const pending = world.enemy.pendingOrders ?? [];
   const reservation = pending.find((row) => row.directiveIds.includes(record.id));
-  const directiveIds = reservation?.directiveIds ?? (world.network.directiveState?.records ?? [])
-    .filter((candidate) => {
-      const candidateCorrelation = correlationOf(candidate);
-      return candidate.principal === 'enemy' && candidateCorrelation.kind === 'enemy-order'
-        && candidateCorrelation.orderKey === correlation.orderKey;
-    })
-    .map((candidate) => candidate.id);
   const remaining = pending.filter((row) => row !== reservation);
   if (remaining.length > 0) world.enemy.pendingOrders = remaining;
   else delete world.enemy.pendingOrders;
@@ -132,7 +125,7 @@ export function settleEnemyOrderReport(
     if (!row) {
       const rows = world.enemy.actionLedger ?? (world.enemy.actionLedger = []);
       row = {
-        orderKey: correlation.orderKey, kind: 'interrogation', directiveIds: [...directiveIds],
+        orderKey: correlation.orderKey, kind: 'interrogation', directiveIds: [record.id],
         leadFeatureId: correlation.leadFeatureId, subject: action.subject,
         about: action.about, district: action.district,
         scheduleStartDay: action.scheduleStartDay,
@@ -140,6 +133,9 @@ export function settleEnemyOrderReport(
         workedDays: action.workedDay === null ? [] : [action.workedDay], askedAt: action.occurredAt,
       };
       rows.push(row);
+    } else if (!row.directiveIds.includes(record.id)) {
+      row.directiveIds.push(record.id);
+      row.directiveIds.sort();
     }
     return;
   }
@@ -148,12 +144,15 @@ export function settleEnemyOrderReport(
     if (!row) {
       const rows = world.enemy.actionLedger ?? (world.enemy.actionLedger = []);
       row = {
-        orderKey: correlation.orderKey, kind: 'watch', directiveIds: [...directiveIds],
+        orderKey: correlation.orderKey, kind: 'watch', directiveIds: [record.id],
         leadFeatureId: correlation.leadFeatureId, subject: action.subject,
         about: action.about, district: action.district,
         scheduleStartDay: action.scheduleStartDay, posts: [], workedDays: [], askedAt: null,
       };
       rows.push(row);
+    } else if (!row.directiveIds.includes(record.id)) {
+      row.directiveIds.push(record.id);
+      row.directiveIds.sort();
     }
     if (!row.posts.some((post) => post.guard === action.guard && post.venue === action.venue)) {
       row.posts.push({ guard: action.guard, venue: action.venue });

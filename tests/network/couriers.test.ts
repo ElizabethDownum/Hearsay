@@ -12,6 +12,10 @@ import { compartmentOf } from '../../src/sim/network/compartment';
 import { assetFor } from '../../src/sim/network/roster';
 import { hashWorld } from '../../src/sim/hash';
 import { appendCourierPlan } from '../../src/sim/fieldwork';
+import { collectDirectiveActIntents, attemptDirective } from '../../src/sim/directives/execution';
+import { issueDirectiveRecord } from '../../src/sim/directives/state';
+import type { DirectiveBrief, DirectiveDecisionProfile } from '../../src/sim/directives/types';
+import { collectCircleIntents, realizeCircleIntents } from '../../src/sim/phases';
 import { at, dayOf, minuteOfDay } from '../../src/core/time';
 import { CONVERSATION_BEAT } from '../../src/sim/rumors/propagation';
 import { SOMEONE, type Claim, type EntityId } from '../../src/sim/rumors/claim';
@@ -334,7 +338,7 @@ describe('courier preconditions — validate-before-mutate refusals', () => {
 
 // ── O5b: same-beat distinct-family minting (guards the P6-T7 keyed-collision class) ───────────────
 describe('courier delivery — same-beat distinct-family minting (O5b)', () => {
-  it('two physically picked-up runs retain distinct planning identities and exact pickup clocks', () => {
+  it('selects and REALIZES two runs in one beat with distinct emitted families', () => {
     // A single public venue with exactly 4 residents → circlesAt forms ONE circle of all four, so both
     // (asset → target) pairs co-locate the SAME beat: the two-delivery-in-one-call condition, by construction.
     const fixture: TownFixture = {
@@ -353,18 +357,69 @@ describe('courier delivery — same-beat distinct-family minting (O5b)', () => {
     const t = at(0, 8);       // a conversation beat
     const queued = at(0, 7);
 
-    world.network.pendingCouriers.push({ planId: 'plan-0', asset: 'a1', spec: mk('t2'), target: 't1',
-      viaDrop: null, pickedUpAt: queued, expiresAt: queued + 3 * 1440 });
-    world.network.pendingCouriers.push({ planId: 'plan-1', asset: 'a2', spec: mk('t1'), target: 't2',
-      viaDrop: null, pickedUpAt: queued, expiresAt: queued + 3 * 1440 });
+    const runs = [
+      { planId: 'plan-0', asset: 'a1', spec: mk('t2'), target: 't1' },
+      { planId: 'plan-1', asset: 'a2', spec: mk('t1'), target: 't2' },
+    ] as const;
+    for (const run of runs) {
+      world.network.pendingCouriers.push({ ...run, viaDrop: null, pickedUpAt: queued,
+        expiresAt: queued + 3 * 1440 });
+      const brief: DirectiveBrief = {
+        mission: { kind: 'shape', operation: 'spread', payload: {
+          family: null, parent: null, claim: run.spec,
+        }, audience: { kind: 'person', id: run.target }, redirectTo: null },
+        priority: 'routine', authority: 'relationship', discretion: 'quiet',
+        specificity: 'detailed', guidance: [], active: { from: queued, until: queued + 3 * 1440 },
+        report: 'none', reportBy: null, purpose: null,
+        application: { kind: 'courier', target: run.target },
+      };
+      const record = issueDirectiveRecord(world, {
+        principal: 'player', principalId: run.target, recipient: run.asset,
+        handoff: { outboundVia: [], reportVia: [] }, brief,
+        correlation: { kind: 'courier', planId: run.planId, dropPayloadId: null },
+        tick: queued, cause: null, queue: false,
+      });
+      const profile: DirectiveDecisionProfile = {
+        interpretation: brief.mission, commitment: 'attempt', initiative: 'literal', risk: 'measured',
+        method: { kind: 'tell', audience: brief.mission.kind === 'shape'
+          ? brief.mission.audience : { kind: 'person', id: run.target },
+        payload: brief.mission.kind === 'shape' ? brief.mission.payload : neverPayload() },
+        timing: { actAt: t, reportAt: null },
+        disclosure: { outcome: true, reason: true, evidence: true, source: true, uncertainty: true },
+        candor: 'ordinary',
+      };
+      record.received = { tick: queued, version: structuredClone(record.authored),
+        handoffFrom: run.target, messageId: `fixture-${run.planId}` };
+      record.decision = profile;
+      record.execution = { state: 'attempted', changedAt: queued, dueAt: null, waiting: null };
+    }
 
-    expect(world.network.pendingCouriers).toHaveLength(2);
-    expect(new Set(world.network.pendingCouriers.map((run) => run.planId)).size).toBe(2);
-    expect(world.network.pendingCouriers.every((run) => run.pickedUpAt === queued)).toBe(true);
-    expect(world.network.pendingCouriers.every((run) => run.expiresAt === queued + 3 * 1440)).toBe(true);
-    expect(t).toBeGreaterThan(queued);
+    const circle = { venue: 'sq', members: ['a1', 'a2', 't1', 't2'] };
+    const offered = collectDirectiveActIntents(world, t, [circle]);
+    expect(offered).toHaveLength(2);
+    const frame = collectCircleIntents(world, circle, t, RULES, offered, new Set());
+    expect(frame.selected.filter((intent) => intent.kind === 'directive-act')).toHaveLength(2);
+    const before = world.claimCounter;
+    const realized = realizeCircleIntents(world, frame, t, RULES,
+      (w, intent, c, tick, rules) => intent.kind === 'directive-act'
+        ? attemptDirective(w, intent.ref, c, tick, rules)
+        : { askings: [], answers: [], tellings: [], extras: [] });
+
+    expect(realized.tellings).toHaveLength(2);
+    const families = realized.tellings.map((utterance) => utterance.claim.family).sort();
+    expect(families).toEqual([`f${before}`, `f${before + 1}`]);
+    expect(new Set(families).size).toBe(2);
+    expect(world.claimCounter).toBe(before + 2);
+    expect(compartmentOf(world, 'player', 'a1').find((fact) => fact.kind === 'carried-story')?.ref)
+      .not.toBe(compartmentOf(world, 'player', 'a2')
+        .find((fact) => fact.kind === 'carried-story')?.ref);
+    expect(world.network.pendingCouriers).toEqual([]);
   });
 });
+
+function neverPayload(): never {
+  throw new Error('expected shape courier brief');
+}
 
 describe('courier planning ids', () => {
   const mark = {
