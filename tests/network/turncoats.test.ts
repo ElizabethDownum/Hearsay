@@ -22,6 +22,7 @@ import { TRAITS } from '../../src/content/traits';
 import { at } from '../../src/core/time';
 import { SOMEONE, type Claim, type EntityId } from '../../src/sim/rumors/claim';
 import { hashWorld, stableStringify } from '../../src/sim/hash';
+import { enemyDigest } from '../../src/sim/enemy/digest';
 import type { TraitContext } from '../../src/sim/rumors/traits';
 import type { ReportedClaim, SketchFeature } from '../../src/sim/enemy/state';
 import type { Belief, WorldState } from '../../src/sim/types';
@@ -247,8 +248,10 @@ describe('the weekly leak — a compartment fact travels by physical speech (res
     expect(world.enemy.evidence).toHaveLength(evBefore);
     const message1 = world.network.directiveState!.messages.at(-1)!;
     expect(message1.payload).toMatchObject({ kind: 'compartment-fact', fact: facts[0] });
+    const enemyBefore = structuredClone(world.enemy);
+    const meetingVenue = Object.keys(world.venues)[0]!;
     const speech1 = realizeNetworkForward(world, message1.id, {
-      venue: Object.keys(world.venues)[0]!, members: [asset.id, spymaster],
+      venue: meetingVenue, members: [asset.id, spymaster],
     }, message1.availableAfter, RULES)!;
     captureEvidence(world, {
       tick: speech1.tick, positions: {}, utterances: [], askings: [], networkSpeeches: [speech1],
@@ -257,9 +260,19 @@ describe('the weekly leak — a compartment fact travels by physical speech (res
     expect(leak1.leaked).toBeTruthy();
     expect(leak1.leaked!.from).toBe(asset.id);
     expect(leak1.leaked!.fact).toEqual(facts[0]); // oldest = recruited-by@0
-    expect(leak1.observer).toBe(spymaster);       // principal actor learned it through their own feed
+    expect(leak1.observer).toBe(asset.id);        // existing leak evidence attributes the walk-in source
     expect(leak1.speaker).toBe(asset.id);         // the turncoat is the physical source
     expect(leak1.addressedTo).toBe(spymaster);
+    expect(leak1).toMatchObject({
+      tick: speech1.tick, venue: meetingVenue, observer: asset.id, overheard: false,
+      speaker: asset.id, addressedTo: spymaster,
+      kind: 'network', mode: null, claimId: null, family: null,
+      reported: null, about: null,
+      leaked: { from: asset.id, fact: facts[0] },
+      network: { messageId: message1.id, sourceDirectiveId: null, spoken: speech1.spoken },
+    });
+    expect(stableStringify(enemyDigest(world.enemy, 7, RULES)))
+      .toBe(stableStringify(enemyDigest(enemyBefore, 7, RULES)));
     expect(asset.leakedThrough).toBe(1);
 
     // A NON-rest-day nightly leaks nothing (weekly cadence).

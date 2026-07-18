@@ -2,7 +2,7 @@ import { dayOf, TICKS_PER_DAY, type Tick } from '../../core/time';
 import { positionOf, type Circle } from '../agents';
 import { cloneSerializable } from '../hash';
 import { recordFact } from '../network/compartment';
-import { assetFor, isTurnedAgainst } from '../network/roster';
+import { assetFor, isTurnedAgainst, principalActor } from '../network/roster';
 import type { NpcAutonomousIntent, NpcIntentRealization } from '../phases';
 import type { ObservationFeed, Utterance } from '../perception';
 import { mintClaim, SOMEONE, type EntityId, type VenueId } from '../rumors/claim';
@@ -119,6 +119,41 @@ function scheduleDirectiveDue(world: WorldState, record: DirectiveRecord, due: T
   else world.scheduledSetup = [cloneSerializable(setup)];
 }
 
+/**
+ * A final recipient who secretly serves the other principal may report only the copy that actually
+ * arrived. This allocates an independent evidence message; no later handler path consults the source
+ * record again.
+ */
+function queueTurncoatHandlerCopy(
+  world: WorldState,
+  record: DirectiveRecord,
+  profile: DirectiveDecisionProfile,
+  tick: Tick,
+): void {
+  if (record.received === null
+    || !isTurnedAgainst(world, record.principal, record.recipient)) return;
+  const secretPrincipal = record.principal === 'player' ? 'enemy' : 'player';
+  const handler = principalActor(world, secretPrincipal);
+  if (handler === null || handler === record.recipient) return;
+
+  let availableAfter = tick;
+  const version = cloneSerializable(record.received.version);
+  if (profile.candor === 'omissive') {
+    version.brief.purpose = null;
+    version.brief.guidance = version.brief.guidance.filter((row) => row.kind !== 'note');
+  } else if (profile.candor === 'guarded') {
+    if (profile.risk === 'avoidant') return;
+    availableAfter = tick + TICKS_PER_DAY;
+  } else if (profile.candor !== 'doctored') {
+    return;
+  }
+
+  validateNetworkRoute(world, record.recipient, [handler]);
+  allocateNetworkMessage(world, secretPrincipal, record.recipient, [handler], {
+    kind: 'handler-brief', sourceDirectiveId: record.id, version,
+  }, availableAfter, null, null);
+}
+
 /** Install the receipt decision and its one direct response/general refusal path. */
 export function initializeDirectiveReceipt(
   world: WorldState,
@@ -147,6 +182,8 @@ export function initializeDirectiveReceipt(
     };
     scheduleDirectiveDue(world, record, due);
   }
+
+  queueTurncoatHandlerCopy(world, record, profile, tick);
 
   if (directPlayerReceipt) {
     let report = null;

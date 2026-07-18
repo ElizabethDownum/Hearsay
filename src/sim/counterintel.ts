@@ -52,16 +52,17 @@ function ingestEnemyObservation(
       reported: null, about: observation.about,
     });
   } else if (observation.kind === 'network-speech') {
-    const duplicate = world.enemy.evidence.some((entry) => entry.kind === 'network'
-      && entry.tick === observation.tick && entry.observer === observer
-      && entry.speaker === observation.speaker
-      && entry.network.messageId === observation.messageId);
-    if (duplicate) return;
     const leaked = observation.spoken.kind === 'compartment-fact'
       ? { from: observation.spoken.asset, fact: { ...observation.spoken.fact } }
       : undefined;
+    const evidenceObserver = leaked?.from ?? observer;
+    const duplicate = world.enemy.evidence.some((entry) => entry.kind === 'network'
+      && entry.tick === observation.tick && entry.observer === evidenceObserver
+      && entry.speaker === observation.speaker
+      && entry.network.messageId === observation.messageId);
+    if (duplicate) return;
     world.enemy.evidence.push({
-      tick: observation.tick, venue: observation.venue, observer,
+      tick: observation.tick, venue: observation.venue, observer: evidenceObserver,
       overheard: observation.overheard, speaker: observation.speaker,
       addressedTo: observation.addressedTo, kind: 'network', mode: null,
       claimId: null, family: null, reported: null, about: null,
