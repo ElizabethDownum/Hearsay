@@ -161,8 +161,16 @@ describe('PILLAR: live ≡ replay with the player speech verbs (goTo/tell/ask) +
     world.npcs['you']!.edges = [{ to: 'ada', kind: 'friend', trust: 0.8 }];
     world.npcs['ada']!.edges.push({ to: 'you', kind: 'friend', trust: 0.8 });
     world.intel.informants = [{ id: 'bez', assignedVenue: null }];
+    world.network.assets.push({
+      id: 'bez', mice: null, wagePaidThroughDay: 0, strikes: 0,
+      facts: [{ tick: 0, kind: 'recruited-by', ref: 'player' }],
+    });
+    world.npcs['bez']!.edges.push({ to: 'you', kind: 'friend', trust: 0.75 });
     world.scheduleOverrides['ada'] = [
       { fromDay: 0, toDay: null, from: 0, to: 1440, venue: 'backroom', source: 'enemy' },
+    ];
+    world.scheduleOverrides['bez'] = [
+      { fromDay: 0, toDay: null, from: 0, to: 1440, venue: 'backroom', source: 'vignette' },
     ];
     applyInject(world, 'ada', {
       subject: 'cyn', predicate: 'stole', object: null, count: 1, severity: 3, place: null, attribution: SOMEONE,

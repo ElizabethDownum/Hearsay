@@ -82,6 +82,27 @@ export interface EnemyDecision {
   interrogations: InterrogationOrder[];
 }
 
+export interface PendingEnemyOrder {
+  key: string;
+  issuedDay: number;
+  reconsiderAfterDay: number;
+  directiveIds: DirectiveId[];
+}
+
+export interface EnemyActionLedgerEntry {
+  orderKey: string;
+  kind: 'watch' | 'interrogation';
+  directiveIds: DirectiveId[];
+  leadFeatureId: string | null;
+  subject: EntityId | null;
+  about: InquiryKeyData | null;
+  district: string;
+  scheduleStartDay: number;
+  posts: { guard: EntityId; venue: VenueId }[];
+  workedDays: number[];
+  askedAt: Tick | null;
+}
+
 export interface EnemyState {
   observers: ObserverSpec[];
   map: TownMap;
@@ -97,6 +118,9 @@ export interface EnemyState {
   interrogated: string[];
   /** Inquiry dedupe keys already issued (`f:${family}` / `s:${subject}`). */
   inquiriesIssued: string[];
+  pendingOrders?: PendingEnemyOrder[];
+  issuedDirectiveIds?: DirectiveId[];
+  actionLedger?: EnemyActionLedgerEntry[];
 }
 
 export function emptyEnemyState(): EnemyState {

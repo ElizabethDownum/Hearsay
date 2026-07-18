@@ -363,19 +363,18 @@ describe('requested-beat local offer', () => {
 
 describe('advance result and remote activity', () => {
   it('an autonomous courier delivery never creates an offer or interruption', () => {
-    const session = newSession(SEED);
-    let staged = false;
-    for (let tick = CONVERSATION_BEAT; tick < TICKS_PER_DAY && !staged; tick += CONVERSATION_BEAT) {
-      const pair = circlesAt(session.world, tick)
-        .map((candidate) => candidate.members.filter((id) => id !== session.world.playerId))
-        .find((members) => members.length >= 2);
-      if (!pair) continue;
-      const [asset, target] = pair;
-      session.world.network.pendingCouriers.push({ planId: 'plan-0', asset: asset!, target: target!, queuedTick: 0, viaDrop: null,
-        spec: { subject: target!, predicate: 'stole', object: null, count: 1, severity: 2, place: null, attribution: SOMEONE } });
-      staged = true;
-    }
-    expect(staged).toBe(true);
+    const { session, offer, members } = requestStagedOffer(2);
+    const [asset, target] = members as [EntityId, EntityId];
+    session.world.network.assets.push({
+      id: asset, mice: 'money', wagePaidThroughDay: 0, strikes: 0,
+      facts: [{ tick: offer.tick, kind: 'recruited-by', ref: 'player' }],
+    });
+    session.world.npcs[asset]!.edges.push({ to: session.world.playerId!, kind: 'friend', trust: 0.6 });
+    session.chooseLocal(offer.token, {
+      kind: 'courier', asset, target, viaDrop: null,
+      spec: { subject: target, predicate: 'stole', object: null, count: 1,
+        severity: 2, place: null, attribution: SOMEONE },
+    });
     const result = session.advance(TICKS_PER_DAY);
     expect(result.stopped).toBe('complete');
     expect(session.localOffer()).toBeNull();

@@ -9,6 +9,7 @@ import { SOMEONE, type EntityId } from '../rumors/claim';
 import type { Rules } from '../rules';
 import type { WorldState } from '../types';
 import { trustBetween } from '../world';
+import { evaluateInvitation, invitationById } from '../network/invitations';
 import { projectFieldReportHop } from './field-reports';
 import {
   allocateNetworkMessage, allocateVersionId, ensureDirectiveState, strictNextBeat,
@@ -18,6 +19,8 @@ import { perceivedScrutiny, recordScrutiny } from './scrutiny';
 import { projectBrief, projectDirectiveReport, type ProjectionSpeaker } from './mutation';
 import { evaluateReceivedBrief } from './evaluator';
 import { initializeDirectiveReceipt } from './execution';
+import { settleEnemyOrderReport } from './reports';
+import { correlationOf } from './types';
 import type {
   DirectiveAuthority, DirectiveDiscretion, MessageId, NetworkMessage, NetworkPayload,
   NetworkSpeech, SpokenNetworkPayload,
@@ -442,7 +445,13 @@ function receiveFinal(
       record.receivedReports.push({
         receivedAt: t, via: message.lastFrom, report: cloneSerializable(spoken.report),
       });
+      settleEnemyOrderReport(world, record, spoken);
       if (record.principal === 'player') {
+        const correlation = correlationOf(record);
+        if (correlation.kind === 'courier') {
+          const plan = world.intel.courierPlans?.find((row) => row.id === correlation.planId);
+          if (plan) plan.acknowledgedAt = t;
+        }
         const known = world.intel.knownAssetFacts ?? (world.intel.knownAssetFacts = []);
         for (const ref of spoken.factRefs) {
           if (!known.some((row) => row.asset === ref.asset && row.factIndex === ref.factIndex)) {
@@ -490,9 +499,55 @@ function receiveFinal(
       });
       return;
     }
+    case 'invitation': {
+      const invitation = invitationById(world, spoken.invitationId);
+      if (!invitation || invitation.status !== 'offered' || invitation.invitee !== message.holder) return;
+      const response = evaluateInvitation({
+        relationship: trustBetween(world, invitation.invitee, invitation.inviter),
+        localWitnesses: circle.members.filter((id) => id !== invitation.inviter
+          && id !== invitation.invitee).length,
+        perceivedScrutiny: perceivedScrutiny(
+          world, invitation.invitee, invitation.inviter, t,
+        ),
+      });
+      invitation.status = response === 'accept' ? 'accepted' : 'refused';
+      invitation.respondedAt = t;
+      if (response === 'refuse') invitation.closedAt = t;
+      allocateNetworkMessage(world, invitation.principal, invitation.invitee, [invitation.inviter], {
+        kind: 'invitation-response', invitationId: invitation.id, response,
+      }, t, null, cloneSerializable(message.cause));
+      return;
+    }
+    case 'invitation-response': {
+      const invitation = invitationById(world, spoken.invitationId);
+      if (!invitation || invitation.inviter !== message.holder) return;
+      invitation.respondedAt = t;
+      if (spoken.response === 'accept') {
+        invitation.status = 'accepted';
+        invitation.scheduled = cloneSerializable(invitation.requested);
+        if (invitation.kind === 'hosting') {
+          const override = {
+            fromDay: Math.floor(invitation.requested.from / 1440),
+            toDay: Math.floor((invitation.requested.until - 1) / 1440) + 1,
+            from: invitation.requested.from % 1440,
+            to: invitation.requested.until % 1440,
+            venue: invitation.venue, source: 'player' as const,
+            sourceRef: `hosting:${invitation.id}`,
+          };
+          world.scheduleOverrides[invitation.invitee] = [
+            override, ...(world.scheduleOverrides[invitation.invitee] ?? []),
+          ];
+        }
+      } else if (spoken.response === 'defer') {
+        invitation.status = 'deferred';
+        invitation.scheduled = null;
+      } else {
+        invitation.status = 'refused';
+        invitation.closedAt = t;
+      }
+      return;
+    }
     case 'handler-brief':
-    case 'invitation':
-    case 'invitation-response':
     case 'recruitment-approach':
     case 'recruitment-response':
       return;
@@ -590,7 +645,9 @@ export function deliverNetworkMessages(
     .filter((message) => {
       if (message.createdAt !== frame.tick || message.cause?.kind !== 'player-action') return false;
       if (phase === 'player') return player !== null && message.holder === player;
-      return message.holder !== player && message.payload.kind === 'directive-response';
+      return message.holder !== player
+        && (message.payload.kind === 'directive-response'
+          || message.payload.kind === 'invitation-response');
     })
     .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
   const speeches: NetworkSpeech[] = [];

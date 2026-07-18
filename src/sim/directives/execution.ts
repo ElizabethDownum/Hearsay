@@ -1,4 +1,4 @@
-import { dayOf, type Tick } from '../../core/time';
+import { dayOf, TICKS_PER_DAY, type Tick } from '../../core/time';
 import { positionOf, type Circle } from '../agents';
 import { cloneSerializable } from '../hash';
 import { recordFact } from '../network/compartment';
@@ -11,12 +11,15 @@ import type { Rules } from '../rules';
 import type { InquiryTask, Npc, WorldState } from '../types';
 import { trustBetween } from '../world';
 import { evaluateReceivedBrief, type ReceivedBriefInput } from './evaluator';
+import { projectBrief } from './mutation';
 import { queueDirectiveReport, buildDirectiveReport } from './reports';
 import { perceivedScrutiny } from './scrutiny';
 import { allocateNetworkMessage, strictNextBeat, validateNetworkRoute } from './state';
 import type {
   DirectiveDecisionProfile, DirectiveExecutionResult, DirectiveRecord, NetworkMessage,
 } from './types';
+import { applicationOf, correlationOf, type DirectiveApplication } from './types';
+import { appendInvitation } from '../network/invitations';
 
 const priorityRank = { urgent: 2, important: 4, routine: 6 } as const;
 
@@ -185,10 +188,19 @@ export function collectDirectiveActIntents(
 ): NpcAutonomousIntent[] {
   const present = new Set(circles.flatMap((circle) => circle.members));
   return (world.network.directiveState?.records ?? [])
-    .filter((record) => record.received !== null && record.execution !== null
-      && record.execution.dueAt !== null && record.execution.dueAt <= tick
-      && record.execution.state !== 'completed' && record.execution.state !== 'aborted'
-      && present.has(record.recipient))
+    .filter((record) => {
+      if (record.received === null || record.execution === null
+        || record.execution.state === 'completed' || record.execution.state === 'aborted'
+        || !present.has(record.recipient)) return false;
+      const correlation = correlationOf(record);
+      const courier = correlation.kind === 'courier'
+        ? world.network.pendingCouriers.find((run) => run.planId === correlation.planId) : undefined;
+      if (courier) {
+        return tick > courier.pickedUpAt && circles.some((circle) =>
+          circle.members.includes(courier.asset) && circle.members.includes(courier.target));
+      }
+      return record.execution.dueAt !== null && record.execution.dueAt <= tick;
+    })
     .map((record) => ({ kind: 'directive-act' as const, actor: record.recipient,
       ref: record.id, rank: priorityRank[record.received!.version.brief.priority] }))
     .sort((a, b) => a.actor.localeCompare(b.actor) || a.ref.localeCompare(b.ref));
@@ -279,6 +291,207 @@ function observeResult(
   };
 }
 
+/** A dead-drop artifact is physically read at pickup; no synthetic transport hop is created. */
+export function initializeArtifactReceipt(
+  world: WorldState, record: DirectiveRecord, circle: Circle, tick: Tick, rules: Rules,
+): void {
+  if (record.received !== null) throw new Error(`directive '${record.id}': artifact already received`);
+  record.received = {
+    tick, version: cloneSerializable(record.authored),
+    handoffFrom: record.principalId, messageId: `drop:${record.id}`,
+  };
+  const profile = evaluateReceivedBrief(evaluationInput(world, record, circle, tick, 'receipt'), rules);
+  const synthetic: NetworkMessage = {
+    id: `drop:${record.id}`, principal: record.principal, createdAt: tick,
+    origin: record.recipient, holder: record.recipient, lastFrom: record.principalId,
+    route: [record.recipient], nextHop: 1, availableAfter: tick,
+    payload: { kind: 'directive', version: cloneSerializable(record.authored) },
+    deliveredAt: tick, expiresAt: null, failedAt: null, processedRelayHops: [], cause: null,
+  };
+  initializeDirectiveReceipt(world, record, profile, synthetic, tick, rules);
+  if (profile.commitment === 'refuse') {
+    const correlation = correlationOf(record);
+    if (correlation.kind === 'courier' && correlation.dropPayloadId !== null) {
+      const payload = world.network.dropPayloads?.find((row) => row.id === correlation.dropPayloadId);
+      if (payload && payload.failedAt === null) payload.failedAt = tick;
+    }
+  }
+}
+
+function interpretedApplication(
+  world: WorldState, record: DirectiveRecord, circle: Circle, tick: Tick, rules: Rules,
+): DirectiveApplication {
+  const input = evaluationInput(world, record, circle, tick, 'execution');
+  const projection = projectBrief({
+    version: input.version, speaker: input.recipient, lastFrom: input.handoffFrom,
+    audience: input.messagePrincipal, turnedAgainstAudience: input.recipient.turned,
+    perceivedScrutiny: input.perceivedScrutiny, mode: 'private-interpretation',
+  }, rules);
+  return applicationOf(projection.brief);
+}
+
+function enemyActionFor(
+  world: WorldState, record: DirectiveRecord, application: Exclude<DirectiveApplication,
+    { kind: 'standard' | 'posting' | 'rendezvous' | 'courier' }>,
+  kind: 'inquiry-started' | 'interrogation-asked' | 'watch-worked' | 'watch-cancelled',
+  tick: Tick, venue: VenueId, workedDay: number | null,
+) {
+  const district = application.kind === 'enemy-watch' || application.kind === 'cancel-watch'
+    ? application.district
+    : world.enemy.map.venues.find((candidate) => candidate.id === venue)?.district ?? 'unknown';
+  const about = application.kind === 'enemy-inquiry' || application.kind === 'enemy-interrogation'
+    ? application.about : application.kind === 'enemy-watch' ? application.about : null;
+  const subject = application.kind === 'enemy-interrogation' ? application.target
+    : application.kind === 'enemy-watch' ? application.subject
+      : application.kind === 'enemy-inquiry' && 'subject' in application.about
+        ? application.about.subject : null;
+  const scheduleStartDay = application.kind === 'enemy-watch' || application.kind === 'cancel-watch'
+    ? application.startDay : application.kind === 'enemy-interrogation' ? application.day : dayOf(tick);
+  return {
+    kind, subject, about, district, scheduleStartDay, guard: record.recipient,
+    venue, workedDay, occurredAt: tick,
+  } as const;
+}
+
+function completeWithApplicationReport(
+  world: WorldState, record: DirectiveRecord, profile: DirectiveDecisionProfile,
+  tick: Tick, rules: Rules, outcome: string,
+  enemyAction: DirectiveExecutionResult['enemyAction'] = null,
+): void {
+  record.execution = { state: 'completed', changedAt: tick, dueAt: null, waiting: null };
+  queueDirectiveReport(world, record, profile, {
+    outcome, reason: 'the received application found a lawful local opportunity', evidence: [],
+    source: record.recipient, uncertainty: 'low', reportedClaim: null, factRefs: [], enemyAction,
+  }, rules, tick);
+}
+
+function startApplication(
+  world: WorldState, record: DirectiveRecord, profile: DirectiveDecisionProfile,
+  application: DirectiveApplication, circle: Circle, tick: Tick, rules: Rules,
+): boolean {
+  const correlation = correlationOf(record);
+  switch (application.kind) {
+    case 'standard': return false;
+    case 'posting': {
+      const sourceRef = `posting:${record.recipient}`;
+      const kept = (world.scheduleOverrides[record.recipient] ?? [])
+        .filter((override) => override.sourceRef !== sourceRef);
+      const informant = world.intel.informants.find((row) => row.id === record.recipient);
+      if (application.venue === null) {
+        if (kept.length > 0) world.scheduleOverrides[record.recipient] = kept;
+        else delete world.scheduleOverrides[record.recipient];
+        if (informant) informant.assignedVenue = null;
+        completeWithApplicationReport(world, record, profile, tick, rules, 'posting removed');
+        return true;
+      }
+      kept.push({
+        fromDay: Math.max(dayOf(tick), dayOf(record.issuedAt) + 1),
+        toDay: dayOf(record.received!.version.brief.active.until) + 1,
+        from: 960, to: 1200, venue: application.venue,
+        source: 'player', sourceRef,
+      });
+      world.scheduleOverrides[record.recipient] = kept;
+      if (informant) informant.assignedVenue = application.venue;
+      record.execution = { state: 'attempted', changedAt: tick, dueAt: null, waiting: null };
+      return true;
+    }
+    case 'rendezvous': {
+      const scheduledFrom = profile.timing.actAt ?? tick;
+      const scheduledUntil = scheduledFrom + CONVERSATION_BEAT;
+      const invitation = appendInvitation(world, {
+        kind: 'rendezvous', principal: record.principal, inviter: record.principalId,
+        counterparty: record.recipient, invitee: record.recipient, venue: application.venue,
+        requested: { from: scheduledFrom, until: scheduledUntil },
+        scheduled: { from: scheduledFrom, until: scheduledUntil }, status: 'accepted',
+        offeredAt: record.received!.tick, respondedAt: tick, setupId: null,
+        sourceDirectiveId: record.id, attendedAt: null, closedAt: null,
+      });
+      world.scheduleOverrides[record.recipient] = [{
+        fromDay: dayOf(scheduledFrom), toDay: dayOf(scheduledUntil - 1) + 1,
+        from: scheduledFrom % TICKS_PER_DAY, to: scheduledUntil % TICKS_PER_DAY,
+        venue: application.venue, source: 'player', sourceRef: `rendezvous:${record.id}`,
+      }, ...(world.scheduleOverrides[record.recipient] ?? [])];
+      invitation.setupId = `rendezvous:${record.id}`;
+      record.execution = { state: 'attempted', changedAt: tick, dueAt: null, waiting: null };
+      return true;
+    }
+    case 'courier': {
+      if (correlation.kind !== 'courier') throw new Error(`directive '${record.id}': courier lacks correlation`);
+      if (!world.network.pendingCouriers.some((run) => run.planId === correlation.planId)) {
+        const method = profile.method;
+        if (method.kind !== 'tell') throw new Error(`directive '${record.id}': courier engagement is not tell`);
+        const pickedUpAt = record.received!.tick;
+        world.network.pendingCouriers.push({
+          planId: correlation.planId, asset: record.recipient,
+          spec: cloneSerializable(method.payload.claim), target: application.target,
+          viaDrop: correlation.dropPayloadId === null ? null
+            : world.network.dropPayloads?.find((row) => row.id === correlation.dropPayloadId)?.dropId ?? null,
+          pickedUpAt, expiresAt: pickedUpAt + 3 * TICKS_PER_DAY,
+        });
+      }
+      record.execution = { state: 'attempted', changedAt: tick, dueAt: null, waiting: null };
+      return true;
+    }
+    case 'enemy-inquiry': {
+      const tasks = world.inquiries[record.recipient] ?? (world.inquiries[record.recipient] = []);
+      if (!tasks.some((task) => task.directiveId === record.id)) tasks.push({
+        id: record.id, about: cloneSerializable(application.about), from: 'enemy',
+        expiresDay: application.expiresDay + 1,
+        expiresAt: record.received!.version.brief.active.until,
+        asked: [], answersHeard: 0, directiveId: record.id,
+      });
+      completeWithApplicationReport(world, record, profile, tick, rules, 'inquiry started',
+        enemyActionFor(world, record, application, 'inquiry-started', tick, circle.venue, null));
+      return true;
+    }
+    case 'enemy-interrogation': {
+      if (correlation.kind !== 'enemy-order') {
+        throw new Error(`directive '${record.id}': enemy interrogation lacks order correlation`);
+      }
+      const tasks = world.inquiries[record.recipient] ?? (world.inquiries[record.recipient] = []);
+      if (!tasks.some((task) => task.directiveId === record.id)) tasks.push({
+        id: record.id, about: cloneSerializable(application.about), from: 'enemy',
+        expiresDay: application.day + 2, expiresAt: record.received!.version.brief.active.until,
+        asked: [], answersHeard: 0, directiveId: record.id, addressee: application.target,
+      });
+      const active = record.received!.version.brief.active;
+      world.scheduleOverrides[record.recipient] = [
+        ...(world.scheduleOverrides[record.recipient] ?? [])
+          .filter((row) => row.sourceRef !== correlation.sourceRef),
+        {
+          fromDay: application.day, toDay: application.day + 1,
+          from: active.from % TICKS_PER_DAY, to: (active.until + 1) % TICKS_PER_DAY,
+          venue: application.venue, source: 'enemy', sourceRef: correlation.sourceRef,
+        },
+      ];
+      record.execution = { state: 'attempted', changedAt: tick, dueAt: null, waiting: null };
+      return true;
+    }
+    case 'enemy-watch': {
+      const sourceRef = `order:watch:${application.district}:${record.recipient}`;
+      world.scheduleOverrides[record.recipient] = [
+        ...(world.scheduleOverrides[record.recipient] ?? []).filter((row) => row.sourceRef !== sourceRef),
+        { fromDay: Math.max(application.startDay, dayOf(tick)), toDay: application.startDay + 8,
+          from: 960, to: 1140, venue: application.post.venue,
+          source: 'enemy', sourceRef },
+      ];
+      record.execution = { state: 'attempted', changedAt: tick, dueAt: null, waiting: null,
+        workedDays: [] };
+      return true;
+    }
+    case 'cancel-watch': {
+      const sourceRef = `order:watch:${application.district}:${application.guard}`;
+      const kept = (world.scheduleOverrides[application.guard] ?? []).filter((row) =>
+        !(row.sourceRef === sourceRef && row.fromDay === application.startDay));
+      if (kept.length > 0) world.scheduleOverrides[application.guard] = kept;
+      else delete world.scheduleOverrides[application.guard];
+      completeWithApplicationReport(world, record, profile, tick, rules, 'watch cancelled',
+        enemyActionFor(world, record, application, 'watch-cancelled', tick, application.venue, null));
+      return true;
+    }
+  }
+}
+
 /** Realize one already-selected directive intent. */
 export function attemptDirective(
   world: WorldState,
@@ -290,6 +503,39 @@ export function attemptDirective(
   const empty: NpcIntentRealization = { askings: [], answers: [], tellings: [], extras: [] };
   const record = world.network.directiveState?.records.find((candidate) => candidate.id === directiveId);
   if (!record || record.received === null || record.execution === null) return empty;
+  const correlation = correlationOf(record);
+  if (correlation.kind === 'courier') {
+    const run = world.network.pendingCouriers.find((candidate) => candidate.planId === correlation.planId);
+    if (run && tick > run.pickedUpAt && tick < run.expiresAt
+      && circle.members.includes(run.asset) && circle.members.includes(run.target)) {
+      const family = `f${world.claimCounter}`;
+      const claim = mintClaim(world, { ...run.spec, family, parent: null });
+      world.claims[claim.id] = claim;
+      const factIndex = recordFact(world, record.principal, run.asset,
+        { kind: 'carried-story', ref: family });
+      const profile = record.decision!;
+      record.execution = { state: 'completed', changedAt: tick, dueAt: null, waiting: null };
+      queueDirectiveReport(world, record, profile, {
+        outcome: 'courier delivered',
+        reason: 'the carrier and target physically shared a conversation circle',
+        evidence: [], source: record.recipient, uncertainty: 'low', reportedClaim: null,
+        factRefs: [{ asset: run.asset, factIndex }],
+      }, rules, tick);
+      world.network.pendingCouriers = world.network.pendingCouriers.filter((candidate) => candidate !== run);
+      const dropPayload = correlation.dropPayloadId === null ? null
+        : world.network.dropPayloads?.find((row) => row.id === correlation.dropPayloadId) ?? null;
+      if (dropPayload) dropPayload.deliveredAt = tick;
+      if (world.playerId !== null && circle.members.includes(world.playerId)) {
+        const plan = world.intel.courierPlans?.find((row) => row.id === correlation.planId);
+        if (plan) plan.acknowledgedAt = tick;
+      }
+      const telling: Utterance = {
+        tick, venue: circle.venue, circleMembers: [...circle.members].sort(),
+        speaker: run.asset, addressedTo: run.target, claim, mode: 'telling',
+      };
+      return { askings: [], answers: [], tellings: [telling], extras: [] };
+    }
+  }
   if (record.execution.dueAt === null || record.execution.dueAt > tick) return empty;
   record.execution.dueAt = null;
   const profile = evaluateReceivedBrief(evaluationInput(world, record, circle, tick, 'execution'), rules);
@@ -300,6 +546,14 @@ export function attemptDirective(
   }
   if (profile.commitment === 'defer' || profile.method.kind === 'hold') {
     deferOrAbort(world, record, profile, tick, rules, 'no lawful opportunity remained before expiry');
+    return empty;
+  }
+  const application = interpretedApplication(world, record, circle, tick, rules);
+  if (application.kind !== 'standard') {
+    record.execution = {
+      state: 'attempted', changedAt: tick, dueAt: null, waiting: null,
+    };
+    startApplication(world, record, profile, application, circle, tick, rules);
     return empty;
   }
   const opportunity = opportunityFor(world, record, profile, circle, tick);
@@ -360,11 +614,28 @@ export function attemptDirective(
 }
 
 /** Called immediately after a directive-owned ordinary asking is emitted. */
-export function recordDirectiveInquiryAsked(world: WorldState, taskId: string, tick: Tick): boolean {
+export function recordDirectiveInquiryAsked(
+  world: WorldState, taskId: string, tick: Tick, rules: Rules,
+): boolean {
   const record = world.network.directiveState?.records.find((candidate) => candidate.id === taskId);
   const task = world.inquiries[record?.recipient ?? '']?.find((candidate) => candidate.id === taskId);
   if (!record || !task || record.received === null || record.execution === null
     || record.execution.state === 'completed' || record.execution.state === 'aborted') return false;
+  const application = applicationOf(record.received.version.brief);
+  if (application.kind === 'enemy-interrogation') {
+    const applied = { ...application, target: task.addressee ?? application.target };
+    completeWithApplicationReport(
+      world, record, record.decision!, tick, rules, 'interrogation asked',
+      enemyActionFor(
+        world, record, applied, 'interrogation-asked', tick,
+        positionOf(world, world.npcs[record.recipient]!, tick), dayOf(tick),
+      ),
+    );
+    const remaining = (world.inquiries[record.recipient] ?? []).filter((candidate) => candidate !== task);
+    if (remaining.length > 0) world.inquiries[record.recipient] = remaining;
+    else delete world.inquiries[record.recipient];
+    return true;
+  }
   record.execution = { state: 'awaiting-answer', changedAt: tick, dueAt: null,
     waiting: { kind: 'story-answer', taskId, expiresAt: record.received.version.brief.active.until } };
   return true;
@@ -420,6 +691,23 @@ export function expireDirectiveExecutions(world: WorldState, tick: Tick, rules: 
 export function expireDirectiveActsBeforeCollection(
   world: WorldState, tick: Tick, rules: Rules,
 ): void {
+  for (const run of [...world.network.pendingCouriers]) {
+    if (tick < run.expiresAt) continue;
+    world.network.pendingCouriers = world.network.pendingCouriers.filter((candidate) => candidate !== run);
+    const record = world.network.directiveState?.records.find((candidate) => {
+      const correlation = correlationOf(candidate);
+      return correlation.kind === 'courier' && correlation.planId === run.planId;
+    });
+    if (record?.received && record.execution && record.execution.state !== 'completed'
+      && record.execution.state !== 'aborted' && record.decision) {
+      abortRecord(world, record, record.decision, tick, rules, 'courier pickup expired before delivery');
+      const correlation = correlationOf(record);
+      if (correlation.kind === 'courier' && correlation.dropPayloadId !== null) {
+        const payload = world.network.dropPayloads?.find((row) => row.id === correlation.dropPayloadId);
+        if (payload && payload.failedAt === null) payload.failedAt = tick;
+      }
+    }
+  }
   for (const record of world.network.directiveState?.records ?? []) {
     if (record.received === null || record.execution === null
       || record.execution.state === 'completed' || record.execution.state === 'aborted'
@@ -427,6 +715,50 @@ export function expireDirectiveActsBeforeCollection(
       || tick <= record.received.version.brief.active.until) continue;
     const profile = record.decision!;
     abortRecord(world, record, profile, tick, rules, 'the active window expired before execution');
+  }
+}
+
+/** Phase-5 latches for operations that complete only when the requested physical reality occurs. */
+export function settleDirectiveApplications(world: WorldState, tick: Tick, rules: Rules): void {
+  for (const record of world.network.directiveState?.records ?? []) {
+    if (!record.received || !record.execution || !record.decision
+      || record.execution.state === 'completed' || record.execution.state === 'aborted') continue;
+    const application = applicationOf(record.received.version.brief);
+    if (application.kind === 'posting' && application.venue !== null) {
+      const override = (world.scheduleOverrides[record.recipient] ?? [])
+        .find((row) => row.sourceRef === `posting:${record.recipient}`);
+      if (override && record.execution.changedAt < tick
+        && positionOf(world, world.npcs[record.recipient]!, tick) === override.venue) {
+        completeWithApplicationReport(world, record, record.decision, tick, rules, 'posting occupied');
+      }
+    } else if (application.kind === 'rendezvous') {
+      const invitation = world.network.invitations?.find((row) => row.sourceDirectiveId === record.id);
+      if (invitation?.status === 'attended') {
+        completeWithApplicationReport(world, record, record.decision, tick, rules, 'rendezvous attended');
+      } else if (invitation?.status === 'missed') {
+        abortRecord(world, record, record.decision, tick, rules, 'rendezvous window missed');
+      }
+    } else if (application.kind === 'enemy-watch'
+      && record.execution.changedAt < tick
+      && tick % CONVERSATION_BEAT === 0
+      && dayOf(tick) >= application.startDay && dayOf(tick) < application.startDay + 8
+      && tick % TICKS_PER_DAY >= 960 && tick % TICKS_PER_DAY < 1140
+      && positionOf(world, world.npcs[record.recipient]!, tick) === application.post.venue) {
+      const worked = record.execution.workedDays ?? (record.execution.workedDays = []);
+      const day = dayOf(tick);
+      if (!worked.includes(day)) {
+        worked.push(day);
+        worked.sort((a, b) => a - b);
+        queueDirectiveReport(world, record, record.decision, {
+          outcome: 'watch worked', reason: 'the guard physically stood the ordered post',
+          evidence: [], source: record.recipient, uncertainty: 'low',
+          reportedClaim: null, factRefs: [],
+          enemyAction: enemyActionFor(
+            world, record, application, 'watch-worked', tick, application.post.venue, day,
+          ),
+        }, rules, tick);
+      }
+    }
   }
 }
 

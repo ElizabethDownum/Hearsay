@@ -6,8 +6,9 @@ import type { WorldState } from '../types';
 import { allocateNetworkMessage } from './state';
 import type {
   DirectiveDecisionProfile, DirectiveExecutionResult, DirectiveRecord,
-  DirectiveReportEvidence, DirectiveReportPayload, MessageId,
+  DirectiveReportEvidence, DirectiveReportPayload, MessageId, SpokenNetworkPayload,
 } from './types';
+import { correlationOf } from './types';
 
 export interface BuiltDirectiveReport {
   report: DirectiveReportPayload;
@@ -90,6 +91,90 @@ export function queueDirectiveReport(
   const availableAfter = Math.max(completedAt, profile.timing.reportAt ?? completedAt);
   return allocateNetworkMessage(world, record.principal, record.recipient, [...route], {
     kind: 'directive-report', directiveId: record.id, report: built.report,
-    factRefs: built.factRefs, enemyAction: null,
+    factRefs: built.factRefs,
+    enemyAction: profile.candor === 'ordinary' || profile.candor === 'guarded'
+      ? cloneSerializable(result.enemyAction ?? null) : null,
   }, availableAfter, null, null);
+}
+
+/** HQ bookkeeping is driven by correlation, while completion facts come only from heard speech. */
+export function settleEnemyOrderReport(
+  world: WorldState,
+  record: DirectiveRecord,
+  spoken: Extract<SpokenNetworkPayload, { kind: 'directive-report' }>,
+): void {
+  const correlation = correlationOf(record);
+  if (record.principal !== 'enemy' || correlation.kind !== 'enemy-order') return;
+  const pending = world.enemy.pendingOrders ?? [];
+  const reservation = pending.find((row) => row.directiveIds.includes(record.id));
+  const directiveIds = reservation?.directiveIds ?? (world.network.directiveState?.records ?? [])
+    .filter((candidate) => {
+      const candidateCorrelation = correlationOf(candidate);
+      return candidate.principal === 'enemy' && candidateCorrelation.kind === 'enemy-order'
+        && candidateCorrelation.orderKey === correlation.orderKey;
+    })
+    .map((candidate) => candidate.id);
+  const remaining = pending.filter((row) => row !== reservation);
+  if (remaining.length > 0) world.enemy.pendingOrders = remaining;
+  else delete world.enemy.pendingOrders;
+
+  const action = spoken.enemyAction;
+  if (action === null) return;
+  if (action.kind === 'inquiry-started') {
+    const key = correlation.orderKey.replace(/^inquiry:/, '');
+    if (!world.enemy.inquiriesIssued.includes(key)) world.enemy.inquiriesIssued.push(key);
+    return;
+  }
+  if (action.kind === 'interrogation-asked') {
+    const key = correlation.orderKey.replace(/^interrogation:/, '');
+    if (!world.enemy.interrogated.includes(key)) world.enemy.interrogated.push(key);
+    let row = world.enemy.actionLedger?.find((candidate) => candidate.orderKey === correlation.orderKey);
+    if (!row) {
+      const rows = world.enemy.actionLedger ?? (world.enemy.actionLedger = []);
+      row = {
+        orderKey: correlation.orderKey, kind: 'interrogation', directiveIds: [...directiveIds],
+        leadFeatureId: correlation.leadFeatureId, subject: action.subject,
+        about: action.about, district: action.district,
+        scheduleStartDay: action.scheduleStartDay,
+        posts: [{ guard: action.guard, venue: action.venue }],
+        workedDays: action.workedDay === null ? [] : [action.workedDay], askedAt: action.occurredAt,
+      };
+      rows.push(row);
+    }
+    return;
+  }
+  if (action.kind === 'watch-worked') {
+    let row = world.enemy.actionLedger?.find((candidate) => candidate.orderKey === correlation.orderKey);
+    if (!row) {
+      const rows = world.enemy.actionLedger ?? (world.enemy.actionLedger = []);
+      row = {
+        orderKey: correlation.orderKey, kind: 'watch', directiveIds: [...directiveIds],
+        leadFeatureId: correlation.leadFeatureId, subject: action.subject,
+        about: action.about, district: action.district,
+        scheduleStartDay: action.scheduleStartDay, posts: [], workedDays: [], askedAt: null,
+      };
+      rows.push(row);
+    }
+    if (!row.posts.some((post) => post.guard === action.guard && post.venue === action.venue)) {
+      row.posts.push({ guard: action.guard, venue: action.venue });
+      row.posts.sort((a, b) => a.guard.localeCompare(b.guard) || a.venue.localeCompare(b.venue));
+    }
+    if (action.workedDay !== null && !row.workedDays.includes(action.workedDay)) {
+      row.workedDays.push(action.workedDay);
+      row.workedDays.sort((a, b) => a - b);
+    }
+    if (!world.enemy.watchedDistricts.includes(action.district)) {
+      world.enemy.watchedDistricts.push(action.district);
+      world.enemy.watchedDistricts.sort();
+    }
+    return;
+  }
+  const row = world.enemy.actionLedger?.find((candidate) => candidate.orderKey === correlation.orderKey);
+  if (row) {
+    row.posts = row.posts.filter((post) => !(post.guard === action.guard && post.venue === action.venue));
+    if (row.posts.length === 0 && !world.enemy.actionLedger?.some((candidate) =>
+      candidate !== row && candidate.district === row.district && candidate.posts.length > 0)) {
+      world.enemy.watchedDistricts = world.enemy.watchedDistricts.filter((district) => district !== row.district);
+    }
+  }
 }

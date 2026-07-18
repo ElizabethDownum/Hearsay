@@ -1,22 +1,25 @@
-import { dayOf, minuteOfDay, type Tick } from '../core/time';
+import { dayOf, minuteOfDay, TICKS_PER_DAY, type Tick } from '../core/time';
 import { circlesAt } from './agents';
 import type { InquiryKey } from './perception';
 import { CONVERSATION_BEAT, STANCE } from './rumors/propagation';
 import { mintClaim, SOMEONE, type Claim, type EntityId, type RumorId, type VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
 import type { Rules } from './rules';
-import type { Belief, IntelEntry, ScheduleOverride, Venue, WorldState } from './types';
+import type { Belief, IntelEntry, Venue, WorldState } from './types';
 import type { Mice } from './network/types';
-import { assetFor, canAfford, debitCoin, dispositionOf, setDispositionEdge, slideDisposition } from './network/roster';
+import { assetFor, canAfford, debitCoin, setDispositionEdge, slideDisposition } from './network/roster';
 import { recordPlayerKnownFact } from './network/compartment';
 import { appendCourierPlan, blankIntel, latestPlayerKnownVenue } from './fieldwork';
 import { reportThrough } from './reporting';
 import { confirmableUnderCompulsion } from './inquiry';
 import { cloneSerializable } from './hash';
+import { allocateDirectiveId, ensureDirectiveState, issueDirectiveRecord } from './directives/state';
 import { queueNetworkMessage } from './directives/transport';
-import { allocateDirectiveId, allocateVersionId, ensureDirectiveState } from './directives/state';
+import { appendInvitation } from './network/invitations';
 import { recordScrutiny } from './directives/scrutiny';
-import type { DirectiveBrief, DirectiveHandoff } from './directives/types';
+import type {
+  DirectiveBrief, DirectiveHandoff, NetworkSpeech, PlayerDirectiveApplication,
+} from './directives/types';
 
 export interface InjectSpec {
   subject: Claim['subject'];
@@ -35,6 +38,19 @@ export function applyDirective(
   handoff: DirectiveHandoff,
   brief: DirectiveBrief,
   tick: Tick,
+  application: PlayerDirectiveApplication = { kind: 'standard' },
+): void {
+  applyDirectiveWithCause(world, recipient, handoff, brief, tick, application, 'directive');
+}
+
+function applyDirectiveWithCause(
+  world: WorldState,
+  recipient: EntityId,
+  handoff: DirectiveHandoff,
+  brief: DirectiveBrief,
+  tick: Tick,
+  application: PlayerDirectiveApplication,
+  causeAction: NonNullable<NetworkSpeech['cause']>['action'],
 ): void {
   const principalId = world.playerId;
   if (principalId === null) throw new Error('directive: no player is enrolled');
@@ -50,6 +66,30 @@ export function applyDirective(
   if (brief.reportBy !== null
     && (brief.reportBy < brief.active.from || brief.reportBy > brief.active.until)) {
     throw new Error('directive: reportBy must fall inside the active range');
+  }
+
+  if (application.kind === 'posting') {
+    const expected = application.venue ?? world.npcs[recipient]!.home;
+    if (brief.mission.kind !== 'learn' || brief.mission.target.kind !== 'venue'
+      || brief.mission.target.id !== expected) {
+      throw new Error('directive: posting application requires a matching learn-venue mission');
+    }
+  } else if (application.kind === 'rendezvous') {
+    if (application.from >= application.until
+      || application.from % CONVERSATION_BEAT !== 0
+      || application.until % CONVERSATION_BEAT !== 0) {
+      throw new Error('directive: rendezvous window must be nonempty and beat aligned');
+    }
+    if (brief.mission.kind !== 'learn' || brief.mission.target.kind !== 'venue'
+      || brief.mission.target.id !== application.venue) {
+      throw new Error('directive: rendezvous application requires a matching learn-venue mission');
+    }
+  } else if (application.kind === 'courier') {
+    if (brief.mission.kind !== 'shape' || brief.mission.operation !== 'spread'
+      || brief.mission.audience.kind !== 'person'
+      || brief.mission.audience.id !== application.target) {
+      throw new Error('directive: courier application requires a matching shape-spread person mission');
+    }
   }
 
   const validateRelayRoute = (label: string, route: readonly EntityId[]): void => {
@@ -73,36 +113,24 @@ export function applyDirective(
     throw new Error(`directive: first handoff '${firstHop}' is not in the offered circle`);
   }
 
-  const state = ensureDirectiveState(world);
-  const directiveId = allocateDirectiveId(state);
-  const version = {
-    id: allocateVersionId(state),
-    parent: null,
-    directiveId,
-    brief: cloneSerializable(brief),
-    claimedIssuer: principalId,
-    replyRoute: brief.report === 'none' ? null : [...handoff.reportVia, principalId],
-    changedBy: null,
-    changes: [],
-  };
-  state.records.push({
-    id: directiveId,
-    principal: 'player',
-    principalId,
-    recipient,
-    issuedAt: tick,
-    handoff: cloneSerializable(handoff),
-    authored: cloneSerializable(version),
-    received: null,
-    decision: null,
-    execution: null,
-    receivedReports: [],
+  const carried = cloneSerializable(brief);
+  delete carried.application;
+  if (application.kind !== 'standard') carried.application = cloneSerializable(application);
+  let correlation: Parameters<typeof issueDirectiveRecord>[1]['correlation'];
+  if (application.kind === 'courier') {
+    const planId = appendCourierPlan(world, {
+      asset: recipient, target: application.target,
+      from: latestPlayerKnownVenue(world, recipient),
+      to: latestPlayerKnownVenue(world, application.target),
+      authoredAt: tick, acknowledgedAt: null,
+    });
+    correlation = { kind: 'courier', planId, dropPayloadId: null };
+  }
+  issueDirectiveRecord(world, {
+    principal: 'player', principalId, recipient, handoff, brief: carried,
+    ...(correlation ? { correlation } : {}), tick,
+    cause: { kind: 'player-action', action: causeAction, tick },
   });
-  queueNetworkMessage(
-    world, 'player', principalId, [...handoff.outboundVia, recipient],
-    { kind: 'directive', version }, tick, brief.active.until,
-    { kind: 'player-action', action: 'directive', tick },
-  );
 }
 
 /** Player tells a rumor to one NPC. Hop zero — the town owns the rest. */
@@ -299,13 +327,16 @@ export function applyRecruit(
  * Place a dead drop at a PUBLIC venue (Plan 8 rung 2 — a drop breaks co-location). The placer is the
  * avatar, who knows it implicitly (`knownBy` seeds with the player). VALIDATE-BEFORE-MUTATE: a private/
  * unknown venue, a duplicate id, or an unaffordable setup REFUSES with zero residue. Cost from the one
- * economy table. No co-location needed — you designate the drop, the courier learns it at tasking.
+ * economy table. Placement is physical: the avatar must currently occupy the named venue.
  */
 export function applySetDrop(world: WorldState, id: string, venue: VenueId, rules: Rules): void {
   if (world.playerId === null) throw new Error('setDrop: no player is enrolled');
   const v = world.venues[venue];
   if (!v) throw new Error(`setDrop: unknown venue '${venue}'`);
   if (v.access !== 'public') throw new Error(`setDrop: a dead drop hides in a public venue — '${venue}' is ${v.access}`);
+  if (world.playerVenue !== venue) {
+    throw new Error(`setDrop: the avatar must be at '${venue}' to place the cache`);
+  }
   if (world.network.drops.some((d) => d.id === id)) throw new Error(`setDrop: duplicate drop id '${id}'`);
   const cost = rules.economy.deadDropSetup;
   if (!canAfford(world, cost)) {
@@ -317,9 +348,8 @@ export function applySetDrop(world: WorldState, id: string, venue: VenueId, rule
 
 /**
  * Task one of YOUR assets to courier a payload to a target — store-and-forward made purchasable
- * (Plan 8 rung 2). The run queues on the asset (NetworkState.pendingCouriers); delivery is the asset's
- * next co-circle with the target, their schedule doing the walking (step's deliverCouriers). ZERO new
- * spread machinery: the delivery is an ordinary utterance, trait-transformed by the ASSET's real traits.
+ * (Plan 8 rung 2). The carried application is accepted through the directive evaluator; only then
+ * does it become a pending run whose delivery competes for the asset's autonomous slot.
  *
  * VALIDATE-BEFORE-MUTATE — every precondition throws before any state changes (zero residue on refusal):
  *  - the asset must be one of YOUR assets; the target a real NPC.
@@ -327,9 +357,9 @@ export function applySetDrop(world: WorldState, id: string, venue: VenueId, rule
  *    faction && the predicate is damaging → throw, term-registered).
  *  - Face handoff (viaDrop null): beat-aligned + avatar present + the courier IN the avatar's circle
  *    this beat (the tell/recruit shape) — records a `met-asset` fact (the courier met the avatar).
- *  - Via a drop: the handoff leg is SKIPPED — no co-location, no `met-asset`; the named drop must exist
- *    and be avatar-known, the courier LEARNS it (a `knows-drop` fact) and the drop's knownBy grows.
- * Cost debits now; the 3-day expiry (step) never refunds — a priced failure.
+ *  - Via a drop: placement requires the avatar at the cache. A carrier who does not already know it
+ *    must share that offered circle to learn it; later pickup is a separate physical autonomous act.
+ * Cost debits now; the pickup-relative 3-day expiry never refunds — a priced failure.
  */
 export function applyCourier(
   world: WorldState, asset: EntityId, spec: InjectSpec, target: EntityId, viaDrop: string | null,
@@ -362,6 +392,13 @@ export function applyCourier(
     const drop = world.network.drops.find((d) => d.id === viaDrop);
     if (!drop) throw new Error(`courier: unknown dead drop '${viaDrop}'`);
     if (!drop.knownBy.includes(world.playerId)) throw new Error(`courier: you don't know the dead drop '${viaDrop}'`);
+    if (world.playerVenue !== drop.venue) {
+      throw new Error(`courier: the avatar must be at dead drop '${viaDrop}' to place the payload`);
+    }
+    const circle = circlesAt(world, tick).find((candidate) => candidate.members.includes(world.playerId!));
+    if (!drop.knownBy.includes(asset) && !(circle?.members.includes(asset) ?? false)) {
+      throw new Error(`courier: '${asset}' neither knows nor is present to learn dead drop '${viaDrop}'`);
+    }
   }
 
   // Cost (validate-before-mutate: refuse an unaffordable run).
@@ -370,45 +407,56 @@ export function applyCourier(
     throw new Error(`courier: the treasury cannot cover this run (${cost} needed, ${world.coin} held)`);
   }
 
-  // --- Effects (all validation passed; edges-only + roster/queue writes keep the fixture clone sound) ---
+  const active = { from: (Math.floor(tick / CONVERSATION_BEAT) + 1) * CONVERSATION_BEAT,
+    until: tick + 3 * TICKS_PER_DAY };
+  const payload = { family: null, parent: null, claim: cloneSerializable(spec) };
+  const brief: DirectiveBrief = {
+    mission: { kind: 'shape', operation: 'spread', payload,
+      audience: { kind: 'person', id: target }, redirectTo: null },
+    priority: 'routine', authority: 'relationship', discretion: 'quiet',
+    specificity: 'detailed', guidance: [], active,
+    report: 'outcome', reportBy: active.until, purpose: null,
+  };
+
+  // --- Effects (all validation passed) ---
   debitCoin(world, cost);
   if (viaDrop === null) {
     // A face handoff is a meeting: the courier's compartment records having met the avatar (ONE
     // direction — the avatar keeps no compartment). This is the `met-asset` that the drop path lacks.
     recordPlayerKnownFact(world, asset, { kind: 'met-asset', ref: world.playerId });
+    applyDirectiveWithCause(
+      world, asset, { outboundVia: [], reportVia: [] }, brief, tick,
+      { kind: 'courier', target }, 'courier',
+    );
   } else {
     const drop = world.network.drops.find((d) => d.id === viaDrop)!;
-    if (!drop.knownBy.includes(asset)) drop.knownBy.push(asset);
-    recordPlayerKnownFact(world, asset, { kind: 'knows-drop', ref: viaDrop });
+    if (!drop.knownBy.includes(asset)) {
+      drop.knownBy.push(asset);
+      recordPlayerKnownFact(world, asset, { kind: 'knows-drop', ref: viaDrop });
+    }
+    const planId = appendCourierPlan(world, {
+      asset, target, from: drop.venue, to: latestPlayerKnownVenue(world, target),
+      authoredAt: tick, acknowledgedAt: null,
+    });
+    const directiveId = allocateDirectiveId(ensureDirectiveState(world));
+    const rows = world.network.dropPayloads ?? (world.network.dropPayloads = []);
+    rows.push({
+      id: `drop-payload-${rows.length}`, planId, principal: 'player', directiveId,
+      dropId: viaDrop, asset, target, artifact: { payload, target }, placedAt: tick,
+      pickedUpAt: null, expiresAt: null, deliveredAt: null, failedAt: null,
+    });
   }
-  const from = viaDrop === null
-    ? latestPlayerKnownVenue(world, asset)
-    : (world.network.drops.find((drop) => drop.id === viaDrop)?.venue ?? null);
-  const planId = appendCourierPlan(world, {
-    asset, target, from, to: latestPlayerKnownVenue(world, target),
-    authoredAt: tick, acknowledgedAt: null,
-  });
-  world.network.pendingCouriers.push({ planId, asset, spec, target, viaDrop, queuedTick: tick });
 }
 
 /** The invitee cap on a hosted event (spec, rung 4) — you pick the circle, but a room seats only so many. */
 export const HOST_INVITEE_CAP = 6;
-/** The acceptance floor: only NPCs whose trust toward the player is ≥ this accept an invitation. */
-const HOST_ACCEPT_TRUST = 0.5;
 /** The hosted event's evening block (spec: 1080–1200, source 'player'), placed on the invitees' NEXT evening. */
 export const HOST_EVENT = { from: 1080, to: 1200 } as const;
 
 /**
- * Rung 3 — the safehouse meet. Pull one of YOUR assets to the private safehouse for the NEXT
- * conversation beat only: a guaranteed 2-person circle (the safehouse is private with no regulars, so
- * the pulled asset and the avatar are its only occupants) for a tell/ask/debrief with ZERO overhear
- * risk. The pull is a one-beat, 15-aligned, source-'player' schedule OVERRIDE (the assignInformant
- * override shape — never a base-schedule write, Task 3's edges-/overrides-only discipline), PREPENDED
- * so a transient meet wins over any standing player posting for its one beat and the posting resumes
- * the next beat. FREE — the economy table prices no meet; the WALK is the price (the asset's movement
- * is public presence, and a `met-asset` fact lands on the record: contact tracing's handle). The avatar
- * attends by being at (or going to) the safehouse, which the access law always opens — meet never moves
- * the avatar. VALIDATE-BEFORE-MUTATE: no-player / non-asset / no-safehouse REFUSES with zero residue.
+ * Rung 3 — offer one of YOUR locally present assets a safehouse rendezvous. The received directive's
+ * evaluator owns acceptance and timing; only its later application attempt may schedule the asset.
+ * The avatar is never moved, and `met-asset` is recorded only for actual joint attendance.
  */
 export function applyMeet(world: WorldState, asset: EntityId, tick: Tick): void {
   if (world.playerId === null) throw new Error('meet: no player is enrolled');
@@ -416,17 +464,22 @@ export function applyMeet(world: WorldState, asset: EntityId, tick: Tick): void 
   if (!world.network.assets.some((a) => a.id === asset)) {
     throw new Error(`meet: '${asset}' is not one of your assets`);
   }
-  // The next conversation beat STRICTLY after `tick` (absolute-tick arithmetic carries the day rollover).
+  const circle = circlesAt(world, tick).find((candidate) => candidate.members.includes(world.playerId!));
+  if (!circle || !circle.members.includes(asset)) {
+    throw new Error(`meet: '${asset}' is not in the offered circle`);
+  }
   const nextBeat = (Math.floor(tick / CONVERSATION_BEAT) + 1) * CONVERSATION_BEAT;
-  const override: ScheduleOverride = {
-    fromDay: dayOf(nextBeat), toDay: dayOf(nextBeat) + 1,
-    from: minuteOfDay(nextBeat), to: minuteOfDay(nextBeat) + CONVERSATION_BEAT,
-    venue: 'safehouse', source: 'player',
+  const brief: DirectiveBrief = {
+    mission: { kind: 'learn', target: { kind: 'venue', id: 'safehouse' } },
+    priority: 'urgent', authority: 'relationship', discretion: 'quiet',
+    specificity: 'detailed', guidance: [], active: { from: nextBeat, until: nextBeat },
+    report: 'outcome', reportBy: nextBeat, purpose: null,
   };
-  // Prepend (not the assignInformant REPLACE): a meet is a transient pull, so it takes precedence for
-  // its one beat over any standing player override, which resumes automatically once the window passes.
-  world.scheduleOverrides[asset] = [override, ...(world.scheduleOverrides[asset] ?? [])];
-  recordPlayerKnownFact(world, asset, { kind: 'met-asset', ref: world.playerId });
+  applyDirectiveWithCause(
+    world, asset, { outboundVia: [], reportVia: [] }, brief, tick,
+    { kind: 'rendezvous', venue: 'safehouse', from: nextBeat, until: nextBeat + CONVERSATION_BEAT },
+    'meet',
+  );
 }
 
 /** The room a standing HOSTS in (rung 4): noble → the salon, lowlife → any back-room. Stricter than the
@@ -436,20 +489,15 @@ function isHostRoom(station: 'noble' | 'lowlife', venue: VenueId): boolean {
 }
 
 /**
- * Rung 4 — the hosted room. Throw a salon (noble) / back-room (lowlife) evening: the invitees' NEXT
- * evening gains the event block (1080–1200, source 'player' — the assignInformant override shape,
- * PREPENDED so the event wins over a standing posting), and an `attended-hosting` fact lands on every
- * invitee (guest lists are evidence when compartments crack). A controlled room: you pick the circle,
- * sampling + injection in one place, with no bystander overhear. VALIDATE-BEFORE-MUTATE — every
- * precondition throws before any state changes (zero residue on refusal):
+ * Rung 4 — invite locally present people to a salon (noble) / back-room (lowlife) evening. Each
+ * invitation is physical speech and is evaluated independently; only a returned acceptance schedules
+ * the guest, and attendance facts are recorded only from actual event presence. Validation is complete
+ * before the single event debit:
  *  - a standing must host its OWN room (noble→salon, lowlife→back-room); the wrong room REFUSES.
  *  - 1..6 distinct invitees, none the avatar (the invitee cap, spec).
- *  - the acceptance gate: each invitee's trust toward the player must be ≥ 0.5 (you can't summon
- *    strangers — a strike-slid asset that dropped under 0.5 stops coming). dispositionOf ≥ 0.5 implies
- *    roster membership (only assets carry a player-trust edge), so the effects' recordFact never throws.
+ *  - every invitee must be present in the offered circle; relationship and scrutiny affect their reply.
  *  - the event cost (salon 8 / back-room 4) from the one economy table; an unaffordable event REFUSES.
- * The avatar attends by going to their own room at the event (the access law opens it) — host never
- * moves the avatar and never sets playerVenue.
+ * Host never moves the avatar and never sets playerVenue.
  */
 export function applyHost(
   world: WorldState, venue: VenueId, invitees: EntityId[], tick: Tick, rules: Rules,
@@ -467,12 +515,12 @@ export function applyHost(
     throw new Error(`host: the invitee cap is ${HOST_INVITEE_CAP} (got ${invitees.length})`);
   }
   if (new Set(invitees).size !== invitees.length) throw new Error('host: duplicate invitee');
+  const offered = circlesAt(world, tick).find((candidate) => candidate.members.includes(world.playerId!));
+  if (!offered) throw new Error('host: the avatar has no offered circle');
   for (const id of invitees) {
     if (id === world.playerId) throw new Error('host: the avatar cannot be their own invitee');
     if (!world.npcs[id]) throw new Error(`host: unknown npc '${id}'`);
-    if (dispositionOf(world, id) < HOST_ACCEPT_TRUST) {
-      throw new Error(`host: '${id}' will not accept — trust below ${HOST_ACCEPT_TRUST} (you can't summon strangers)`);
-    }
+    if (!offered.members.includes(id)) throw new Error(`host: '${id}' is not present in the offered circle`);
   }
   const cost = world.station === 'noble' ? rules.economy.salonEvent : rules.economy.backRoomEvent;
   if (!canAfford(world, cost)) {
@@ -481,13 +529,21 @@ export function applyHost(
 
   // --- Effects (all validation passed) ---
   debitCoin(world, cost);
+  const requested = {
+    from: (dayOf(tick) + 1) * TICKS_PER_DAY + HOST_EVENT.from,
+    until: (dayOf(tick) + 1) * TICKS_PER_DAY + HOST_EVENT.to,
+  };
   for (const id of invitees) {
-    const override: ScheduleOverride = {
-      fromDay: dayOf(tick) + 1, toDay: dayOf(tick) + 2,
-      from: HOST_EVENT.from, to: HOST_EVENT.to, venue, source: 'player',
-    };
-    world.scheduleOverrides[id] = [override, ...(world.scheduleOverrides[id] ?? [])];
-    recordPlayerKnownFact(world, id, { kind: 'attended-hosting', ref: venue });
+    const invitation = appendInvitation(world, {
+      kind: 'hosting', principal: 'player', inviter: world.playerId,
+      counterparty: id, invitee: id, venue, requested,
+      scheduled: null, status: 'offered', offeredAt: tick, respondedAt: null,
+      setupId: null, sourceDirectiveId: null, attendedAt: null, closedAt: null,
+    });
+    queueNetworkMessage(world, 'player', world.playerId, [id], {
+      kind: 'invitation', invitationId: invitation.id, invitationKind: 'hosting',
+      inviter: world.playerId, counterparty: id, invitee: id, venue, requested,
+    }, tick, null, { kind: 'player-action', action: 'host', tick });
   }
 }
 
@@ -656,18 +712,29 @@ export function applyAssignInformant(
   const spec = world.intel.informants.find((i) => i.id === informant);
   if (!spec) throw new Error(`assignInformant: '${informant}' is not an informant`);
   if (venue !== null && !world.venues[venue]) throw new Error(`assignInformant: unknown venue '${venue}'`);
+  if (world.playerId === null) throw new Error('assignInformant: no player is enrolled');
+  const circle = circlesAt(world, tick).find((candidate) => candidate.members.includes(world.playerId!));
+  if (!circle || !circle.members.includes(informant)) {
+    throw new Error(`assignInformant: '${informant}' is not in the offered circle`);
+  }
+  const targetVenue = venue ?? world.npcs[informant]!.home;
+  const brief: DirectiveBrief = {
+    mission: { kind: 'learn', target: { kind: 'venue', id: targetVenue } },
+    priority: 'routine', authority: 'relationship', discretion: 'quiet',
+    specificity: 'detailed',
+    guidance: venue === null ? [] : [
+      { kind: 'not-before', tick: (dayOf(tick) + 1) * TICKS_PER_DAY + ASSIGNMENT.from },
+      { kind: 'not-after', tick: (dayOf(tick) + 7) * TICKS_PER_DAY + ASSIGNMENT.to },
+    ],
+    active: { from: tick + CONVERSATION_BEAT, until: tick + 7 * TICKS_PER_DAY },
+    report: 'outcome', reportBy: tick + 7 * TICKS_PER_DAY, purpose: null,
+  };
+  applyDirectiveWithCause(
+    world, informant, { outboundVia: [], reportVia: [] }, brief, tick,
+    { kind: 'posting', venue }, 'assignInformant',
+  );
   const requested = world.intel.requestedPosts ?? (world.intel.requestedPosts = []);
   requested.push({ informant, venue, authoredAt: tick });
-  spec.assignedVenue = venue;
-  const kept = (world.scheduleOverrides[informant] ?? []).filter((o) => o.source !== 'player');
-  if (venue !== null) {
-    kept.push({
-      fromDay: dayOf(tick) + 1, toDay: null,
-      from: ASSIGNMENT.from, to: ASSIGNMENT.to, venue, source: 'player',
-    });
-  }
-  if (kept.length === 0) delete world.scheduleOverrides[informant];
-  else world.scheduleOverrides[informant] = kept;
 }
 
 /** Add/remove a trait hypothesis in the Codex. Propose is idempotent per (npc, trait). */

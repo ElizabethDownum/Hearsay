@@ -7,11 +7,11 @@ import {
 } from '../../src/sim/actions';
 import { applyAction, runLogOn, type Action } from '../../src/sim/campaign';
 import { circlesAt, positionOf } from '../../src/sim/agents';
-import { step } from '../../src/sim/step';
+import { runUntil, step } from '../../src/sim/step';
 import { dispositionOf, payWagesNightly } from '../../src/sim/network/roster';
 import { compartmentOf } from '../../src/sim/network/compartment';
 import { hashWorld } from '../../src/sim/hash';
-import { at } from '../../src/core/time';
+import { at, dayOf } from '../../src/core/time';
 import { SOMEONE, type EntityId } from '../../src/sim/rumors/claim';
 import type { TownFixture, WorldState } from '../../src/sim/types';
 
@@ -54,7 +54,7 @@ function world(seed: string, station: WorldState['station']): WorldState {
 
 /** Force `id` onto the roster with a disposition edge (the direct-construct idiom): a money asset,
  *  recruited-by:player on the record, trust `trust` toward the avatar. */
-function makeAsset(w: WorldState, id: EntityId, trust = 0.6): void {
+function makeAsset(w: WorldState, id: EntityId, trust = 0.8): void {
   w.network.assets.push({
     id, mice: 'money', wagePaidThroughDay: 0, strikes: 0,
     facts: [{ tick: 0, kind: 'recruited-by', ref: 'player' }],
@@ -62,31 +62,58 @@ function makeAsset(w: WorldState, id: EntityId, trust = 0.6): void {
   w.npcs[id]!.edges.push({ to: 'you', kind: 'friend', trust });
 }
 
+/** Keep the selected people in the avatar's one real tavern circle and move every fixture-only
+ * bystander away for the offer day. This stages physical speech without depending on seeded
+ * partitioning of an overcrowded venue. */
+function stageOfferedCircle(w: WorldState, tick: number, members: readonly EntityId[]): void {
+  applyGoTo(w, 'tavern');
+  const kept = new Set(members);
+  for (const id of Object.keys(w.npcs)) {
+    if (id === w.playerId || kept.has(id)) continue;
+    w.scheduleOverrides[id] = [{
+      fromDay: dayOf(tick), toDay: dayOf(tick) + 1, from: 0, to: 1440,
+      venue: 'guard-post', source: 'vignette', sourceRef: `test-offer:${tick}:${id}`,
+    }, ...(w.scheduleOverrides[id] ?? [])];
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Rung 3 — the safehouse meet
 // ─────────────────────────────────────────────────────────────────────────────
 describe('meet — pull one asset to the safehouse for the next beat (rung 3)', () => {
-  it('writes exactly a one-beat, 15-aligned, safehouse, source-player override + a met-asset fact', () => {
+  it('queues locally, then writes the one-beat sourced override and fact only at actual attendance', () => {
     const w = world('meet-override', 'noble');
     makeAsset(w, 'ann');
+    stageOfferedCircle(w, 0, ['ann']);
     applyMeet(w, 'ann', 0); // planned at tick 0 → the NEXT beat is minute 15
+    const directiveId = w.network.directiveState!.records[0]!.id;
+    expect(w.scheduleOverrides['ann']).toBeUndefined();
+    expect(compartmentOf(w, 'player', 'ann').some((f) => f.kind === 'met-asset')).toBe(false);
+    step(w, RULES); // the offered-circle handoff is spoken at tick 0
+    applyGoTo(w, 'safehouse');
+    runUntil(w, 16, RULES);
 
     const own = w.scheduleOverrides['ann']!.filter((o) => o.source === 'player');
     expect(own).toHaveLength(1);
-    expect(own[0]!).toEqual({ fromDay: 0, toDay: 1, from: 15, to: 30, venue: 'safehouse', source: 'player' });
+    expect(own[0]!).toEqual({ fromDay: 0, toDay: 1, from: 15, to: 30, venue: 'safehouse',
+      source: 'player', sourceRef: `rendezvous:${directiveId}` });
     // 15-aligned and exactly one beat long.
     expect(own[0]!.from % 15).toBe(0);
     expect(own[0]!.to - own[0]!.from).toBe(15);
     // The visit is on the record — contact tracing's handle.
-    expect(compartmentOf(w, 'player', 'ann')).toContainEqual({ tick: 0, kind: 'met-asset', ref: 'you' });
+    expect(compartmentOf(w, 'player', 'ann')).toContainEqual({ tick: 15, kind: 'met-asset', ref: 'you' });
   });
 
-  it('a GUARANTEED 2-person circle forms at the meet beat, and the asset RETURNS to schedule after', () => {
+  it('an accepted meet forms a real 2-person circle only when the avatar attends', () => {
     const w = world('meet-circle', 'noble');
     makeAsset(w, 'ann');
     // ann is a tavern regular — proving the pull, not a coincidence of schedule.
     expect(positionOf(w, w.npcs['ann']!, 15)).toBe('tavern');
+    stageOfferedCircle(w, 0, ['ann']);
     applyMeet(w, 'ann', 0);
+    step(w, RULES);
+    applyGoTo(w, 'safehouse');
+    runUntil(w, 16, RULES);
 
     // The meet beat (15): avatar (home = safehouse) + ann, and NOBODY else (private, no regulars).
     const circle = circlesAt(w, 15).find((c) => c.members.includes('you'))!;
@@ -103,7 +130,12 @@ describe('meet — pull one asset to the safehouse for the next beat (rung 3)', 
     makeAsset(w, 'ann');
     // A standing player posting keeps ann at the tavern 960–1200 every day (the assignInformant shape).
     w.scheduleOverrides['ann'] = [{ fromDay: 0, toDay: null, from: 960, to: 1200, venue: 'tavern', source: 'player' }];
+    w.tick = 960;
+    stageOfferedCircle(w, 960, ['ann']);
     applyMeet(w, 'ann', 960); // plan the meet at 960 → next beat 975, inside the posting window
+    step(w, RULES);
+    applyGoTo(w, 'safehouse');
+    runUntil(w, 976, RULES);
 
     expect(positionOf(w, w.npcs['ann']!, 975)).toBe('safehouse'); // the transient pull wins
     expect(positionOf(w, w.npcs['ann']!, 990)).toBe('tavern');    // the posting resumes the next beat
@@ -120,8 +152,17 @@ describe('meet — pull one asset to the safehouse for the next beat (rung 3)', 
   });
 
   it('meet joins the Action union (needs no rules); live ≡ replay', () => {
-    const build = (): WorldState => { const w = world('meet-replay', 'noble'); makeAsset(w, 'ann'); return w; };
-    const log: Action[] = [{ tick: 0, kind: 'meet', asset: 'ann' }];
+    const build = (): WorldState => {
+      const w = world('meet-replay', 'noble');
+      makeAsset(w, 'ann');
+      stageOfferedCircle(w, 0, ['ann']);
+      return w;
+    };
+    const log: Action[] = [
+      { tick: 0, kind: 'goTo', venue: 'tavern' },
+      { tick: 0, kind: 'meet', asset: 'ann' },
+      { tick: 1, kind: 'goTo', venue: 'safehouse' },
+    ];
     const a = runLogOn(build(), RULES, log, at(0, 2));
     const b = runLogOn(build(), RULES, log, at(0, 2));
     expect(hashWorld(a)).toBe(hashWorld(b));
@@ -135,28 +176,40 @@ describe('meet — pull one asset to the safehouse for the next beat (rung 3)', 
 // Rung 4 — the hosted room
 // ─────────────────────────────────────────────────────────────────────────────
 describe('host — the controlled room (rung 4)', () => {
-  it('writes the next-evening event blocks + attended-hosting facts on every invitee, and debits the salon cost', () => {
+  it('queues invitations locally; accepted replies schedule, and facts wait for actual attendance', () => {
     const w = world('host-blocks', 'noble');
     makeAsset(w, 'ann'); makeAsset(w, 'bri');
     const coin0 = w.coin;
     w.tick = at(0, 10); // the applyAction invariant (world.tick === action.tick): the fact stamps this tick
+    stageOfferedCircle(w, at(0, 10), ['ann', 'bri']);
 
     applyHost(w, 'salon', ['ann', 'bri'], at(0, 10), RULES);
+    expect(w.scheduleOverrides['ann']).toBeUndefined();
+    expect(compartmentOf(w, 'player', 'ann').some((f) => f.kind === 'attended-hosting')).toBe(false);
+    step(w, RULES);
 
     for (const id of ['ann', 'bri']) {
       const own = w.scheduleOverrides[id]!.filter((o) => o.source === 'player');
       expect(own).toHaveLength(1);
-      expect(own[0]!).toEqual({ fromDay: 1, toDay: 2, from: 1080, to: 1200, venue: 'salon', source: 'player' });
-      expect(compartmentOf(w, 'player', id)).toContainEqual({ tick: at(0, 10), kind: 'attended-hosting', ref: 'salon' });
+      expect(own[0]!).toMatchObject({ fromDay: 1, toDay: 2, from: 1080, to: 1200,
+        venue: 'salon', source: 'player' });
+      expect(compartmentOf(w, 'player', id).some((f) => f.kind === 'attended-hosting')).toBe(false);
     }
     expect(w.coin).toBe(coin0 - STANDARD_ECONOMY.salonEvent);
+    runUntil(w, at(1, 20, 1), RULES);
+    for (const id of ['ann', 'bri']) {
+      expect(compartmentOf(w, 'player', id).some((f) => f.kind === 'attended-hosting')).toBe(true);
+    }
   });
 
   it('a LOWLIFE hosts the back-room and debits the back-room cost', () => {
     const w = world('host-lowlife', 'lowlife');
     makeAsset(w, 'ann');
     const coin0 = w.coin;
+    w.tick = at(0, 10);
+    applyGoTo(w, 'tavern');
     applyHost(w, 'back-room-d0', ['ann'], at(0, 10), RULES);
+    step(w, RULES);
     expect(w.scheduleOverrides['ann']!.some((o) => o.venue === 'back-room-d0' && o.source === 'player')).toBe(true);
     expect(w.coin).toBe(coin0 - STANDARD_ECONOMY.backRoomEvent);
   });
@@ -173,38 +226,55 @@ describe('host — the controlled room (rung 4)', () => {
     expect(() => applyHost(low, 'salon', ['ann'], at(0, 10), RULES)).toThrow(/room|standing|back-room/i);
   });
 
-  it('the ≥0.5 acceptance gate: a strike-slid asset at 0.45 REFUSES; a 0.5 asset accepts', () => {
+  it('relationship is evaluated by the physical invitation response, not by applyHost', () => {
     const w = world('host-gate', 'noble');
     makeAsset(w, 'ann', 0.5);      // a coercion-floor disposition
     w.coin = 0; payWagesNightly(w, RULES); // one missed wage: strike + slide −0.05 → 0.45 (push them under)
     expect(dispositionOf(w, 'ann')).toBeCloseTo(0.45, 10);
+    w.coin = STANDARD_ECONOMY.salonEvent;
 
-    const before = hashWorld(w);
-    expect(() => applyHost(w, 'salon', ['ann'], at(0, 10), RULES)).toThrow(/0\.5|trust|summon|stranger|accept/i);
-    expect(hashWorld(w)).toBe(before); // zero residue — no block, no fact, no debit
+    w.tick = at(0, 10);
+    stageOfferedCircle(w, at(0, 10), ['ann']);
+    applyHost(w, 'salon', ['ann'], at(0, 10), RULES);
+    step(w, RULES);
+    expect(w.network.invitations![0]!.status).toBe('refused');
+    expect(w.scheduleOverrides['ann']).toBeUndefined();
 
-    // Control: exactly 0.5 accepts (dossier freebies at 0.75 and every recruit 0.5–0.7 clear this).
+    // Control: a strong relationship survives the crowded offer's witness penalty.
     const ok = world('host-gate-ok', 'noble');
-    makeAsset(ok, 'bri', 0.5);
-    expect(dispositionOf(ok, 'bri')).toBe(0.5);
+    makeAsset(ok, 'bri', 0.75);
+    expect(dispositionOf(ok, 'bri')).toBe(0.75);
+    ok.tick = at(0, 10);
+    stageOfferedCircle(ok, at(0, 10), ['bri']);
     applyHost(ok, 'salon', ['bri'], at(0, 10), RULES);
+    step(ok, RULES);
     expect(ok.scheduleOverrides['bri']!.some((o) => o.venue === 'salon')).toBe(true);
   });
 
-  it('enforces the invitee cap of 6 (zero residue on refusal); six is accepted', () => {
+  it('enforces the invitee cap of 6 before physical-presence validation; a full offered circle is accepted', () => {
     const w = world('host-cap', 'noble');
     const seven = ['ann', 'bri', 'cy', 'dot', 'eve', 'fin', 'gus'];
     for (const id of seven) makeAsset(w, id);
     const before = hashWorld(w);
     expect(() => applyHost(w, 'salon', seven, at(0, 10), RULES)).toThrow(/cap|6|six|too many/i);
     expect(hashWorld(w)).toBe(before);
-    applyHost(w, 'salon', seven.slice(0, 6), at(0, 10), RULES); // six is fine
+    w.tick = at(0, 10);
+    stageOfferedCircle(w, at(0, 10), seven.slice(0, 3));
+    // Six clears the cap check and reaches the newly binding physical-circle check. A player plus
+    // three invitees is the largest lawful CIRCLE_SIZE=4 offer and is accepted.
+    const beforePresenceRefusal = hashWorld(w);
+    expect(() => applyHost(w, 'salon', seven.slice(0, 6), at(0, 10), RULES))
+      .toThrow(/offered circle/);
+    expect(hashWorld(w)).toBe(beforePresenceRefusal);
+    expect(() => applyHost(w, 'salon', seven.slice(0, 3), at(0, 10), RULES)).not.toThrow();
   });
 
   it('refuses when the treasury cannot cover the event (zero residue)', () => {
     const w = world('host-broke', 'noble');
     makeAsset(w, 'ann');
     w.coin = STANDARD_ECONOMY.salonEvent - 1;
+    w.tick = at(0, 10);
+    applyGoTo(w, 'tavern');
     const before = hashWorld(w);
     expect(() => applyHost(w, 'salon', ['ann'], at(0, 10), RULES)).toThrow(/treasury|cover/);
     expect(hashWorld(w)).toBe(before);
@@ -228,7 +298,10 @@ describe('the hosted tell — no guard invited is NEVER caught, by mechanism', (
     w.enemy.observers.push({ id: 'greg', vigilance: 1 }); // a real guard, kept at his post — NOT invited
     w.network.spymaster = 'greg'; // embodied handler is real but remains outside the event circle
     makeAsset(w, 'ann');
+    w.tick = at(0, 10);
+    applyGoTo(w, 'tavern');
     applyHost(w, 'salon', ['ann'], at(0, 10), RULES);
+    step(w, RULES);
 
     // Jump to the event beat (no nightly stepped → the demonstration is purely the hosting mechanism).
     w.tick = EVENT_TICK;
@@ -255,7 +328,10 @@ describe('the hosted tell — no guard invited is NEVER caught, by mechanism', (
     w.enemy.observers.push({ id: 'greg', vigilance: 1 });
     w.network.spymaster = 'greg'; // the invited guard is also the embodied receiving principal
     makeAsset(w, 'greg'); // trust-edged so he clears the host gate — a guard at your salon is a blunder
+    w.tick = at(0, 10);
+    w.playerVenue = 'guard-post';
     applyHost(w, 'salon', ['greg'], at(0, 10), RULES);
+    step(w, RULES);
 
     w.tick = EVENT_TICK;
     applyGoTo(w, 'salon');

@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { buildWorld, enrollPlayer } from '../../src/sim/world';
-import { applyAssignInformant } from '../../src/sim/actions';
+import { applyAssignInformant, applyGoTo } from '../../src/sim/actions';
 import { captureIntel, playerView } from '../../src/sim/fieldwork';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { at } from '../../src/core/time';
 import { mintClaim, SOMEONE } from '../../src/sim/rumors/claim';
 import type { TownFixture, WorldState } from '../../src/sim/types';
 import type { TickEvents } from '../../src/sim/perception';
+import { runUntil, step } from '../../src/sim/step';
 
 /**
  * CONTROLLER RIDER (Plan 8 Task 2): informant coverage must apply ONLY while the informant is
@@ -45,7 +46,12 @@ describe('informant coverage is window-scoped (controller rider)', () => {
     const world = buildWorld(riderFixture(), 'rider');
     enrollPlayer(world, { home: 'safehouse' });
     world.intel.informants.push({ id: 'scout', assignedVenue: null });
+    world.network.assets.push({ id: 'scout', mice: 'money', wagePaidThroughDay: 0, strikes: 0, facts: [] });
+    world.npcs['scout']!.edges.push({ to: 'you', kind: 'friend', trust: 0.8 });
+    applyGoTo(world, 'elsewhere');
     applyAssignInformant(world, 'scout', 'post', at(0, 0)); // override: day>=1, minutes [960,1200)
+    step(world, STANDARD_RULES);
+    runUntil(world, 76, STANDARD_RULES); // routine application attempt at tick 75
     return world;
   };
 

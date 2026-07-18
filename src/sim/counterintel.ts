@@ -1,4 +1,4 @@
-import { dayOf } from '../core/time';
+import { dayOf, TICKS_PER_DAY } from '../core/time';
 import { observationsFor, type Observation, type TickEvents } from './perception';
 import { juiciness, STANCE } from './rumors/propagation';
 import { reportThrough } from './reporting';
@@ -12,6 +12,9 @@ import {
   holdFieldObservation, holdObservedFieldReportItems, ingestObservedFieldReport,
 } from './directives/field-reports';
 import type { ObserverSpec } from './enemy/state';
+import { issueDirectiveRecord, strictNextBeat } from './directives/state';
+import type { DirectiveBrief, DirectiveCorrelation } from './directives/types';
+import type { EntityId } from './rumors/claim';
 
 export function noticedByObserver(spec: ObserverSpec, observation: Observation, rules: Rules): boolean {
   if (observation.kind === 'utterance') {
@@ -128,11 +131,88 @@ export function captureEvidence(world: WorldState, events: TickEvents, rules: Ru
 export const INTERROGATION = { from: 900, to: 1020 } as const;
 export const WATCH = { from: 960, to: 1140 } as const;
 
-function addOverride(world: WorldState, id: string, o: WorldState['scheduleOverrides'][string][number]): void {
-  world.scheduleOverrides[id] = [...(world.scheduleOverrides[id] ?? []), o];
+const aboutKey = (about: { family: string } | { subject: EntityId }): string =>
+  'family' in about ? `f:${about.family}` : `s:${about.subject}`;
+const inquiryOrderKey = (about: { family: string } | { subject: EntityId }): string =>
+  `inquiry:${aboutKey(about)}`;
+const interrogationOrderKey = (
+  target: EntityId, about: { family: string } | { subject: EntityId },
+): string => `interrogation:${target}:${aboutKey(about)}`;
+const watchOrderKey = (district: string): string => `watch:${district}`;
+
+export function enemyRoute(world: WorldState, recipient: EntityId): EntityId[] {
+  const district = world.enemy.map.directory.find((person) => person.id === recipient)?.district ?? null;
+  const relay = [...world.network.enemyAssets]
+    .map((asset) => asset.id)
+    .filter((id) => id !== recipient)
+    .filter((id) => world.enemy.map.directory.find((person) => person.id === id)?.district === district)
+    .sort()[0];
+  return relay === undefined ? [recipient] : [relay, recipient];
 }
 
-/** Decisions become world facts — all of them observable through ordinary perception. */
+function orderBrief(
+  world: WorldState, decision: EnemyDecision,
+  input:
+    | { kind: 'inquiry'; order: EnemyDecision['inquiries'][number] }
+    | { kind: 'interrogation'; order: EnemyDecision['interrogations'][number] }
+    | { kind: 'watch'; district: string; post: EnemyDecision['watches'][number]['posts'][number]; startDay: number },
+): { key: string; recipient: EntityId; brief: DirectiveBrief; correlation: DirectiveCorrelation } {
+  const issueTick = world.tick;
+  let key: string;
+  let recipient: EntityId;
+  let brief: DirectiveBrief;
+  if (input.kind === 'inquiry') {
+    const { order } = input;
+    key = inquiryOrderKey(order.about); recipient = order.asker;
+    brief = {
+      mission: { kind: 'learn', target: 'family' in order.about
+        ? { kind: 'story', family: order.about.family }
+        : { kind: 'person', id: order.about.subject } },
+      priority: 'important', authority: 'office', discretion: 'open', specificity: 'guided',
+      guidance: [], active: { from: strictNextBeat(issueTick), until: order.expiresDay * TICKS_PER_DAY - 1 },
+      report: 'outcome', reportBy: null, purpose: null,
+      application: { kind: 'enemy-inquiry', about: { ...order.about }, expiresDay: order.expiresDay },
+    };
+  } else if (input.kind === 'interrogation') {
+    const { order } = input;
+    key = interrogationOrderKey(order.target, order.about); recipient = order.guard;
+    brief = {
+      mission: { kind: 'learn', target: { kind: 'person', id: order.target } },
+      priority: 'urgent', authority: 'compel', discretion: 'quiet', specificity: 'detailed',
+      guidance: [{ kind: 'expected-presence', person: order.target, venue: order.venue,
+        at: order.day * TICKS_PER_DAY + INTERROGATION.from }],
+      active: { from: order.day * TICKS_PER_DAY + INTERROGATION.from,
+        until: order.day * TICKS_PER_DAY + INTERROGATION.to - 1 },
+      report: 'outcome', reportBy: null, purpose: null,
+      application: { kind: 'enemy-interrogation', target: order.target,
+        about: { ...order.about }, venue: order.venue, day: order.day },
+    };
+  } else {
+    key = watchOrderKey(input.district); recipient = input.post.guard;
+    brief = {
+      mission: { kind: 'learn', target: { kind: 'venue', id: input.post.venue } },
+      priority: 'important', authority: 'office', discretion: 'quiet', specificity: 'detailed',
+      guidance: [{ kind: 'expected-presence', person: input.post.guard, venue: input.post.venue,
+        at: input.startDay * TICKS_PER_DAY + WATCH.from }],
+      active: { from: input.startDay * TICKS_PER_DAY + WATCH.from,
+        until: (input.startDay + 7) * TICKS_PER_DAY + WATCH.to - 1 },
+      report: 'outcome', reportBy: null, purpose: null,
+      application: { kind: 'enemy-watch', district: input.district, post: { ...input.post },
+        startDay: input.startDay, subject: null, about: null },
+    };
+  }
+  const leadFeatureId = decision.features.find((feature) => {
+    if (input.kind === 'watch') return feature.district === input.district;
+    const about = input.order.about;
+    return 'family' in about ? feature.family === about.family : feature.subject === about.subject;
+  })?.id ?? null;
+  return { key, recipient, brief, correlation: {
+    kind: 'enemy-order', orderKey: key, leadFeatureId,
+    sourceRef: `order:${key}:${recipient}`,
+  } };
+}
+
+/** Record the digest and issue embodied orders; no remote operation is applied here. */
 export function applyEnemyDecision(world: WorldState, decision: EnemyDecision): void {
   const enemy = world.enemy;
   enemy.decisions.push(decision);
@@ -140,26 +220,38 @@ export function applyEnemyDecision(world: WorldState, decision: EnemyDecision): 
   enemy.featureCounter += decision.features.length;
   enemy.digestedThrough = enemy.evidence.length;
 
-  for (const q of decision.inquiries) {
-    world.inquiries[q.asker] = [...(world.inquiries[q.asker] ?? []),
-      { about: q.about, from: 'enemy', expiresDay: q.expiresDay, asked: [], answersHeard: 0 }];
-    enemy.inquiriesIssued.push('family' in q.about ? `f:${q.about.family}` : `s:${q.about.subject}`);
-  }
-  for (const order of decision.interrogations) {
-    enemy.interrogated.push(`${order.target}:${'family' in order.about ? `f:${order.about.family}` : `s:${order.about.subject}`}`);
-    for (const id of [order.guard, order.target]) {
-      addOverride(world, id, { fromDay: order.day, toDay: order.day + 1,
-        from: INTERROGATION.from, to: INTERROGATION.to, venue: order.venue, source: 'enemy' });
+  const spymaster = world.network.spymaster;
+  if (spymaster === null || !world.npcs[spymaster]) return;
+  const specs = [
+    ...decision.inquiries.map((order) => orderBrief(world, decision, { kind: 'inquiry', order })),
+    ...decision.interrogations.map((order) => orderBrief(world, decision, { kind: 'interrogation', order })),
+    ...decision.watches.flatMap((watch) => watch.posts.map((post) =>
+      orderBrief(world, decision, { kind: 'watch', district: watch.district, post, startDay: watch.startDay }))),
+  ];
+  const grouped = new Map<string, typeof specs>();
+  for (const spec of specs) (grouped.get(spec.key) ?? grouped.set(spec.key, []).get(spec.key)!).push(spec);
+  for (const [key, group] of [...grouped].sort(([a], [b]) => a.localeCompare(b))) {
+    if (enemy.pendingOrders?.some((pending) => pending.key === key)) continue;
+    const directiveIds: string[] = [];
+    let reconsiderAfterDay = decision.day;
+    for (const spec of group) {
+      // A person cannot physically hand a message to themself. Treat a digest-selected handler as
+      // an unqueued member of the group; other guards still receive their own embodied orders.
+      if (spec.recipient === spymaster) continue;
+      const route = enemyRoute(world, spec.recipient);
+      const record = issueDirectiveRecord(world, {
+        principal: 'enemy', principalId: spymaster, recipient: spec.recipient,
+        handoff: { outboundVia: route.slice(0, -1), reportVia: route.slice(0, -1).reverse() },
+        brief: spec.brief, correlation: spec.correlation, tick: world.tick, cause: null,
+      });
+      directiveIds.push(record.id);
+      reconsiderAfterDay = dayOf(spec.brief.active.until) + 2;
     }
-    world.inquiries[order.guard] = [...(world.inquiries[order.guard] ?? []),
-      { about: order.about, from: 'enemy', expiresDay: order.day + 2, asked: [], answersHeard: 0 }];
-  }
-  for (const w of decision.watches) {
-    enemy.watchedDistricts.push(w.district);
-    for (const post of w.posts) {
-      addOverride(world, post.guard, { fromDay: w.startDay, toDay: null,
-        from: WATCH.from, to: WATCH.to, venue: post.venue, source: 'enemy' });
-    }
+    if (directiveIds.length === 0) continue;
+    const pending = enemy.pendingOrders ?? (enemy.pendingOrders = []);
+    pending.push({ key, issuedDay: decision.day, reconsiderAfterDay, directiveIds });
+    const issued = enemy.issuedDirectiveIds ?? (enemy.issuedDirectiveIds = []);
+    issued.push(...directiveIds);
   }
 }
 
@@ -214,8 +306,14 @@ function spendCountermeasureBudget(world: WorldState, decision: EnemyDecision, r
  */
 export function runEnemyDay(world: WorldState, rules: Rules): void {
   if (world.enemy.observers.length === 0) return;
+  const day = dayOf(world.tick);
+  if (world.enemy.pendingOrders) {
+    world.enemy.pendingOrders = world.enemy.pendingOrders
+      .filter((pending) => day <= pending.reconsiderAfterDay);
+    if (world.enemy.pendingOrders.length === 0) delete world.enemy.pendingOrders;
+  }
   const pressure = pressureFor(exposureStatus(world).score);
-  const decision = enemyDigest(world.enemy, dayOf(world.tick), rules, pressure);
+  const decision = enemyDigest(world.enemy, day, rules, pressure);
   spendCountermeasureBudget(world, decision, rules);
   applyEnemyDecision(world, decision);
 }

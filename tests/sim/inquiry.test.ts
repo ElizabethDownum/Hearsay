@@ -73,23 +73,30 @@ describe('asking', () => {
     ]);
   });
 
-  it.each([
-    [
-      { kind: 'drop-pickup', actor: 'bez', ref: 'drop-payload-2', rank: 3 },
-      'phase4: drop-pickup handler not installed',
-    ],
-    [
-      { kind: 'recruitment-answer', actor: 'bez', ref: 'approach-2', rank: 0 },
-      'phase4: recruitment-answer handler not installed',
-    ],
-  ] as const)('names the uninstalled %s arm', (intent, message) => {
+  it('the Task-9 drop-pickup arm is installed and a stale payload ref realizes as a no-op', () => {
+    const intent = { kind: 'drop-pickup' as const, actor: 'bez', ref: 'drop-payload-2', rank: 3 as const };
+    const world = buildWorld(miniTown(), 'installed-drop-pickup');
+    const frame = collectCircleIntents(
+      world, { venue: 'square', members: ['ada', 'bez', 'cyn', 'dov'] },
+      0, RULES, [intent], new Set(),
+    );
+    expect(frame.selected).toContainEqual(intent);
+    const before = hashWorld(world);
+    expect(realizeCircleIntents(world, frame, 0, RULES))
+      .toEqual({ askings: [], answers: [], tellings: [], extras: [] });
+    expect(hashWorld(world)).toBe(before);
+  });
+
+  it('names the uninstalled recruitment-answer arm', () => {
+    const intent = { kind: 'recruitment-answer' as const, actor: 'bez', ref: 'approach-2', rank: 0 as const };
     const world = seededSimultaneousWorld(`uninstalled-${intent.kind}`);
     const frame = collectCircleIntents(
       world, { venue: 'square', members: ['ada', 'bez', 'cyn', 'dov'] },
       0, RULES, [intent], new Set(),
     );
     expect(frame.selected).toContainEqual(intent);
-    expect(() => realizeCircleIntents(world, frame, 0, RULES)).toThrow(message);
+    expect(() => realizeCircleIntents(world, frame, 0, RULES))
+      .toThrow('phase4: recruitment-answer handler not installed');
   });
 
   it('the Task-8 directive-act arm is installed and realizes a collected due intent', () => {

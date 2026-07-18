@@ -18,7 +18,7 @@ describe('player actions — validation matrix', () => {
     expect(world.playerVenue).toBe('backroom');
   });
 
-  it('assignInformant: non-informant throws; writes one player override; re-assign replaces it; enemy override untouched', () => {
+  it('assignInformant: a local handoff records requests without immediate operational writes', () => {
     const world = buildWorld(miniTown(), 'assign');
     enrollPlayer(world, { home: 'square' });
 
@@ -26,32 +26,30 @@ describe('player actions — validation matrix', () => {
       .toThrow(); // ada is not yet an informant
 
     world.intel.informants = [{ id: 'ada', assignedVenue: null }];
+    world.network.assets.push({ id: 'ada', mice: 'money', wagePaidThroughDay: 0, strikes: 0, facts: [] });
+    world.npcs['ada']!.edges.push({ to: 'you', kind: 'friend', trust: 0.8 });
     // A pre-existing ENEMY override on the same NPC must survive assignment.
     world.scheduleOverrides['ada'] = [
       { fromDay: 0, toDay: 1, from: 900, to: 1020, venue: 'home-0', source: 'enemy' },
     ];
 
     applyAction(world, { tick: 0, kind: 'assignInformant', informant: 'ada', venue: 'square' });
-    const afterFirst = world.scheduleOverrides['ada']!.filter((o) => o.source === 'player');
-    expect(afterFirst).toHaveLength(1);
-    expect(afterFirst[0]).toMatchObject({
-      fromDay: 1, toDay: null, from: 960, to: 1200, venue: 'square', source: 'player',
-    });
+    expect(world.scheduleOverrides['ada']!.filter((o) => o.source === 'player')).toHaveLength(0);
     expect(world.scheduleOverrides['ada']!.some((o) => o.source === 'enemy')).toBe(true);
-    expect(world.intel.informants[0]!.assignedVenue).toBe('square');
+    expect(world.intel.informants[0]!.assignedVenue).toBeNull();
+    expect(world.intel.requestedPosts).toContainEqual({ informant: 'ada', venue: 'square', authoredAt: 0 });
 
-    // Re-assign: exactly one player override remains (replaced, not appended).
+    // Later requests are append-only intent; no accepted application has landed yet.
     applyAction(world, { tick: 0, kind: 'assignInformant', informant: 'ada', venue: 'backroom' });
-    const afterSecond = world.scheduleOverrides['ada']!.filter((o) => o.source === 'player');
-    expect(afterSecond).toHaveLength(1);
-    expect(afterSecond[0]!.venue).toBe('backroom');
+    expect(world.scheduleOverrides['ada']!.filter((o) => o.source === 'player')).toHaveLength(0);
     expect(world.scheduleOverrides['ada']!.some((o) => o.source === 'enemy')).toBe(true);
 
-    // Unassign (venue null): the player override is cleared, enemy override kept.
+    // Unassignment is also a request until receipt/evaluation/application.
     applyAction(world, { tick: 0, kind: 'assignInformant', informant: 'ada', venue: null });
     expect(world.scheduleOverrides['ada']!.filter((o) => o.source === 'player')).toHaveLength(0);
     expect(world.scheduleOverrides['ada']!.some((o) => o.source === 'enemy')).toBe(true);
     expect(world.intel.informants[0]!.assignedVenue).toBeNull();
+    expect(world.intel.requestedPosts).toHaveLength(3);
   });
 
   it('assignInformant: unknown non-null venue throws', () => {
@@ -133,8 +131,8 @@ describe('player actions — validation matrix', () => {
 
 describe('player actions — deterministic replay', () => {
   const log: ActionLog = [
-    { tick: 0, kind: 'goTo', venue: 'backroom' },
     { tick: 0, kind: 'assignInformant', informant: 'ada', venue: 'square' },
+    { tick: 0, kind: 'goTo', venue: 'backroom' },
     { tick: 0, kind: 'codex', op: 'propose', npc: 'bez', trait: 'moralizer' },
     { tick: 0, kind: 'card', op: 'add', id: 'k1', text: 'note', confidence: 0.5, links: [] },
   ];
@@ -143,6 +141,8 @@ describe('player actions — deterministic replay', () => {
     const world = buildWorld(miniTown(), 'replay');
     enrollPlayer(world, { home: 'square' });
     world.intel.informants = [{ id: 'ada', assignedVenue: null }];
+    world.network.assets.push({ id: 'ada', mice: 'money', wagePaidThroughDay: 0, strikes: 0, facts: [] });
+    world.npcs['ada']!.edges.push({ to: 'you', kind: 'friend', trust: 0.8 });
     return world;
   }
 

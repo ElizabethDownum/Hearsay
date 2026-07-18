@@ -5,7 +5,8 @@ import { captureEvidence, noticedByObserver, runEnemyDay } from './counterintel'
 import { captureIntel } from './fieldwork';
 import { cloneSerializable, stableStringify } from './hash';
 import { chooseAnswer, collectOrdinaryAskOffers, expireInquiries, runPlayerAskPhase } from './inquiry';
-import { deliverCouriers } from './network/couriers';
+import { collectDropPickupIntents, realizeDropPickup } from './network/couriers';
+import { resolveInvitations } from './network/invitations';
 import { payWagesNightly } from './network/roster';
 import { runTurncoatPass } from './network/turncoats';
 import { observationsFor, type Asking, type TickEvents, type Utterance } from './perception';
@@ -27,6 +28,7 @@ import {
   attemptDirective, collectDirectiveActIntents, expireDirectiveExecutions,
   expireDirectiveActsBeforeCollection, markDirectiveDue,
   recordDirectiveInquiryAnswer, recordDirectiveInquiryAsked,
+  settleDirectiveApplications,
 } from './directives/execution';
 
 export interface ScheduledSetup {
@@ -143,7 +145,7 @@ const defaultExtra: RealizeExtraIntent<NetworkSpeech> = (world, intent, circle, 
     case 'directive-act':
       return attemptDirective(world, intent.ref, circle, t, rules) as NpcIntentRealization<NetworkSpeech>;
     case 'drop-pickup':
-      throw new Error('phase4: drop-pickup handler not installed');
+      return realizeDropPickup(world, intent.ref, circle, t, rules);
     case 'recruitment-answer':
       throw new Error('phase4: recruitment-answer handler not installed');
     default: {
@@ -193,7 +195,7 @@ export function realizeCircleIntents<Extra = NetworkSpeech>(
     askings.push(asking);
     task.asked.push(addressedTo);
     if (task.id !== undefined && task.directiveId !== undefined) {
-      recordDirectiveInquiryAsked(world, task.id, t);
+      recordDirectiveInquiryAsked(world, task.id, t, rules);
     }
     realizedAsks.push({ asking, taskIndex: intent.taskIndex });
   }
@@ -465,17 +467,13 @@ function resolveNpcSpeech(
   expireDirectiveActsBeforeCollection(world, tick, rules);
   const network = collectNetworkForwardIntents(world, tick, circles);
   const directives = collectDirectiveActIntents(world, tick, circles);
+  const pickups = collectDropPickupIntents(world, tick, circles);
   const phase = resolveAutonomousPhase(
-    world, rules, tick, circles, new Set(alreadySpoke), [...network, ...directives],
+    world, rules, tick, circles, new Set(alreadySpoke), [...network, ...pickups, ...directives],
   );
   askings.push(...phase.askings);
   utterances.push(...phase.answers, ...phase.tellings);
   networkSpeeches.push(...phase.extras);
-  // Transitional Plan-8 courier loop. Task 9 replaces it with directive-act candidates.
-  utterances.push(...deliverCouriers(world, tick, rules).map((utterance) => ({
-    ...utterance,
-    circleMembers: [...utterance.circleMembers].sort(),
-  })));
 }
 
 function recordAndIngest(
@@ -562,6 +560,8 @@ function recordAndIngest(
 }
 
 function resolveEnvironment(world: WorldState, rules: Rules, tick: Tick): void {
+  resolveInvitations(world, tick);
+  settleDirectiveApplications(world, tick, rules);
   expireDirectiveExecutions(world, tick, rules);
   if (minuteOfDay(tick) !== 1439) return;
   if (dayOfWeek(tick) === REST_DAY) {

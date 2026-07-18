@@ -1,7 +1,7 @@
 import type { Tick } from '../../core/time';
 import type { EntityId, RumorId, VenueId } from '../rumors/claim';
 import type { InjectSpec } from '../actions';
-import type { DirectiveState } from '../directives/types';
+import type { DirectiveId, DirectiveState, ShapePayload } from '../directives/types';
 
 export type Principal = 'player' | 'enemy';
 
@@ -53,9 +53,8 @@ export interface DeadDrop { id: string; venue: VenueId; knownBy: EntityId[] }
 
 /**
  * A courier run queued on one of the player's assets (Task 5): the payload, and the target it is
- * bound for. Store-and-forward made purchasable — it waits on the ASSET's own schedule and delivers
- * at their next beat sharing a circle with the target (step's deliverCouriers; the schedule does the
- * walking). Consumed deterministically; expires 3 days after tasking, undelivered, with NO refund.
+ * bound for. Store-and-forward made purchasable — it waits on the ASSET's own schedule and competes
+ * for the asset's autonomous slot at a real co-circle. Its clock begins at physical pickup/receipt.
  */
 export interface CourierTasking {
   /** Player-known planning-mark correlation; allocated append-only before the task is queued. */
@@ -67,8 +66,47 @@ export interface CourierTasking {
    *  handoff leg was skipped via a dead drop (no co-location, no `met-asset` — the drop's knownBy
    *  grew instead: the compartmentalization you can point to in the record). */
   viaDrop: string | null;
-  /** The tick the run was tasked — origin of the 3-day expiry clock. */
-  queuedTick: Tick;
+  /** The physical pickup/final receipt starts the only delivery clock. */
+  pickedUpAt: Tick;
+  expiresAt: Tick;
+}
+
+export type InvitationStatus =
+  | 'offered' | 'deferred' | 'accepted' | 'refused' | 'attended' | 'missed';
+
+export interface NetworkInvitation {
+  id: string;
+  kind: 'rendezvous' | 'hosting' | 'sound-out';
+  principal: Principal;
+  inviter: EntityId;
+  counterparty: EntityId;
+  invitee: EntityId;
+  venue: VenueId;
+  requested: { from: Tick; until: Tick };
+  scheduled: { from: Tick; until: Tick } | null;
+  status: InvitationStatus;
+  offeredAt: Tick;
+  respondedAt: Tick | null;
+  setupId: string | null;
+  sourceDirectiveId: DirectiveId | null;
+  attendedAt: Tick | null;
+  closedAt: Tick | null;
+}
+
+export interface PendingDropPayload {
+  id: string;
+  planId: string;
+  principal: Principal;
+  directiveId: DirectiveId;
+  dropId: string;
+  asset: EntityId;
+  target: EntityId;
+  artifact: { payload: ShapePayload; target: EntityId };
+  placedAt: Tick;
+  pickedUpAt: Tick | null;
+  expiresAt: Tick | null;
+  deliveredAt: Tick | null;
+  failedAt: Tick | null;
 }
 
 export interface NetworkState {
@@ -90,6 +128,8 @@ export interface NetworkState {
   sales: { family: RumorId; buyer: EntityId }[];
   /** Plan 11 is lazy: untouched worlds serialize exactly as before. */
   directiveState?: DirectiveState;
+  invitations?: NetworkInvitation[];
+  dropPayloads?: PendingDropPayload[];
 }
 
 /** A fresh, empty network compartment — the neutral world-init value (buildWorld seeds this). */

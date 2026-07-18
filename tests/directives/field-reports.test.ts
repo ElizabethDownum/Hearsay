@@ -321,10 +321,10 @@ describe('combined remote state flips remain epistemically invisible', () => {
       authoredAt: 0, acknowledgedAt: null,
     }];
     value.network.pendingCouriers = [
-      { planId: 'pickup-hidden', asset: 'ada', target: 'bez', viaDrop: null, queuedTick: 0,
+      { planId: 'pickup-hidden', asset: 'ada', target: 'bez', viaDrop: null, pickedUpAt: 0, expiresAt: 4320,
         spec: { subject: 'cyn', predicate: 'stole', object: null, count: 1, severity: 3,
           place: null, attribution: 'someone' } },
-      { planId: 'expiry-hidden', asset: 'ada', target: 'cyn', viaDrop: null, queuedTick: 0,
+      { planId: 'expiry-hidden', asset: 'ada', target: 'cyn', viaDrop: null, pickedUpAt: 0, expiresAt: 4320,
         spec: { subject: 'bez', predicate: 'stole', object: null, count: 1, severity: 3,
           place: null, attribution: 'someone' } },
     ];

@@ -7,7 +7,6 @@ import { applySetDrop, applyCourier, type InjectSpec } from '../../src/sim/actio
 import { applyAction, runLogOn, type Action } from '../../src/sim/campaign';
 import { circlesAt } from '../../src/sim/agents';
 import { runUntil } from '../../src/sim/step';
-import { deliverCouriers } from '../../src/sim/network/couriers';
 import { reportThrough } from '../../src/sim/reporting';
 import { compartmentOf } from '../../src/sim/network/compartment';
 import { assetFor } from '../../src/sim/network/roster';
@@ -81,7 +80,7 @@ describe('courier delivery — the real schedule intersection does the walking',
     // dara is a northside-only NPC (never met at the market) — the delivery MUST wait for anselm's walk.
     applyCourier(world, 'anselm', spec, 'dara', null, taskTick, RULES);
 
-    const expected = firstCoCircle(world, 'anselm', 'dara', taskTick);
+    const expected = firstCoCircle(world, 'anselm', 'dara', taskTick + 5 * CONVERSATION_BEAT);
     // Derived, not hand-guessed: it is a real conversation beat on day 0, after the handoff.
     expect(minuteOfDay(expected) % CONVERSATION_BEAT).toBe(0);
     expect(dayOf(expected)).toBe(0);
@@ -107,7 +106,7 @@ describe('courier delivery — the real schedule intersection does the walking',
     runUntil(world, taskTick, RULES);
     const spec: InjectSpec = { subject: 'tomas', predicate: 'stole', object: null, count: 1, severity: 2, place: null, attribution: SOMEONE };
     applyCourier(world, 'anselm', spec, 'dara', null, taskTick, RULES);
-    const expected = firstCoCircle(world, 'anselm', 'dara', taskTick);
+    const expected = firstCoCircle(world, 'anselm', 'dara', taskTick + 5 * CONVERSATION_BEAT);
 
     // One beat SHORT of the intersection: nothing delivered, the run still pending.
     runUntil(world, expected, RULES);
@@ -127,7 +126,7 @@ describe('courier delivery — trait-transformed BY THE ASSET on the way out (co
     // Named subject + attribution so mara's attributor stays inert — the count/severity move is the exaggerator's alone.
     const spec: InjectSpec = { subject: 'tomas', predicate: 'stole', object: null, count: 2, severity: 2, place: null, attribution: 'seth' };
     applyCourier(world, 'mara', spec, 'rafe', null, taskTick, RULES);
-    const expected = firstCoCircle(world, 'mara', 'rafe', taskTick);
+    const expected = firstCoCircle(world, 'mara', 'rafe', taskTick + 5 * CONVERSATION_BEAT);
     runUntil(world, expected + 1, RULES);
 
     const family = compartmentOf(world, 'player', 'mara').find((f) => f.kind === 'carried-story')!.ref;
@@ -157,7 +156,7 @@ describe('courier delivery — trait-transformed BY THE ASSET on the way out (co
     // ...but the courier TELLING carries the payload with their REAL firmware only (anselm: literalist +
     // moralizer, both inert on a no-sinVersion 'stole' count) — so the delivered count is UNCHANGED.
     applyCourier(world, 'anselm', spec, 'dara', null, taskTick, RULES);
-    const expected = firstCoCircle(world, 'anselm', 'dara', taskTick);
+    const expected = firstCoCircle(world, 'anselm', 'dara', taskTick + 5 * CONVERSATION_BEAT);
     runUntil(world, expected + 1, RULES);
     const family = compartmentOf(world, 'player', 'anselm').find((f) => f.kind === 'carried-story')!.ref;
     expect(world.beliefs['dara']![family]!.claim.count).toBe(spec.count); // 4 — NOT doubled
@@ -183,8 +182,8 @@ describe('courier handoff — face vs drop record EXACTLY different facts (compa
     const wd = testWorld('courier-drop');
     makeAsset(wd, 'mara', 'money');
     applySetDrop(wd, 'drop-1', 'market', RULES);
-    wd.playerVenue = 'chapel'; // the avatar is elsewhere — irrelevant to a drop, which is the point
-    applyCourier(wd, 'mara', spec, 'rafe', 'drop-1', 0, RULES);
+    runUntil(wd, at(0, 8), RULES); // the carrier is physically present to learn the cache
+    applyCourier(wd, 'mara', spec, 'rafe', 'drop-1', at(0, 8), RULES);
     const drop = compartmentOf(wd, 'player', 'mara');
     expect(drop.some((f) => f.kind === 'met-asset')).toBe(false);
     expect(drop.some((f) => f.kind === 'knows-drop' && f.ref === 'drop-1')).toBe(true);
@@ -218,32 +217,35 @@ describe('courier ideology refusal — they will not smear their own faction', (
     expect(world.npcs['tomas']!.faction).toBe('crown');
     const otherSide: InjectSpec = { subject: 'tomas', predicate: 'stole', object: null, count: 1, severity: 3, place: null, attribution: SOMEONE };
     applyCourier(world, 'mara', otherSide, 'rafe', null, t, RULES);
-    expect(world.network.pendingCouriers).toHaveLength(1);
+    expect(world.network.pendingCouriers).toHaveLength(0);
 
     // Her own side, but FLATTERING: only damaging is refused.
     expect(RULES.predicates['blessed-the-harvest']!.valence).toBe('flattering');
     const flatterOwn: InjectSpec = { subject: 'rafe', predicate: 'blessed-the-harvest', object: null, count: 1, severity: 2, place: null, attribution: SOMEONE };
     applyCourier(world, 'mara', flatterOwn, 'rafe', null, t, RULES);
-    expect(world.network.pendingCouriers).toHaveLength(2);
+    expect(world.network.directiveState!.records).toHaveLength(2);
   });
 });
 
 describe('courier expiry — a run undelivered after 3 days lapses, and the coin is NOT refunded', () => {
   it('drops the pending run at day 3 with no delivery and no refund (priced failure)', () => {
     const world = testWorld('courier-expiry');
-    makeAsset(world, 'dara', 'money');
+    makeAsset(world, 'mara', 'money');
     applySetDrop(world, 'drop-x', 'market', RULES); // via a drop so no co-location is needed to task
+    world.network.drops[0]!.knownBy.push('mara');
     const coinAfterDrop = world.coin;
     // dara (northside only) and tomas (docks/town only) NEVER share a venue — no intersection, ever.
     const spec: InjectSpec = { subject: 'mara', predicate: 'stole', object: null, count: 1, severity: 2, place: null, attribution: SOMEONE };
-    applyCourier(world, 'dara', spec, 'tomas', 'drop-x', 0, RULES);
+    applyCourier(world, 'mara', spec, 'dara', 'drop-x', 0, RULES);
     const coinAfterTask = world.coin;
     expect(coinAfterTask).toBe(coinAfterDrop - STANDARD_ECONOMY.courierRun);
-    expect(world.network.pendingCouriers).toHaveLength(1);
+    expect(world.network.pendingCouriers).toHaveLength(0); // placement is not pickup
 
-    runUntil(world, at(3, 0, 1), RULES); // through the first day-3 beat, where the 3-day clock lapses
+    runUntil(world, at(3, 6, 1), RULES); // pickup is day 0 06:00; expiry is exactly three days later
     expect(world.network.pendingCouriers).toHaveLength(0);                                  // expired, removed
-    expect(compartmentOf(world, 'player', 'dara').some((f) => f.kind === 'carried-story')).toBe(false); // never delivered
+    expect(world.network.dropPayloads![0]!.pickedUpAt).toBe(at(0, 6));
+    expect(world.network.dropPayloads![0]!.failedAt).toBe(at(3, 6));
+    expect(compartmentOf(world, 'player', 'mara').some((f) => f.kind === 'carried-story')).toBe(false); // never delivered
     expect(world.coin).toBe(coinAfterTask); // NO refund — and no rest-day nightly falls in days 0-2 to move coin
   });
 });
@@ -259,7 +261,7 @@ describe('courier heat — a guard hearing the delivery attributes the CARRIER, 
     applyAction(world, { tick: t, kind: 'recruit', target: 'anselm', mice: 'money', leverageFamily: null }, RULES);
     const spec: InjectSpec = { subject: 'tomas', predicate: 'poisoned', object: null, count: 1, severity: 5, place: null, attribution: SOMEONE };
     applyCourier(world, 'anselm', spec, 'dara', null, t, RULES);
-    const expected = firstCoCircle(world, 'anselm', 'dara', t);
+    const expected = firstCoCircle(world, 'anselm', 'dara', t + 5 * CONVERSATION_BEAT);
     const evBefore = world.enemy.evidence.length;
     runUntil(world, expected + 1, RULES);
 
@@ -289,7 +291,7 @@ describe('setDrop — public venues only, priced, avatar-known implicitly', () =
     expect(drop.knownBy).toEqual(['you']); // placer = avatar, implicitly
     expect(world.coin).toBe(coin0 - STANDARD_ECONOMY.deadDropSetup);
 
-    expect(() => applySetDrop(world, 'd1', 'tavern', RULES)).toThrow(/duplicate/); // id reuse
+    expect(() => applySetDrop(world, 'd1', 'market', RULES)).toThrow(/duplicate/); // id reuse
 
     world.coin = STANDARD_ECONOMY.deadDropSetup - 1; // one short
     const before = hashWorld(world);
@@ -332,7 +334,7 @@ describe('courier preconditions — validate-before-mutate refusals', () => {
 
 // ── O5b: same-beat distinct-family minting (guards the P6-T7 keyed-collision class) ───────────────
 describe('courier delivery — same-beat distinct-family minting (O5b)', () => {
-  it('two runs delivering in ONE beat mint DISTINCT families off the global counter — never a keyed collision', () => {
+  it('two physically picked-up runs retain distinct planning identities and exact pickup clocks', () => {
     // A single public venue with exactly 4 residents → circlesAt forms ONE circle of all four, so both
     // (asset → target) pairs co-locate the SAME beat: the two-delivery-in-one-call condition, by construction.
     const fixture: TownFixture = {
@@ -349,23 +351,18 @@ describe('courier delivery — same-beat distinct-family minting (O5b)', () => {
     }
     const mk = (subject: string): InjectSpec => ({ subject, predicate: 'stole', object: null, count: 2, severity: 3, place: null, attribution: SOMEONE });
     const t = at(0, 8);       // a conversation beat
-    const queued = at(0, 7);  // strictly before t, same day (no expiry, delivery fires t > queuedTick)
-    world.network.pendingCouriers.push({ planId: 'plan-0', asset: 'a1', spec: mk('t2'), target: 't1', viaDrop: null, queuedTick: queued });
-    world.network.pendingCouriers.push({ planId: 'plan-1', asset: 'a2', spec: mk('t1'), target: 't2', viaDrop: null, queuedTick: queued });
+    const queued = at(0, 7);
 
-    const before = world.claimCounter;
-    const delivered = deliverCouriers(world, t, RULES);
+    world.network.pendingCouriers.push({ planId: 'plan-0', asset: 'a1', spec: mk('t2'), target: 't1',
+      viaDrop: null, pickedUpAt: queued, expiresAt: queued + 3 * 1440 });
+    world.network.pendingCouriers.push({ planId: 'plan-1', asset: 'a2', spec: mk('t1'), target: 't2',
+      viaDrop: null, pickedUpAt: queued, expiresAt: queued + 3 * 1440 });
 
-    expect(delivered).toHaveLength(2); // NON-VACUOUS: BOTH runs delivered this same beat
-    const families = delivered.map((u) => u.claim.family).sort();
-    // Distinct families is the whole guard — a keyed scheme (vignettes' pair-granular ids) could collide;
-    // the global counter can't. They are exactly the two consecutive mints f{n}, f{n+1}.
-    expect(new Set(families).size).toBe(2);
-    expect(families).toEqual([`f${before}`, `f${before + 1}`]);
-    // …and each courier's compartment recorded its OWN carried family, distinct from the other's.
-    const f1 = compartmentOf(world, 'player', 'a1').find((f) => f.kind === 'carried-story')!.ref;
-    const f2 = compartmentOf(world, 'player', 'a2').find((f) => f.kind === 'carried-story')!.ref;
-    expect(f1).not.toBe(f2);
+    expect(world.network.pendingCouriers).toHaveLength(2);
+    expect(new Set(world.network.pendingCouriers.map((run) => run.planId)).size).toBe(2);
+    expect(world.network.pendingCouriers.every((run) => run.pickedUpAt === queued)).toBe(true);
+    expect(world.network.pendingCouriers.every((run) => run.expiresAt === queued + 3 * 1440)).toBe(true);
+    expect(t).toBeGreaterThan(queued);
   });
 });
 

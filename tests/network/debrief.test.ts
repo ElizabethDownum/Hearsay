@@ -5,7 +5,7 @@ import { STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT } from '../../src/content/gen
 import { generateValidTown } from '../../src/world/serve';
 import { worldFromTown, attachPlayer } from '../../src/world/attach';
 import {
-  applyDebrief, applyGoTo, applyInject, applyMeet, type InjectSpec,
+  applyDebrief, applyGoTo, applyInject, type InjectSpec,
 } from '../../src/sim/actions';
 import { applyAction, runLogOn, type Action } from '../../src/sim/campaign';
 import { runUntil } from '../../src/sim/step';
@@ -64,6 +64,15 @@ function makeAsset(w: WorldState, id: EntityId, mice: 'money' | 'ideology' | nul
 
 const BEAT = CONVERSATION_BEAT; // 15 — the meet's one-beat pull lands exactly here from tick 0
 
+/** Debrief-focused setup: place the asset for one real safehouse beat without exercising meet. */
+function stageSafehouse(w: WorldState, asset: EntityId, tick: number): void {
+  w.scheduleOverrides[asset] = [{
+    fromDay: dayOf(tick), toDay: dayOf(tick) + 1,
+    from: tick % 1440, to: tick % 1440 + CONVERSATION_BEAT,
+    venue: 'safehouse', source: 'player', sourceRef: `test-debrief:${asset}:${tick}`,
+  }, ...(w.scheduleOverrides[asset] ?? [])];
+}
+
 const spec: InjectSpec = { subject: 'dot', predicate: 'stole', object: null, count: 3, severity: 3, place: null, attribution: SOMEONE };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -78,7 +87,7 @@ describe('debrief — validate-before-mutate refusals (zero residue)', () => {
   it('refuses when the avatar is not at the safehouse', () => {
     const w = world('debrief-wrongvenue');
     makeAsset(w, 'ann');
-    applyMeet(w, 'ann', 0);
+    stageSafehouse(w, 'ann', BEAT);
     runUntil(w, BEAT, RULES);
     applyGoTo(w, 'tavern');
     const before = hashWorld(w);
@@ -106,7 +115,7 @@ describe('debrief — validate-before-mutate refusals (zero residue)', () => {
   it('refuses an asset with nothing in their belief store', () => {
     const w = world('debrief-empty');
     makeAsset(w, 'ann');
-    applyMeet(w, 'ann', 0);
+    stageSafehouse(w, 'ann', BEAT);
     runUntil(w, BEAT, RULES);
     const before = hashWorld(w);
     expect(() => applyDebrief(w, 'ann', BEAT, RULES)).toThrow(/nothing|belief store/i);
@@ -119,7 +128,7 @@ describe('debrief — extraction bypasses discretion exactly once per debrief', 
   it('extracts a held-close, low-trust belief a normal ask genuinely refuses (BY MECHANISM)', () => {
     const w = world('debrief-bypass');
     makeAsset(w, 'ann', 'money', 0.3); // well under the 0.7 confide line
-    applyMeet(w, 'ann', 0);
+    stageSafehouse(w, 'ann', BEAT);
     runUntil(w, BEAT, RULES);
 
     const claim: Claim = { id: 'c-held', family: 'f-held', parent: null, ...spec };
@@ -158,7 +167,7 @@ describe('debrief — trust slide exact (zero new constants)', () => {
   it('slides disposition by exactly -0.1 and adds exactly one strike', () => {
     const w = world('debrief-slide');
     makeAsset(w, 'ann', 'money', 0.6);
-    applyMeet(w, 'ann', 0);
+    stageSafehouse(w, 'ann', BEAT);
     runUntil(w, BEAT, RULES);
     applyInject(w, 'ann', spec); // something in their belief store to extract
 
@@ -175,7 +184,7 @@ describe('debrief — ideology refusal (same law as courier)', () => {
   it('REFUSES when the picked family is a damaging claim about their own faction (zero residue)', () => {
     const w = world('debrief-ideology-refuse');
     makeAsset(w, 'bri', 'ideology', 0.6); // bri is faction 'guild'
-    applyMeet(w, 'bri', 0);
+    stageSafehouse(w, 'bri', BEAT);
     runUntil(w, BEAT, RULES);
     const ownSide: InjectSpec = { subject: 'cy', predicate: 'stole', object: null, count: 1, severity: 3, place: null, attribution: SOMEONE }; // cy is guild too
     applyInject(w, 'bri', ownSide);
@@ -188,7 +197,7 @@ describe('debrief — ideology refusal (same law as courier)', () => {
   it('answers a damaging claim about ANOTHER faction, and a flattering claim about its own', () => {
     const w1 = world('debrief-ideology-ok-other');
     makeAsset(w1, 'bri', 'ideology', 0.6);
-    applyMeet(w1, 'bri', 0);
+    stageSafehouse(w1, 'bri', BEAT);
     runUntil(w1, BEAT, RULES);
     const otherSide: InjectSpec = { subject: 'dot', predicate: 'stole', object: null, count: 1, severity: 3, place: null, attribution: SOMEONE }; // dot is crown
     applyInject(w1, 'bri', otherSide);
@@ -196,7 +205,7 @@ describe('debrief — ideology refusal (same law as courier)', () => {
 
     const w2 = world('debrief-ideology-ok-flatter');
     makeAsset(w2, 'bri', 'ideology', 0.6);
-    applyMeet(w2, 'bri', 0);
+    stageSafehouse(w2, 'bri', BEAT);
     runUntil(w2, BEAT, RULES);
     const flatterOwn: InjectSpec = { subject: 'cy', predicate: 'blessed-the-harvest', object: null, count: 1, severity: 2, place: null, attribution: SOMEONE };
     applyInject(w2, 'bri', flatterOwn);
@@ -221,12 +230,14 @@ describe('debrief joins the Action union', () => {
     const build = (): WorldState => {
       const w = world('debrief-replay');
       makeAsset(w, 'ann');
+      stageSafehouse(w, 'ann', 0);
+      stageSafehouse(w, 'ann', 2 * BEAT);
       applyInject(w, 'ann', spec);
       return w;
     };
     const log: Action[] = [
       { tick: 0, kind: 'meet', asset: 'ann' },
-      { tick: BEAT, kind: 'debrief', asset: 'ann' },
+      { tick: 2 * BEAT, kind: 'debrief', asset: 'ann' },
     ];
     const a = runLogOn(build(), RULES, log, at(0, 2));
     const b = runLogOn(build(), RULES, log, at(0, 2));
@@ -256,7 +267,7 @@ describe('debrief — the compelled-independent floors survive compulsion (self-
   it('skips a self-subject damaging OLDEST belief; debriefs the next-oldest answerable one (self-dirt never surfaces)', () => {
     const w = world('debrief-selfdirt');
     makeAsset(w, 'ann', 'money', 0.6);
-    applyMeet(w, 'ann', 0);
+    stageSafehouse(w, 'ann', BEAT);
     runUntil(w, BEAT, RULES);
 
     seatBelief(w, 'ann', 'f-self', 'ann', 'stole', 0.9, 0);   // OLDEST: dirt on ANN herself (damaging) — floored
@@ -273,7 +284,7 @@ describe('debrief — the compelled-independent floors survive compulsion (self-
   it('skips a below-DISMISS OLDEST belief; debriefs the next-oldest above-floor one', () => {
     const w = world('debrief-belowdismiss');
     makeAsset(w, 'ann', 'money', 0.6);
-    applyMeet(w, 'ann', 0);
+    stageSafehouse(w, 'ann', BEAT);
     runUntil(w, BEAT, RULES);
 
     seatBelief(w, 'ann', 'f-faint', 'dot', 'stole', 0.1, 0);  // OLDEST: credence below STANCE.DISMISS (0.2) — floored
@@ -290,7 +301,7 @@ describe('debrief — the compelled-independent floors survive compulsion (self-
   it('refuses (zero residue) when EVERY belief is floored (self-dirt and/or below-DISMISS)', () => {
     const w = world('debrief-allfloored');
     makeAsset(w, 'ann', 'money', 0.6);
-    applyMeet(w, 'ann', 0);
+    stageSafehouse(w, 'ann', BEAT);
     runUntil(w, BEAT, RULES);
 
     seatBelief(w, 'ann', 'f-self', 'ann', 'stole', 0.9, 0);   // self-dirt — floored
@@ -329,7 +340,7 @@ describe('debrief — attribution discloses the asset\'s OWN source (T9 carry / 
   it('reports attribution === heardFrom for a named-source belief, not the stored claim.attribution', () => {
     const w = world('debrief-disclose-named');
     makeAsset(w, 'ann', 'money', 0.6);
-    applyMeet(w, 'ann', 0);
+    stageSafehouse(w, 'ann', BEAT);
     runUntil(w, BEAT, RULES);
     // ann HEARD it from bri; the STORY claims it came from cy — the propaganda field diverges.
     const claim = seatSourced(w, 'ann', 'f-named', 'bri', 'cy');
@@ -347,7 +358,7 @@ describe('debrief — attribution discloses the asset\'s OWN source (T9 carry / 
   it('is a no-op for injected/witnessed beliefs — attribution stays SOMEONE', () => {
     const wi = world('debrief-disclose-injected');
     makeAsset(wi, 'ann', 'money', 0.6);
-    applyMeet(wi, 'ann', 0);
+    stageSafehouse(wi, 'ann', BEAT);
     runUntil(wi, BEAT, RULES);
     applyInject(wi, 'ann', spec); // heardFrom 'injected', attribution SOMEONE — the existing-suite shape
     let logBefore = wi.intel.log.length;
@@ -356,7 +367,7 @@ describe('debrief — attribution discloses the asset\'s OWN source (T9 carry / 
 
     const ww = world('debrief-disclose-witnessed');
     makeAsset(ww, 'ann', 'money', 0.6);
-    applyMeet(ww, 'ann', 0);
+    stageSafehouse(ww, 'ann', BEAT);
     runUntil(ww, BEAT, RULES);
     seatSourced(ww, 'ann', 'f-wit', 'witnessed', SOMEONE); // ground-truth secret — attribution SOMEONE
     logBefore = ww.intel.log.length;
@@ -371,7 +382,7 @@ describe('debrief — attribution discloses the asset\'s OWN source (T9 carry / 
     const w = world('debrief-disclose-turned');
     makeAsset(w, 'ann', 'money', 0.6);
     assetFor(w, 'player', 'ann')!.turned = true; // a player asset CAN be turned (see debrief-flip) — minimizer fires
-    applyMeet(w, 'ann', 0);
+    stageSafehouse(w, 'ann', BEAT);
     runUntil(w, BEAT, RULES);
     const claim = seatSourced(w, 'ann', 'f-turned', 'bri', 'cy', 'dot', 4, 4); // severity 4, count 4
 
@@ -430,8 +441,8 @@ describe("debrief — the strike compounds into Task 8's flip precondition (inte
     // Four debriefs on the HOT world only: 0.75 -> 0.65 -> 0.55 -> 0.45 -> 0.35 (< 0.4, the flip line).
     let tick = hot.tick;
     for (let i = 0; i < 4; i++) {
-      applyMeet(hot, asset, tick);
       const nextBeat = tick + CONVERSATION_BEAT;
+      stageSafehouse(hot, asset, nextBeat);
       runUntil(hot, nextBeat, RULES);
       applyDebrief(hot, asset, nextBeat, RULES);
       tick = nextBeat;

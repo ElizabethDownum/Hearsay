@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { buildWorld, buildTownMap } from '../../src/sim/world';
 import { applyEnemyDecision } from '../../src/sim/counterintel';
 import { enemyDigest } from '../../src/sim/enemy/digest';
-import { circlesAt, positionOf } from '../../src/sim/agents';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { SOMEONE } from '../../src/sim/rumors/claim';
-import { at } from '../../src/core/time';
 import { emptyEnemyState, type EnemyState, type EvidenceEntry } from '../../src/sim/enemy/state';
 import type { Npc, TownFixture, WorldState } from '../../src/sim/types';
 
@@ -39,6 +37,7 @@ const FIXTURE: TownFixture = {
     // guards — enough of them (6) to also stand up the generous-roster control (e).
     npc('gale', 'home-w0'), npc('gorm', 'home-w0'), npc('ida', 'home-w0'),
     npc('hugo', 'home-w1'), npc('jago', 'home-w1'), npc('lark', 'home-w1'),
+    npc('boss', 'home-w0', 'spymaster'),
     // interrogation targets — real npcs so their CIRCLE presence (or absence) is checkable.
     npc('mira', 'home-w0', 'grocer'), npc('sten', 'home-w0', 'carter'), npc('rosa', 'home-w1', 'weaver'),
   ],
@@ -47,6 +46,7 @@ const FIXTURE: TownFixture = {
 function worldWith(observers: EnemyState['observers'], evidence: EvidenceEntry[]): WorldState {
   const world = buildWorld(FIXTURE, `schedule-${observers.map((o) => o.id).join('-')}`);
   world.enemy = { ...emptyEnemyState(), observers, map: buildTownMap(FIXTURE), evidence };
+  world.network.spymaster = 'boss';
   return world;
 }
 
@@ -75,11 +75,10 @@ describe('I-1 fix — two interrogations never merge into one circle (schedule-a
 
     const world = worldWith(observers, INTERROGATION_EVIDENCE);
     applyEnemyDecision(world, d);
-    const t = at(2, 0, 950); // day 2 (order.day = day+1), inside INTERROGATION [900,1020)
-    const circles = circlesAt(world, t);
-    const guardPost = circles.filter((c) => c.venue === 'guard-post-w0');
-    expect(guardPost).toHaveLength(1);
-    expect(guardPost[0]!.members.slice().sort()).toEqual(['gale', 'mira'].sort());
+    expect(world.scheduleOverrides['gale']).toBeUndefined();
+    expect(world.scheduleOverrides['mira']).toBeUndefined();
+    expect(world.enemy.pendingOrders).toHaveLength(1);
+    expect(world.network.directiveState!.messages).toHaveLength(1);
   });
 
   it('(b) two DISTINCT guards sharing a district, 2 candidates: no merged circle — degradation to one order', () => {
@@ -90,15 +89,10 @@ describe('I-1 fix — two interrogations never merge into one circle (schedule-a
 
     const world = worldWith(observers, INTERROGATION_EVIDENCE);
     applyEnemyDecision(world, d);
-    const t = at(2, 0, 950);
-    const circles = circlesAt(world, t);
-    const guardPost = circles.filter((c) => c.venue === 'guard-post-w0');
-    expect(guardPost).toHaveLength(1);
-    expect(guardPost[0]!.members).toHaveLength(2); // never the 4-way {gale,gorm,mira,sten} merge
-    // the guard NOT chosen for the emitted order never appears in a circle with a target.
-    const chosenTarget = d.interrogations[0]!.target;
-    const otherTarget = chosenTarget === 'mira' ? 'sten' : 'mira';
-    expect(positionOf(world, world.npcs[otherTarget]!, t)).not.toBe('guard-post-w0');
+    expect(world.scheduleOverrides['gale']).toBeUndefined();
+    expect(world.scheduleOverrides['gorm']).toBeUndefined();
+    expect(world.enemy.pendingOrders).toHaveLength(1);
+    expect(world.network.directiveState!.records).toHaveLength(1);
   });
 
   it('(c) two guards in DIFFERENT districts: both interrogations fire, two separate circles, both targets interrogated (non-vacuity control)', () => {
@@ -109,12 +103,11 @@ describe('I-1 fix — two interrogations never merge into one circle (schedule-a
 
     const world = worldWith(observers, INTERROGATION_EVIDENCE);
     applyEnemyDecision(world, d);
-    const t = at(2, 0, 950);
-    const circles = circlesAt(world, t);
-    const postW0 = circles.find((c) => c.venue === 'guard-post-w0');
-    const postW1 = circles.find((c) => c.venue === 'guard-post-w1');
-    expect(postW0?.members.slice().sort()).toEqual(['gale', 'mira'].sort());
-    expect(postW1?.members.slice().sort()).toEqual(['hugo', 'sten'].sort());
+    expect(world.scheduleOverrides['gale']).toBeUndefined();
+    expect(world.scheduleOverrides['hugo']).toBeUndefined();
+    expect(world.scheduleOverrides['mira']).toBeUndefined();
+    expect(world.scheduleOverrides['sten']).toBeUndefined();
+    expect(world.enemy.pendingOrders).toHaveLength(2);
   });
 });
 
@@ -149,13 +142,11 @@ describe('I-2 fix — a watch order is never a phantom (schedule-application lay
     expect(d.watches.length).toBeGreaterThan(0); // non-vacuous: at least one order still fires
 
     const world = worldWith(observers, WATCH_EVIDENCE);
-    applyEnemyDecision(world, d);
-    const t = at(2, 0, 1000); // day 2 (startDay = day+1), inside WATCH [960,1140)
-    // the honest-degradation invariant: EVERY watch order this digest emitted really has its
-    // posted guards standing at that order's own venue — never a sibling order's silent override.
+    applyEnemyDecision(world, { ...d, inquiries: [], interrogations: [] });
+    // Digest application only queues the physical orders; no intended post is operational yet.
     for (const w of d.watches) {
       for (const post of w.posts) {
-        expect(positionOf(world, world.npcs[post.guard]!, t)).toBe(post.venue);
+        expect(world.scheduleOverrides[post.guard]).toBeUndefined();
       }
     }
     // with only 2 total guards fully claimed by the first watch, the second watchable
@@ -176,12 +167,12 @@ describe('I-2 fix — a watch order is never a phantom (schedule-application lay
     expect([...guardsUsed[0]!].some((g) => guardsUsed[1]!.has(g))).toBe(false); // disjoint
 
     const world = worldWith(observers, WATCH_EVIDENCE);
-    applyEnemyDecision(world, d);
-    const t = at(2, 0, 1000);
+    applyEnemyDecision(world, { ...d, inquiries: [], interrogations: [] });
     for (const w of d.watches) {
       for (const post of w.posts) {
-        expect(positionOf(world, world.npcs[post.guard]!, t)).toBe(post.venue);
+        expect(world.scheduleOverrides[post.guard]).toBeUndefined();
       }
     }
+    expect(world.enemy.pendingOrders).toHaveLength(2);
   });
 });

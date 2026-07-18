@@ -108,6 +108,12 @@ function applyEnvelopeDelta(brief: DirectiveBrief, claimedIssuer: EntityId | typ
     } else if (next.mission.kind === 'shape' && next.mission.audience.kind === 'person') {
       next.mission.audience.id = subject;
     } else if (next.mission.kind === 'sound-out') next.mission.target = subject;
+    const application = next.application;
+    if (application?.kind === 'courier' || application?.kind === 'enemy-interrogation') {
+      application.target = subject;
+    } else if (application?.kind === 'enemy-watch') {
+      application.subject = subject;
+    }
   }
   if (owns(delta, 'place')) {
     const index = venueGuidanceIndex(next);
@@ -118,6 +124,15 @@ function applyEnvelopeDelta(brief: DirectiveBrief, claimedIssuer: EntityId | typ
         const row = next.guidance[index]!;
         if (row.kind === 'expected-presence' || row.kind === 'avoid-venue') row.venue = place;
       }
+    }
+    const application = next.application;
+    if (application?.kind === 'posting' && application.venue !== null && place !== undefined) {
+      application.venue = place;
+    } else if (place !== null && place !== undefined) {
+      if (application?.kind === 'rendezvous'
+        || application?.kind === 'enemy-interrogation'
+        || application?.kind === 'cancel-watch') application.venue = place;
+      else if (application?.kind === 'enemy-watch') application.post.venue = place;
     }
   }
   if (owns(delta, 'attribution') && delta.attribution !== undefined) issuer = delta.attribution;

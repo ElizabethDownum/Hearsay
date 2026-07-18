@@ -13,7 +13,7 @@ import type { TownFixture, WorldState } from './types';
 import type { EntityId, RumorId, VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
 import type { Mice } from './network/types';
-import type { DirectiveBrief, DirectiveHandoff } from './directives/types';
+import type { DirectiveBrief, DirectiveHandoff, PlayerDirectiveApplication } from './directives/types';
 import { buildWorld } from './world';
 
 export interface InjectAction {
@@ -146,6 +146,7 @@ export interface DirectiveAction {
   recipient: EntityId;
   handoff: DirectiveHandoff;
   brief: DirectiveBrief;
+  application?: PlayerDirectiveApplication;
 }
 
 /** The player's recorded verbs — the entire save-relevant intent surface. */
@@ -227,7 +228,7 @@ export function applyAction(world: WorldState, action: Action, rules?: Rules): v
       applySell(world, action.buyer, action.family, action.tick, rules);
       break;
     case 'directive':
-      applyDirective(world, action.recipient, action.handoff, action.brief, action.tick);
+      applyDirective(world, action.recipient, action.handoff, action.brief, action.tick, action.application);
       break;
     default: {
       // Saves are untrusted JSON — an unknown kind must fail loudly, never silently no-op.

@@ -164,6 +164,8 @@ export interface ScheduleOverride {
   venue: VenueId;
   /** Provenance: who placed this override — assignment replaces only its own ('player'). */
   source: 'enemy' | 'player' | 'vignette';
+  /** Exact operational provenance; absent keeps pre-Task-9 data byte-compatible. */
+  sourceRef?: string;
 }
 
 export interface WorldState {

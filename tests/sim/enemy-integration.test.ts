@@ -15,8 +15,25 @@ const stole = { subject: 'otto', predicate: 'stole', object: null,
 
 /** Drive step() from `from` to `to`, handing every tick's events to `sink`. */
 function driveCollecting(world: ReturnType<typeof watchfordWorld>, to: number,
-  sink: (e: TickEvents) => void): void {
-  while (world.tick < to) sink(step(world, STANDARD_RULES));
+  sink: (e: TickEvents) => void,
+  beforeStep: (world: ReturnType<typeof watchfordWorld>) => void = () => {}): void {
+  while (world.tick < to) {
+    beforeStep(world);
+    sink(step(world, STANDARD_RULES));
+  }
+}
+
+/** Issue at a real spymaster/recipient co-circle and execute that physical handoff before tests
+ * advance to the operation day. Watchford puts sten with gale at 08:00 and hugo at 18:00. */
+function deliverOrderAtContact(
+  world: ReturnType<typeof watchfordWorld>, decision: EnemyDecision, contactTick: number,
+) {
+  world.tick = contactTick;
+  applyEnemyDecision(world, decision);
+  step(world, STANDARD_RULES);
+  const record = world.network.directiveState!.records.at(-1)!;
+  expect(record.received?.tick).toBe(contactTick);
+  return record;
 }
 
 describe('the full trace chain — interrogation walks a citizen to the guard post', () => {
@@ -38,21 +55,21 @@ describe('the full trace chain — interrogation walks a citizen to the guard po
   // compulsion). This is the faithful realization of the brief's intended mechanism.
   it('interrogation → authority asking at the invitational venue → compelled vague answer → evidence → origin-vague + carrier-profile', () => {
     const world = watchfordWorld('trace-1');
-    world.network.spymaster = 'gale';
+    world.network.spymaster = 'sten'; // the bridge handler can physically reach gale and hear reports
     // hop zero: seed rosa with an injected damaging story. heardFrom 'injected' ⇒
     // when disclosed under interrogation her attribution is SOMEONE (she names nobody).
     applyInject(world, 'rosa', stole);
-    // Apply BY HAND one interrogation. applyEnemyDecision also pushes gale's matching
-    // enemy-origin inquiry task {about:{family:'f0'}, from:'enemy', expiresDay: day+2}.
+    // The order never moves its target. Stage a lawful target visit so the named guard can ask her.
+    world.npcs['rosa']!.schedule.unshift({ days: 'all', from: 900, to: 1020, venue: 'guard-post-w0' });
+    // Apply BY HAND one interrogation. The decision queues a physical order; only gale's later
+    // application attempt may create the enemy-origin inquiry task and bounded guard override.
     const decision: EnemyDecision = {
       day: 0, features: [], inquiries: [], watches: [],
       interrogations: [{ target: 'rosa', guard: 'gale', day: 1, about: { family: 'f0' }, venue: 'guard-post-w0' }],
     };
-    applyEnemyDecision(world, decision);
-    // Forced & deterministic: skip day 0 so the hand-applied decision is the sole
-    // enemy input. The nightly digest CANNOT consume gale's task (it is pure — reads
-    // only enemy state, never world.inquiries); only expireInquiries could, and it
-    // keeps tasks whose expiresDay (3) > day+1. gale's task is pristine at the window.
+    deliverOrderAtContact(world, decision, at(0, 8));
+    // The order was physically delivered at 08:00. Skip the rest of day 0 so the hand-applied
+    // decision remains the sole enemy input; the due setup survives the deterministic jump.
     world.tick = at(1, 0);
     runUntil(world, at(2, 0), STANDARD_RULES);
 
@@ -83,31 +100,26 @@ describe('the full trace chain — interrogation walks a citizen to the guard po
     expect(world.enemy.sketch.find((f) => f.kind === 'carrier-profile')).toMatchObject({ subject: 'rosa' });
   });
 
-  // The Watchford geometry finding, pinned as a permanent test: the brief's literal
-  // decision (target mira). The trace chain's TAIL still forms, but via the public
-  // square, NOT the guard post — because gale meets mira before the override window.
-  it('geometry finding — a co-located target is exhausted at the public square before the override fires', () => {
+  // Task 9's geometry finding: pre-window co-location cannot execute an order whose application
+  // has not started. At the real window only the guard moves, so a target who stays in the square
+  // is never asked and no remote enemy fact is fabricated.
+  it('geometry finding — pre-window co-location cannot substitute for the exact interrogation window', () => {
     const world = watchfordWorld('trace-mira');
-    world.network.spymaster = 'gale';
+    world.network.spymaster = 'sten';
     applyInject(world, 'mira', stole);
-    applyEnemyDecision(world, {
+    deliverOrderAtContact(world, {
       day: 0, features: [], inquiries: [], watches: [],
       interrogations: [{ target: 'mira', guard: 'gale', day: 1, about: { family: 'f0' }, venue: 'guard-post-w0' }],
-    });
+    }, at(0, 8));
     world.tick = at(1, 0);
     runUntil(world, at(2, 0), STANDARD_RULES);
 
     const askings = world.chronicle.filter((c) => c.kind === 'asking');
-    // gale's authority question DID fire — but at square-w0 (public), before 900.
-    const atSquare = askings.find((c) => c.kind === 'asking' &&
-      c.speaker === 'gale' && c.addressedTo === 'mira' && c.authority && c.venue === 'square-w0');
-    expect(atSquare).toBeDefined();
-    expect(minuteOfDay(atSquare!.tick)).toBeLessThan(900);
-    // …and so NO asking ever lands at the interrogation venue: mira was already `asked`.
+    // The order moves only the guard. Mira never visits the named post, so no asking occurs anywhere.
+    expect(askings.some((c) => c.kind === 'asking'
+      && c.speaker === 'gale' && c.addressedTo === 'mira')).toBe(false);
     expect(askings.some((c) => c.kind === 'asking' && c.venue === 'guard-post-w0')).toBe(false);
-    // The tail still forms (compulsion was redundant here — trust already discloses).
-    expect(world.enemy.sketch.some((f) => f.kind === 'origin-vague' && f.subject === 'mira')).toBe(true);
-    expect(world.enemy.sketch.some((f) => f.kind === 'carrier-profile' && f.subject === 'mira')).toBe(true);
+    expect(world.enemy.sketch.some((f) => f.kind === 'origin-vague' && f.subject === 'mira')).toBe(false);
   });
 });
 
@@ -116,8 +128,13 @@ describe('watches are visible — the Counter-Sketch feed', () => {
     const seed = 'watch-1';
     const inject = (w: ReturnType<typeof watchfordWorld>): void => {
       applyInject(w, 'mira', stole);
-      // a second live story keeps district w0 gossiping past saturation
-      applyInject(w, 'otto', { subject: 'gale', predicate: 'is-bankrupt', object: null,
+    };
+    const injectLateWatchStory = (w: ReturnType<typeof watchfordWorld>): void => {
+      if (w.tick !== at(1, 18)) return;
+      // Physical delivery makes the important watch operational after the old 16:00 cooldown
+      // burst. Stage the comparison's second story at 18:00, while the accepted guard is still
+      // posted and the four w0 occupants share one real circle.
+      applyInject(w, 'otto', { subject: 'gale', predicate: 'stole', object: null,
         count: null, severity: 4, place: null, attribution: SOMEONE });
     };
     const watch: EnemyDecision = {
@@ -127,9 +144,10 @@ describe('watches are visible — the Counter-Sketch feed', () => {
 
     // WITH the watch: hugo (a w1 guard) is posted to square-w0 from day 1.
     const world = watchfordWorld(seed);
-    world.network.spymaster = 'gale';
+    world.network.spymaster = 'sten';
     inject(world);
-    applyEnemyDecision(world, watch);
+    const watchRecord = deliverOrderAtContact(world, watch, at(0, 18));
+    world.tick = at(1, 0);
     let miraSawHugo = 0;
     let hugoSampledW0 = 0;
     driveCollecting(world, at(5, 0), (events) => {
@@ -143,13 +161,14 @@ describe('watches are visible — the Counter-Sketch feed', () => {
           (o) => o.kind === 'presence' && o.venue === 'square-w0' &&
           (o.actor === 'mira' || o.actor === 'otto'))) hugoSampledW0++;
       }
-    });
-    // Re-encoded by mechanism (P6-T8): the guard stands at square-w0 for every window-tick, and
-    // mira/otto are at square-w0 [480,1230) across the whole retuned window — so both presence
-    // counts equal the window width, whatever WATCH is. (Presence is venue-level co-location; the
-    // 4-person cap is on conversation circles, not who stands in the square.)
-    expect(miraSawHugo).toBe(WATCH.to - WATCH.from);
-    expect(hugoSampledW0).toBe(WATCH.to - WATCH.from);
+    }, injectLateWatchStory);
+    // The important-order evaluator acts one beat after the active window opens, and the override
+    // becomes positional reality on the following tick. Count the exact physically operational
+    // portion rather than the retired immediate-order window.
+    const firstOperationalTick = watchRecord.execution!.changedAt + 1;
+    expect(dayOf(firstOperationalTick)).toBe(1);
+    expect(miraSawHugo).toBe(WATCH.to - minuteOfDay(firstOperationalTick));
+    expect(hugoSampledW0).toBe(WATCH.to - minuteOfDay(firstOperationalTick));
 
     // CONTROL: identical world, no watch applied. hugo never reaches square-w0.
     const control = watchfordWorld(seed);
@@ -161,22 +180,21 @@ describe('watches are visible — the Counter-Sketch feed', () => {
       if (dayOf(events.tick) === 1 && min >= WATCH.from && min < WATCH.to &&
         observationsFor('mira', events).observations.some(
           (o) => o.kind === 'presence' && o.actor === 'hugo' && o.venue === 'square-w0')) controlSawHugo++;
-    });
+    }, injectLateWatchStory);
     expect(controlSawHugo).toBe(0);
 
     // Coverage actually increased: WITH the watch hugo's evidence now includes captures
     // from square-w0 (territory his w1 schedule never reached); WITHOUT it, zero.
-    // (The retuned window {960,1140} now spans the 960 cooldown-burst that the old {1080,1200}
-    // missed — w0 tellings cluster at 480/720/960/1200 — so the coverage gain lands from day 1's
-    // window onward, not a day late. The delta assertion below stays a pure existence check.)
-    // Hugo did capture at the post. Because Gale shares square-w0 during the continuing watch,
-    // the normal network-forward phase has already completed their physical report contact by the
-    // end of this five-day drive; the retained held row records both capture and later delivery.
+    // The retuned window still contains the staged 18:00 story after physical order delivery's
+    // lawful one-beat evaluator delay. The delta assertion below stays a pure existence check.
+    // Hugo did capture at the post. When the watch window closes he returns to square-w1, where
+    // Sten can physically hear the report; the retained held row records both capture and delivery.
     const hugoReport = world.network.directiveState!.heldObservations.find((row) =>
       row.principal === 'enemy' && row.observer === 'hugo'
       && row.content.kind === 'raw' && row.content.observation.kind === 'utterance'
       && row.content.observation.venue === 'square-w0');
     expect(hugoReport).toBeDefined();
+    expect(hugoReport!.observedAt).toBe(at(1, 18));
     expect(hugoReport!.queuedIn).not.toBeNull();
     expect(hugoReport!.deliveredAt).not.toBeNull();
     expect(hugoReport!.deliveredAt!).toBeGreaterThan(hugoReport!.observedAt);

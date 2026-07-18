@@ -109,6 +109,7 @@ export function collectOrdinaryAskOffers(
     const task = tasks[taskIndex]!;
     const preferred = members
       .filter((candidate) => candidate !== actor && !task.asked.includes(candidate))
+      .filter((candidate) => task.addressee === undefined || candidate === task.addressee)
       .filter((candidate) => task.from === 'enemy' || trustBetween(world, actor, candidate) > 0)
       .sort((a, b) =>
         trustBetween(world, actor, b) - trustBetween(world, actor, a) || a.localeCompare(b));
@@ -181,6 +182,7 @@ export function runAskPhase(
     if (!task) continue;
     const eligible = circle.members
       .filter((m) => m !== member && !task.asked.includes(m) && !spoke.has(m))
+      .filter((m) => task.addressee === undefined || m === task.addressee)
       .filter((m) => task.from === 'enemy' || trustBetween(world, member, m) > 0)
       .sort((a, b) =>
         trustBetween(world, member, b) - trustBetween(world, member, a) || (a < b ? -1 : 1));

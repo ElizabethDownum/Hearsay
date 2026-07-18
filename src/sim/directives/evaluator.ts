@@ -12,6 +12,7 @@ import type {
   BriefVersion, DirectiveDecisionProfile, DirectiveMethod, DirectiveMission,
   DirectiveTarget,
 } from './types';
+import { applicationOf } from './types';
 
 export interface ReceivedBriefInput {
   directiveId: string;
@@ -79,13 +80,25 @@ function retarget(target: DirectiveTarget, input: ReceivedBriefInput,
 }
 
 function baseMethod(mission: DirectiveMission, input: ReceivedBriefInput, rules: Rules): DirectiveMethod {
+  const application = applicationOf(input.version.brief);
+  if (mission.kind === 'learn' && application.kind === 'enemy-inquiry') {
+    return 'family' in application.about
+      ? { kind: 'ask', target: { kind: 'story', family: application.about.family } }
+      : { kind: 'ask', target: { kind: 'person', id: application.about.subject } };
+  }
+  if (mission.kind === 'learn' && application.kind === 'enemy-interrogation') {
+    return { kind: 'ask', target: { kind: 'person', id: application.target } };
+  }
   if (mission.kind === 'learn') return mission.target.kind === 'story'
     ? { kind: 'ask', target: mission.target }
     : { kind: 'observe', target: mission.target };
   if (mission.kind === 'shape') return {
     kind: 'tell', audience: mission.audience,
+    // projectBrief already applied the recipient's one private-interpretation trait pass to
+    // mission.payload. Apply only the selected operation here; a second recipient trait chain
+    // would make a courier exaggerator double the same carried count twice.
     payload: projectShapePayloadForMethod(mission.payload, mission.operation,
-      mission.redirectTo, input.recipient, rules, input.perceivedScrutiny),
+      mission.redirectTo, { ...input.recipient, traits: [] }, rules, input.perceivedScrutiny),
   };
   return mission.meeting === null
     ? { kind: 'approach', target: mission.target }

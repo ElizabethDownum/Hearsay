@@ -107,6 +107,12 @@ function stageLadder(seed: string): { world: WorldState; town: GeneratedTown } {
   // sly→you trust so a single addressed anti-sly tell lands at REPEAT (budget rung, it-4). Post-enrol —
   // 'you' does not exist at fixture-build time.
   world.npcs['sly']!.edges.push({ to: 'you', kind: 'colleague', trust: 0.5 });
+  for (const id of ['ida', 'obs']) {
+    world.scheduleOverrides[id] = [{
+      fromDay: 7, toDay: 8, from: 0, to: 1440,
+      venue: 'safehouse', source: 'vignette', sourceRef: `test-host-offer:${id}`,
+    }];
+  }
   return { world, town };
 }
 
@@ -154,13 +160,14 @@ const CAMPAIGN: Action[] = [
   { tick: 0, kind: 'recruit', target: 'cass', mice: 'money', leverageFamily: null },
   { tick: 0, kind: 'setDrop', id: 'd1', venue: 'market' },
   { tick: 0, kind: 'courier', asset: 'cass', spec: poison('vane'), target: 'nell', viaDrop: 'd1' },
+  { tick: at(7, 8) - 1, kind: 'goTo', venue: 'safehouse' },
   { tick: at(7, 8), kind: 'host', venue: 'back-room-d0', invitees: ['ida', 'obs'] },
 ];
 
 describe('full-ladder e2e — the ladder climbs, the books balance', () => {
   it('every rung fires by mechanism; the compartment is complete; the coin books balance to the exact integer', () => {
     const { world } = stageLadder('ladder-books');
-    runLogOn(world, RULES, CAMPAIGN, at(8, 0)); // through day 7
+    runLogOn(world, RULES, CAMPAIGN, at(8, 20, 1)); // through the physically attended event
 
     // ── Rung 1 (recruit, money): cass is on the roster, recruited-by:player, coin debited. ──────────
     const cass = assetFor(world, 'player', 'cass');
@@ -187,7 +194,7 @@ describe('full-ladder e2e — the ladder climbs, the books balance', () => {
     //    attended-hosting fact on each — a guest list that is evidence when compartments crack. ──────
     for (const id of ['ida', 'obs']) {
       expect(world.scheduleOverrides[id]!.some((o) => o.venue === 'back-room-d0' && o.source === 'player')).toBe(true);
-      expect(compartmentOf(world, 'player', id)).toContainEqual({ tick: at(7, 8), kind: 'attended-hosting', ref: 'back-room-d0' });
+      expect(compartmentOf(world, 'player', id)).toContainEqual({ tick: at(8, 20), kind: 'attended-hosting', ref: 'back-room-d0' });
     }
 
     // ── The coin books balance to the EXACT expected integer, DERIVED through the full flow (O4). If

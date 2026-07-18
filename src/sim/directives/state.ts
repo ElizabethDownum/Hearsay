@@ -5,7 +5,8 @@ import type { WorldState } from '../types';
 import { cloneSerializable } from '../hash';
 import type { Principal } from '../network/types';
 import type {
-  DirectiveState, MessageId, NetworkPayload, NetworkSpeech, ScrutinyCause,
+  DirectiveBrief, DirectiveCorrelation, DirectiveHandoff, DirectiveRecord, DirectiveState,
+  MessageId, NetworkPayload, NetworkSpeech, ScrutinyCause,
 } from './types';
 
 export const SCRUTINY: Record<ScrutinyCause, { weight: number; decayDays: number }> = {
@@ -100,6 +101,55 @@ export function allocateNetworkMessage(
     cause: cloneSerializable(cause),
   });
   return id;
+}
+
+/** One cycle-free issuer for player presets, custom directives, and enemy orders. */
+export function issueDirectiveRecord(
+  world: WorldState,
+  input: {
+    principal: Principal;
+    principalId: EntityId;
+    recipient: EntityId;
+    handoff: DirectiveHandoff;
+    brief: DirectiveBrief;
+    correlation?: DirectiveCorrelation;
+    directiveId?: string;
+    tick: number;
+    cause: NetworkSpeech['cause'];
+    queue?: boolean;
+  },
+): DirectiveRecord {
+  if (input.queue !== false) {
+    validateNetworkRoute(world, input.principalId, [...input.handoff.outboundVia, input.recipient]);
+  }
+  const state = ensureDirectiveState(world);
+  const directiveId = input.directiveId ?? allocateDirectiveId(state);
+  if (state.records.some((record) => record.id === directiveId)) {
+    throw new Error(`directive: duplicate reserved id '${directiveId}'`);
+  }
+  const version = {
+    id: allocateVersionId(state), parent: null, directiveId,
+    brief: cloneSerializable(input.brief), claimedIssuer: input.principalId,
+    replyRoute: input.brief.report === 'none'
+      ? null : [...input.handoff.reportVia, input.principalId],
+    changedBy: null, changes: [],
+  };
+  const record: DirectiveRecord = {
+    id: directiveId, principal: input.principal, principalId: input.principalId,
+    recipient: input.recipient, issuedAt: input.tick,
+    handoff: cloneSerializable(input.handoff), authored: cloneSerializable(version),
+    ...(input.correlation && input.correlation.kind !== 'none'
+      ? { correlation: cloneSerializable(input.correlation) } : {}),
+    received: null, decision: null, execution: null, receivedReports: [],
+  };
+  state.records.push(record);
+  if (input.queue === false) return record;
+  allocateNetworkMessage(
+    world, input.principal, input.principalId,
+    [...input.handoff.outboundVia, input.recipient],
+    { kind: 'directive', version }, input.tick, input.brief.active.until, input.cause,
+  );
+  return record;
 }
 
 export function recordScrutiny(

@@ -1,6 +1,6 @@
 import type { Tick } from '../../core/time';
 import type { InjectSpec } from '../actions';
-import type { ReportedClaim } from '../enemy/state';
+import type { ReportedClaim, WatchPost } from '../enemy/state';
 import type { CompartmentFact, Mice, Principal } from '../network/types';
 import type { InquiryKey, Observation } from '../perception';
 import type { Claim, ClaimId, EntityId, RumorId, VenueId, SOMEONE } from '../rumors/claim';
@@ -49,6 +49,30 @@ export type DirectiveDiscretion = 'open' | 'quiet' | 'compartmented';
 export type DirectiveSpecificity = 'outcome-only' | 'guided' | 'detailed';
 export type ReportExpectation = 'none' | 'outcome' | 'reasoned' | 'full';
 
+export type DirectiveApplication =
+  | { kind: 'standard' }
+  | { kind: 'posting'; venue: VenueId | null }
+  | { kind: 'rendezvous'; venue: VenueId; from: Tick; until: Tick }
+  | { kind: 'courier'; target: EntityId }
+  | { kind: 'enemy-inquiry'; about: InquiryKey; expiresDay: number }
+  | { kind: 'enemy-interrogation'; target: EntityId; about: InquiryKey; venue: VenueId; day: number }
+  | {
+      kind: 'enemy-watch'; district: string; post: WatchPost; startDay: number;
+      subject: EntityId | null; about: InquiryKey | null;
+    }
+  | { kind: 'cancel-watch'; district: string; guard: EntityId; venue: VenueId; startDay: number };
+
+export type DirectiveCorrelation =
+  | { kind: 'none' }
+  | { kind: 'courier'; planId: string; dropPayloadId: string | null }
+  | { kind: 'enemy-order'; orderKey: string; leadFeatureId: string | null; sourceRef: string };
+
+export type PlayerDirectiveApplication =
+  | { kind: 'standard' }
+  | { kind: 'posting'; venue: VenueId | null }
+  | { kind: 'rendezvous'; venue: VenueId; from: Tick; until: Tick }
+  | { kind: 'courier'; target: EntityId };
+
 export type AdvisoryGuidance =
   | { kind: 'expected-presence'; person: EntityId; venue: VenueId; at: Tick }
   | { kind: 'avoid-person'; person: EntityId }
@@ -68,6 +92,16 @@ export interface DirectiveBrief {
   report: ReportExpectation;
   reportBy: Tick | null;
   purpose: string | null;
+  /** Absent is byte-compatible with the original generic brief and always means standard. */
+  application?: DirectiveApplication;
+}
+
+export function applicationOf(brief: Pick<DirectiveBrief, 'application'>): DirectiveApplication {
+  return brief.application ?? { kind: 'standard' };
+}
+
+export function correlationOf(record: { correlation?: DirectiveCorrelation }): DirectiveCorrelation {
+  return record.correlation ?? { kind: 'none' };
 }
 
 export interface BriefChange { field: string; from: unknown; to: unknown }
@@ -146,6 +180,8 @@ export interface DirectiveExecutionResult {
   uncertainty: 'low' | 'medium' | 'high';
   reportedClaim: Claim | null;
   factRefs: { asset: EntityId; factIndex: number }[];
+  /** Physical enemy work said in the returned report; absent is the pre-Task-9 null shape. */
+  enemyAction?: EnemyActionReport | null;
 }
 
 export type ReportedFieldObservation =
@@ -282,6 +318,8 @@ export interface DirectiveRecord {
   issuedAt: Tick;
   handoff: DirectiveHandoff;
   authored: BriefVersion;
+  /** Association-only bookkeeping. It is never projected into speech or mutation. */
+  correlation?: DirectiveCorrelation;
   received: {
     tick: Tick;
     version: BriefVersion;

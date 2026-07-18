@@ -131,7 +131,7 @@ describe('directive execution', () => {
     expect(world.inquiries.ada?.[0]).toMatchObject({
       id: record.id, directiveId: record.id, from: 'player', expiresAt: 120,
     });
-    recordDirectiveInquiryAsked(world, record.id, due + 15);
+    recordDirectiveInquiryAsked(world, record.id, due + 15, STANDARD_RULES);
     expect(record.execution).toMatchObject({ state: 'awaiting-answer', waiting: {
       kind: 'story-answer', taskId: record.id, expiresAt: 120,
     } });
@@ -270,7 +270,7 @@ describe('directive execution', () => {
       markDirectiveDue(pair.world, pair.record.id, pair.world.tick);
       attemptDirective(pair.world, pair.record.id,
         { venue: 'square', members: ['ada', 'bez'] }, pair.world.tick, STANDARD_RULES);
-      recordDirectiveInquiryAsked(pair.world, pair.record.id, 30);
+      recordDirectiveInquiryAsked(pair.world, pair.record.id, 30, STANDARD_RULES);
       pair.world.tick = 45;
     }
     const answer: Utterance = { tick: 45, venue: 'square', circleMembers: ['ada', 'bez'],

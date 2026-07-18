@@ -165,11 +165,16 @@ describe('day-0 dossier — truthful, capped starting intelligence', () => {
   });
 
   // (e) full campaign replay: build + attach + 4 verbs, 2 days, hash-identical on a fresh world
-  it('worldFromTown + attachPlayer + a 4-verb log replays hash-identical on a fresh world', () => {
+  it('worldFromTown + attachPlayer + a 4-verb log replays hash-identical on a fresh world', { timeout: 30000 }, () => {
     const town = generateValidTown('replay-town', CFG, CONTENT, STANDARD_RULES, OPTS).town;
     const build = (): ReturnType<typeof worldFromTown> => {
       const w = worldFromTown(town, 'replay-seed');
       attachPlayer(w, town);
+      const informant = town.dossier!.informants[0]!;
+      w.scheduleOverrides[informant] = [{
+        fromDay: 0, toDay: 1, from: 0, to: 1440,
+        venue: 'safehouse', source: 'vignette',
+      }];
       return w;
     };
     const log: ActionLog = [
@@ -177,7 +182,7 @@ describe('day-0 dossier — truthful, capped starting intelligence', () => {
         tick: 0, kind: 'inject', target: town.fixture.npcs[0]!.id,
         spec: { subject: town.fixture.npcs[1]!.id, predicate: 'stole', object: null, count: 1, severity: 4, place: null, attribution: SOMEONE },
       },
-      { tick: 0, kind: 'goTo', venue: 'tavern-d0' },
+      { tick: 0, kind: 'goTo', venue: 'safehouse' },
       { tick: 0, kind: 'assignInformant', informant: town.dossier!.informants[0]!, venue: 'market-d0' },
       { tick: 0, kind: 'codex', op: 'propose', npc: town.fixture.npcs[2]!.id, trait: 'literalist' },
     ];

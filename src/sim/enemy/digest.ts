@@ -58,6 +58,8 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
   const inquiries: InquiryOrder[] = [];
   const interrogations: InterrogationOrder[] = [];
   const watches: WatchOrder[] = [];
+  const pending = new Set((state.pendingOrders ?? [])
+    .filter((order) => day <= order.reconsiderAfterDay).map((order) => order.key));
 
   // Dedupe consults the persisted sketch PLUS features already grown this digest.
   const has = (pred: (f: SketchFeature) => boolean): boolean =>
@@ -165,7 +167,8 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
         evidence: [ref(answer)],
       });
     }
-    if (firstObserver !== null && !state.inquiriesIssued.includes(`s:${s}`)) {
+    if (firstObserver !== null && !state.inquiriesIssued.includes(`s:${s}`)
+      && !pending.has(`inquiry:s:${s}`)) {
       inquiries.push({ asker: firstObserver, about: { subject: s }, expiresDay: day + 3 });
     }
   }
@@ -177,6 +180,7 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
     if (!has((f) => f.kind === 'district-activity' && f.family === family)) continue;
     if (has((f) => f.kind === 'origin-vague' && f.family === family)) continue;
     if (state.inquiriesIssued.includes(`f:${family}`)) continue;
+    if (pending.has(`inquiry:f:${family}`)) continue;
     for (const asker of observerIds.slice(0, 2)) {
       inquiries.push({ asker, about: { family }, expiresDay: day + 3 });
     }
@@ -193,7 +197,8 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
     const a = e.reported.attribution;
     if (a === SOMEONE || a === e.speaker) continue;
     if (has((f) => f.kind === 'origin-vague' && f.family === e.family)) continue;
-    if (state.interrogated.includes(`${a}:f:${e.family}`)) continue;
+    if (state.interrogated.includes(`${a}:f:${e.family}`)
+      || pending.has(`interrogation:${a}:f:${e.family}`)) continue;
     candidates.push({ target: a, family: e.family });
   }
   candidates.sort((x, y) => byId(x.target, y.target) || byId(x.family, y.family));
@@ -237,7 +242,8 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
       countByDistrict.set(f.district, (countByDistrict.get(f.district) ?? 0) + 1);
     }
     const watchable = [...countByDistrict.entries()]
-      .filter(([d, n]) => n >= 2 && !state.watchedDistricts.includes(d) && publicVenuesOf(d).length > 0)
+      .filter(([d, n]) => n >= 2 && !state.watchedDistricts.includes(d)
+        && !pending.has(`watch:${d}`) && publicVenuesOf(d).length > 0)
       .map(([d]) => d)
       .sort(byId);
     // Pressure >= 1 lifts the cap 1 -> 2, taking the NEXT watchable district off the SAME
