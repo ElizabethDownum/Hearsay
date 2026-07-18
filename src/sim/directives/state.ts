@@ -58,6 +58,24 @@ export function allocateVersionId(state: DirectiveState): string {
   return id;
 }
 
+/** Allocate a child-copy id without colliding with imported or already-carried version ids. */
+export function allocateProjectedVersionId(world: WorldState): string {
+  const state = ensureDirectiveState(world);
+  const used = new Set<string>();
+  for (const record of state.records) {
+    used.add(record.authored.id);
+    if (record.received) used.add(record.received.version.id);
+  }
+  for (const carried of state.messages) {
+    if (carried.payload.kind === 'directive' || carried.payload.kind === 'handler-brief') {
+      used.add(carried.payload.version.id);
+    }
+  }
+  let id = allocateVersionId(state);
+  while (used.has(id)) id = allocateVersionId(state);
+  return id;
+}
+
 export function allocateObservationId(state: DirectiveState): string {
   const id = `o${state.nextObservation}`;
   state.nextObservation += 1;

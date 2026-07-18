@@ -105,6 +105,7 @@ function brief(overrides: Partial<DirectiveBrief> = {}): DirectiveBrief {
     ],
     active: { from: 0, until: at(12, 23, 59) },
     report: 'outcome', reportBy: null, purpose: 'identify the source before departure',
+    application: { kind: 'posting', venue: 'square-w0' },
     ...overrides,
   };
 }
@@ -132,25 +133,37 @@ function issueAndReceivePlayerBrief(world: WorldState): {
   return { record, copy: copies[0]! };
 }
 
-function mutateEverySourceStage(record: DirectiveRecord): void {
-  record.received!.tick += 1;
-  record.received!.version.brief.priority = 'routine';
-  record.received!.version.claimedIssuer = 'otto';
-  record.received!.version.replyRoute = null;
-  record.received!.handoffFrom = 'otto';
-  record.received!.messageId = 'source-mutated';
-  const decision = record.decision!;
-  decision.interpretation = { kind: 'learn', target: { kind: 'venue', id: 'square-w1' } };
-  decision.commitment = 'refuse';
-  decision.initiative = 'literal';
-  decision.risk = 'avoidant';
-  decision.method = { kind: 'hold' };
-  decision.timing = { actAt: null, reportAt: null };
-  decision.disclosure = {
-    outcome: false, reason: false, evidence: false, source: false, uncertainty: false,
-  };
-  decision.candor = 'guarded';
-  record.execution = { state: 'aborted', changedAt: 99, dueAt: null, waiting: null };
+function leafPaths(value: unknown, path: string[] = []): string[][] {
+  if (Array.isArray(value)) {
+    return [path, ...value.flatMap((row, index) => leafPaths(row, [...path, String(index)]))];
+  }
+  if (value === null || typeof value !== 'object') return [path];
+  return Object.keys(value as Record<string, unknown>).sort().flatMap((key) =>
+    leafPaths((value as Record<string, unknown>)[key], [...path, key]));
+}
+
+function sourceStageLeafPaths(record: DirectiveRecord): string[][] {
+  return (['received', 'decision', 'execution'] as const).flatMap((key) =>
+    leafPaths(record[key], [key]));
+}
+
+function mutateSourceLeaf(record: DirectiveRecord, path: readonly string[]): void {
+  let owner = record as unknown as Record<string, unknown>;
+  for (const key of path.slice(0, -1)) owner = owner[key] as Record<string, unknown>;
+  const key = path.at(-1)!;
+  const value = owner[key];
+  if (Array.isArray(value)) {
+    const field = path.join('.');
+    if (field.endsWith('.workedDays')) owner[key] = [999_999];
+    else if (field.endsWith('.changes')) {
+      owner[key] = [{ field: 'source-mutated', from: null, to: 'source-mutated' }];
+    } else if (field.endsWith('.guidance')) {
+      owner[key] = [{ kind: 'note', text: 'source-mutated' }];
+    } else owner[key] = ['source-mutated'];
+  } else if (typeof value === 'number') owner[key] = value + 999_999;
+  else if (typeof value === 'boolean') owner[key] = !value;
+  else if (typeof value === 'string') owner[key] = `${value}:source-mutated`;
+  else owner[key] = 'source-mutated';
 }
 
 describe('generic turncoat content waits for a real handler', () => {
@@ -237,9 +250,7 @@ describe('generic turncoat content waits for a real handler', () => {
 describe('stolen received briefs become evidence, never source-record execution', () => {
   it('copies the received version for the secret audience and is byte-independent both ways', () => {
     const control = stagedDualNetwork('handler-received-copy-control').world;
-    const mutated = stagedDualNetwork('handler-received-copy-control').world;
     const controlReceipt = issueAndReceivePlayerBrief(control);
-    const mutatedReceipt = issueAndReceivePlayerBrief(mutated);
 
     expect(controlReceipt.copy.payload).toEqual({
       kind: 'handler-brief', sourceDirectiveId: controlReceipt.record.id,
@@ -248,8 +259,6 @@ describe('stolen received briefs become evidence, never source-record execution'
     expect(controlReceipt.record.authored.brief.specificity).toBe('guided');
     expect(controlReceipt.record.received!.version.brief.specificity).toBe('detailed');
 
-    mutateEverySourceStage(mutatedReceipt.record);
-    const sourceBeforeArrival = stableStringify(mutatedReceipt.record);
     const deliver = (world: WorldState, copy: NetworkMessage) => {
       const circle = contact(world, copy.holder, world.network.spymaster!, at(2, 8));
       const speech = realizeNetworkForward(world, copy.id, circle, world.tick, RULES)!;
@@ -257,18 +266,48 @@ describe('stolen received briefs become evidence, never source-record execution'
       return { speech, evidence: world.enemy.evidence.at(-1)! };
     };
     const expected = deliver(control, controlReceipt.copy);
-    const actual = deliver(mutated, mutatedReceipt.copy);
-    expect(stableStringify(actual.evidence)).toBe(stableStringify(expected.evidence));
-    expect(actual.speech.spoken).toMatchObject({
+    expect(expected.speech.spoken).toMatchObject({
       kind: 'handler-brief', brief: { specificity: 'detailed' },
     });
-    expect(actual.speech.spoken).not.toHaveProperty('sourceDirectiveId');
-    expect(actual.evidence.network).toMatchObject({
-      messageId: mutatedReceipt.copy.id,
-      sourceDirectiveId: mutatedReceipt.record.id,
-      spoken: actual.speech.spoken,
+    expect(expected.speech.spoken).not.toHaveProperty('sourceDirectiveId');
+    expect(expected.evidence.network).toMatchObject({
+      messageId: controlReceipt.copy.id,
+      sourceDirectiveId: controlReceipt.record.id,
+      spoken: expected.speech.spoken,
     });
-    expect(stableStringify(mutatedReceipt.record)).toBe(sourceBeforeArrival);
+
+    const staged = stagedDualNetwork('handler-received-copy-control').world;
+    const stagedReceipt = issueAndReceivePlayerBrief(staged);
+    stagedReceipt.record.execution!.workedDays = [1, 2];
+    const paths = sourceStageLeafPaths(stagedReceipt.record);
+    expect(paths.map((path) => path.join('.'))).toEqual(expect.arrayContaining([
+      'received.version.id', 'received.version.parent', 'received.version.directiveId',
+      'received.version.changedBy', 'received.version.changes',
+      'received.version.brief.mission.kind', 'received.version.brief.priority',
+      'received.version.brief.authority', 'received.version.brief.discretion',
+      'received.version.brief.specificity', 'received.version.brief.guidance',
+      'received.version.brief.guidance.0.kind', 'received.version.brief.guidance.0.person',
+      'received.version.brief.guidance.0.venue', 'received.version.brief.guidance.0.at',
+      'received.version.brief.guidance.1.kind', 'received.version.brief.guidance.1.text',
+      'received.version.brief.active.from', 'received.version.brief.active.until',
+      'received.version.brief.report', 'received.version.brief.reportBy',
+      'received.version.brief.purpose', 'received.version.brief.application.kind',
+      'received.version.brief.application.venue', 'execution.workedDays',
+      'execution.workedDays.0', 'execution.workedDays.1',
+    ]));
+    for (const path of paths) {
+      const variant = structuredClone(staged);
+      const record = variant.network.directiveState!.records.find((row) =>
+        row.id === stagedReceipt.record.id)!;
+      const copy = variant.network.directiveState!.messages.find((row) =>
+        row.id === stagedReceipt.copy.id)!;
+      mutateSourceLeaf(record, path);
+      const sourceBeforeArrival = stableStringify(record);
+      const actual = deliver(variant, copy);
+      expect(stableStringify(actual.evidence), path.join('.'))
+        .toBe(stableStringify(expected.evidence));
+      expect(stableStringify(record), path.join('.')).toBe(sourceBeforeArrival);
+    }
   });
 
   it('uses the opposite audience roster in both directions, never the deceived-principal overlay', () => {
@@ -286,20 +325,28 @@ describe('stolen received briefs become evidence, never source-record execution'
     enemyToPlayer.tick = 0;
     const record = issueDirectiveRecord(enemyToPlayer, {
       principal: 'enemy', principalId: 'hugo', recipient: 'sten',
-      handoff: { outboundVia: [], reportVia: [] }, brief: brief(), tick: 0, cause: null,
+      handoff: { outboundVia: ['gale'], reportVia: [] }, brief: brief(), tick: 0, cause: null,
     });
     const outbound = enemyToPlayer.network.directiveState!.messages[0]!;
     expect(realizeNetworkForward(
-      enemyToPlayer, outbound.id, contact(enemyToPlayer, 'hugo', 'sten', 0), 0, RULES,
+      enemyToPlayer, outbound.id, contact(enemyToPlayer, 'hugo', 'gale', 0), 0, RULES,
+    )).not.toBeNull();
+    expect(realizeNetworkForward(
+      enemyToPlayer, outbound.id, contact(enemyToPlayer, 'gale', 'sten', 15), 15, RULES,
     )).not.toBeNull();
     const copy = enemyToPlayer.network.directiveState!.messages.find((message) =>
       message.payload.kind === 'handler-brief')!;
+    expect(stableStringify(record.received!.version)).not.toBe(stableStringify(record.authored));
+    expect(copy.payload).toEqual({
+      kind: 'handler-brief', sourceDirectiveId: record.id,
+      version: structuredClone(record.received!.version),
+    });
     const playerCircle = contact(enemyToPlayer, 'sten', enemyToPlayer.playerId!, at(2, 8));
     const playerSpeech = realizeNetworkForward(enemyToPlayer, copy.id, playerCircle, enemyToPlayer.tick, RULES)!;
     captureIntel(enemyToPlayer, eventsFor(playerSpeech), RULES);
     expect(record.received).not.toBeNull();
     expect(playerSpeech.spoken).toMatchObject({
-      kind: 'handler-brief', brief: { priority: 'important', specificity: 'guided' },
+      kind: 'handler-brief', brief: { priority: 'important', specificity: 'detailed' },
     });
     expect(enemyToPlayer.intel.network!.at(-1)).toMatchObject({
       messageId: copy.id, spoken: playerSpeech.spoken,
@@ -376,6 +423,19 @@ describe('stolen received briefs become evidence, never source-record execution'
     expect(omitted.kind === 'handler-brief' ? omitted.version.brief.purpose : 'wrong').toBeNull();
     expect(omitted.kind === 'handler-brief' ? omitted.version.brief.guidance : [])
       .toEqual([expect.objectContaining({ kind: 'expected-presence' })]);
+    if (omitted.kind !== 'handler-brief') throw new Error('expected handler brief');
+    expect(omitted.version.id).not.toBe(omissive.record.received!.version.id);
+    expect(omitted.version.parent).toBe(omissive.record.received!.version.id);
+    expect(omitted.version.changedBy).toBe(omissive.record.recipient);
+    expect(omitted.version.changes).toEqual([
+      {
+        field: 'brief.guidance.1',
+        from: { kind: 'note', text: 'because the source may leave town' }, to: null,
+      },
+      {
+        field: 'brief.purpose', from: 'identify the source before departure', to: null,
+      },
+    ]);
 
     const guarded = stagePolicy('handler-policy-high', 'high', {
       priority: 'urgent', authority: 'compel', discretion: 'open',

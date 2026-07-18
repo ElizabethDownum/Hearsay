@@ -14,9 +14,12 @@ import { evaluateReceivedBrief, type ReceivedBriefInput } from './evaluator';
 import { projectBrief } from './mutation';
 import { queueDirectiveReport, buildDirectiveReport } from './reports';
 import { perceivedScrutiny } from './scrutiny';
-import { allocateNetworkMessage, strictNextBeat, validateNetworkRoute } from './state';
+import {
+  allocateNetworkMessage, allocateProjectedVersionId, strictNextBeat, validateNetworkRoute,
+} from './state';
 import type {
-  DirectiveDecisionProfile, DirectiveExecutionResult, DirectiveRecord, NetworkMessage,
+  BriefChange, BriefVersion, DirectiveDecisionProfile, DirectiveExecutionResult, DirectiveRecord,
+  NetworkMessage,
 } from './types';
 import { applicationOf, correlationOf, type DirectiveApplication } from './types';
 import { appendInvitation } from '../network/invitations';
@@ -137,10 +140,29 @@ function queueTurncoatHandlerCopy(
   if (handler === null || handler === record.recipient) return;
 
   let availableAfter = tick;
-  const version = cloneSerializable(record.received.version);
+  const received = record.received.version;
+  let version = cloneSerializable(received);
   if (profile.candor === 'omissive') {
+    const changes: BriefChange[] = [];
+    received.brief.guidance.forEach((row, index) => {
+      if (row.kind === 'note') {
+        changes.push({ field: `brief.guidance.${index}`, from: cloneSerializable(row), to: null });
+      }
+    });
+    if (received.brief.purpose !== null) {
+      changes.push({
+        field: 'brief.purpose', from: received.brief.purpose, to: null,
+      });
+    }
     version.brief.purpose = null;
     version.brief.guidance = version.brief.guidance.filter((row) => row.kind !== 'note');
+    version = {
+      id: allocateProjectedVersionId(world), parent: received.id,
+      directiveId: received.directiveId, brief: version.brief,
+      claimedIssuer: received.claimedIssuer, replyRoute: cloneSerializable(received.replyRoute),
+      changedBy: record.recipient,
+      changes: changes.sort((a, b) => a.field.localeCompare(b.field)),
+    } satisfies BriefVersion;
   } else if (profile.candor === 'guarded') {
     if (profile.risk === 'avoidant') return;
     availableAfter = tick + TICKS_PER_DAY;
