@@ -19,10 +19,11 @@ import {
 } from './state';
 import type {
   BriefChange, BriefVersion, DirectiveDecisionProfile, DirectiveExecutionResult, DirectiveRecord,
-  NetworkMessage,
+  NetworkMessage, NetworkSpeech,
 } from './types';
 import { applicationOf, correlationOf, type DirectiveApplication } from './types';
 import { appendInvitation } from '../network/invitations';
+import { startSoundOut } from '../network/recruitment';
 
 const priorityRank = { urgent: 2, important: 4, routine: 6 } as const;
 
@@ -330,6 +331,12 @@ function opportunityFor(
     }
     return adaptivePerson(circle, record.recipient) === null ? null : { method, adapted: false };
   }
+  if (method.kind === 'approach' || method.kind === 'invite-meeting') {
+    // A sounding-out asset works its REAL target: the approach is a named conversation, so no
+    // adaptive substitute exists. Absence is an ordinary deferral, exactly like a missing audience.
+    return circle.members.includes(method.target) && method.target !== record.recipient
+      ? { method, adapted: false } : null;
+  }
   return null;
 }
 
@@ -558,8 +565,10 @@ export function attemptDirective(
   circle: Circle,
   tick: Tick,
   rules: Rules,
-): NpcIntentRealization {
-  const empty: NpcIntentRealization = { askings: [], answers: [], tellings: [], extras: [] };
+): NpcIntentRealization<NetworkSpeech> {
+  const empty: NpcIntentRealization<NetworkSpeech> = {
+    askings: [], answers: [], tellings: [], extras: [],
+  };
   const record = world.network.directiveState?.records.find((candidate) => candidate.id === directiveId);
   if (!record || record.received === null || record.execution === null) return empty;
   const correlation = correlationOf(record);
@@ -640,6 +649,23 @@ export function attemptDirective(
     const tasks = world.inquiries[record.recipient] ?? (world.inquiries[record.recipient] = []);
     if (!tasks.some((candidate) => candidate.id === task.id)) tasks.push(task);
     return empty;
+  }
+  if (method.kind === 'approach' || method.kind === 'invite-meeting') {
+    // The whole act is the observable approach speech. What the candidate answers is a separate
+    // spoken act that must physically come back before this asset knows anything at all.
+    const started = startSoundOut(world, record, method, circle, tick, rules);
+    if (started === null) {
+      deferOrAbort(world, record, profile, tick, rules, 'the approach could not be spoken here');
+      return empty;
+    }
+    record.execution = {
+      state: 'awaiting-answer', changedAt: tick, dueAt: null,
+      waiting: {
+        kind: 'recruitment-answer', approachId: started.approachId,
+        expiresAt: record.received.version.brief.active.until,
+      },
+    };
+    return { askings: [], answers: [], tellings: [], extras: [started.speech] };
   }
   if (method.kind === 'tell') {
     const addressedTo = method.audience.kind === 'person'

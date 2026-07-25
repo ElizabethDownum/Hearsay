@@ -7,6 +7,9 @@ import { cloneSerializable, stableStringify } from './hash';
 import { chooseAnswer, collectOrdinaryAskOffers, expireInquiries, runPlayerAskPhase } from './inquiry';
 import { collectDropPickupIntents, realizeDropPickup } from './network/couriers';
 import { resolveInvitations } from './network/invitations';
+import {
+  collectRecruitmentAnswerIntents, markRecruitmentDecisionDue, realizeRecruitmentAnswer,
+} from './network/recruitment';
 import { payWagesNightly } from './network/roster';
 import { runTurncoatPass } from './network/turncoats';
 import { observationsFor, type Asking, type TickEvents, type Utterance } from './perception';
@@ -143,11 +146,11 @@ const defaultExtra: RealizeExtraIntent<NetworkSpeech> = (world, intent, circle, 
       return { askings: [], answers: [], tellings: [], extras: speech ? [speech] : [] };
     }
     case 'directive-act':
-      return attemptDirective(world, intent.ref, circle, t, rules) as NpcIntentRealization<NetworkSpeech>;
+      return attemptDirective(world, intent.ref, circle, t, rules);
     case 'drop-pickup':
       return realizeDropPickup(world, intent.ref, circle, t, rules);
     case 'recruitment-answer':
-      throw new Error('phase4: recruitment-answer handler not installed');
+      return realizeRecruitmentAnswer(world, intent.ref, circle, t, rules);
     default: {
       const exhaustive: never = intent;
       return exhaustive;
@@ -292,7 +295,8 @@ function applySetup(world: WorldState, setup: ScheduledSetup): void {
       markDirectiveDue(world, setup.ref, setup.due);
       return;
     case 'recruitment-response':
-      throw new Error(`recruitment-response handler not installed (setup '${setup.id}')`);
+      markRecruitmentDecisionDue(world, setup.ref, setup.due);
+      return;
   }
 }
 
@@ -465,11 +469,13 @@ function resolveNpcSpeech(
   alreadySpoke: readonly EntityId[],
 ): void {
   expireDirectiveActsBeforeCollection(world, tick, rules);
+  const answers = collectRecruitmentAnswerIntents(world, tick, circles);
   const network = collectNetworkForwardIntents(world, tick, circles);
   const directives = collectDirectiveActIntents(world, tick, circles);
   const pickups = collectDropPickupIntents(world, tick, circles);
   const phase = resolveAutonomousPhase(
-    world, rules, tick, circles, new Set(alreadySpoke), [...network, ...pickups, ...directives],
+    world, rules, tick, circles, new Set(alreadySpoke),
+    [...answers, ...network, ...pickups, ...directives],
   );
   askings.push(...phase.askings);
   utterances.push(...phase.answers, ...phase.tellings);

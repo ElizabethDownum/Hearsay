@@ -87,16 +87,20 @@ describe('asking', () => {
     expect(hashWorld(world)).toBe(before);
   });
 
-  it('names the uninstalled recruitment-answer arm', () => {
+  // MIGRATED (Task 11): the recruitment-answer arm is now installed. It keeps the drop-pickup shape —
+  // a stale approach ref realizes as a no-op rather than throwing inside the simultaneous tier.
+  it('the Task-11 recruitment-answer arm is installed and a stale approach ref realizes as a no-op', () => {
     const intent = { kind: 'recruitment-answer' as const, actor: 'bez', ref: 'approach-2', rank: 0 as const };
-    const world = seededSimultaneousWorld(`uninstalled-${intent.kind}`);
+    const world = buildWorld(miniTown(), `installed-${intent.kind}`);
     const frame = collectCircleIntents(
       world, { venue: 'square', members: ['ada', 'bez', 'cyn', 'dov'] },
       0, RULES, [intent], new Set(),
     );
     expect(frame.selected).toContainEqual(intent);
-    expect(() => realizeCircleIntents(world, frame, 0, RULES))
-      .toThrow('phase4: recruitment-answer handler not installed');
+    const before = hashWorld(world);
+    expect(realizeCircleIntents(world, frame, 0, RULES))
+      .toEqual({ askings: [], answers: [], tellings: [], extras: [] });
+    expect(hashWorld(world)).toBe(before);
   });
 
   it('the Task-8 directive-act arm is installed and realizes a collected due intent', () => {

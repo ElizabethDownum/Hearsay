@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildWorld, enrollPlayer, trustBetween } from '../../src/sim/world';
 import { TESTFORD } from '../../src/content/fixtures/testford';
@@ -6,41 +8,28 @@ import { STANDARD_ECONOMY } from '../../src/content/economy';
 import { STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT } from '../../src/content/gen/standard';
 import { generateValidTown } from '../../src/world/serve';
 import { worldFromTown, attachPlayer } from '../../src/world/attach';
-import { attachScenario } from '../../src/sim/scenario/referee';
-import { CORONATION } from '../../src/content/scenarios/coronation';
 import { applyInject, applyRecruit, type InjectSpec } from '../../src/sim/actions';
 import { applyAction, runLogOn, type Action } from '../../src/sim/campaign';
-import { circlesAt } from '../../src/sim/agents';
 import { runUntil, step } from '../../src/sim/step';
 import { reportThrough } from '../../src/sim/reporting';
 import { assetFor, dispositionOf, payWagesNightly } from '../../src/sim/network/roster';
 import { compartmentOf } from '../../src/sim/network/compartment';
+import {
+  evaluateRecruitment, handleFitFor, isLinkedTo, isProtectedRole, shouldReportApproach,
+  type RecruitmentInput,
+} from '../../src/sim/network/recruitment';
 import { hashWorld } from '../../src/sim/hash';
 import { blankIntel } from '../../src/sim/fieldwork';
 import { TRAITS } from '../../src/content/traits';
 import { at, dayOf } from '../../src/core/time';
 import { SOMEONE, type Claim, type EntityId, type RumorId } from '../../src/sim/rumors/claim';
 import type { TraitContext } from '../../src/sim/rumors/traits';
+import type { RecruitmentResponse } from '../../src/sim/directives/types';
 import type { WorldState } from '../../src/sim/types';
-import type { GeneratedTown } from '../../src/world/types';
+import { makePlayerAsset, pin, recruitWorld, trust } from './helpers/recruit-town';
 
 const RULES = STANDARD_RULES;
-const CFG = STANDARD_GEN_CONFIG;
-const CONTENT = STANDARD_GEN_CONTENT;
-
-/** Procgen staging: valid town → live world (coin 20 from rules) → avatar (+ referee by default). */
-function stage(seed: string, opts: { scenario: boolean } = { scenario: true }): { world: WorldState; town: GeneratedTown } {
-  const { town } = generateValidTown(seed, CFG, CONTENT, RULES);
-  const world = worldFromTown(town, seed, RULES);
-  attachPlayer(world, town);
-  if (opts.scenario) attachScenario(world, town, CORONATION);
-  return { world, town };
-}
-
-/** Pin an NPC to the safehouse for all of day 0 — the enemy-source override idiom (NOT a save-log write). */
-function pinTo(world: WorldState, id: EntityId, venue: string): void {
-  world.scheduleOverrides[id] = [{ fromDay: 0, toDay: null, from: 0, to: 1440, venue, source: 'enemy' }];
-}
+const SOURCE = readFileSync(join(process.cwd(), 'src/sim/network/recruitment.ts'), 'utf8');
 
 const asClaim = (spec: InjectSpec): Claim => ({ id: 'probe', family: 'probe', parent: null, ...spec });
 const pick7 = (c: Claim | InjectSpec): Pick<Claim, 'subject' | 'predicate' | 'object' | 'count' | 'severity' | 'place' | 'attribution'> => {
@@ -48,212 +37,397 @@ const pick7 = (c: Claim | InjectSpec): Pick<Claim, 'subject' | 'predicate' | 'ob
   return { subject, predicate, object, count, severity, place, attribution };
 };
 
-/** Pin `id` alone to the safehouse and return the first day-0 beat sharing the avatar's circle. */
-function pinnedCircleMate(world: WorldState, id: EntityId): number {
-  pinTo(world, id, 'safehouse');
-  for (let h = 0; h < 24; h++) {
-    const t = at(0, h);
-    const c = circlesAt(world, t).find((circle) => circle.members.includes('you'));
-    if (c && c.members.includes(id)) return t;
+/** Extract one exported function's body from the module source — the seam every source scan reads. */
+function bodyOf(source: string, name: string): string {
+  const start = source.indexOf(`export function ${name}(`);
+  expect(start, `${name} is exported from recruitment.ts`).toBeGreaterThanOrEqual(0);
+  const open = source.indexOf('{', source.indexOf(')', start));
+  let depth = 0;
+  for (let i = open; i < source.length; i++) {
+    if (source[i] === '{') depth += 1;
+    else if (source[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(open, i + 1);
+    }
   }
-  throw new Error(`pinnedCircleMate: ${id} never shared the avatar's circle`);
+  throw new Error(`bodyOf: unbalanced body for '${name}'`);
 }
 
-/** The alphabetically-first NPC recruitable in principle: not the avatar, a guard, cast, the enemy
- *  spymaster, or an asset. */
-function civilian(world: WorldState, town: GeneratedTown): EntityId {
-  const guardIds = new Set(world.enemy.observers.map((o) => o.id));
-  const assetIds = new Set(world.network.assets.map((a) => a.id));
-  const id = Object.keys(world.npcs).sort().find((n) =>
-    n !== 'you' && !guardIds.has(n) && n !== town.cast!.usurper
-    && !town.cast!.council.includes(n) && n !== world.network.spymaster && !assetIds.has(n));
-  if (!id) throw new Error('civilian: none found');
-  return id;
+// ─────────────────────────────────────────────────────────────────────────────
+// The pure response formula: contextual causes, never a hidden lottery.
+
+const CATEGORIES = [
+  { id: 'civilian', target: 'cass' },
+  { id: 'guard', target: 'gil' },
+  { id: 'council', target: 'cora' },
+  { id: 'spymaster', target: 'sly' },
+  { id: 'enemy-asset', target: 'ewan' },
+  { id: 'protected-role', target: 'vane' },
+] as const;
+
+describe('evaluateRecruitment — every hidden category shares one outward response union', () => {
+  it('lawful context reaches accept, refuse AND hesitate for all six categories', () => {
+    for (const category of CATEGORIES) {
+      const world = recruitWorld(`table-${category.id}`);
+      const responses = new Set<RecruitmentResponse>();
+      const reached = new Map<RecruitmentResponse, string>();
+      for (const relationship of [0.1, 0.3, 0.6, 0.8]) {
+        for (const handleFit of [-2, 0, 2] as const) {
+          for (const localWitnesses of [0, 3]) {
+            for (const perceivedScrutiny of [0, 0.8]) {
+              const input: RecruitmentInput = {
+                relationship, handleFit,
+                traits: [...world.npcs[category.target]!.traits],
+                protectedRole: isProtectedRole(world, RULES, category.target),
+                enemyLinked: isLinkedTo(world, 'enemy', category.target),
+                localWitnesses, perceivedScrutiny, stage: 'initial',
+              };
+              const response = evaluateRecruitment(input);
+              responses.add(response);
+              if (!reached.has(response)) reached.set(response, JSON.stringify(input));
+            }
+          }
+        }
+      }
+      expect([...responses].sort(), `${category.id}: ${[...reached.values()].join(' | ')}`)
+        .toEqual(['accept', 'hesitate', 'refuse']);
+    }
+  });
+
+  it('every category is structurally distinguishable ONLY through lawful context fields', () => {
+    const world = recruitWorld('table-shape');
+    expect(isProtectedRole(world, RULES, 'gil')).toBe(true);       // watch occupation
+    expect(isProtectedRole(world, RULES, 'cora')).toBe(true);      // council
+    expect(isProtectedRole(world, RULES, 'vane')).toBe(true);      // usurper
+    expect(isProtectedRole(world, RULES, 'cass')).toBe(false);
+    expect(isProtectedRole(world, RULES, 'ewan')).toBe(false);     // enemy roster is NOT a role
+    expect(isProtectedRole(world, RULES, 'sly')).toBe(false);      // the spymaster is deliberately unprotected
+    expect(isLinkedTo(world, 'enemy', 'sly')).toBe(true);
+    expect(isLinkedTo(world, 'enemy', 'ewan')).toBe(true);
+    expect(isLinkedTo(world, 'enemy', 'gil')).toBe(true);
+    expect(isLinkedTo(world, 'enemy', 'cass')).toBe(false);
+  });
+
+  it('pins the exact score algebra, including the later stage and the enemy-linkage flip', () => {
+    const base: RecruitmentInput = {
+      relationship: 0.8, handleFit: 0, traits: [], protectedRole: false,
+      enemyLinked: false, localWitnesses: 0, perceivedScrutiny: 0, stage: 'initial',
+    };
+    expect(evaluateRecruitment(base)).toBe('accept');                                  // 2
+    expect(evaluateRecruitment({ ...base, relationship: 0.6 })).toBe('hesitate');       // 1
+    expect(evaluateRecruitment({ ...base, relationship: 0.3 })).toBe('hesitate');       // 0
+    expect(evaluateRecruitment({ ...base, relationship: 0.1 })).toBe('refuse');         // -2
+    expect(evaluateRecruitment({ ...base, traits: ['skeptic'] })).toBe('hesitate');     // 2-1
+    expect(evaluateRecruitment({ ...base, localWitnesses: 2 })).toBe('accept');         // >2 only
+    expect(evaluateRecruitment({ ...base, localWitnesses: 3 })).toBe('hesitate');
+    expect(evaluateRecruitment({ ...base, perceivedScrutiny: 0.69 })).toBe('accept');
+    expect(evaluateRecruitment({ ...base, perceivedScrutiny: 0.70 })).toBe('hesitate');
+    expect(evaluateRecruitment({ ...base, protectedRole: true })).toBe('hesitate');
+    expect(evaluateRecruitment({ ...base, enemyLinked: true })).toBe('hesitate');       // initial: -1
+    // The later stage is a two-way branch that never hesitates, and enemy linkage now HELPS.
+    expect(evaluateRecruitment({ ...base, relationship: 0.3, stage: 'later' })).toBe('accept');   // 0
+    expect(evaluateRecruitment({ ...base, relationship: 0.1, stage: 'later' })).toBe('refuse');   // -2
+    expect(evaluateRecruitment({
+      ...base, relationship: 0.1, enemyLinked: true, stage: 'later',
+    })).toBe('accept');                                                                 // -2 + 2
+  });
+
+  it('source scan: neither pure decision function reads seed, tick, id hash, parity or randomness', () => {
+    const forbidden = /\bseed\b|\btick\b|\bRng\b|random|fnv1a|hashWorld|charCodeAt|%/;
+    for (const name of ['evaluateRecruitment', 'shouldReportApproach']) {
+      expect(bodyOf(SOURCE, name), name).not.toMatch(forbidden);
+    }
+    // FIRING PROOF: the same scan catches an injected lottery.
+    const injected = SOURCE.replace(
+      /export function evaluateRecruitment\(([^)]*)\)([^{]*)\{/,
+      'export function evaluateRecruitment($1)$2{\n  if (new Rng(world.seed, `x`).next() > 0.5) return \'accept\';',
+    );
+    expect(bodyOf(injected, 'evaluateRecruitment')).toMatch(forbidden);
+  });
+
+  it('source scan: isProtectedRole never reads roster, observer, turned, or any enemy/network field', () => {
+    const forbidden = /roster|observer|turned|enemyAssets|network\.|\.enemy\b|assetFor/;
+    expect(bodyOf(SOURCE, 'isProtectedRole')).not.toMatch(forbidden);
+    const injected = SOURCE.replace(
+      /(export function isProtectedRole\([^)]*\)[^{]*\{)/,
+      '$1\n  if (world.network.enemyAssets.length > 0) return true;',
+    );
+    expect(bodyOf(injected, 'isProtectedRole')).toMatch(forbidden);
+  });
+});
+
+describe('shouldReportApproach — a candidate reports only for context reasons', () => {
+  it('needs a real handler, then either real linkage or a warmer edge to that handler', () => {
+    const base = {
+      enemyHandler: 'sly' as string | null, enemyLinked: false,
+      relationshipToRecruiter: 0.6, relationshipToEnemyHandler: 0.2,
+    };
+    expect(shouldReportApproach({ ...base, enemyHandler: null })).toBe(false);
+    expect(shouldReportApproach(base)).toBe(false);
+    expect(shouldReportApproach({ ...base, enemyLinked: true })).toBe(true);
+    expect(shouldReportApproach({ ...base, relationshipToEnemyHandler: 0.9 })).toBe(true);
+    expect(shouldReportApproach({ ...base, relationshipToRecruiter: 0.2 })).toBe(false); // ties do not report
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// handleFit — exact, and the only place a MICE handle enters the response.
+
+describe('handleFit — the exact per-handle table', () => {
+  it('money, ideology, coercion, ego and the null cooperation handle', () => {
+    const world = recruitWorld('fit');
+    expect(handleFitFor(world, RULES, 'player', 'cass', null, null)).toBe(0);
+    expect(handleFitFor(world, RULES, 'player', 'cass', 'money', null)).toBe(1);
+    // A wage-strike context on the record takes money's edge away.
+    makePlayerAsset(world, 'nell', 'money');
+    assetFor(world, 'player', 'nell')!.strikes = 1;
+    expect(handleFitFor(world, RULES, 'player', 'nell', 'money', null)).toBe(0);
+
+    expect(handleFitFor(world, RULES, 'player', 'cass', 'ideology', null)).toBe(-1);
+    applyInject(world, 'cass', {
+      subject: 'vane', predicate: 'stole', object: null, count: 1, severity: 3,
+      place: null, attribution: SOMEONE,
+    });
+    expect(handleFitFor(world, RULES, 'player', 'cass', 'ideology', null)).toBe(2);
+
+    expect(handleFitFor(world, RULES, 'player', 'cass', 'coercion', null)).toBe(-2);
+    world.intel.log.push({
+      ...blankIntel(), tick: 0, venue: 'square', via: 'self', kind: 'utterance', overheard: false,
+      family: 'lev-1',
+      reported: { subject: 'cass', predicate: 'stole', object: null, count: 1, severity: 4, place: null, attribution: SOMEONE },
+    });
+    expect(handleFitFor(world, RULES, 'player', 'cass', 'coercion', 'lev-1')).toBe(2);
+
+    expect(handleFitFor(world, RULES, 'player', 'cass', 'ego', null)).toBe(0);
+    world.npcs['cass']!.traits = ['literalist', 'name-dropper'];
+    expect(handleFitFor(world, RULES, 'player', 'cass', 'ego', null)).toBe(1);
+    world.npcs['cass']!.traits = ['dramatist'];
+    expect(handleFitFor(world, RULES, 'player', 'cass', 'ego', null)).toBe(1);
+    world.npcs['cass']!.traits = ['exaggerator'];
+    expect(handleFitFor(world, RULES, 'player', 'cass', 'ego', null)).toBe(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public validation reads only player/action facts.
+
+/** Run exactly one tick with the given player actions applied in its player phase. */
+function runTick(world: WorldState, log: Action[], untilTick = world.tick + 1): void {
+  runLogOn(world, RULES, log, untilTick);
 }
 
-describe('MICE recruit — money: coin buys fast', () => {
-  it('recruits an in-circle civilian: 0.6 friend edge, roster + informant + recruited-by fact, coin debited', () => {
-    const { world, town } = stage('rec-money');
-    const target = civilian(world, town);
-    const t = pinnedCircleMate(world, target);
-    runUntil(world, t, RULES);
+describe('recruit validation — public facts only, never a hidden category', () => {
+  it('opens an approach against EVERY hidden category with an identical (empty) refusal set', () => {
+    for (const category of CATEGORIES) {
+      const world = recruitWorld(`validate-${category.id}`);
+      pin(world, 'square', 'you', category.target);
+      const coin0 = world.coin;
+      expect(() => applyRecruit(world, category.target, 'money', null, 0, RULES),
+        `${category.id} must not be refused for what they are`).not.toThrow();
+      expect(world.network.directiveState!.recruitmentApproaches, category.id).toHaveLength(1);
+      expect(world.coin).toBe(coin0 - STANDARD_ECONOMY.recruitCost.money);
+    }
+  });
+
+  it('refuses only public-fact failures, each with zero residue', () => {
+    const headless = buildWorld(TESTFORD, 'rec-headless', RULES);
+    expect(() => applyRecruit(headless, 'mara', 'money', null, 0, RULES)).toThrow(/no player/);
+
+    const world = recruitWorld('rec-shape');
+    pin(world, 'square', 'you', 'cass');
+    expect(() => applyRecruit(world, 'ghost', 'money', null, 0, RULES)).toThrow(/unknown npc/);
+    expect(() => applyRecruit(world, 'you', 'money', null, 0, RULES)).toThrow(/avatar/);
+    expect(() => applyRecruit(world, 'cass', 'money', null, 7, RULES)).toThrow(/beat/);
+    expect(() => applyRecruit(world, 'nell', 'money', null, 0, RULES)).toThrow(/circle/);
+    expect(() => applyRecruit(world, 'cass', 'coercion', null, 0, RULES)).toThrow(/leverage/);
+    world.coin = STANDARD_ECONOMY.recruitCost.money - 1;
+    expect(() => applyRecruit(world, 'cass', 'money', null, 0, RULES)).toThrow(/treasury/);
+    expect(hashWorld(world)).toBe(hashWorld(world)); // sanity for the residue comparisons below
+  });
+
+  it('every refusal leaves ZERO residue (validate-before-mutate)', () => {
+    const cases: { setup: (world: WorldState) => void; run: (world: WorldState) => void }[] = [
+      { setup: () => {}, run: (w) => applyRecruit(w, 'nell', 'money', null, 0, RULES) },
+      { setup: () => {}, run: (w) => applyRecruit(w, 'cass', 'coercion', null, 0, RULES) },
+      { setup: (w) => { w.coin = 0; }, run: (w) => applyRecruit(w, 'cass', 'money', null, 0, RULES) },
+      { setup: (w) => makePlayerAsset(w, 'cass'), run: (w) => applyRecruit(w, 'cass', 'money', null, 0, RULES) },
+    ];
+    for (const { setup, run } of cases) {
+      const world = recruitWorld('rec-residue');
+      pin(world, 'square', 'you', 'cass');
+      setup(world);
+      const before = hashWorld(world);
+      expect(() => run(world)).toThrow();
+      expect(hashWorld(world)).toBe(before);
+    }
+  });
+
+  it('an existing PLAYER roster row is public bookkeeping and says so; a second open approach refuses', () => {
+    const world = recruitWorld('rec-existing');
+    pin(world, 'square', 'you', 'cass');
+    makePlayerAsset(world, 'cass');
+    expect(() => applyRecruit(world, 'cass', 'money', null, 0, RULES))
+      .toThrow('recruit: this person is already on your roster');
+
+    const second = recruitWorld('rec-open');
+    pin(second, 'square', 'you', 'cass');
+    applyRecruit(second, 'cass', 'money', null, 0, RULES);
+    expect(() => applyRecruit(second, 'cass', 'money', null, 0, RULES)).toThrow(/already open/);
+  });
+
+  it('no refusal string names guard, spymaster, council, usurper, or enemy-asset status', () => {
+    const messages: string[] = [];
+    for (const target of ['gil', 'sly', 'ewan', 'vane']) {
+      const world = recruitWorld(`rec-oracle-${target}`);
+      pin(world, 'square', 'you', target);
+      try {
+        applyRecruit(world, target, 'coercion', null, 0, RULES); // refused for a PUBLIC reason only
+      } catch (error) { messages.push((error as Error).message); }
+    }
+    expect(messages).toHaveLength(4);
+    for (const message of messages) {
+      expect(message).toMatch(/leverage/);
+      expect(message).not.toMatch(/guard|spymaster|council|usurper|asset|cannot be recruited/i);
+    }
+  });
+});
+
+describe('recruit cost — debited once on the approach, never refunded', () => {
+  it('drops once for accept, refuse AND hesitate alike', () => {
+    // money fit is +1 and ideology's is −1 with no conviction behind it, so the three bands are
+    // reachable with only lawful context: 0.8→2 accept · 0.3→1 hesitate · 0.1 with ideology→−3 refuse.
+    const wanted: { expected: RecruitmentResponse; relationship: number; mice: 'money' | 'ideology' }[] = [
+      { expected: 'accept', relationship: 0.8, mice: 'money' },
+      { expected: 'hesitate', relationship: 0.3, mice: 'money' },
+      { expected: 'refuse', relationship: 0.1, mice: 'ideology' },
+    ];
+    for (const { expected, relationship, mice } of wanted) {
+      const world = recruitWorld(`cost-${expected}`);
+      pin(world, 'square', 'you', 'cass');
+      trust(world, 'cass', 'you', relationship);
+      const coin0 = world.coin;
+      const cost = STANDARD_ECONOMY.recruitCost[mice];
+      runTick(world, [{ tick: 0, kind: 'recruit', target: 'cass', mice, leverageFamily: null }]);
+      const approach = world.network.directiveState!.recruitmentApproaches[0]!;
+      expect(approach.initial, expected).toBe(expected);
+      expect(world.coin, expected).toBe(coin0 - cost);
+      runUntil(world, at(3, 0), RULES);
+      expect(world.coin, `${expected} never refunds`).toBeLessThanOrEqual(coin0 - cost);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRATED from the pre-Task-11 suite: the four handles still price and dispose the same way,
+// but enrollment is now the ANSWER's physical receipt, not the action.
+
+describe('MICE recruit — the handles still buy the same disposition on acceptance', () => {
+  const floors: Record<string, number> = { money: 0.6, ideology: 0.7, coercion: 0.5, ego: 0.6 };
+
+  it('money: roster + informant + recruited-by fact + the 0.6 friend edge, coin debited once', () => {
+    const world = recruitWorld('rec-money');
+    pin(world, 'square', 'you', 'cass');
+    trust(world, 'cass', 'you', 0.8);
     const coin0 = world.coin;
+    runTick(world, [{ tick: 0, kind: 'recruit', target: 'cass', mice: 'money', leverageFamily: null }]);
 
-    applyAction(world, { tick: t, kind: 'recruit', target, mice: 'money', leverageFamily: null }, RULES);
-
-    const rec = assetFor(world, 'player', target)!;
-    expect(rec.mice).toBe('money');
-    expect(rec.strikes).toBe(0);
-    expect(rec.wagePaidThroughDay).toBe(dayOf(t));
-    expect(compartmentOf(world, 'player', target)).toEqual([{ tick: t, kind: 'recruited-by', ref: 'player' }]);
-    expect(dispositionOf(world, target)).toBe(0.6);
-    expect(trustBetween(world, target, 'you')).toBe(0.6);
-    expect(world.intel.informants.some((i) => i.id === target)).toBe(true);
+    const record = assetFor(world, 'player', 'cass')!;
+    expect(record.mice).toBe('money');
+    expect(record.strikes).toBe(0);
+    expect(record.wagePaidThroughDay).toBe(dayOf(0));
+    expect(record.turned).toBeUndefined();
+    expect(compartmentOf(world, 'player', 'cass')).toEqual([{ tick: 0, kind: 'recruited-by', ref: 'player' }]);
+    expect(dispositionOf(world, 'cass')).toBe(floors['money']);
+    expect(trustBetween(world, 'cass', 'you')).toBe(floors['money']);
+    expect(world.intel.informants.some((i) => i.id === 'cass')).toBe(true);
     expect(world.coin).toBe(coin0 - STANDARD_ECONOMY.recruitCost.money);
   });
 
-  it('insufficient coin REFUSES with zero residue (validate-before-mutate)', () => {
-    const { world, town } = stage('rec-broke');
-    const target = civilian(world, town);
-    const t = pinnedCircleMate(world, target);
-    world.coin = STANDARD_ECONOMY.recruitCost.money - 1; // one short
-    const before = hashWorld(world);
-
-    expect(() => applyAction(world, { tick: t, kind: 'recruit', target, mice: 'money', leverageFamily: null }, RULES))
-      .toThrow(/treasury/);
-
-    expect(hashWorld(world)).toBe(before); // no asset, no informant, no edge, no fact, coin untouched
-    expect(assetFor(world, 'player', target)).toBeNull();
-    expect(world.intel.informants.some((i) => i.id === target)).toBe(false);
+  it('ideology, coercion and ego each land their own disposition floor', () => {
+    {
+      const world = recruitWorld('rec-ideo');
+      pin(world, 'square', 'you', 'cass');
+      trust(world, 'cass', 'you', 0.8);
+      applyInject(world, 'cass', {
+        subject: 'vane', predicate: 'stole', object: null, count: 1, severity: 3, place: null, attribution: SOMEONE,
+      });
+      runTick(world, [{ tick: 0, kind: 'recruit', target: 'cass', mice: 'ideology', leverageFamily: null }]);
+      expect(assetFor(world, 'player', 'cass')!.mice).toBe('ideology');
+      expect(dispositionOf(world, 'cass')).toBe(floors['ideology']);
+    }
+    {
+      const world = recruitWorld('rec-coerce');
+      pin(world, 'square', 'you', 'cass');
+      trust(world, 'cass', 'you', 0.8);
+      world.intel.log.push({
+        ...blankIntel(), tick: 0, venue: 'square', via: 'self', kind: 'utterance', overheard: false,
+        family: 'lev-1',
+        reported: { subject: 'cass', predicate: 'stole', object: null, count: 1, severity: 4, place: null, attribution: SOMEONE },
+      });
+      runTick(world, [{ tick: 0, kind: 'recruit', target: 'cass', mice: 'coercion', leverageFamily: 'lev-1' }]);
+      expect(assetFor(world, 'player', 'cass')!.mice).toBe('coercion');
+      expect(dispositionOf(world, 'cass')).toBe(floors['coercion']);
+    }
+    {
+      const world = recruitWorld('rec-ego');
+      pin(world, 'square', 'you', 'cass');
+      trust(world, 'cass', 'you', 0.8);
+      runTick(world, [{ tick: 0, kind: 'recruit', target: 'cass', mice: 'ego', leverageFamily: null }]);
+      expect(assetFor(world, 'player', 'cass')!.mice).toBe('ego');
+      expect(dispositionOf(world, 'cass')).toBe(floors['ego']);
+    }
   });
-});
 
-describe('MICE recruit — ideology: loyal to the cause', () => {
-  /** A civilian who does NOT yet hold a damaging conviction about the usurper (so the RED half is real). */
-  function unconvinced(world: WorldState, town: GeneratedTown): EntityId {
-    const guardIds = new Set(world.enemy.observers.map((o) => o.id));
-    const assetIds = new Set(world.network.assets.map((a) => a.id));
-    const leans = (id: EntityId): boolean => Object.values(world.beliefs[id] ?? {}).some((b) =>
-      b.claim.subject === town.cast!.usurper && RULES.predicates[b.claim.predicate]?.valence === 'damaging' && b.credence >= 0.5);
-    const id = Object.keys(world.npcs).sort().find((n) =>
-      n !== 'you' && !guardIds.has(n) && n !== town.cast!.usurper
-      && !town.cast!.council.includes(n) && n !== world.network.spymaster && !assetIds.has(n) && !leans(n));
-    if (!id) throw new Error('unconvinced: none found');
-    return id;
-  }
-
-  it('refuses a target with no damaging conviction about the usurper; recruits one who leans your way (0.7)', () => {
-    const { world, town } = stage('rec-ideo');
-    const target = unconvinced(world, town);
-    const t = pinnedCircleMate(world, target);
-
-    // RED: they hold nothing against the usurper yet — the cause has no purchase.
-    expect(() => applyAction(world, { tick: t, kind: 'recruit', target, mice: 'ideology', leverageFamily: null }, RULES))
-      .toThrow(/ideology/);
-
-    // They now hold a damaging belief about the usurper at >= REPEAT (0.85 credence from inject).
-    applyInject(world, target, {
-      subject: town.cast!.usurper, predicate: 'stole', object: null, count: 1, severity: 3, place: null, attribution: SOMEONE,
-    });
-    applyAction(world, { tick: t, kind: 'recruit', target, mice: 'ideology', leverageFamily: null }, RULES);
-
-    expect(assetFor(world, 'player', target)!.mice).toBe('ideology');
-    expect(dispositionOf(world, target)).toBe(0.7);
-    expect(world.coin).toBe(20 - STANDARD_ECONOMY.recruitCost.ideology);
-  });
-});
-
-describe('MICE recruit — coercion: dirt you hold (0.5, they do not love you)', () => {
-  it('checks the PLAYER INTEL LOG, not world truth: needs a damaging family about the target', () => {
-    const { world, town } = stage('rec-coerce');
-    const target = civilian(world, town);
-    const t = pinnedCircleMate(world, target);
-
-    // RED: no leverage named.
-    expect(() => applyAction(world, { tick: t, kind: 'recruit', target, mice: 'coercion', leverageFamily: null }, RULES))
-      .toThrow(/coercion|leverage/);
-
-    // RED: a family in the log, but NOT about the target.
-    world.intel.log.push({
-      ...blankIntel(), tick: 0, venue: 'safehouse', via: 'self', kind: 'utterance', overheard: false, family: 'lev-other',
-      reported: { subject: 'not-the-target', predicate: 'stole', object: null, count: 1, severity: 4, place: null, attribution: SOMEONE },
-    });
-    expect(() => applyAction(world, { tick: t, kind: 'recruit', target, mice: 'coercion', leverageFamily: 'lev-other' }, RULES))
-      .toThrow(/coercion|leverage/);
-
-    // GREEN: damaging dirt ABOUT the target in your intel log (it may even be a lie you believe).
-    world.intel.log.push({
-      ...blankIntel(), tick: 0, venue: 'safehouse', via: 'self', kind: 'utterance', overheard: false, family: 'lev-1',
-      reported: { subject: target, predicate: 'stole', object: null, count: 1, severity: 4, place: null, attribution: SOMEONE },
-    });
-    applyAction(world, { tick: t, kind: 'recruit', target, mice: 'coercion', leverageFamily: 'lev-1' }, RULES);
-
-    expect(assetFor(world, 'player', target)!.mice).toBe('coercion');
-    expect(dispositionOf(world, target)).toBe(0.5);
-    expect(world.coin).toBe(20 - STANDARD_ECONOMY.recruitCost.coercion);
-  });
-});
-
-describe('MICE recruit — ego: no gate, chronic exaggeration overlay (one mechanic)', () => {
-  /** An NPC lacking the exaggerator trait whose own firmware leaves a counted claim's count intact. */
-  function egoTarget(world: WorldState, town: GeneratedTown, spec: InjectSpec): EntityId {
-    const guardIds = new Set(world.enemy.observers.map((o) => o.id));
-    const assetIds = new Set(world.network.assets.map((a) => a.id));
-    const id = Object.keys(world.npcs).sort().find((n) =>
-      n !== 'you' && !guardIds.has(n) && n !== town.cast!.usurper && !town.cast!.council.includes(n)
-      && n !== world.network.spymaster && !assetIds.has(n) && !world.npcs[n]!.traits.includes('exaggerator')
-      && reportThrough(world, n, asClaim(spec), RULES, 'player').count === spec.count);
-    if (!id) throw new Error('egoTarget: none found');
-    return id;
-  }
-
-  const dirt2: InjectSpec = { subject: SOMEONE, predicate: 'stole', object: null, count: 2, severity: 2, place: null, attribution: SOMEONE };
-
-  it('ego is the priced ordering coercion < ego < money, and adds an exaggerator pass AFTER real traits', () => {
-    const { world, town } = stage('rec-ego');
+  it('the priced ordering coercion < ego < money holds, and ego adds an exaggerator report pass', () => {
     expect(STANDARD_ECONOMY.recruitCost.coercion).toBeLessThan(STANDARD_ECONOMY.recruitCost.ego);
     expect(STANDARD_ECONOMY.recruitCost.ego).toBeLessThan(STANDARD_ECONOMY.recruitCost.money);
 
-    const target = egoTarget(world, town, dirt2);
-    expect(world.npcs[target]!.traits).not.toContain('exaggerator'); // the canary: they are NOT natural exaggerators
-    const t = pinnedCircleMate(world, target);
-    const base = reportThrough(world, target, asClaim(dirt2), RULES, 'player');
-    expect(base.count).toBe(dirt2.count); // their real traits leave the count untouched
+    const world = recruitWorld('rec-ego-report');
+    pin(world, 'square', 'you', 'cass');
+    trust(world, 'cass', 'you', 0.8);
+    const dirt2: InjectSpec = { subject: SOMEONE, predicate: 'stole', object: null, count: 2, severity: 2, place: null, attribution: SOMEONE };
+    expect(world.npcs['cass']!.traits).not.toContain('exaggerator'); // NOT a natural exaggerator
+    const base = reportThrough(world, 'cass', asClaim(dirt2), RULES, 'player');
+    expect(base.count).toBe(dirt2.count);
 
-    applyAction(world, { tick: t, kind: 'recruit', target, mice: 'ego', leverageFamily: null }, RULES);
-    expect(assetFor(world, 'player', target)!.mice).toBe('ego');
-    expect(dispositionOf(world, target)).toBe(0.6);
-    expect(world.coin).toBe(20 - STANDARD_ECONOMY.recruitCost.ego);
-
-    const after = reportThrough(world, target, asClaim(dirt2), RULES, 'player');
-    // Report diff: the count doubles and severity climbs by one even though they lack exaggerator.
+    runTick(world, [{ tick: 0, kind: 'recruit', target: 'cass', mice: 'ego', leverageFamily: null }]);
+    const after = reportThrough(world, 'cass', asClaim(dirt2), RULES, 'player');
     expect(after.count).toBe(base.count! * 2);
     expect(after.severity).toBe(Math.min(5, base.severity + 1));
-    // BY MECHANISM: the overlay is EXACTLY the registered exaggerator transform composed onto their real output.
     const ctx: TraitContext = {
-      ownerId: target, faction: world.npcs[target]!.faction, rivals: world.npcs[target]!.rivals,
+      ownerId: 'cass', faction: world.npcs['cass']!.faction, rivals: world.npcs['cass']!.rivals,
       factionOf: (e) => world.npcs[e]?.faction ?? null,
     };
     const overlaid = { ...base, ...TRAITS['exaggerator']!.transform({ id: 'x', family: 'x', parent: null, ...base } as Claim, ctx) };
     expect(after).toEqual(pick7(overlaid as Claim));
   });
 
-  it('control: a non-ego (money) recruit adds NO overlay — the exaggeration is ego-specific', () => {
-    const { world, town } = stage('rec-ego-ctrl');
-    const target = egoTarget(world, town, dirt2);
-    const t = pinnedCircleMate(world, target);
-    const base = reportThrough(world, target, asClaim(dirt2), RULES, 'player');
-
-    applyAction(world, { tick: t, kind: 'recruit', target, mice: 'money', leverageFamily: null }, RULES);
-
-    expect(reportThrough(world, target, asClaim(dirt2), RULES, 'player')).toEqual(base);
+  it('control: a money recruit adds NO report overlay — the exaggeration is ego-specific', () => {
+    const world = recruitWorld('rec-ego-ctrl');
+    pin(world, 'square', 'you', 'cass');
+    trust(world, 'cass', 'you', 0.8);
+    const dirt2: InjectSpec = { subject: SOMEONE, predicate: 'stole', object: null, count: 2, severity: 2, place: null, attribution: SOMEONE };
+    const base = reportThrough(world, 'cass', asClaim(dirt2), RULES, 'player');
+    runTick(world, [{ tick: 0, kind: 'recruit', target: 'cass', mice: 'money', leverageFamily: null }]);
+    expect(reportThrough(world, 'cass', asClaim(dirt2), RULES, 'player')).toEqual(base);
   });
 });
 
 // ── O2 (Ellie ruling 2026-07-08(2), KEEP; T4-M2): ego × natural-exaggerator stacking ──────────────
-// "The flattered braggart brags harder" — the ruling KEPT the natural composition of two lawful
-// transforms. The reachable ×4 / +2 stack (ego overlay ON TOP of a natural exaggerator) was untested.
 describe('MICE recruit — ego × natural-exaggerator stacking (O2)', () => {
-  it('an ego-recruited NATURAL exaggerator double-exaggerates — EXACTLY exaggerator ∘ (real chain), by mechanism', () => {
+  it('an ego-recruited NATURAL exaggerator double-exaggerates — EXACTLY exaggerator ∘ (real chain)', () => {
     const world = buildWorld(TESTFORD, 'o2-stack', RULES);
-    const target = 'mara'; // Testford: traits [exaggerator, attributor] — she IS a natural exaggerator
-    expect(world.npcs[target]!.traits).toContain('exaggerator'); // the premise of the stack
+    const target = 'mara';
+    expect(world.npcs[target]!.traits).toContain('exaggerator');
 
-    // Named subject + attribution keeps mara's attributor INERT — the count/severity move is the
-    // exaggerator's alone, so the two composed passes are unambiguous.
     const spec: InjectSpec = { subject: 'tomas', predicate: 'stole', object: null, count: 2, severity: 2, place: null, attribution: 'seth' };
     const claim = asClaim(spec);
 
-    // r0 = her report as a NON-ego (money) asset — her REAL chain already exaggerates ONCE.
     world.network.assets = [{ id: target, mice: 'money', wagePaidThroughDay: 0, strikes: 0, facts: [] }];
     const r0 = reportThrough(world, target, claim, RULES, 'player');
-
-    // rE = her report as an EGO asset — the overlay adds ONE MORE registered exaggerator pass, composed LAST.
     world.network.assets = [{ id: target, mice: 'ego', wagePaidThroughDay: 0, strikes: 0, facts: [] }];
     const rE = reportThrough(world, target, claim, RULES, 'player');
 
-    // BY MECHANISM: rE is EXACTLY the registered exaggerator transform composed onto r0 — the natural
-    // composition of two lawful transforms (NOT the ×4/+2 constants asserted as such). This is the KEEP.
     const ctx: TraitContext = {
       ownerId: target, faction: world.npcs[target]!.faction, rivals: world.npcs[target]!.rivals,
       factionOf: (e) => world.npcs[e]?.faction ?? null,
@@ -263,166 +437,61 @@ describe('MICE recruit — ego × natural-exaggerator stacking (O2)', () => {
     const overlaid = exag.appliesTo(r0Claim, ctx) ? { ...r0, ...exag.transform(r0Claim, ctx) } : r0;
     expect(rE).toEqual(overlaid);
 
-    // Reachability of the ×4 / +2 stack (informational — it FOLLOWS from the mechanism above).
-    expect(r0.count).toBe(spec.count! * 2);                     // natural exaggerator: ×2
-    expect(rE.count).toBe(spec.count! * 4);                     // ego overlay: ×2 again → ×4
-    expect(rE.severity).toBe(Math.min(5, spec.severity + 2));  // +1 then +1 → +2 (clamped)
-    // Control: without the ego overlay the stack is not reachable (a single natural pass only).
+    expect(r0.count).toBe(spec.count! * 2);
+    expect(rE.count).toBe(spec.count! * 4);
+    expect(rE.severity).toBe(Math.min(5, spec.severity + 2));
     expect(r0.severity).toBe(spec.severity + 1);
-  });
-});
-
-describe('MICE recruit — preconditions refuse (identity + conversation shape)', () => {
-  it('refuses guards, the usurper, council members, and existing assets (O3: one uniform refusal)', () => {
-    {
-      const { world } = stage('rec-guard');
-      const guard = world.enemy.observers[0]!.id;
-      expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: guard, mice: 'money', leverageFamily: null }, RULES)).toThrow(/cannot be recruited/);
-    }
-    {
-      const { world, town } = stage('rec-usurper');
-      expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: town.cast!.usurper, mice: 'money', leverageFamily: null }, RULES)).toThrow(/cannot be recruited/);
-    }
-    {
-      const { world, town } = stage('rec-council');
-      expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: town.cast!.council[0]!, mice: 'money', leverageFamily: null }, RULES)).toThrow(/cannot be recruited/);
-    }
-    {
-      const { world } = stage('rec-existing');
-      const existing = world.network.assets[0]!.id; // a dossier freebie — already on the roster
-      expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: existing, mice: 'money', leverageFamily: null }, RULES)).toThrow(/cannot be recruited/);
-    }
-    {
-      // Task 7: the embodied spymaster now EXISTS, so the plan's "not the usurper/council/spymaster"
-      // precondition (vacuous until this task) has teeth. He is not a guard, not cast, not an asset —
-      // the exclusion is his own, and fires before the co-circle gate (refused as such, not on earshot).
-      const { world } = stage('rec-spymaster');
-      const spymaster = world.network.spymaster!;
-      expect(spymaster).toBeTruthy();
-      expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: spymaster, mice: 'money', leverageFamily: null }, RULES)).toThrow(/cannot be recruited/);
-    }
-  });
-
-  // ── O3 (T11 adjudication A; Ellie 2026-07-09): the identity-exclusion refusal leaks NOTHING ──────
-  it('O3: every identity-excluded class refuses with the IDENTICAL message that names no category', () => {
-    const capture = (fn: () => void): string => {
-      try { fn(); } catch (e) { return (e as Error).message; }
-      throw new Error('expected a refusal throw, got none');
-    };
-    // One target per excluded class: guard/observer, usurper, council, existing asset, enemy spymaster.
-    const guardW = stage('o3-guard');
-    const usurpW = stage('o3-usurp');
-    const cnclW = stage('o3-cncl');
-    const asstW = stage('o3-asst');
-    const spyW = stage('o3-spy');
-    const rec = (w: WorldState, target: EntityId): (() => void) =>
-      () => applyAction(w, { tick: 0, kind: 'recruit', target, mice: 'money', leverageFamily: null }, RULES);
-
-    const messages = [
-      capture(rec(guardW.world, guardW.world.enemy.observers[0]!.id)),
-      capture(rec(usurpW.world, usurpW.town.cast!.usurper)),
-      capture(rec(cnclW.world, cnclW.town.cast!.council[0]!)),
-      capture(rec(asstW.world, asstW.world.network.assets[0]!.id)),
-      capture(rec(spyW.world, spyW.world.network.spymaster!)),
-    ];
-
-    // (a) Identical across every excluded class — no per-class message survives.
-    expect(new Set(messages).size).toBe(1);
-    // (b) The message names no category — no hidden-state oracle (guard / enemy-asset / spymaster).
-    for (const m of messages) {
-      expect(m).not.toMatch(/guard/i);
-      expect(m).not.toMatch(/spymaster/i);
-      expect(m).not.toMatch(/asset/i);
-      // …and not the specific ids either (the target id would still narrow the class for a probe).
-      expect(m).not.toContain(spyW.world.network.spymaster!);
-      expect(m).not.toContain(usurpW.town.cast!.usurper);
-    }
-    // NON-VACUOUS: it really is a refusal, and still a validation throw (the failed action drops).
-    expect(messages[0]).toMatch(/recruit/);
-  });
-
-  it('refuses no-player, off-beat, and non-circle targets', () => {
-    const headless = buildWorld(TESTFORD, 'rec-headless', RULES);
-    expect(() => applyRecruit(headless, 'mara', 'money', null, 0, RULES)).toThrow(/no player/);
-
-    const { world, town } = stage('rec-shape');
-    const target = civilian(world, town);
-    pinnedCircleMate(world, target);
-    // Off-beat: tick 7 is not a conversation beat.
-    expect(() => applyRecruit(world, target, 'money', null, 7, RULES)).toThrow(/beat/);
-
-    // Non-circle: an unpinned civilian is not in the avatar's (safehouse) circle at tick 0.
-    const { world: w2, town: town2 } = stage('rec-noncircle');
-    const civ2 = civilian(w2, town2);
-    expect(() => applyAction(w2, { tick: 0, kind: 'recruit', target: civ2, mice: 'money', leverageFamily: null }, RULES)).toThrow(/circle/);
   });
 });
 
 describe('recruit routing — save = seed + action log', () => {
   it('joins the Action union; applyAction refuses recruit without rules; unknown kinds still throw', () => {
-    const { world, town } = stage('rec-route');
-    const target = civilian(world, town);
-    pinTo(world, target, 'safehouse');
-    // recruit needs rules threaded through applyAction (economy prices + predicate valence).
-    expect(() => applyAction(world, { tick: 0, kind: 'recruit', target, mice: 'money', leverageFamily: null })).toThrow(/rules/);
-    // The union's default-throw is preserved.
+    const world = recruitWorld('rec-route');
+    pin(world, 'square', 'you', 'cass');
+    expect(() => applyAction(world, { tick: 0, kind: 'recruit', target: 'cass', mice: 'money', leverageFamily: null })).toThrow(/rules/);
     expect(() => applyAction(world, { tick: 0, kind: 'teleport' } as unknown as Action, RULES)).toThrow(/unknown action kind/);
   });
 
-  it('live ≡ replay: a recruit in the log regrows byte-identically over 3 days', () => {
-    const { town } = generateValidTown('rec-replay', CFG, CONTENT, RULES);
+  it('live ≡ replay: an accepted recruit in the log regrows byte-identically over 3 days', () => {
     const build = (): WorldState => {
-      const w = worldFromTown(town, 'rec-replay', RULES);
-      attachPlayer(w, town);
-      return w;
+      const world = recruitWorld('rec-replay');
+      pin(world, 'square', 'you', 'cass', 'nell');
+      trust(world, 'cass', 'you', 0.8);
+      return world;
     };
-    // Pre-compute a natural money recruit (public venue + beat + target) from a throwaway build.
-    const probe = build();
-    const guardIds = new Set(probe.enemy.observers.map((o) => o.id));
-    const assetIds = new Set(probe.network.assets.map((a) => a.id));
-    let found: { venue: string; t: number; target: EntityId } | null = null;
-    for (let h = 0; h < 48 && !found; h++) {
-      const t = at(Math.floor(h / 24), h % 24);
-      for (const v of Object.values(probe.venues)) {
-        if (v.access !== 'public') continue;
-        probe.playerVenue = v.id;
-        const c = circlesAt(probe, t).find((cc) => cc.members.includes('you'));
-        if (!c) continue;
-        const target = c.members.find((m) => m !== 'you' && !guardIds.has(m)
-          && m !== probe.scenario?.cast.usurper && !(probe.scenario?.cast.council ?? []).includes(m)
-          && m !== town.cast!.usurper && !town.cast!.council.includes(m)
-          && m !== probe.network.spymaster && !assetIds.has(m));
-        if (target) { found = { venue: v.id, t, target }; break; }
-      }
-    }
-    if (!found) throw new Error('replay: no natural money recruit found in 2 days');
-
     const log: Action[] = [
-      { tick: 0, kind: 'goTo', venue: found.venue },
-      { tick: found.t, kind: 'recruit', target: found.target, mice: 'money', leverageFamily: null as RumorId | null },
+      { tick: 0, kind: 'recruit', target: 'cass', mice: 'money', leverageFamily: null as RumorId | null },
     ];
     const a = runLogOn(build(), RULES, log, at(3, 0));
     const b = runLogOn(build(), RULES, log, at(3, 0));
     expect(hashWorld(a)).toBe(hashWorld(b));
-    expect(assetFor(a, 'player', found.target)!.mice).toBe('money');
+    expect(assetFor(a, 'player', 'cass')!.mice).toBe('money');
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MIGRATED verbatim: the wage payroll is untouched by Task 11.
+
 describe('wages — auto-debit on the rest-day nightly (never a refusal)', () => {
-  it('stipend credits FIRST, then payroll: a treasury zeroed before the nightly still covers wages that night', () => {
-    const { world } = stage('wage-order', { scenario: false });
-    const n = world.network.assets.length; // the two dossier freebies draw wages too (uniform rule)
+  const CFG = STANDARD_GEN_CONFIG;
+  const CONTENT = STANDARD_GEN_CONTENT;
+
+  it('stipend credits FIRST, then payroll: a treasury zeroed before the nightly still covers wages', () => {
+    const { town } = generateValidTown('wage-order', CFG, CONTENT, RULES);
+    const world = worldFromTown(town, 'wage-order', RULES);
+    attachPlayer(world, town);
+    const n = world.network.assets.length;
     expect(n).toBeGreaterThan(0);
 
-    runUntil(world, at(6, 23, 59), RULES); // up to (not through) day 6's nightly beat
-    world.coin = 0;                        // if wages ran BEFORE the stipend, both would miss
+    runUntil(world, at(6, 23, 59), RULES);
+    world.coin = 0;
     const strikesBefore = world.network.assets.map((a) => a.strikes);
 
-    step(world, RULES); // day-6 nightly: stipend +12, THEN wages -2 each
+    step(world, RULES);
 
     const wage = STANDARD_ECONOMY.wagePerInformantPerWeek;
-    expect(world.coin).toBe(STANDARD_ECONOMY.weeklyStipend - n * wage); // 12 - 2*2 = 8
-    expect(world.network.assets.map((a) => a.strikes)).toEqual(strikesBefore); // nobody missed → no strikes
+    expect(world.coin).toBe(STANDARD_ECONOMY.weeklyStipend - n * wage);
+    expect(world.network.assets.map((a) => a.strikes)).toEqual(strikesBefore);
     for (const a of world.network.assets) expect(a.wagePaidThroughDay).toBe(6);
   });
 
@@ -430,7 +499,7 @@ describe('wages — auto-debit on the rest-day nightly (never a refusal)', () =>
     const world = buildWorld(TESTFORD, 'wage-miss', RULES);
     enrollPlayer(world, { home: 'market' });
     const wage = STANDARD_ECONOMY.wagePerInformantPerWeek;
-    world.coin = wage; // exactly one wage — anselm (id-first) is paid, mara misses
+    world.coin = wage;
     for (const id of ['anselm', 'mara']) {
       world.network.assets.push({ id, mice: 'money', wagePaidThroughDay: 0, strikes: 0, facts: [] });
       world.npcs[id]!.edges.push({ to: 'you', kind: 'friend', trust: 0.6 });
@@ -445,3 +514,7 @@ describe('wages — auto-debit on the rest-day nightly (never a refusal)', () =>
     expect(dispositionOf(world, 'mara')).toBeCloseTo(0.55, 10);
   });
 });
+
+/** A stray `EntityId` import guard so the fixture roster stays typed at the call sites above. */
+const _typed: EntityId = 'cass';
+void _typed;

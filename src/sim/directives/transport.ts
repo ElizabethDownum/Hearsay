@@ -10,6 +10,9 @@ import type { Rules } from '../rules';
 import type { WorldState } from '../types';
 import { trustBetween } from '../world';
 import { evaluateInvitation, invitationById } from '../network/invitations';
+import {
+  closeUnspokenApproach, hearRecruitmentApproach, settleRecruitmentAnswer,
+} from '../network/recruitment';
 import { projectFieldReportHop } from './field-reports';
 import {
   allocateNetworkMessage, allocateProjectedVersionId, ensureDirectiveState, strictNextBeat,
@@ -339,6 +342,10 @@ function failExpired(world: WorldState, message: NetworkMessage, t: Tick): void 
   if (message.deliveredAt !== null || message.failedAt !== null
     || message.expiresAt === null || t <= message.expiresAt) return;
   message.failedAt = t;
+  if (message.payload.kind === 'recruitment-approach') {
+    closeUnspokenApproach(world, message.payload.approachId, message.origin);
+    return;
+  }
   if (message.payload.kind !== 'directive') return;
   const payload = message.payload;
   const directive = world.network.directiveState?.records.find((candidate) =>
@@ -508,14 +515,14 @@ function receiveFinal(
       if (spoken.response === 'accept') {
         invitation.status = 'accepted';
         invitation.scheduled = cloneSerializable(invitation.requested);
-        if (invitation.kind === 'hosting') {
+        if (invitation.kind === 'hosting' || invitation.kind === 'sound-out') {
           const override = {
             fromDay: Math.floor(invitation.requested.from / 1440),
             toDay: Math.floor((invitation.requested.until - 1) / 1440) + 1,
             from: invitation.requested.from % 1440,
             to: invitation.requested.until % 1440,
             venue: invitation.venue, source: 'player' as const,
-            sourceRef: `hosting:${invitation.id}`,
+            sourceRef: `${invitation.kind}:${invitation.id}`,
           };
           world.scheduleOverrides[invitation.invitee] = [
             override, ...(world.scheduleOverrides[invitation.invitee] ?? []),
@@ -530,9 +537,17 @@ function receiveFinal(
       }
       return;
     }
+    case 'recruitment-approach': {
+      hearRecruitmentApproach(world, {
+        approachId: spoken.approachId, recruiter: spoken.recruiter, target: spoken.target,
+      }, message.holder, circle, t, rules, message.cause);
+      return;
+    }
+    case 'recruitment-response': {
+      settleRecruitmentAnswer(world, spoken.approachId, spoken.response, message.holder, t, rules);
+      return;
+    }
     case 'handler-brief':
-    case 'recruitment-approach':
-    case 'recruitment-response':
       return;
   }
 }
@@ -630,7 +645,8 @@ export function deliverNetworkMessages(
       if (phase === 'player') return player !== null && message.holder === player;
       return message.holder !== player
         && (message.payload.kind === 'directive-response'
-          || message.payload.kind === 'invitation-response');
+          || message.payload.kind === 'invitation-response'
+          || message.payload.kind === 'recruitment-response');
     })
     .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
   const speeches: NetworkSpeech[] = [];

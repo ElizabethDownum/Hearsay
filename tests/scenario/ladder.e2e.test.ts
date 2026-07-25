@@ -107,6 +107,10 @@ function stageLadder(seed: string): { world: WorldState; town: GeneratedTown } {
   // sly→you trust so a single addressed anti-sly tell lands at REPEAT (budget rung, it-4). Post-enrol —
   // 'you' does not exist at fixture-build time.
   world.npcs['sly']!.edges.push({ to: 'you', kind: 'colleague', trust: 0.5 });
+  // Task 11: recruitment is an observable APPROACH whose answer is the candidate's own. A cold
+  // money offer to a stranger draws a hesitation, so rung 1 approaches somebody who already knows
+  // the avatar — the relationship is the lever, and the response formula reads it.
+  world.npcs['cass']!.edges.push({ to: 'you', kind: 'friend', trust: 0.8 });
   for (const id of ['ida', 'obs']) {
     world.scheduleOverrides[id] = [{
       fromDay: 7, toDay: 8, from: 0, to: 1440,
@@ -155,11 +159,15 @@ const dmg = (subject: string, attribution: string): ReportedClaim =>
 // The campaign script — one seeded action log. Day 0: enter the hub, recruit the carrier (money), set
 // a drop, courier the poison to nell via the drop. Day 7 (after the day-6 stipend clears): host the
 // back-room evening. runLogOn crosses the day-6 rest-day nightly (stipend + wages) in between.
+// Task 11 re-staged the first two beats: the avatar walks in on beat 0, makes the approach on beat 1
+// (the offered circle the frame froze now really holds them both), and — because the roster row
+// appears only when cass's spoken acceptance physically arrives that same beat — tasks the courier on
+// beat 2. Costs, venues and every downstream rung are unchanged.
 const CAMPAIGN: Action[] = [
   { tick: 0, kind: 'goTo', venue: 'market' },
-  { tick: 0, kind: 'recruit', target: 'cass', mice: 'money', leverageFamily: null },
-  { tick: 0, kind: 'setDrop', id: 'd1', venue: 'market' },
-  { tick: 0, kind: 'courier', asset: 'cass', spec: poison('vane'), target: 'nell', viaDrop: 'd1' },
+  { tick: 15, kind: 'recruit', target: 'cass', mice: 'money', leverageFamily: null },
+  { tick: 15, kind: 'setDrop', id: 'd1', venue: 'market' },
+  { tick: 30, kind: 'courier', asset: 'cass', spec: poison('vane'), target: 'nell', viaDrop: 'd1' },
   { tick: at(7, 8) - 1, kind: 'goTo', venue: 'safehouse' },
   { tick: at(7, 8), kind: 'host', venue: 'back-room-d0', invitees: ['ida', 'obs'] },
 ];

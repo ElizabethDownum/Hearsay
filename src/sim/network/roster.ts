@@ -2,7 +2,7 @@ import { dayOf } from '../../core/time';
 import type { EntityId } from '../rumors/claim';
 import type { Rules } from '../rules';
 import type { WorldState } from '../types';
-import type { AssetRecord, Principal } from './types';
+import type { AssetRecord, Mice, Principal } from './types';
 import { trustBetween } from '../world';
 
 /** Principal-explicit roster access: dual membership is lawful and never resolved by search order. */
@@ -16,6 +16,30 @@ export function assetFor(world: WorldState, principal: Principal, id: EntityId):
 
 export function isTurnedAgainst(world: WorldState, principal: Principal, id: EntityId): boolean {
   return assetFor(world, principal, id)?.turned === true;
+}
+
+/**
+ * Recruitment disposition floor by handle — the trust an accepted recruit establishes toward the
+ * player. Coercion is lowest (they don't love you — nearest Task 8's flip line); ideology highest.
+ */
+export const RECRUIT_DISPOSITION: Record<Mice, number> = {
+  money: 0.6, ideology: 0.7, coercion: 0.5, ego: 0.6,
+};
+
+/**
+ * Give a principal the ORDINARY record for someone their own channels already touch — empty facts,
+ * no handle, no wage history. Used where real linkage becomes bookkeeping (Task 11: a physically
+ * delivered approach, or an accepted recruit who already served the other side). It never invents a
+ * meeting: a compartment fact is recorded only where one actually happened.
+ */
+export function ensureAssetRecord(
+  world: WorldState, principal: Principal, id: EntityId,
+): AssetRecord {
+  const existing = assetFor(world, principal, id);
+  if (existing) return existing;
+  const record: AssetRecord = { id, mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [] };
+  rosterFor(world, principal).push(record);
+  return record;
 }
 
 export function principalActor(world: WorldState, principal: Principal): EntityId | null {

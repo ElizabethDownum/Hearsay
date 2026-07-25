@@ -1,13 +1,14 @@
 import { dayOf, minuteOfDay, TICKS_PER_DAY, type Tick } from '../core/time';
 import { circlesAt } from './agents';
 import type { InquiryKey } from './perception';
-import { CONVERSATION_BEAT, STANCE } from './rumors/propagation';
+import { CONVERSATION_BEAT } from './rumors/propagation';
 import { mintClaim, SOMEONE, type Claim, type EntityId, type RumorId, type VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
 import type { Rules } from './rules';
 import type { Belief, IntelEntry, Venue, WorldState } from './types';
 import type { Mice } from './network/types';
-import { assetFor, canAfford, debitCoin, setDispositionEdge, slideDisposition } from './network/roster';
+import { assetFor, canAfford, debitCoin, slideDisposition } from './network/roster';
+import { openApproachBetween, openRecruitmentApproach } from './network/recruitment';
 import { recordPlayerKnownFact } from './network/compartment';
 import { appendCourierPlan, blankIntel, latestPlayerKnownVenue } from './fieldwork';
 import { reportThrough } from './reporting';
@@ -59,7 +60,16 @@ function applyDirectiveWithCause(
     throw new Error(`directive: '${recipient}' is not one of your assets`);
   }
   if (brief.mission.kind === 'sound-out') {
-    throw new Error('directive: sound-out missions land with recruitment (Task 11)');
+    // The permanent validation (Task 11): an asset cannot sound ITSELF out. Checked before any state
+    // allocation, so a refusal leaves zero residue. Task 13's composer merely stops offering the row.
+    if (brief.mission.target === recipient) {
+      throw new Error('directive: an asset cannot sound itself out');
+    }
+    const meeting = brief.mission.meeting;
+    if (meeting !== null && (meeting.from >= meeting.until
+      || meeting.from % CONVERSATION_BEAT !== 0 || meeting.until % CONVERSATION_BEAT !== 0)) {
+      throw new Error('directive: sound-out meeting window must be nonempty and beat aligned');
+    }
   }
   if (brief.active.from > brief.active.until) throw new Error('directive: active range is reversed');
   if (brief.active.until < tick) throw new Error('directive: active range has expired');
@@ -246,25 +256,18 @@ export function applyAsk(world: WorldState, to: EntityId, about: InquiryKey, tic
   }
 }
 
-/** Recruitment disposition floor by handle — the trust the recruit establishes toward the player.
- *  Coercion is lowest (they don't love you — nearest Task 8's flip line); ideology highest. */
-const RECRUIT_DISPOSITION: Record<Mice, number> = {
-  money: 0.6, ideology: 0.7, coercion: 0.5, ego: 0.6,
-};
-
-/** O3: the ONE uniform identity-exclusion refusal (see applyRecruit). It names no target and no
- *  category, so no throw string can leak guard / enemy-asset / spymaster status. */
-const RECRUIT_EXCLUDED = 'recruit: this person cannot be recruited';
-
 /**
- * Recruit an in-circle NPC onto the roster (spec's MICE). VALIDATE-BEFORE-MUTATE: every precondition
- * throws BEFORE any state changes, so a refused recruit leaves ZERO residue (no asset, informant,
- * edge, fact, or coin move). Recruitment is a conversation, like tell — beat-aligned, avatar present,
- * target in the avatar's circle this beat. Per-handle gate: `money` none; `ideology` needs the target
- * to already hold a damaging conviction about the usurper at ≥REPEAT (the cause is the coronation);
- * `coercion` needs `leverageFamily` to name a damaging family ABOUT the target in the PLAYER'S INTEL
- * LOG (never world truth — your leverage can be a lie you believe); `ego` none. Cost from the one
- * economy table; insufficient coin REFUSES (distinct from the nightly wage shortfall, which slides).
+ * Approach an in-circle NPC about joining the roster (spec's MICE). Recruitment is an OBSERVABLE ACT,
+ * never a hidden-state validator: public validation reads only player/action facts — a real target
+ * who is not the avatar, the offered circle, no approach already open from you to them, existing
+ * roster membership (your own public bookkeeping), held coercion leverage, and the treasury.
+ * Guard, cast, spymaster, eligibility and enemy linkage shape the NPC's RESPONSE (they are inputs to
+ * `evaluateRecruitment`), never a throw string — so no refusal can be read as a hidden-state oracle.
+ *
+ * VALIDATE-BEFORE-MUTATE: every precondition throws before any state change (zero residue). The cost
+ * is debited when the real approach occurs and is NEVER refunded — probing is priced, on all three
+ * outward answers alike. The approach itself is a phase-2 `NetworkSpeech`; the candidate's answer is
+ * their OWN spoken act, and only its physical receipt closes the approach or adds anyone to a roster.
  */
 export function applyRecruit(
   world: WorldState, target: EntityId, mice: Mice, leverageFamily: RumorId | null, tick: Tick, rules: Rules,
@@ -275,20 +278,11 @@ export function applyRecruit(
   if (!world.npcs[target]) throw new Error(`recruit: unknown npc '${target}'`);
   if (target === world.playerId) throw new Error('recruit: cannot recruit the avatar');
 
-  // Identity exclusions (spec) — checked before the co-circle gate so a guard/cast member is refused
-  // as such even when not in earshot. O3 (Plan 8 T12; T11 adjudication A; Ellie 2026-07-09): all four
-  // excluded classes refuse with the SAME uniform message (RECRUIT_EXCLUDED). The message names no
-  // category, so it can never hand the player a hidden-state oracle — that a target is a guard, the
-  // enemy spymaster, or (the sharpest leak) a SECRETLY enemy-net asset, which a "already an asset"
-  // string on someone the player never recruited would out. The residual recruitable/not oracle (a
-  // refusal at all) is Ellie-ratified v1 tradecraft; composer-side sealing is structurally barred.
-  if (world.enemy.observers.some((o) => o.id === target)) throw new Error(RECRUIT_EXCLUDED);
-  const cast = world.scenario?.cast;
-  if (cast && (cast.usurper === target || cast.council.includes(target))) throw new Error(RECRUIT_EXCLUDED);
-  // The embodied spymaster (Task 7) is nobody's asset — his own gate; recruiting HIS asset is Task 8's
-  // turncoat flow, a different verb. Both refuse with the SAME message as the guard/cast exclusions.
-  if (world.network.spymaster === target) throw new Error(RECRUIT_EXCLUDED);
-  if (assetFor(world, 'player', target)) throw new Error(RECRUIT_EXCLUDED);
+  // Public bookkeeping only: you already know who is on YOUR roster.
+  if (assetFor(world, 'player', target)) throw new Error('recruit: this person is already on your roster');
+  if (openApproachBetween(world, 'player', world.playerId, target)) {
+    throw new Error(`recruit: an approach to '${target}' is already open`);
+  }
 
   // Co-circle basis (recruitment is a conversation — the same validation shape as tell).
   const circle = circlesAt(world, tick).find((c) => c.members.includes(world.playerId!));
@@ -296,20 +290,15 @@ export function applyRecruit(
     throw new Error(`recruit: '${target}' is not in the avatar's circle this beat`);
   }
 
-  // Per-handle gate.
-  if (mice === 'ideology') {
-    const usurper = cast?.usurper;
-    const leans = usurper !== undefined && Object.values(world.beliefs[target] ?? {}).some((b) =>
-      b.claim.subject === usurper && rules.predicates[b.claim.predicate]?.valence === 'damaging' && b.credence >= STANCE.REPEAT);
-    if (!leans) throw new Error('recruit: ideology needs the target to already hold a damaging conviction about the usurper');
-  } else if (mice === 'coercion') {
+  // The one surviving handle gate is a fact about YOU: coercion needs leverage you actually hold.
+  if (mice === 'coercion') {
     const holdsDirt = leverageFamily !== null && world.intel.log.some((e) =>
       e.family === leverageFamily && e.reported !== null && e.reported.subject === target
       && rules.predicates[e.reported.predicate]?.valence === 'damaging');
     if (!holdsDirt) throw new Error('recruit: coercion needs damaging leverage you hold on the target');
   }
 
-  // Cost (validate-before-mutate: refuse an unaffordable recruit).
+  // Cost (validate-before-mutate: refuse an unaffordable approach).
   const cost = rules.economy.recruitCost[mice];
   if (!canAfford(world, cost)) {
     throw new Error(`recruit: the treasury cannot cover this recruitment (${cost} needed, ${world.coin} held)`);
@@ -317,10 +306,15 @@ export function applyRecruit(
 
   // --- Effects (all validation passed; edges-only writes keep the fixture clone sound) ---
   debitCoin(world, cost);
-  world.network.assets.push({ id: target, mice, wagePaidThroughDay: dayOf(tick), strikes: 0, facts: [] });
-  recordPlayerKnownFact(world, target, { kind: 'recruited-by', ref: 'player' });
-  setDispositionEdge(world, target, RECRUIT_DISPOSITION[mice]);
-  world.intel.informants.push({ id: target, assignedVenue: null });
+  const approach = openRecruitmentApproach(world, {
+    principal: 'player', recruiter: world.playerId, target, mice, leverageFamily,
+    sourceDirectiveId: null, tick,
+  });
+  // The approach is SPOKEN this beat or not at all; the candidate's answer is composed when they
+  // physically hear it (phase 2) and returns as a causally marked direct response (phase 3).
+  queueNetworkMessage(world, 'player', world.playerId, [target], {
+    kind: 'recruitment-approach', approachId: approach.id, recruiter: world.playerId, target,
+  }, tick, tick, { kind: 'player-action', action: 'recruit', tick });
 }
 
 /**

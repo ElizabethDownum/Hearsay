@@ -148,14 +148,16 @@ describe('five-phase tick transaction', () => {
     expect(hashWorld(world)).toBe(beforeTick);
   });
 
-  it('names a remaining uninstalled setup handler without partially applying it', () => {
+  // MIGRATED (Task 11): the recruitment-response setup handler is installed. It still refuses a setup
+  // that names no real approach, and prepareTick still applies nothing to the live world when it does.
+  it('the installed recruitment-response setup refuses an unknown approach without partially applying it', () => {
     const world = staged();
     scheduleSetup(world, {
       ...moveMara('elsewhere', 'future-recruitment'), kind: 'recruitment-response', override: null,
     });
     runUntil(world, 15, RULES);
     const before = hashWorld(world);
-    expect(() => prepareTick(world, RULES)).toThrow(/recruitment-response.*handler not installed/i);
+    expect(() => prepareTick(world, RULES)).toThrow(/recruitment-response: unknown approach/i);
     expect(hashWorld(world)).toBe(before);
   });
 

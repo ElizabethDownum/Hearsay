@@ -53,12 +53,14 @@ export function resolveInvitations(world: WorldState, tick: Tick): void {
     if (inside && tick % CONVERSATION_BEAT === 0 && invitation.attendedAt === null) {
       const guest = world.npcs[invitation.invitee];
       const guestThere = guest !== undefined && positionOf(world, guest, tick) === invitation.venue;
-      const rendezvousThere = invitation.kind !== 'rendezvous' || (
+      // A rendezvous and a sound-out meeting are BOTH avatar-present moments: the room only counts
+      // when the player is actually standing in it with the guest. A hosted evening is the guest's.
+      const counterpartyThere = invitation.kind === 'hosting' || (
         world.playerId !== null && world.playerVenue === invitation.venue
         && circlesAt(world, tick).some((circle) => circle.venue === invitation.venue
           && circle.members.includes(world.playerId!) && circle.members.includes(invitation.invitee))
       );
-      if (guestThere && rendezvousThere) {
+      if (guestThere && counterpartyThere) {
         invitation.attendedAt = tick;
         if (invitation.kind === 'rendezvous'
           && assetFor(world, invitation.principal, invitation.invitee)) {

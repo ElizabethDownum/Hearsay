@@ -117,13 +117,24 @@ describe('lazy directive state', () => {
     }
   });
 
-  it('rejects sound-out with the exact Task-11 error and validates active/reportBy bounds', () => {
+  it('rejects a self-targeted sound-out and validates active/reportBy bounds', () => {
+    // MIGRATED (Task 11): the interim "lands with recruitment" stub is replaced by the PERMANENT
+    // validation — an asset cannot sound itself out — and a lawful sound-out now issues.
     const soundOut: DirectiveBrief = {
       ...BRIEF,
-      mission: { kind: 'sound-out', target: 'ada', topic: 'cooperation', handle: null, meeting: null },
+      mission: { kind: 'sound-out', target: 'bez', topic: 'cooperation', handle: null, meeting: null },
     };
-    expect(() => applyDirective(world(), 'bez', { outboundVia: [], reportVia: [] }, soundOut, 0))
-      .toThrow('directive: sound-out missions land with recruitment (Task 11)');
+    const selfTargeted = world();
+    expect(() => applyDirective(selfTargeted, 'bez', { outboundVia: [], reportVia: [] }, soundOut, 0))
+      .toThrow('directive: an asset cannot sound itself out');
+    expect(selfTargeted.network.directiveState).toBeUndefined();
+
+    const lawful = world();
+    applyDirective(lawful, 'bez', { outboundVia: [], reportVia: [] }, {
+      ...soundOut,
+      mission: { ...soundOut.mission, target: 'ada' } as DirectiveBrief['mission'],
+    }, 0);
+    expect(lawful.network.directiveState!.records).toHaveLength(1);
 
     const invalid: { brief: DirectiveBrief; error: RegExp }[] = [
       { brief: { ...BRIEF, active: { from: 30, until: 15 }, reportBy: null }, error: /active range is reversed/ },
@@ -141,7 +152,12 @@ describe('lazy directive state', () => {
 });
 
 describe('raw network allocation hatch importer fence', () => {
-  const allowed = ['directives/execution.ts', 'directives/reports.ts', 'directives/transport.ts'];
+  // Task 11 adds one reviewed importer: the recruitment layer queues the approach/answer/report
+  // messages through the same cycle-free allocation seam every other network producer uses.
+  const allowed = [
+    'directives/execution.ts', 'directives/reports.ts', 'directives/transport.ts',
+    'network/recruitment.ts',
+  ];
 
   it('pins the exact reviewed importer set', () => {
     expect(allocationImporters()).toEqual(allowed);

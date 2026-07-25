@@ -150,7 +150,9 @@ describe('courier delivery — trait-transformed BY THE ASSET on the way out (co
     expect(world.npcs['anselm']!.traits).not.toContain('exaggerator'); // NOT a natural exaggerator
     const taskTick = at(0, 12);
     runUntil(world, taskTick, RULES);
-    applyAction(world, { tick: taskTick, kind: 'recruit', target: 'anselm', mice: 'ego', leverageFamily: null }, RULES);
+    // MIGRATED (Task 11): enrollment is now the candidate's answer arriving, so a courier test uses
+    // the file's direct-construct idiom instead of driving a whole recruitment conversation.
+    makeAsset(world, 'anselm', 'ego');
     expect(assetFor(world, 'player', 'anselm')!.mice).toBe('ego');
 
     const spec: InjectSpec = { subject: 'tomas', predicate: 'stole', object: null, count: 4, severity: 2, place: null, attribution: SOMEONE };
@@ -261,8 +263,10 @@ describe('courier heat — a guard hearing the delivery attributes the CARRIER, 
     world.network.spymaster = 'cole'; // embodied handler hears this delivery in person
     const t = at(0, 12);
     runUntil(world, t, RULES);
-    // Recruit anselm for real so recruited-by:player is genuinely on the record (the chain the enemy pulls).
-    applyAction(world, { tick: t, kind: 'recruit', target: 'anselm', mice: 'money', leverageFamily: null }, RULES);
+    // Put recruited-by:player genuinely on the record (the chain the enemy pulls). MIGRATED (Task 11):
+    // the recruit VERB now completes at the answer's physical receipt, so this uses makeAsset — which
+    // writes the same fact and edge. The recruitment conversation itself is pinned in recruit.test.ts.
+    makeAsset(world, 'anselm', 'money');
     const spec: InjectSpec = { subject: 'tomas', predicate: 'poisoned', object: null, count: 1, severity: 5, place: null, attribution: SOMEONE };
     applyCourier(world, 'anselm', spec, 'dara', null, t, RULES);
     const expected = firstCoCircle(world, 'anselm', 'dara', t + 5 * CONVERSATION_BEAT);
@@ -455,9 +459,12 @@ describe('courier routing — save = seed + action log', () => {
   });
 
   it('live ≡ replay: a setDrop + courier in the log regrows byte-identically across a nightly, and delivers', () => {
-    const build = (): WorldState => testWorld('courier-replay');
+    const build = (): WorldState => {
+      const world = testWorld('courier-replay');
+      makeAsset(world, 'anselm', 'money'); // MIGRATED (Task 11): staging, not a logged action
+      return world;
+    };
     const log: Action[] = [
-      { tick: at(0, 12), kind: 'recruit', target: 'anselm', mice: 'money', leverageFamily: null },
       { tick: at(0, 12), kind: 'setDrop', id: 'd1', venue: 'market' },
       { tick: at(0, 12), kind: 'courier', asset: 'anselm', spec, target: 'dara', viaDrop: null },
     ];
