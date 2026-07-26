@@ -53,7 +53,8 @@ function payloads(): NetworkPayload[] {
       inviter: 'ada', counterparty: 'cyn', invitee: 'cyn', venue: 'square',
       requested: { from: 15, until: 30 } },
     { kind: 'invitation-response', invitationId: 'i-law', response: 'accept' },
-    { kind: 'recruitment-approach', approachId: 'a-law', recruiter: 'ada', target: 'cyn' },
+    { kind: 'recruitment-approach', approachId: 'a-law', recruiter: 'ada', target: 'cyn',
+      mice: 'coercion', leverageFamily: 'f-law' },
     { kind: 'recruitment-response', approachId: 'a-law', response: 'accept' },
   ];
 }
@@ -86,7 +87,8 @@ function carried(payload: NetworkPayload): CarriedSpeech {
     case 'invitation-response': return { kind: 'invitation-response', invitationId: payload.invitationId,
       response: payload.response };
     case 'recruitment-approach': return { kind: 'recruitment-approach', approachId: payload.approachId,
-      recruiter: payload.recruiter, target: payload.target };
+      recruiter: payload.recruiter, target: payload.target,
+      mice: payload.mice, leverageFamily: payload.leverageFamily };
     case 'recruitment-response': return { kind: 'recruitment-response', approachId: payload.approachId,
       response: payload.response };
   }

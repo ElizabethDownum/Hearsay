@@ -15,8 +15,8 @@ import { reportThrough } from '../../src/sim/reporting';
 import { assetFor, dispositionOf, payWagesNightly } from '../../src/sim/network/roster';
 import { compartmentOf } from '../../src/sim/network/compartment';
 import {
-  evaluateRecruitment, handleFitFor, isLinkedTo, isProtectedRole, shouldReportApproach,
-  type RecruitmentInput,
+  evaluateRecruitment, handleFitFor, isLinkedTo, isProtectedRole, recruitmentHistoryView,
+  shouldReportApproach, type RecruitmentInput,
 } from '../../src/sim/network/recruitment';
 import { hashWorld } from '../../src/sim/hash';
 import { blankIntel } from '../../src/sim/fieldwork';
@@ -27,31 +27,39 @@ import type { TraitContext } from '../../src/sim/rumors/traits';
 import type { RecruitmentResponse } from '../../src/sim/directives/types';
 import type { WorldState } from '../../src/sim/types';
 import { makePlayerAsset, pin, recruitWorld, trust } from './helpers/recruit-town';
+import { callArgCounts, forbiddenReached, operatorsFrom, parseModule } from '../helpers/callgraph';
 
 const RULES = STANDARD_RULES;
-const SOURCE = readFileSync(join(process.cwd(), 'src/sim/network/recruitment.ts'), 'utf8');
+const RECRUITMENT_PATH = 'src/sim/network/recruitment.ts';
+const SOURCE = readFileSync(join(process.cwd(), RECRUITMENT_PATH), 'utf8');
+
+/** The two pure decision functions the plan forbids any hidden lottery inside. */
+const EVALUATORS = ['evaluateRecruitment', 'shouldReportApproach'];
+/** Seed, clock, identity hash and ambient entropy — every non-contextual cause, by name. */
+const LOTTERY_NAMES = [
+  'seed', 'tick', 'Rng', 'random', 'Math', 'Date', 'now', 'fnv1a', 'hashWorld', 'charCodeAt',
+  'stableStringify', 'localeCompare',
+];
+/** Roster / observer / turncoat / enemy state — forbidden inputs to protected pressure. */
+const HIDDEN_ROLE_NAMES = [
+  'rosterFor', 'assetFor', 'isLinkedTo', 'isTurnedAgainst', 'ensureAssetRecord', 'observers',
+  'enemyAssets', 'assets', 'turned', 'network', 'enemy', 'spymaster', 'directiveState',
+];
+
+/** Splice a statement in at the top of a named function body — the enforcement-scan injection idiom. */
+function inject(anchor: string, replacement: string, statement: string): string {
+  const start = SOURCE.indexOf(anchor);
+  expect(start, `the injection anchor '${anchor}' exists`).toBeGreaterThanOrEqual(0);
+  const open = SOURCE.indexOf('{', SOURCE.indexOf(')', start + anchor.length));
+  return SOURCE.slice(0, start) + replacement + SOURCE.slice(start + anchor.length, open + 1)
+    + '\n' + statement + SOURCE.slice(open + 1);
+}
 
 const asClaim = (spec: InjectSpec): Claim => ({ id: 'probe', family: 'probe', parent: null, ...spec });
 const pick7 = (c: Claim | InjectSpec): Pick<Claim, 'subject' | 'predicate' | 'object' | 'count' | 'severity' | 'place' | 'attribution'> => {
   const { subject, predicate, object, count, severity, place, attribution } = c;
   return { subject, predicate, object, count, severity, place, attribution };
 };
-
-/** Extract one exported function's body from the module source — the seam every source scan reads. */
-function bodyOf(source: string, name: string): string {
-  const start = source.indexOf(`export function ${name}(`);
-  expect(start, `${name} is exported from recruitment.ts`).toBeGreaterThanOrEqual(0);
-  const open = source.indexOf('{', source.indexOf(')', start));
-  let depth = 0;
-  for (let i = open; i < source.length; i++) {
-    if (source[i] === '{') depth += 1;
-    else if (source[i] === '}') {
-      depth -= 1;
-      if (depth === 0) return source.slice(open, i + 1);
-    }
-  }
-  throw new Error(`bodyOf: unbalanced body for '${name}'`);
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The pure response formula: contextual causes, never a hidden lottery.
@@ -132,27 +140,52 @@ describe('evaluateRecruitment — every hidden category shares one outward respo
     })).toBe('accept');                                                                 // -2 + 2
   });
 
-  it('source scan: neither pure decision function reads seed, tick, id hash, parity or randomness', () => {
-    const forbidden = /\bseed\b|\btick\b|\bRng\b|random|fnv1a|hashWorld|charCodeAt|%/;
-    for (const name of ['evaluateRecruitment', 'shouldReportApproach']) {
-      expect(bodyOf(SOURCE, name), name).not.toMatch(forbidden);
-    }
-    // FIRING PROOF: the same scan catches an injected lottery.
-    const injected = SOURCE.replace(
-      /export function evaluateRecruitment\(([^)]*)\)([^{]*)\{/,
-      'export function evaluateRecruitment($1)$2{\n  if (new Rng(world.seed, `x`).next() > 0.5) return \'accept\';',
-    );
-    expect(bodyOf(injected, 'evaluateRecruitment')).toMatch(forbidden);
+  // ── ENFORCEMENT SCAN 1: no hidden lottery, anywhere the two evaluators can reach ──────────────
+  it('call-graph scan: nothing reachable from either evaluator reads seed, clock, hash or entropy', () => {
+    const graph = parseModule(RECRUITMENT_PATH);
+    expect(forbiddenReached(graph, EVALUATORS, LOTTERY_NAMES)).toEqual([]);
+    expect([...operatorsFrom(graph, EVALUATORS)], 'no parity arithmetic').not.toContain('%');
+
+    // FIRING PROOF (a): a lottery written straight into the evaluator.
+    expect(forbiddenReached(parseModule(RECRUITMENT_PATH, inject(
+      'export function evaluateRecruitment(',
+      'export function evaluateRecruitment(',
+      '  if (new Rng(world.seed, `x`).next() > 0.5) return \'accept\';\n',
+    )), EVALUATORS, LOTTERY_NAMES)).toContain('Rng');
+
+    // FIRING PROOF (b): the reviewer's bypass — the same lottery moved one HELPER deep.
+    const viaHelper = SOURCE
+      .replace('export function evaluateRecruitment(',
+        'function rollLottery(world: { seed: string }): number {\n'
+        + '  return new Rng(world.seed, `lottery`).next();\n}\n'
+        + 'export function evaluateRecruitment(')
+      .replace(/(export function evaluateRecruitment\([^)]*\)[^{]*\{)/,
+        '$1\n  if (rollLottery(world) > 0.5) return \'accept\';');
+    expect(forbiddenReached(parseModule(RECRUITMENT_PATH, viaHelper), EVALUATORS, LOTTERY_NAMES),
+      'a helper lottery is inside the evaluator\'s closure').toContain('Rng');
+
+    // FIRING PROOF (c): parity on the entity id, which names none of the forbidden identifiers.
+    const parity = SOURCE.replace(/(export function evaluateRecruitment\([^)]*\)[^{]*\{)/,
+      '$1\n  if (input.traits.length % 2 === 0) return \'accept\';');
+    expect([...operatorsFrom(parseModule(RECRUITMENT_PATH, parity), EVALUATORS)]).toContain('%');
   });
 
-  it('source scan: isProtectedRole never reads roster, observer, turned, or any enemy/network field', () => {
-    const forbidden = /roster|observer|turned|enemyAssets|network\.|\.enemy\b|assetFor/;
-    expect(bodyOf(SOURCE, 'isProtectedRole')).not.toMatch(forbidden);
-    const injected = SOURCE.replace(
-      /(export function isProtectedRole\([^)]*\)[^{]*\{)/,
-      '$1\n  if (world.network.enemyAssets.length > 0) return true;',
-    );
-    expect(bodyOf(injected, 'isProtectedRole')).toMatch(forbidden);
+  // ── ENFORCEMENT SCAN 2: isProtectedRole knows only its own PUBLIC role ────────────────────────
+  it('call-graph scan: nothing reachable from isProtectedRole reads roster, observer or turned state', () => {
+    const graph = parseModule(RECRUITMENT_PATH);
+    expect(forbiddenReached(graph, ['isProtectedRole'], HIDDEN_ROLE_NAMES)).toEqual([]);
+
+    // FIRING PROOF (a): a direct hidden-state read.
+    expect(forbiddenReached(parseModule(RECRUITMENT_PATH, inject(
+      'export function isProtectedRole(', 'export function isProtectedRole(',
+      '  if (world.network.enemyAssets.length > 0) return true;\n',
+    )), ['isProtectedRole'], HIDDEN_ROLE_NAMES)).toContain('enemyAssets');
+
+    // FIRING PROOF (b): the same read one helper deep — `isLinkedTo` already exists in the module.
+    const viaHelper = SOURCE.replace(/(export function isProtectedRole\([^)]*\)[^{]*\{)/,
+      '$1\n  if (isLinkedTo(world, \'enemy\', id)) return true;');
+    expect(forbiddenReached(parseModule(RECRUITMENT_PATH, viaHelper), ['isProtectedRole'],
+      HIDDEN_ROLE_NAMES), 'a helper hop still reaches the roster').toContain('isLinkedTo');
   });
 });
 
@@ -441,6 +474,59 @@ describe('MICE recruit — ego × natural-exaggerator stacking (O2)', () => {
     expect(rE.count).toBe(spec.count! * 4);
     expect(rE.severity).toBe(Math.min(5, spec.severity + 2));
     expect(r0.severity).toBe(spec.severity + 1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Offer/execution identity: the approach binds to the OFFERED frame, so validation and the phase-2
+// delivery snapshot can never disagree — including across same-tick multi-action logs (T11 I-4).
+
+describe('recruit binds to the offered frame — one snapshot for validation and speech', () => {
+  it('goTo then recruit REFUSES under the offered frame, with zero residue (no spent coin)', () => {
+    const world = recruitWorld('frame-goto-recruit');
+    pin(world, 'annex', 'you');
+    pin(world, 'square', 'cass');
+    trust(world, 'cass', 'you', 0.8);
+    const coin0 = world.coin;
+
+    // Live circles say the avatar is standing with cass; the offered frame — the one the approach
+    // would actually be spoken into — still has them in different venues.
+    expect(() => runLogOn(world, RULES, [
+      { tick: 0, kind: 'goTo', venue: 'square' },
+      { tick: 0, kind: 'recruit', target: 'cass', mice: 'money', leverageFamily: null },
+    ], 1)).toThrow(/circle/);
+
+    expect(world.coin, 'a refusal never spends coin').toBe(coin0);
+    expect(world.network.directiveState?.recruitmentApproaches ?? []).toEqual([]);
+  });
+
+  it('every PRODUCTION path hands the prepared frame to applyAction (P11-9 reachability)', () => {
+    // The frame argument is optional so direct unit-test verb calls stay untouched; these three are
+    // the only paths a real campaign runs through, and none of them may drop it.
+    for (const path of ['src/sim/campaign.ts', 'src/bots/runner.ts', 'app/src/loop/session.ts']) {
+      const counts = callArgCounts(parseModule(path), 'applyAction');
+      expect(counts.length, `${path} applies actions`).toBeGreaterThan(0);
+      expect(counts.every((count) => count === 4), `${path} forwards the frame (${counts.join(',')})`)
+        .toBe(true);
+    }
+  });
+
+  it('recruit then goTo speaks in the offered circle — the frame is not rug-pulled', () => {
+    const world = recruitWorld('frame-recruit-goto');
+    pin(world, 'square', 'you', 'cass');
+    trust(world, 'cass', 'you', 0.8);
+    const coin0 = world.coin;
+
+    runLogOn(world, RULES, [
+      { tick: 0, kind: 'recruit', target: 'cass', mice: 'money', leverageFamily: null },
+      { tick: 0, kind: 'goTo', venue: 'annex' },
+    ], 1);
+
+    expect(world.playerVenue, 'goTo stays immediate').toBe('annex');
+    expect(recruitmentHistoryView(world).map((row) => `${row.venue}:${row.stage}:${row.response}`))
+      .toEqual(['square:approach:null', 'square:answer:accept']);
+    expect(assetFor(world, 'player', 'cass')!.mice).toBe('money');
+    expect(world.coin).toBe(coin0 - STANDARD_ECONOMY.recruitCost.money);
   });
 });
 

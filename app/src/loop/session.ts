@@ -109,14 +109,14 @@ function makeSession(seed: string, world: WorldState, log: Action[]): Session {
 
   const pendingTick = (): Tick | null => pendingOffer?.offer.tick ?? requestedFor;
 
-  const applyQueued = (): unknown => {
+  const applyQueued = (frame: PreparedTick): unknown => {
     let firstError: unknown = null;
     for (let i = 0; i < queue.length;) {
       if (queue[i]!.tick !== world.tick) { i += 1; continue; }
       const action = queue[i]!;
       queue.splice(i, 1);
       try {
-        applyAction(world, action, STANDARD_RULES);
+        applyAction(world, action, STANDARD_RULES, frame);
         log.push(action);
       } catch (error) {
         if (firstError === null) firstError = error;
@@ -189,7 +189,7 @@ function makeSession(seed: string, world: WorldState, log: Action[]): Session {
           const held = pendingOffer;
           finishTick(world, STANDARD_RULES, held.frame, () => {
             try {
-              applyAction(world, held.action!, STANDARD_RULES);
+              applyAction(world, held.action!, STANDARD_RULES, held.frame);
               log.push(held.action!);
             } catch (error) {
               firstError = error;
@@ -225,7 +225,7 @@ function makeSession(seed: string, world: WorldState, log: Action[]): Session {
         const frame = prepareTick(world, STANDARD_RULES);
         const hasDueAction = queue.some((action) => action.tick === world.tick);
         if (hasDueAction) {
-          finishTick(world, STANDARD_RULES, frame, () => { firstError = applyQueued(); });
+          finishTick(world, STANDARD_RULES, frame, () => { firstError = applyQueued(frame); });
         } else {
           finishTick(world, STANDARD_RULES, frame);
         }

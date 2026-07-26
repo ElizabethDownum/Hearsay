@@ -8,7 +8,7 @@ import {
 import type { InquiryKey } from './perception';
 import type { Rules } from './rules';
 import { isTerminal } from './scenario/referee';
-import { finishTick, prepareTick } from './phases';
+import { finishTick, prepareTick, type PreparedTick } from './phases';
 import type { TownFixture, WorldState } from './types';
 import type { EntityId, RumorId, VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
@@ -167,8 +167,15 @@ export interface Save {
  * stay untouched. `recruit` is the one verb that needs it — economy prices + predicate valence —
  * and REFUSES loudly if applied without rules (never silently no-ops an untrusted save). runLogOn,
  * the app session, and the bot runner all forward the rules already in their scope.
+ *
+ * `frame` is the PreparedTick this action is being applied inside. Offer/execution identity: a verb
+ * whose effect is spoken in phase 2 must validate against the frame's frozen circles, not against a
+ * live projection an earlier same-tick action may already have moved. All three production paths
+ * (session, bot runner, replay) hold the frame and forward it here.
  */
-export function applyAction(world: WorldState, action: Action, rules?: Rules): void {
+export function applyAction(
+  world: WorldState, action: Action, rules?: Rules, frame?: PreparedTick,
+): void {
   if (action.tick !== world.tick) {
     throw new Error(`applyAction: action tick ${action.tick} != world tick ${world.tick}`);
   }
@@ -199,7 +206,9 @@ export function applyAction(world: WorldState, action: Action, rules?: Rules): v
       break;
     case 'recruit':
       if (!rules) throw new Error('applyAction: recruit requires rules (economy prices + predicate valence)');
-      applyRecruit(world, action.target, action.mice, action.leverageFamily, action.tick, rules);
+      applyRecruit(
+        world, action.target, action.mice, action.leverageFamily, action.tick, rules, frame?.circles,
+      );
       break;
     case 'setDrop':
       if (!rules) throw new Error('applyAction: setDrop requires rules (economy prices)');
@@ -262,7 +271,7 @@ export function runLogOn(
     if (i < log.length && log[i]!.tick === world.tick) {
       finishTick(world, rules, frame, () => {
         while (i < log.length && log[i]!.tick === world.tick) {
-          applyAction(world, log[i]!, rules);
+          applyAction(world, log[i]!, rules, frame);
           i += 1;
         }
       });

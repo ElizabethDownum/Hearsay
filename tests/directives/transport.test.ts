@@ -222,7 +222,8 @@ describe('physical network transport', () => {
       { kind: 'invitation', invitationId: 'i0', invitationKind: 'rendezvous',
         inviter: 'ada', counterparty: 'bez', invitee: 'bez', venue: 'square', requested: { from: 0, until: 30 } },
       { kind: 'invitation-response', invitationId: 'i0', response: 'accept' },
-      { kind: 'recruitment-approach', approachId: 'a0', recruiter: 'ada', target: 'bez' },
+      { kind: 'recruitment-approach', approachId: 'a0', recruiter: 'ada', target: 'bez',
+        mice: 'money', leverageFamily: null },
       { kind: 'recruitment-response', approachId: 'a0', response: 'accept' },
     ];
     for (const payload of payloads) {

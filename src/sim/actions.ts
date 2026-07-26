@@ -1,5 +1,5 @@
 import { dayOf, minuteOfDay, TICKS_PER_DAY, type Tick } from '../core/time';
-import { circlesAt } from './agents';
+import { circlesAt, type Circle } from './agents';
 import type { InquiryKey } from './perception';
 import { CONVERSATION_BEAT } from './rumors/propagation';
 import { mintClaim, SOMEONE, type Claim, type EntityId, type RumorId, type VenueId } from './rumors/claim';
@@ -268,9 +268,15 @@ export function applyAsk(world: WorldState, to: EntityId, about: InquiryKey, tic
  * is debited when the real approach occurs and is NEVER refunded — probing is priced, on all three
  * outward answers alike. The approach itself is a phase-2 `NetworkSpeech`; the candidate's answer is
  * their OWN spoken act, and only its physical receipt closes the approach or adds anyone to a roster.
+ *
+ * OFFER/EXECUTION IDENTITY: `offered` is the prepared tick's frozen circles — the very snapshot the
+ * phase-2 delivery speaks into. Every production path (session, bots, replay) hands it in, so the
+ * co-circle this verb validates and the circle the approach is spoken in can never disagree; an
+ * earlier same-tick `goTo` therefore refuses BEFORE the coin debit instead of buying silence.
  */
 export function applyRecruit(
   world: WorldState, target: EntityId, mice: Mice, leverageFamily: RumorId | null, tick: Tick, rules: Rules,
+  offered?: readonly Circle[],
 ): void {
   if (world.playerId === null) throw new Error('recruit: no player is enrolled');
   if (world.playerVenue === null) throw new Error('recruit: the avatar is nowhere');
@@ -284,8 +290,10 @@ export function applyRecruit(
     throw new Error(`recruit: an approach to '${target}' is already open`);
   }
 
-  // Co-circle basis (recruitment is a conversation — the same validation shape as tell).
-  const circle = circlesAt(world, tick).find((c) => c.members.includes(world.playerId!));
+  // Co-circle basis (recruitment is a conversation — the same validation shape as tell), read from
+  // the OFFERED frame when one exists so validation and delivery share one snapshot.
+  const circles = offered ?? circlesAt(world, tick);
+  const circle = circles.find((c) => c.members.includes(world.playerId!));
   if (!circle || !circle.members.includes(target)) {
     throw new Error(`recruit: '${target}' is not in the avatar's circle this beat`);
   }
@@ -314,6 +322,7 @@ export function applyRecruit(
   // physically hear it (phase 2) and returns as a causally marked direct response (phase 3).
   queueNetworkMessage(world, 'player', world.playerId, [target], {
     kind: 'recruitment-approach', approachId: approach.id, recruiter: world.playerId, target,
+    mice, leverageFamily,
   }, tick, tick, { kind: 'player-action', action: 'recruit', tick });
 }
 

@@ -237,7 +237,12 @@ export type NetworkPayload =
       requested: { from: Tick; until: Tick };
     }
   | { kind: 'invitation-response'; invitationId: string; response: 'accept' | 'refuse' | 'defer' }
-  | { kind: 'recruitment-approach'; approachId: string; recruiter: EntityId; target: EntityId }
+  | {
+      kind: 'recruitment-approach'; approachId: string; recruiter: EntityId; target: EntityId;
+      /** The offer the approach conversation VOICES. Present on every approach, identical in shape
+       *  for every hidden category, so it is speech and never an oracle. */
+      mice: Mice | null; leverageFamily: RumorId | null;
+    }
   | { kind: 'recruitment-response'; approachId: string; response: RecruitmentResponse };
 
 export type SpokenNetworkPayload =
@@ -273,7 +278,10 @@ export type SpokenNetworkPayload =
       requested: { from: Tick; until: Tick }; onwardTo: EntityId | null;
     }
   | { kind: 'invitation-response'; invitationId: string; response: 'accept' | 'refuse' | 'defer'; onwardTo: EntityId | null }
-  | { kind: 'recruitment-approach'; approachId: string; recruiter: EntityId; target: EntityId; onwardTo: EntityId | null }
+  | {
+      kind: 'recruitment-approach'; approachId: string; recruiter: EntityId; target: EntityId;
+      mice: Mice | null; leverageFamily: RumorId | null; onwardTo: EntityId | null;
+    }
   | { kind: 'recruitment-response'; approachId: string; response: RecruitmentResponse; onwardTo: EntityId | null };
 
 export interface NetworkMessage {

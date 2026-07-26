@@ -38,6 +38,19 @@ const WILLINGNESS: Record<RecruitmentResponse, string> = {
 
 const opposite = (principal: Principal): Principal => (principal === 'player' ? 'enemy' : 'player');
 
+/**
+ * WHAT THE APPROACH SAID — the candidate's entire input about the offer. Every field here is spoken
+ * content that physically arrived (`SpokenNetworkPayload`'s `recruitment-approach` variant); the
+ * recruiter-principal's `RecruitmentApproach` row is never read back into a candidate's answer.
+ */
+export interface SpokenApproach {
+  approachId: string;
+  recruiter: EntityId;
+  target: EntityId;
+  mice: Mice | null;
+  leverageFamily: RumorId | null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // The pure decision layer. Contextual causes only — no seed, no clock, no identity hash, no lottery.
 
@@ -202,27 +215,55 @@ export function openApproachBetween(
     && row.status !== 'closed') ?? null;
 }
 
-function recruitmentInputFor(
+/**
+ * The candidate's answer is built from the WORDS THEY HEARD plus facts about themselves: how well
+ * they know the person in front of them, who else is standing there, how closely they feel watched,
+ * their own public post, and whether they really serve the other side. `channel` is the message's
+ * own principal — transport metadata that only names which roster "the other side" means.
+ */
+function recruitmentInputFrom(
   world: WorldState,
   rules: Rules,
-  approach: RecruitmentApproach,
+  heard: SpokenApproach,
+  channel: Principal,
   circle: Circle,
   tick: Tick,
   stage: RecruitmentInput['stage'],
 ): RecruitmentInput {
   return {
-    relationship: trustBetween(world, approach.target, approach.recruiter),
-    handleFit: handleFitFor(
-      world, rules, approach.principal, approach.target, approach.mice, approach.leverageFamily,
-    ),
-    traits: [...(world.npcs[approach.target]?.traits ?? [])],
-    protectedRole: isProtectedRole(world, rules, approach.target),
-    enemyLinked: isLinkedTo(world, opposite(approach.principal), approach.target),
+    relationship: trustBetween(world, heard.target, heard.recruiter),
+    handleFit: handleFitFor(world, rules, channel, heard.target, heard.mice, heard.leverageFamily),
+    traits: [...(world.npcs[heard.target]?.traits ?? [])],
+    protectedRole: isProtectedRole(world, rules, heard.target),
+    enemyLinked: isLinkedTo(world, opposite(channel), heard.target),
     localWitnesses: circle.members.filter((id) =>
-      id !== approach.recruiter && id !== approach.target).length,
-    perceivedScrutiny: perceivedScrutiny(world, approach.target, approach.recruiter, tick),
+      id !== heard.recruiter && id !== heard.target).length,
+    perceivedScrutiny: perceivedScrutiny(world, heard.target, heard.recruiter, tick),
     stage,
   };
+}
+
+/**
+ * The offer as the CANDIDATE received it, re-read from the speech that physically reached them.
+ * A later answer recovers the words that arrived — never the recruiter's copy, which relay
+ * projection may lawfully have diverged from.
+ */
+function receivedApproach(
+  world: WorldState, approachId: string, target: EntityId,
+): { heard: SpokenApproach; channel: Principal } | null {
+  for (const message of world.network.directiveState?.messages ?? []) {
+    const payload = message.payload;
+    if (payload.kind !== 'recruitment-approach' || payload.approachId !== approachId) continue;
+    if (message.deliveredAt === null || message.holder !== target) continue;
+    return {
+      heard: {
+        approachId, recruiter: payload.recruiter, target: payload.target,
+        mice: payload.mice, leverageFamily: payload.leverageFamily,
+      },
+      channel: message.principal,
+    };
+  }
+  return null;
 }
 
 function answerQueued(world: WorldState, approachId: string): boolean {
@@ -235,21 +276,25 @@ function answerQueued(world: WorldState, approachId: string): boolean {
  * changes no membership: this is a physical message that has to arrive. When the candidate IS that
  * handler, nothing is queued — their own hearing already is that principal's knowledge.
  */
-function queueApproachReport(world: WorldState, approach: RecruitmentApproach, tick: Tick): void {
-  const other = opposite(approach.principal);
+function queueApproachReport(
+  world: WorldState, heard: SpokenApproach, channel: Principal, tick: Tick,
+): void {
+  const other = opposite(channel);
   const handler = principalActor(world, other);
-  if (handler === null || handler === approach.target || handler === approach.recruiter) return;
+  if (handler === null || handler === heard.target || handler === heard.recruiter) return;
   const carry = shouldReportApproach({
     enemyHandler: handler,
-    enemyLinked: isLinkedTo(world, other, approach.target),
-    relationshipToRecruiter: trustBetween(world, approach.target, approach.recruiter),
-    relationshipToEnemyHandler: trustBetween(world, approach.target, handler),
+    enemyLinked: isLinkedTo(world, other, heard.target),
+    relationshipToRecruiter: trustBetween(world, heard.target, heard.recruiter),
+    relationshipToEnemyHandler: trustBetween(world, heard.target, handler),
   });
   if (!carry) return;
-  validateNetworkRoute(world, approach.target, [handler]);
-  allocateNetworkMessage(world, other, approach.target, [handler], {
-    kind: 'recruitment-approach', approachId: approach.id,
-    recruiter: approach.recruiter, target: approach.target,
+  validateNetworkRoute(world, heard.target, [handler]);
+  // The candidate repeats the offer they were made — nothing they did not hear travels onward.
+  allocateNetworkMessage(world, other, heard.target, [handler], {
+    kind: 'recruitment-approach', approachId: heard.approachId,
+    recruiter: heard.recruiter, target: heard.target,
+    mice: heard.mice, leverageFamily: heard.leverageFamily,
   }, strictNextBeat(tick), null, null);
 }
 
@@ -259,7 +304,8 @@ function queueApproachReport(world: WorldState, approach: RecruitmentApproach, t
  */
 function composeCandidateResponse(
   world: WorldState,
-  approach: RecruitmentApproach,
+  heard: SpokenApproach,
+  channel: Principal,
   circle: Circle,
   tick: Tick,
   rules: Rules,
@@ -267,17 +313,31 @@ function composeCandidateResponse(
   cause: NetworkSpeech['cause'],
 ): void {
   const response = evaluateRecruitment(
-    recruitmentInputFor(world, rules, approach, circle, tick, 'initial'),
+    recruitmentInputFrom(world, rules, heard, channel, circle, tick, 'initial'),
   );
+  recordSpokenAnswer(world, heard.approachId, channel, heard.target, response);
+  validateNetworkRoute(world, heard.target, [heard.recruiter]);
+  allocateNetworkMessage(world, channel, heard.target, [heard.recruiter], {
+    kind: 'recruitment-response', approachId: heard.approachId, response,
+  }, availableAfter, null, cause);
+  queueApproachReport(world, heard, channel, tick);
+}
+
+/**
+ * The recruiter-side row RECORDS the answer that is about to be spoken (and, on a decided answer,
+ * the linkage truth at that moment). It is written here and never read back into a candidate's
+ * evaluation — bookkeeping flows one way only.
+ */
+function recordSpokenAnswer(
+  world: WorldState, approachId: string, channel: Principal, target: EntityId,
+  response: RecruitmentResponse,
+): void {
+  const approach = approachById(world, approachId);
+  if (!approach) return;
   approach.initial = response;
   if (response !== 'hesitate') {
-    approach.enemyLinkedAtDecision = isLinkedTo(world, opposite(approach.principal), approach.target);
+    approach.enemyLinkedAtDecision = isLinkedTo(world, opposite(channel), target);
   }
-  validateNetworkRoute(world, approach.target, [approach.recruiter]);
-  allocateNetworkMessage(world, approach.principal, approach.target, [approach.recruiter], {
-    kind: 'recruitment-response', approachId: approach.id, response,
-  }, availableAfter, null, cause);
-  queueApproachReport(world, approach, tick);
 }
 
 /**
@@ -292,7 +352,8 @@ function composeCandidateResponse(
  */
 export function hearRecruitmentApproach(
   world: WorldState,
-  spoken: { approachId: string; recruiter: EntityId; target: EntityId },
+  spoken: SpokenApproach,
+  channel: Principal,
   holder: EntityId,
   circle: Circle,
   tick: Tick,
@@ -303,29 +364,31 @@ export function hearRecruitmentApproach(
     receiveApproachAtHandler(world, spoken, holder);
     return;
   }
-  const approach = approachById(world, spoken.approachId);
-  if (!approach || answerQueued(world, spoken.approachId)) return;
+  if (answerQueued(world, spoken.approachId)) return;
   const direct = cause?.kind === 'player-action';
   composeCandidateResponse(
-    world, approach, circle, tick, rules, direct ? tick : strictNextBeat(tick),
+    world, spoken, channel, circle, tick, rules, direct ? tick : strictNextBeat(tick),
     direct ? cloneSerializable(cause) : null,
   );
 }
 
 /**
- * A handler physically hears that one of their own people was approached. Membership happens HERE and
- * only here: the ordinary record appears with EMPTY facts — never a fabricated `recruited-by` meeting
- * — and an existing record on the approaching principal's roster is marked for that audience alone.
+ * A handler physically hears that one of their own people was approached. This receipt is
+ * PRINCIPAL-ASYMMETRIC. The ENEMY handler's receipt IS membership: the ordinary record appears with
+ * EMPTY facts — never a fabricated `recruited-by` meeting — and an existing player record is marked
+ * turned for that audience alone (the adjudicated late-delivery clause). The PLAYER's receipt of a
+ * reported approach is INTEL ONLY: final enrollment stays a direct avatar moment (backlog #23), so
+ * the avatar's handler seat creates no roster row and turns nobody. The delivered words are still
+ * ordinary player intel through the normal ingestion path.
  */
 function receiveApproachAtHandler(
   world: WorldState,
-  spoken: { approachId: string; recruiter: EntityId; target: EntityId },
+  spoken: SpokenApproach,
   holder: EntityId,
 ): void {
-  const audience: Principal = principalActor(world, 'enemy') === holder ? 'enemy' : 'player';
-  if (principalActor(world, audience) !== holder) return;
-  ensureAssetRecord(world, audience, spoken.target);
-  const exposed = rosterFor(world, opposite(audience)).find((row) => row.id === spoken.target);
+  if (principalActor(world, 'enemy') !== holder) return;
+  ensureAssetRecord(world, 'enemy', spoken.target);
+  const exposed = rosterFor(world, 'player').find((row) => row.id === spoken.target);
   if (exposed) exposed.turned = true;
 }
 
@@ -344,8 +407,19 @@ function scheduleRecruitmentDecision(world: WorldState, approach: RecruitmentApp
   rows.push(cloneSerializable(setup));
 }
 
-/** The ONE enrollment site in the engine. Reachable only from a direct-recruitment acceptance. */
+/**
+ * The ONE enrollment site in the engine. Reachable only from a direct-recruitment acceptance, and
+ * FAIL-CLOSED about it: enrollment is a direct avatar moment, so an approach that came from a
+ * directive (a sound-out), or one whose recruiter is not the principal's own actor, refuses loudly
+ * rather than quietly growing a roster.
+ */
 function enrollRecruitedAsset(world: WorldState, approach: RecruitmentApproach, tick: Tick): void {
+  if (approach.sourceDirectiveId !== null) {
+    throw new Error(`recruitment: enrollment is a direct avatar moment — approach '${approach.id}' came from directive '${approach.sourceDirectiveId}'`);
+  }
+  if (approach.recruiter !== principalActor(world, approach.principal)) {
+    throw new Error(`recruitment: enrollment is a direct avatar moment — approach '${approach.id}' was made by '${approach.recruiter}'`);
+  }
   const roster = rosterFor(world, approach.principal);
   if (roster.some((row) => row.id === approach.target)) return;
   roster.push({
@@ -359,14 +433,13 @@ function enrollRecruitedAsset(world: WorldState, approach: RecruitmentApproach, 
   world.intel.informants.push({ id: approach.target, assignedVenue: null });
 }
 
+/** The roster half of a DIRECT recruitment's close. A refusal closes and buys nothing. */
 function closeDirectRecruitment(
   world: WorldState,
   approach: RecruitmentApproach,
-  response: Exclude<RecruitmentResponse, 'hesitate'>,
+  response: RecruitmentResponse,
   tick: Tick,
 ): void {
-  approach.status = 'closed';
-  approach.decided = response;
   if (response !== 'accept') return;
   if (approach.enemyLinkedAtDecision) {
     ensureAssetRecord(world, opposite(approach.principal), approach.target);
@@ -381,31 +454,31 @@ function closeDirectRecruitment(
  */
 export function settleSoundOutAnswer(
   world: WorldState,
-  approach: RecruitmentApproach,
+  record: DirectiveRecord,
   response: RecruitmentResponse,
   tick: Tick,
   rules: Rules,
 ): void {
-  const record = world.network.directiveState?.records.find((row) =>
-    row.id === approach.sourceDirectiveId);
-  if (!record || record.received === null || record.decision === null || record.execution === null) return;
-  const waiting = record.execution.waiting;
-  if (waiting?.kind !== 'recruitment-answer' || waiting.approachId !== approach.id) return;
+  if (record.received === null || record.decision === null || record.execution === null) return;
+  if (record.execution.waiting?.kind !== 'recruitment-answer') return;
   const profile = record.decision;
   const method = profile.method;
+  if (method.kind !== 'approach' && method.kind !== 'invite-meeting') return;
+  // Who was sounded out is the asset's OWN chosen method, from its OWN received brief.
+  const candidate = method.target;
   if (response === 'accept' && method.kind === 'invite-meeting') {
     const counterparty = principalActor(world, record.principal) ?? record.principalId;
     const invitation = appendInvitation(world, {
       kind: 'sound-out', principal: record.principal, inviter: record.recipient,
-      counterparty, invitee: approach.target, venue: method.venue,
+      counterparty, invitee: candidate, venue: method.venue,
       requested: { from: method.from, until: method.until },
       scheduled: null, status: 'offered', offeredAt: tick, respondedAt: null,
       setupId: null, sourceDirectiveId: record.id, attendedAt: null, closedAt: null,
     });
-    validateNetworkRoute(world, record.recipient, [approach.target]);
-    allocateNetworkMessage(world, record.principal, record.recipient, [approach.target], {
+    validateNetworkRoute(world, record.recipient, [candidate]);
+    allocateNetworkMessage(world, record.principal, record.recipient, [candidate], {
       kind: 'invitation', invitationId: invitation.id, invitationKind: 'sound-out',
-      inviter: record.recipient, counterparty, invitee: approach.target,
+      inviter: record.recipient, counterparty, invitee: candidate,
       venue: invitation.venue, requested: { ...invitation.requested },
     }, tick, null, null);
   }
@@ -420,7 +493,33 @@ export function settleSoundOutAnswer(
   }, rules, tick);
 }
 
-/** Physical receipt of a spoken answer by the recruiter who made the approach. */
+/**
+ * The asset's OWN waiting record for this answer — the Task-8 substrate the sound-out conversion
+ * runs on. Found by the receiving asset's identity plus the approach it is waiting on, never by
+ * dereferencing the recruiter-principal's approach row.
+ */
+function waitingSoundOutRecord(
+  world: WorldState, approachId: string, holder: EntityId,
+): DirectiveRecord | null {
+  return world.network.directiveState?.records.find((row) => row.recipient === holder
+    && row.execution?.waiting?.kind === 'recruitment-answer'
+    && row.execution.waiting.approachId === approachId) ?? null;
+}
+
+/** "Ask for time": the approach stays open and the later answer is scheduled from the same clock. */
+function holdForLaterAnswer(world: WorldState, approach: RecruitmentApproach): void {
+  if (approach.status !== 'approached') return;
+  approach.status = 'waiting';
+  approach.resolveAt = approach.openedAt + TICKS_PER_DAY;
+  scheduleRecruitmentDecision(world, approach);
+}
+
+/**
+ * Physical receipt of a spoken answer by the recruiter who made the approach. The two receipts are
+ * disjoint: a DIRECTED approach (one a directive asked for) settles as a sound-out through the
+ * asset's own record and can never reach enrollment; only an approach the principal's actor made in
+ * person closes as recruitment.
+ */
 export function settleRecruitmentAnswer(
   world: WorldState,
   approachId: string,
@@ -431,20 +530,16 @@ export function settleRecruitmentAnswer(
 ): void {
   const approach = approachById(world, approachId);
   if (!approach || approach.recruiter !== holder || approach.status === 'closed') return;
-  if (response === 'hesitate') {
-    if (approach.status === 'approached') {
-      approach.status = 'waiting';
-      approach.resolveAt = approach.openedAt + TICKS_PER_DAY;
-      scheduleRecruitmentDecision(world, approach);
-    }
-  } else if (approach.sourceDirectiveId === null) {
-    closeDirectRecruitment(world, approach, response, tick);
-  } else {
+  if (response === 'hesitate') holdForLaterAnswer(world, approach);
+  else {
     approach.status = 'closed';
     approach.decided = response;
   }
   if (approach.sourceDirectiveId !== null) {
-    settleSoundOutAnswer(world, approach, response, tick, rules);
+    const record = waitingSoundOutRecord(world, approachId, holder);
+    if (record !== null) settleSoundOutAnswer(world, record, response, tick, rules);
+  } else if (response !== 'hesitate') {
+    closeDirectRecruitment(world, approach, response, tick);
   }
 }
 
@@ -474,10 +569,11 @@ export function collectRecruitmentAnswerIntents(
 }
 
 function decideLaterAnswer(
-  world: WorldState, approach: RecruitmentApproach, circle: Circle, tick: Tick, rules: Rules,
+  world: WorldState, heard: SpokenApproach, channel: Principal, circle: Circle, tick: Tick,
+  rules: Rules,
 ): Exclude<RecruitmentResponse, 'hesitate'> {
   const response = evaluateRecruitment(
-    recruitmentInputFor(world, rules, approach, circle, tick, 'later'),
+    recruitmentInputFrom(world, rules, heard, channel, circle, tick, 'later'),
   );
   return response === 'refuse' ? 'refuse' : 'accept';
 }
@@ -496,7 +592,10 @@ export function realizeRecruitmentAnswer(
   const approach = approachById(world, approachId);
   if (!approach || approach.status !== 'waiting' || approach.decisionDueAt === null
     || approach.decisionDueAt > tick || !circle.members.includes(approach.target)) return empty;
-  const decided = decideLaterAnswer(world, approach, circle, tick, rules);
+  // The candidate answers the offer they were actually made — re-read from the words that arrived.
+  const received = receivedApproach(world, approachId, approach.target);
+  if (received === null) return empty;
+  const decided = decideLaterAnswer(world, received.heard, received.channel, circle, tick, rules);
   approach.decided = decided;
   approach.decisionDueAt = null;
   approach.enemyLinkedAtDecision = isLinkedTo(world, opposite(approach.principal), approach.target);
@@ -541,6 +640,7 @@ export function startSoundOut(
     world, record.principal, record.recipient, [method.target], {
       kind: 'recruitment-approach', approachId: approach.id,
       recruiter: record.recipient, target: method.target,
+      mice: handle, leverageFamily: null,
     }, tick, tick, null,
   );
   const speech = realizeNetworkForward(world, messageId, circle, tick, rules);

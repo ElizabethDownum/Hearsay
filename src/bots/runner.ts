@@ -36,7 +36,7 @@ export function runBotCampaignOn(
       if (i < actions.length && actions[i]!.tick === world.tick) {
         finishTick(world, rules, frame, () => {
           while (i < actions.length && actions[i]!.tick === world.tick) {
-            applyAction(world, actions[i]!, rules);
+            applyAction(world, actions[i]!, rules, frame);
             i += 1;
           }
         });

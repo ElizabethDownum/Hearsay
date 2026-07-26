@@ -280,6 +280,8 @@ function replaceCarriedContent(message: NetworkMessage, spoken: SpokenNetworkPay
       payload.approachId = spoken.approachId;
       payload.recruiter = spoken.recruiter;
       payload.target = spoken.target;
+      payload.mice = spoken.mice;
+      payload.leverageFamily = spoken.leverageFamily;
       return;
     }
     case 'recruitment-response': {
@@ -538,9 +540,12 @@ function receiveFinal(
       return;
     }
     case 'recruitment-approach': {
+      // The whole input is the words that arrived plus the channel they arrived on — never the
+      // recruiter-principal's approach row.
       hearRecruitmentApproach(world, {
         approachId: spoken.approachId, recruiter: spoken.recruiter, target: spoken.target,
-      }, message.holder, circle, t, rules, message.cause);
+        mice: spoken.mice, leverageFamily: spoken.leverageFamily,
+      }, message.principal, message.holder, circle, t, rules, message.cause);
       return;
     }
     case 'recruitment-response': {
