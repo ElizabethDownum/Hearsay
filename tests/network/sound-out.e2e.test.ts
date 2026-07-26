@@ -16,8 +16,8 @@ import type { EntityId, VenueId } from '../../src/sim/rumors/claim';
 import type { ScheduleOverride, WorldState } from '../../src/sim/types';
 import { makePlayerAsset, pin, recruitWorld, trust } from './helpers/recruit-town';
 import {
-  callSites, callSiteTable, forbiddenReached, mentionedBy, parseModule, pushSiteTable, pushTargets,
-  srcFilesNaming,
+  callSites, callSiteTable, describeUnresolved, forbiddenReached, mentionedBy, parseModule,
+  pushSiteTable, pushTargets, srcFilesNaming, unresolvedSites,
 } from '../helpers/callgraph';
 
 const RULES = STANDARD_RULES;
@@ -374,6 +374,12 @@ const ALLOWED_EVALUATOR_SITES = [
   'evaluateRecruitment→composeCandidateResponse',
   'evaluateRecruitment→decideLaterAnswer',
 ];
+/** Every name whose reach these scans claim to know — the fail-closed default's watch list. */
+const GUARDED_NAMES = [...ENROLLMENT_NAMES, 'evaluateRecruitment'];
+/** The modules the fail-closed default governs: recruitment plus the sound-out execution arm. */
+const GUARDED_MODULES = [RECRUITMENT_PATH, EXECUTION_PATH];
+const DYNAMIC_BANNED =
+  'dynamic access is banned in the guarded module — use a direct call so the enforcement scans can see you';
 /** The ONLY src files allowed to name an enrollment primitive — the cross-module escape fence. */
 const ENROLLMENT_FILES = [
   'src/sim/actions.ts',
@@ -407,6 +413,13 @@ const DISPATCH_PROLOGUE =
   '  if (!approach || approach.recruiter !== holder || approach.status === \'closed\') return;';
 const leakAtDispatcher = (statement: string): string =>
   injectAfter(RECRUITMENT_SRC, DISPATCH_PROLOGUE, statement);
+
+/** Add a real import to the guarded module — the shape an import-alias leak needs. */
+const TYPES_IMPORT = 'import type { Mice, Principal } from \'./types\';';
+function withImport(source: string, line: string): string {
+  expect(source.includes(TYPES_IMPORT), 'the import anchor exists').toBe(true);
+  return source.replace(TYPES_IMPORT, `${line}\n${TYPES_IMPORT}`);
+}
 
 describe('sound-out enforcement scans', () => {
   // ── ENFORCEMENT SCAN 3: zero enrollment reachable from any sound-out path ─────────────────────
@@ -470,6 +483,25 @@ describe('sound-out enforcement scans', () => {
     ));
     expect(ROSTER_ARRAYS.filter((name) => pushTargets(viaAccessor, SOUND_OUT_ROOTS, DISPATCH_CUT).has(name)),
       'growth through rosterFor(...) is still growth').toContain('rosterFor');
+
+    // FIRING PROOF (f): RE-RE-REVIEW SEAM — an IMPORT ALIAS of the primitive, called at the
+    // dispatcher. `import { ensureAssetRecord as x }` makes `x` the primitive, not a new name.
+    const importAliased = parseModule(RECRUITMENT_PATH, withImport(
+      leakAtDispatcher('  stealthEnsure(world, approach.principal, approach.target);'),
+      'import { ensureAssetRecord as stealthEnsure } from \'./roster\';',
+    ));
+    expect(forbiddenReached(importAliased, SOUND_OUT_ROOTS, ENROLLMENT_NAMES, DISPATCH_CUT),
+      'an import alias is still the primitive').toContain('ensureAssetRecord');
+
+    // FIRING PROOF (g): RE-RE-REVIEW SEAM — roster growth through BRACKET access, which dodges the
+    // literal `assets.push` needle the file fence looks for.
+    const bracketPush = parseModule(RECRUITMENT_PATH, injectInto(
+      RECRUITMENT_SRC, 'export function settleSoundOutAnswer(',
+      '  world.network[\'assets\'].push(undefined as never);',
+    ));
+    expect(ROSTER_ARRAYS.filter((name) => pushTargets(bracketPush, SOUND_OUT_ROOTS, DISPATCH_CUT).has(name)),
+      'bracket syntax is still growth of the same array').toContain('assets');
+    expect(pushSiteTable(bracketPush, ROSTER_ARRAYS)).toContain('assets@settleSoundOutAnswer');
   });
 
   // ── ENFORCEMENT SCAN 4: enrollment stays a guarded direct-avatar moment ───────────────────────
@@ -525,6 +557,23 @@ describe('sound-out enforcement scans', () => {
     ));
     expect(callSiteTable(viaProperty, ENROLLMENT_PRIMITIVES))
       .toContain('ensureAssetRecord→settleRecruitmentAnswer');
+
+    // FIRING PROOF (f): RE-RE-REVIEW SEAM — an IMPORT ALIAS. The exact table resolves the specifier,
+    // so the site is attributed to the primitive it actually reaches.
+    const importAliased = parseModule(RECRUITMENT_PATH, withImport(
+      leakAtDispatcher('  stealthEnsure(world, approach.principal, approach.target);'),
+      'import { ensureAssetRecord as stealthEnsure } from \'./roster\';',
+    ));
+    expect(callSiteTable(importAliased, ENROLLMENT_PRIMITIVES))
+      .toContain('ensureAssetRecord→settleRecruitmentAnswer');
+
+    // FIRING PROOF (g): RE-RE-REVIEW SEAM — a STATIC BRACKET call of the primitive.
+    const bracketCall = parseModule(RECRUITMENT_PATH, leakAtDispatcher(
+      '  const rosterApi = { ensureAssetRecord };\n'
+      + '  rosterApi[\'ensureAssetRecord\'](world, approach.principal, approach.target);',
+    ));
+    expect(callSiteTable(bracketCall, ENROLLMENT_PRIMITIVES))
+      .toContain('ensureAssetRecord→settleRecruitmentAnswer');
   });
 
   // ── ENFORCEMENT SCAN 5: the evaluator's result belongs to the target alone ────────────────────
@@ -572,6 +621,27 @@ describe('sound-out enforcement scans', () => {
         preamble: 'const evaluatorApi = { evaluateRecruitment };',
         call: 'void evaluatorApi.evaluateRecruitment(undefined as never);',
       },
+      // (e) RE-RE-REVIEW SEAM — a STATIC ELEMENT ACCESS call. Bracket syntax names the evaluator
+      // exactly as dot syntax does, and is resolved the same way.
+      {
+        label: 'static element-access call',
+        preamble: 'const evaluatorApi = { evaluateRecruitment };',
+        call: 'void evaluatorApi[\'evaluateRecruitment\'](undefined as never);',
+      },
+      // (f) RE-RE-REVIEW SEAM — a static element access captured into a local first.
+      {
+        label: 'static element-access alias',
+        preamble: 'const evaluatorApi = { evaluateRecruitment };\n'
+          + 'const peekAnswer = evaluatorApi[\'evaluateRecruitment\'];',
+        call: 'void peekAnswer(undefined as never);',
+      },
+      // (g) RE-RE-REVIEW SEAM — a COMPUTED-LITERAL destructuring rename.
+      {
+        label: 'computed destructuring rename',
+        preamble: 'const evaluatorApi = { evaluateRecruitment };\n'
+          + 'const { [\'evaluateRecruitment\']: peekAnswer } = evaluatorApi;',
+        call: 'void peekAnswer(undefined as never);',
+      },
     ];
 
     for (const { label, preamble, call } of aliasShapes) {
@@ -596,11 +666,66 @@ describe('sound-out enforcement scans', () => {
       ['evaluateRecruitment'], DISPATCH_CUT), 'a helper hop still reads the evaluator')
       .toEqual(['evaluateRecruitment']);
 
-    // FIRING PROOF (f): the evaluator read from the shared response DISPATCHER itself.
+    // FIRING PROOF (h): the evaluator read from the shared response DISPATCHER itself.
     const atDispatcher = parseModule(RECRUITMENT_PATH,
       leakAtDispatcher('  void evaluateRecruitment(undefined as never);'));
     expect(forbiddenReached(atDispatcher, SOUND_OUT_ROOTS, ['evaluateRecruitment'], DISPATCH_CUT),
       'the dispatcher is inside the evaluator boundary too').toEqual(['evaluateRecruitment']);
+  });
+
+  // ── ENFORCEMENT SCAN 6: the FAIL-CLOSED default ───────────────────────────────────────────────
+  // Scans 1–5 each answer "is this guarded name reached from here?". A name-hiding form the parser
+  // cannot read makes all of them answer "no" for the wrong reason — which is how bracket, computed
+  // and import-alias syntax kept slipping through. This scan inverts the default: anything the
+  // resolver cannot name is itself a violation, so a NEW dynamic shape fails on arrival instead of
+  // waiting to be enumerated. Truly dynamic access is thereby structurally banned in these modules.
+  it(`call-graph scan: nothing in the guarded modules is unreadable — ${DYNAMIC_BANNED}`, () => {
+    for (const path of GUARDED_MODULES) {
+      const sites = unresolvedSites(parseModule(path), GUARDED_NAMES);
+      expect(sites, `${path}\n${DYNAMIC_BANNED}\n${describeUnresolved(sites)}`).toEqual([]);
+    }
+
+    /** Every proof below asserts the KIND that fired, so a coincidental hit cannot stand in. */
+    const kindsFor = (source: string): string[] =>
+      [...new Set(unresolvedSites(parseModule(RECRUITMENT_PATH, source), GUARDED_NAMES)
+        .map((site) => site.kind))].sort();
+
+    // FIRING PROOF (a): RE-RE-REVIEW SEAM — a genuinely DYNAMIC evaluator call. There is no static
+    // answer, so it cannot be resolved and must therefore be refused.
+    const dynamicCall = injectInto(
+      RECRUITMENT_SRC.replace('const opposite =',
+        'const evaluatorApi = { evaluateRecruitment };\n'
+        + 'const evaluatorName = \'evaluateRecruitment\' as \'evaluateRecruitment\';\n'
+        + 'const opposite ='),
+      'export function settleSoundOutAnswer(',
+      '  void evaluatorApi[evaluatorName](undefined as never);',
+    );
+    expect(kindsFor(dynamicCall), 'a computed callee is refused').toContain('callee');
+
+    // FIRING PROOF (b): RE-RE-REVIEW SEAM — a TERNARY roster receiver, the shape whose `'<unknown>'`
+    // sentinel used to be filtered out of the pinned table.
+    const ternaryPush = injectInto(
+      RECRUITMENT_SRC, 'export function settleSoundOutAnswer(',
+      '  (response === \'accept\' ? world.network.assets : world.network.enemyAssets)\n'
+      + '    .push(undefined as never);',
+    );
+    expect(kindsFor(ternaryPush), 'an unnameable growth receiver is refused')
+      .toContain('growth-receiver');
+
+    // FIRING PROOF (c): capturing a guarded name into MODULE state. Every bracket bypass needs such a
+    // holder to read the name out of, so the capture itself is refused — no enumeration required.
+    expect(kindsFor(RECRUITMENT_SRC.replace('const opposite =',
+      'const evaluatorApi = { evaluateRecruitment };\nconst opposite =')),
+    'a module-level holder for a guarded name is refused').toContain('module-capture');
+
+    // FIRING PROOF (d): the fail-closed default catches a form NOBODY enumerated — an indirect call
+    // through a ternary of two function values.
+    const ternaryCallee = injectInto(
+      RECRUITMENT_SRC, 'export function settleSoundOutAnswer(',
+      '  void (response === \'accept\' ? isProtectedRole : isProtectedRole)(world, rules, \'x\');',
+    );
+    expect(kindsFor(ternaryCallee), 'an unenumerated dynamic shape still fails closed')
+      .toContain('callee');
   });
 });
 

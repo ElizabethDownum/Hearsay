@@ -44,26 +44,76 @@ function declaredName(node: ts.Node): string | null {
   return null;
 }
 
+/** Syntactic wrappers that change nothing about which name an expression reaches. */
+function unwrap(node: ts.Expression): ts.Expression {
+  let current = node;
+  for (;;) {
+    if (ts.isParenthesizedExpression(current) || ts.isNonNullExpression(current)
+      || ts.isAsExpression(current) || ts.isSatisfiesExpression(current)
+      || ts.isTypeAssertionExpression(current)) {
+      current = current.expression;
+      continue;
+    }
+    return current;
+  }
+}
+
 /**
- * Every rename that can stand in for a guarded name. A rename is not an escape hatch, in any of the
- * three shapes TypeScript offers:
- *   `const peek = evaluateRecruitment`               — a bare identifier;
- *   `const peek = api.evaluateRecruitment`           — a PROPERTY ACCESS (re-review seam 6);
- *   `const { evaluateRecruitment: peek } = api`      — a destructuring rename.
+ * An ELEMENT-ACCESS key with a parse-time answer: `api['name']` yes, `api[whichever]` no. Position
+ * matters — inside brackets an identifier is a variable READ, whose value only the running program
+ * knows, so it must not be mistaken for the property name it happens to be spelled like.
+ */
+function literalElementKey(node: ts.Node | undefined): string | null {
+  if (node === undefined) return null;
+  const target = ts.isExpression(node) ? unwrap(node) : node;
+  if (ts.isStringLiteral(target) || ts.isNoSubstitutionTemplateLiteral(target)) return target.text;
+  return null;
+}
+
+/**
+ * A property-NAME position, where an identifier IS the name: `{ guarded: local }`,
+ * `{ 'guarded': local }`, `{ ['guarded']: local }`. A computed name falls back to the literal rule.
+ */
+function staticPropertyName(node: ts.Node | undefined): string | null {
+  if (node === undefined) return null;
+  if (ts.isComputedPropertyName(node)) return literalElementKey(node.expression);
+  if (ts.isIdentifier(node) || ts.isStringLiteral(node)
+    || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+  return null;
+}
+
+/**
+ * Every rename that can stand in for a guarded name. A rename is not an escape hatch, in any shape
+ * TypeScript offers a STATIC answer for:
+ *   `const peek = evaluateRecruitment`                  — a bare identifier;
+ *   `const peek = api.evaluateRecruitment`              — a property access;
+ *   `const peek = api['evaluateRecruitment']`           — a static element access;
+ *   `const { evaluateRecruitment: peek } = api`         — a destructuring rename;
+ *   `const { ['evaluateRecruitment']: peek } = api`     — a computed-literal destructuring rename;
+ *   `import { ensureAssetRecord as peek } from '...'`   — an import specifier.
+ * Shapes with no static answer (`api[whichever]`) are not aliased here — they FAIL CLOSED instead,
+ * via `unresolvedSites`.
  */
 function aliasTable(file: ts.SourceFile): Map<string, string> {
   const direct = new Map<string, string>();
   const visit = (node: ts.Node): void => {
     if (ts.isVariableDeclaration(node) && node.initializer !== undefined
       && ts.isIdentifier(node.name)) {
-      const from = node.initializer;
+      const from = unwrap(node.initializer);
       if (ts.isIdentifier(from)) direct.set(node.name.text, from.text);
       else if (ts.isPropertyAccessExpression(from)) direct.set(node.name.text, from.name.text);
+      else if (ts.isElementAccessExpression(from)) {
+        const key = literalElementKey(from.argumentExpression);
+        if (key !== null) direct.set(node.name.text, key);
+      }
     }
-    // `const { guarded: local } = whatever` — the local name stands for the property name.
-    if (ts.isBindingElement(node) && node.propertyName !== undefined
-      && ts.isIdentifier(node.name)
-      && (ts.isIdentifier(node.propertyName) || ts.isStringLiteral(node.propertyName))) {
+    // `const { guarded: local } = whatever` / `const { ['guarded']: local } = whatever`.
+    if (ts.isBindingElement(node) && node.propertyName !== undefined && ts.isIdentifier(node.name)) {
+      const key = staticPropertyName(node.propertyName);
+      if (key !== null) direct.set(node.name.text, key);
+    }
+    // `import { guarded as local }` — the local name IS the primitive.
+    if (ts.isImportSpecifier(node) && node.propertyName !== undefined) {
       direct.set(node.name.text, node.propertyName.text);
     }
     ts.forEachChild(node, visit);
@@ -98,7 +148,13 @@ export function parseModule(relativePath: string, sourceOverride?: string): Modu
       if (node !== fn && isFunctionLike(node) && declaredName(node) !== null) return;
       if (ts.isIdentifier(node)) named.add(aliases.get(node.text) ?? node.text);
       else if (ts.isPropertyAccessExpression(node)) named.add(node.name.text);
-      else if (ts.isBinaryExpression(node)) ops.add(ts.tokenToString(node.operatorToken.kind) ?? '');
+      else if (ts.isElementAccessExpression(node)) {
+        // `api['evaluateRecruitment']` names the evaluator exactly as `api.evaluateRecruitment` does.
+        const key = literalElementKey(node.argumentExpression);
+        if (key !== null) named.add(aliases.get(key) ?? key);
+      } else if (ts.isBinaryExpression(node)) {
+        ops.add(ts.tokenToString(node.operatorToken.kind) ?? '');
+      }
       ts.forEachChild(node, walk);
     };
     const body = (fn as { body?: ts.Node }).body;
@@ -213,14 +269,25 @@ export interface CallSite {
 }
 
 /**
- * The name a call expression actually reaches: a bare identifier, a property access
- * (`api.guarded(...)`), or either of those behind a rename — all resolved through the alias table.
+ * The static name an expression reaches — the ONE resolver every scan shares. `null` means only the
+ * running program knows, which in the guarded module is itself a failure (see `unresolvedSites`).
  */
+export function staticName(graph: ModuleGraph, expr: ts.Expression): string | null {
+  const target = unwrap(expr);
+  const resolve = (raw: string): string => graph.aliases.get(raw) ?? raw;
+  if (ts.isIdentifier(target)) return resolve(target.text);
+  if (ts.isPropertyAccessExpression(target)) return resolve(target.name.text);
+  if (ts.isElementAccessExpression(target)) {
+    const key = literalElementKey(target.argumentExpression);
+    return key === null ? null : resolve(key);
+  }
+  // `rosterFor(world, p).push(row)` — the array is named by the accessor that produced it.
+  if (ts.isCallExpression(target)) return staticName(graph, target.expression);
+  return null;
+}
+
 function calleeName(graph: ModuleGraph, node: ts.CallExpression): string | null {
-  const target = node.expression;
-  const raw = ts.isIdentifier(target) ? target.text
-    : ts.isPropertyAccessExpression(target) ? target.name.text : null;
-  return raw === null ? null : (graph.aliases.get(raw) ?? raw);
+  return staticName(graph, node.expression);
 }
 
 /**
@@ -276,36 +343,33 @@ export function pushTargets(
   graph: ModuleGraph, roots: readonly string[], cut: readonly string[] = [],
 ): Set<string> {
   const inClosure = reachable(graph, roots, cut);
-  return new Set(pushSites(graph)
-    .filter((site) => inClosure.has(site.enclosing))
-    .map((site) => site.array));
+  const named: string[] = [];
+  for (const site of pushSites(graph)) {
+    // An UNNAMEABLE receiver is not silently dropped here — `unresolvedSites` refuses it outright.
+    if (site.array !== null && inClosure.has(site.enclosing)) named.push(site.array);
+  }
+  return new Set(named);
 }
 
 export interface PushSite {
-  /** The receiver the row is pushed into, by name. */
-  array: string;
+  /** The receiver the row is pushed into, by static name — `null` when only runtime knows. */
+  array: string | null;
   /** The enclosing named function, or `'<module>'`. */
   enclosing: string;
 }
 
 /**
- * Every `<receiver>.push(...)` in the module. The receiver is named by identifier, property name, or
- * — the case a purely name-based reading misses — the ACCESSOR CALL that produced the array, so
- * `rosterFor(world, principal).push(row)` reads as growth of `rosterFor`.
+ * Every `<receiver>.push(...)` in the module, the receiver resolved by `staticName`. An unresolvable
+ * receiver is reported as `null` rather than a sentinel string: sentinels were silently filtered out
+ * of the pinned table, which is exactly how `(cond ? a.assets : a.enemyAssets).push(...)` escaped.
  */
 export function pushSites(graph: ModuleGraph): PushSite[] {
   const sites: PushSite[] = [];
   const visit = (node: ts.Node, owner: string): void => {
     let current = owner;
     if (isFunctionLike(node) && declaredName(node) !== null) current = declaredName(node)!;
-    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
-      && node.expression.name.text === 'push') {
-      const receiver = node.expression.expression;
-      const array = ts.isIdentifier(receiver) ? (graph.aliases.get(receiver.text) ?? receiver.text)
-        : ts.isPropertyAccessExpression(receiver) ? receiver.name.text
-          : ts.isCallExpression(receiver) ? (calleeName(graph, receiver) ?? '<call>')
-            : '<unknown>';
-      sites.push({ array, enclosing: current });
+    if (GROWTH_METHODS.some((method) => isMethodCall(node, method)) && isMethodCall(node)) {
+      sites.push({ array: staticName(graph, node.expression.expression), enclosing: current });
     }
     ts.forEachChild(node, (child) => { visit(child, current); });
   };
@@ -317,9 +381,105 @@ export function pushSites(graph: ModuleGraph): PushSite[] {
 export function pushSiteTable(graph: ModuleGraph, arrays: readonly string[]): string[] {
   const wanted = new Set(arrays);
   return pushSites(graph)
-    .filter((site) => wanted.has(site.array))
-    .map((site) => `${site.array}@${site.enclosing}`)
+    .filter((site) => site.array !== null && wanted.has(site.array))
+    .map((site) => `${site.array!}@${site.enclosing}`)
     .sort();
+}
+
+type MethodCall = ts.CallExpression & {
+  expression: ts.PropertyAccessExpression | ts.ElementAccessExpression;
+};
+
+function isMethodCall(node: ts.Node, name?: string): node is MethodCall {
+  if (!ts.isCallExpression(node)) return false;
+  const target = unwrap(node.expression);
+  if (!ts.isPropertyAccessExpression(target) && !ts.isElementAccessExpression(target)) return false;
+  if (name === undefined) return true;
+  const called = ts.isPropertyAccessExpression(target)
+    ? target.name.text : literalElementKey(target.argumentExpression);
+  return called === name;
+}
+
+/**
+ * The array mutators that can GROW a roster. Their receiver must be nameable; an ordinary read
+ * (`(rows ?? []).some(...)`, `[...members].filter(...)`) hides no name and is left alone.
+ */
+export const GROWTH_METHODS = ['push', 'unshift', 'splice'];
+
+/** A site in the guarded module whose meaning the scans cannot read at parse time. */
+export interface UnresolvedSite {
+  kind: 'callee' | 'growth-receiver' | 'module-capture';
+  /** The offending source text, trimmed for a readable failure message. */
+  text: string;
+  enclosing: string;
+  line: number;
+}
+
+/**
+ * THE FAIL-CLOSED DEFAULT. Everything above answers "is this guarded name reached from here?"; this
+ * answers the question that terminates the arms race: "is there anything here I cannot read?"
+ *
+ * Three ways a guarded module can become unreadable, each reported rather than skipped:
+ *  1. `callee`           — a call whose target has no static name (`api[whichever](...)`, `(a ? f : g)(...)`);
+ *  2. `growth-receiver`  — an array-GROWTH call whose receiver has no static name
+ *                          (`(cond ? a.assets : a.enemyAssets).push(...)`);
+ *  3. `module-capture` — a guarded name referenced at MODULE scope outside an import/export. Every
+ *     bracket/computed bypass needs a module-level holder to read the name out of; a guarded name has
+ *     no lawful reason to be captured into module state, so capturing one is itself the violation.
+ *
+ * A truly dynamic form is therefore structurally banned in the guarded module: it either resolves
+ * (and the exact tables see it) or it lands here.
+ */
+export function unresolvedSites(graph: ModuleGraph, guarded: readonly string[]): UnresolvedSite[] {
+  const watched = new Set(guarded);
+  const sites: UnresolvedSite[] = [];
+  const record = (kind: UnresolvedSite['kind'], node: ts.Node, enclosing: string): void => {
+    const text = node.getText(graph.file).replace(/\s+/g, ' ').slice(0, 90);
+    const line = graph.file.getLineAndCharacterOfPosition(node.getStart(graph.file)).line + 1;
+    sites.push({ kind, text, enclosing, line });
+  };
+
+  const visit = (node: ts.Node, owner: string): void => {
+    // Import/export declarations name the primitives lawfully — that IS the module's wiring.
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)
+      || ts.isImportEqualsDeclaration(node)) return;
+    let current = owner;
+    if (isFunctionLike(node) && declaredName(node) !== null) current = declaredName(node)!;
+
+    if (ts.isCallExpression(node) && staticName(graph, node.expression) === null) {
+      record('callee', node.expression, current);
+    }
+    if (GROWTH_METHODS.some((method) => isMethodCall(node, method))
+      && isMethodCall(node) && staticName(graph, node.expression.expression) === null) {
+      record('growth-receiver', node.expression.expression, current);
+    }
+    if (current === '<module>' && !isTypePosition(node)) {
+      const named = ts.isIdentifier(node) ? node.text
+        : ts.isPropertyAccessExpression(node) ? node.name.text
+          : ts.isElementAccessExpression(node) ? literalElementKey(node.argumentExpression) : null;
+      const resolved = named === null ? null : (graph.aliases.get(named) ?? named);
+      if (resolved !== null && watched.has(resolved)) record('module-capture', node, current);
+    }
+    ts.forEachChild(node, (child) => { visit(child, current); });
+  };
+  visit(graph.file, '<module>');
+  return sites;
+}
+
+/** Type annotations mention names without reaching their values. */
+function isTypePosition(node: ts.Node): boolean {
+  for (let cursor: ts.Node | undefined = node; cursor !== undefined; cursor = cursor.parent) {
+    if (ts.isTypeNode(cursor) || ts.isTypeAliasDeclaration(cursor)
+      || ts.isInterfaceDeclaration(cursor)) return true;
+  }
+  return false;
+}
+
+/** One readable line per unresolved site — the scan's failure message. */
+export function describeUnresolved(sites: readonly UnresolvedSite[]): string {
+  return sites
+    .map((site) => `${site.kind} @ ${site.enclosing} (line ${site.line}): ${site.text}`)
+    .join('\n');
 }
 
 /** Strip comments so a prose mention of a guarded name is not read as a call site. */
