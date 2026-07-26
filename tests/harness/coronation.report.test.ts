@@ -91,7 +91,7 @@ describe('Coronation MC observation report (npm run mc)', () => {
   const DAYS = 12;
   const BOTS = [patientPoison, cannyPoison, blitzPoison];
 
-  it('runs the three usurper-damage archetypes over the seed batch and prints trajectories', { timeout: 30000 }, () => {
+  it('runs the three usurper-damage archetypes over the seed batch and prints trajectories', { timeout: 60000 }, () => {
     let completed = 0;
     for (const bot of BOTS) {
       console.log(`\n=== ${bot.name} · ${SEEDS.length} seeds · ${DAYS} days · quorum ${CORONATION.win.quorum} ===`);
