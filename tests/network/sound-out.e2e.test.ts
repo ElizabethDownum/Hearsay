@@ -16,7 +16,8 @@ import type { EntityId, VenueId } from '../../src/sim/rumors/claim';
 import type { ScheduleOverride, WorldState } from '../../src/sim/types';
 import { makePlayerAsset, pin, recruitWorld, trust } from './helpers/recruit-town';
 import {
-  callSites, forbiddenReached, mentionedBy, parseModule, pushTargets, srcFilesNaming,
+  callSites, callSiteTable, forbiddenReached, mentionedBy, parseModule, pushSiteTable, pushTargets,
+  srcFilesNaming,
 } from '../helpers/callgraph';
 
 const RULES = STANDARD_RULES;
@@ -337,15 +338,42 @@ describe('sound-out meetings — an independent invitation, and attendance that 
 // The two sound-out enforcement scans, as CALL-GRAPH closures. A token scan over one function body
 // is bypassed by a helper hop or a rename; these ask what the whole reachable closure can touch.
 
-/** Every module-local function a sound-out can pass through on the asset's side. */
-const SOUND_OUT_ROOTS = ['startSoundOut', 'settleSoundOutAnswer', 'waitingSoundOutRecord'];
-/** The engine's enrollment primitives — every way a roster row or its trimmings can be created. */
-const ENROLLMENT_NAMES = [
-  'enrollRecruitedAsset', 'ensureAssetRecord', 'recordPlayerKnownFact', 'setDispositionEdge',
-  'rosterFor',
+/**
+ * Every module-local function a sound-out can pass through on the asset's side — INCLUDING the shared
+ * response dispatcher `settleRecruitmentAnswer`, which a sound-out answer's physical receipt always
+ * enters. The dispatcher lawfully hands off to `closeDirectRecruitment` for a direct approach, so that
+ * one branch target is CUT from the walk (see `reachable`): what remains is exactly the region that
+ * runs no matter which branch is taken, which is where a leak would actually sit.
+ */
+const SOUND_OUT_ROOTS = [
+  'startSoundOut', 'settleSoundOutAnswer', 'waitingSoundOutRecord', 'settleRecruitmentAnswer',
 ];
+const DISPATCH_CUT = ['closeDirectRecruitment'];
+/** The engine's enrollment primitives — every way a roster row or its trimmings can be created. */
+const ENROLLMENT_PRIMITIVES = [
+  'enrollRecruitedAsset', 'ensureAssetRecord', 'recordPlayerKnownFact', 'setDispositionEdge',
+];
+const ENROLLMENT_NAMES = [...ENROLLMENT_PRIMITIVES, 'rosterFor'];
 /** …and the arrays whose growth IS membership, which a name scan alone cannot see. */
-const ROSTER_ARRAYS = ['assets', 'enemyAssets', 'informants', 'roster'];
+const ROSTER_ARRAYS = ['assets', 'enemyAssets', 'informants', 'roster', 'rosterFor'];
+/**
+ * The EXACT set of places an enrollment primitive may be called, and the exact places a roster array
+ * may grow. Pinned rather than merely bounded: a new site ANYWHERE in the module — dispatcher, helper,
+ * or a rename of either — changes these tables and fires, whatever guard it hides behind.
+ */
+const ALLOWED_ENROLLMENT_SITES = [
+  'enrollRecruitedAsset→closeDirectRecruitment',
+  'ensureAssetRecord→closeDirectRecruitment',
+  'ensureAssetRecord→receiveApproachAtHandler',
+  'recordPlayerKnownFact→enrollRecruitedAsset',
+  'setDispositionEdge→enrollRecruitedAsset',
+];
+const ALLOWED_ROSTER_GROWTH = ['informants@enrollRecruitedAsset', 'roster@enrollRecruitedAsset'];
+/** The evaluator's result belongs to the target's own answer composition, and to nothing else. */
+const ALLOWED_EVALUATOR_SITES = [
+  'evaluateRecruitment→composeCandidateResponse',
+  'evaluateRecruitment→decideLaterAnswer',
+];
 /** The ONLY src files allowed to name an enrollment primitive — the cross-module escape fence. */
 const ENROLLMENT_FILES = [
   'src/sim/actions.ts',
@@ -365,18 +393,34 @@ function injectInto(source: string, anchor: string, statement: string): string {
   return `${source.slice(0, open + 1)}\n${statement}${source.slice(open + 1)}`;
 }
 
+/** Splice a statement in immediately after an exact source line. */
+function injectAfter(source: string, anchor: string, statement: string): string {
+  expect(source.includes(anchor), `the injection anchor exists: ${anchor}`).toBe(true);
+  return source.replace(anchor, `${anchor}\n${statement}`);
+}
+
+/**
+ * The re-reviewer's dispatcher injection: an enrollment primitive in the UNGUARDED prologue of
+ * `settleRecruitmentAnswer`, which every sound-out answer's receipt runs through.
+ */
+const DISPATCH_PROLOGUE =
+  '  if (!approach || approach.recruiter !== holder || approach.status === \'closed\') return;';
+const leakAtDispatcher = (statement: string): string =>
+  injectAfter(RECRUITMENT_SRC, DISPATCH_PROLOGUE, statement);
+
 describe('sound-out enforcement scans', () => {
   // ── ENFORCEMENT SCAN 3: zero enrollment reachable from any sound-out path ─────────────────────
   it('call-graph scan: nothing reachable from a sound-out path can enroll anybody', () => {
     const graph = parseModule(RECRUITMENT_PATH);
-    expect(forbiddenReached(graph, SOUND_OUT_ROOTS, ENROLLMENT_NAMES)).toEqual([]);
-    expect(ROSTER_ARRAYS.filter((name) => pushTargets(graph, SOUND_OUT_ROOTS).has(name))).toEqual([]);
+    expect(forbiddenReached(graph, SOUND_OUT_ROOTS, ENROLLMENT_NAMES, DISPATCH_CUT)).toEqual([]);
+    expect(ROSTER_ARRAYS.filter((name) => pushTargets(graph, SOUND_OUT_ROOTS, DISPATCH_CUT).has(name)))
+      .toEqual([]);
     const execution = parseModule(EXECUTION_PATH);
     expect(forbiddenReached(execution, ['attemptDirective'], ENROLLMENT_NAMES)).toEqual([]);
     expect(ROSTER_ARRAYS.filter((name) => pushTargets(execution, ['attemptDirective']).has(name)))
       .toEqual([]);
     // Cross-module fence: a new enrolling helper in a new module cannot hide from these scans.
-    expect(srcFilesNaming(ENROLLMENT_NAMES.slice(0, 4))).toEqual(ENROLLMENT_FILES);
+    expect(srcFilesNaming(ENROLLMENT_PRIMITIVES)).toEqual(ENROLLMENT_FILES);
     expect(srcFilesNaming(ROSTER_GROWTH_NEEDLES)).toEqual(ROSTER_GROWTH_FILES);
 
     // FIRING PROOF (a): a direct enrollment — roster GROWTH, which no name scan sees.
@@ -384,14 +428,14 @@ describe('sound-out enforcement scans', () => {
       RECRUITMENT_SRC, 'export function settleSoundOutAnswer(',
       '  world.intel.informants.push({ id: record.recipient, assignedVenue: null });',
     ));
-    expect(ROSTER_ARRAYS.filter((name) => pushTargets(pushed, SOUND_OUT_ROOTS).has(name)))
+    expect(ROSTER_ARRAYS.filter((name) => pushTargets(pushed, SOUND_OUT_ROOTS, DISPATCH_CUT).has(name)))
       .toContain('informants');
 
     // FIRING PROOF (b): the reviewer's bypass — `ensureAssetRecord`, which the old scan did not know.
     expect(forbiddenReached(parseModule(RECRUITMENT_PATH, injectInto(
       RECRUITMENT_SRC, 'export function settleSoundOutAnswer(',
       '  ensureAssetRecord(world, record.principal, record.recipient);',
-    )), SOUND_OUT_ROOTS, ENROLLMENT_NAMES)).toContain('ensureAssetRecord');
+    )), SOUND_OUT_ROOTS, ENROLLMENT_NAMES, DISPATCH_CUT)).toContain('ensureAssetRecord');
 
     // FIRING PROOF (c): the reviewer's bypass — the same enrollment one HELPER deep.
     const viaHelper = injectInto(
@@ -402,14 +446,39 @@ describe('sound-out enforcement scans', () => {
       'export function settleSoundOutAnswer(', '  quietlyEnroll(world, record.recipient);',
     );
     expect(forbiddenReached(parseModule(RECRUITMENT_PATH, viaHelper), SOUND_OUT_ROOTS,
-      ENROLLMENT_NAMES), 'a helper hop still enrolls').toContain('ensureAssetRecord');
+      ENROLLMENT_NAMES, DISPATCH_CUT), 'a helper hop still enrolls').toContain('ensureAssetRecord');
+
+    // FIRING PROOF (d): RE-REVIEW SEAM — the enrollment sits in the shared response DISPATCHER's
+    // unguarded prologue, which every sound-out answer's physical receipt runs through.
+    const atDispatcher = parseModule(RECRUITMENT_PATH, leakAtDispatcher(
+      '  const leaked = approach;\n  ensureAssetRecord(world, leaked.principal, leaked.target);',
+    ));
+    expect(forbiddenReached(atDispatcher, SOUND_OUT_ROOTS, ENROLLMENT_NAMES, DISPATCH_CUT),
+      'the dispatcher is inside the boundary').toContain('ensureAssetRecord');
+    // …and cutting the direct branch does not blind the walk to a leak inside the sound-out branch.
+    const inSoundOutBranch = parseModule(RECRUITMENT_PATH, injectAfter(
+      RECRUITMENT_SRC, '    const record = waitingSoundOutRecord(world, approachId, holder);',
+      '    ensureAssetRecord(world, approach.principal, approach.target);',
+    ));
+    expect(forbiddenReached(inSoundOutBranch, SOUND_OUT_ROOTS, ENROLLMENT_NAMES, DISPATCH_CUT),
+      'the cut removes only the lawful direct hand-off').toContain('ensureAssetRecord');
+
+    // FIRING PROOF (e): roster growth through the ACCESSOR rather than a named array.
+    const viaAccessor = parseModule(RECRUITMENT_PATH, injectInto(
+      RECRUITMENT_SRC, 'export function settleSoundOutAnswer(',
+      '  rosterFor(world, record.principal).push(undefined as never);',
+    ));
+    expect(ROSTER_ARRAYS.filter((name) => pushTargets(viaAccessor, SOUND_OUT_ROOTS, DISPATCH_CUT).has(name)),
+      'growth through rosterFor(...) is still growth').toContain('rosterFor');
   });
 
   // ── ENFORCEMENT SCAN 4: enrollment stays a guarded direct-avatar moment ───────────────────────
-  it('call-graph scan: the direct-recruitment close is the ONE enrollment route, and it is guarded', () => {
+  it('call-graph scan: EVERY enrollment primitive sits at a pinned, guarded call site', () => {
     const graph = parseModule(RECRUITMENT_PATH);
-    const enrolling = callSites(graph, ['enrollRecruitedAsset']);
-    expect(enrolling.map((site) => site.enclosing)).toEqual(['closeDirectRecruitment']);
+    // Exact allowed-call-site enforcement: not "no enrollment on this path" but "enrollment exists
+    // HERE and nowhere else", for every primitive including `ensureAssetRecord`.
+    expect(callSiteTable(graph, ENROLLMENT_PRIMITIVES)).toEqual(ALLOWED_ENROLLMENT_SITES);
+    expect(pushSiteTable(graph, ROSTER_ARRAYS)).toEqual(ALLOWED_ROSTER_GROWTH);
 
     const closing = callSites(graph, ['closeDirectRecruitment']);
     expect(closing.map((site) => site.enclosing)).toEqual(['settleRecruitmentAnswer']);
@@ -432,6 +501,30 @@ describe('sound-out enforcement scans', () => {
     ));
     expect(callSites(smuggled, ['closeDirectRecruitment']).map((site) => site.enclosing))
       .toContain('settleSoundOutAnswer');
+
+    // FIRING PROOF (c): RE-REVIEW SEAM — `ensureAssetRecord` in the response dispatcher. No guard,
+    // helper, or closure argument can hide it: the pinned table simply gains a row.
+    const atDispatcher = parseModule(RECRUITMENT_PATH, leakAtDispatcher(
+      '  const leaked = approach;\n  ensureAssetRecord(world, leaked.principal, leaked.target);',
+    ));
+    expect(callSiteTable(atDispatcher, ENROLLMENT_PRIMITIVES))
+      .toContain('ensureAssetRecord→settleRecruitmentAnswer');
+    expect(callSiteTable(atDispatcher, ENROLLMENT_PRIMITIVES)).not.toEqual(ALLOWED_ENROLLMENT_SITES);
+
+    // FIRING PROOF (d): the same leak behind a RENAME of the primitive — the table resolves aliases.
+    const renamed = parseModule(RECRUITMENT_PATH, leakAtDispatcher(
+      '  const ensureRow = ensureAssetRecord;\n  ensureRow(world, approach.principal, approach.target);',
+    ));
+    expect(callSiteTable(renamed, ENROLLMENT_PRIMITIVES))
+      .toContain('ensureAssetRecord→settleRecruitmentAnswer');
+
+    // FIRING PROOF (e): and behind a PROPERTY alias of the primitive.
+    const viaProperty = parseModule(RECRUITMENT_PATH, leakAtDispatcher(
+      '  const rosterApi = { ensureAssetRecord };\n'
+      + '  rosterApi.ensureAssetRecord(world, approach.principal, approach.target);',
+    ));
+    expect(callSiteTable(viaProperty, ENROLLMENT_PRIMITIVES))
+      .toContain('ensureAssetRecord→settleRecruitmentAnswer');
   });
 
   // ── ENFORCEMENT SCAN 5: the evaluator's result belongs to the target alone ────────────────────
@@ -439,21 +532,59 @@ describe('sound-out enforcement scans', () => {
     const graph = parseModule(RECRUITMENT_PATH);
     expect(mentionedBy(graph, 'evaluateRecruitment'))
       .toEqual(['composeCandidateResponse', 'decideLaterAnswer']);
-    expect(forbiddenReached(graph, SOUND_OUT_ROOTS, ['evaluateRecruitment'])).toEqual([]);
+    // Direct AST call-site enforcement, independent of the mention closure.
+    expect(callSiteTable(graph, ['evaluateRecruitment'])).toEqual(ALLOWED_EVALUATOR_SITES);
+    expect(forbiddenReached(graph, SOUND_OUT_ROOTS, ['evaluateRecruitment'], DISPATCH_CUT)).toEqual([]);
     // Cross-module fence: the evaluator is not even nameable outside its own module.
     expect(srcFilesNaming(['evaluateRecruitment'])).toEqual([RECRUITMENT_PATH]);
 
-    // FIRING PROOF (a): the reviewer's bypass — a module-level ALIAS used from a sound-out path.
-    const aliased = parseModule(RECRUITMENT_PATH, injectInto(
-      RECRUITMENT_SRC.replace('const opposite =', 'const peekAnswer = evaluateRecruitment;\nconst opposite ='),
-      'export function settleSoundOutAnswer(', '  void peekAnswer(undefined as never);',
-    ));
-    expect(mentionedBy(aliased, 'evaluateRecruitment'), 'a rename is not an escape hatch')
-      .toContain('settleSoundOutAnswer');
-    expect(forbiddenReached(aliased, SOUND_OUT_ROOTS, ['evaluateRecruitment']))
-      .toEqual(['evaluateRecruitment']);
+    /** Read the evaluator from `settleSoundOutAnswer` through the given module-level preamble. */
+    const leakThrough = (preamble: string, call: string): ReturnType<typeof parseModule> =>
+      parseModule(RECRUITMENT_PATH, injectInto(
+        RECRUITMENT_SRC.replace('const opposite =', `${preamble}\nconst opposite =`),
+        'export function settleSoundOutAnswer(', `  ${call}`,
+      ));
 
-    // FIRING PROOF (b): the evaluator one HELPER deep from the sound-out path.
+    const aliasShapes: { label: string; preamble: string; call: string }[] = [
+      // (a) the original bypass — a bare identifier alias.
+      {
+        label: 'bare alias',
+        preamble: 'const peekAnswer = evaluateRecruitment;',
+        call: 'void peekAnswer(undefined as never);',
+      },
+      // (b) RE-REVIEW SEAM — a PROPERTY-ACCESS alias.
+      {
+        label: 'property alias',
+        preamble: 'const evaluatorApi = { evaluateRecruitment };\n'
+          + 'const peekAnswer = evaluatorApi.evaluateRecruitment;',
+        call: 'void peekAnswer(undefined as never);',
+      },
+      // (c) a DESTRUCTURING rename of the same property.
+      {
+        label: 'destructuring rename',
+        preamble: 'const evaluatorApi = { evaluateRecruitment };\n'
+          + 'const { evaluateRecruitment: peekAnswer } = evaluatorApi;',
+        call: 'void peekAnswer(undefined as never);',
+      },
+      // (d) called straight off the property, with no local name at all.
+      {
+        label: 'property call',
+        preamble: 'const evaluatorApi = { evaluateRecruitment };',
+        call: 'void evaluatorApi.evaluateRecruitment(undefined as never);',
+      },
+    ];
+
+    for (const { label, preamble, call } of aliasShapes) {
+      const leaked = leakThrough(preamble, call);
+      expect(mentionedBy(leaked, 'evaluateRecruitment'), `${label}: not an escape hatch`)
+        .toContain('settleSoundOutAnswer');
+      expect(forbiddenReached(leaked, SOUND_OUT_ROOTS, ['evaluateRecruitment'], DISPATCH_CUT), label)
+        .toEqual(['evaluateRecruitment']);
+      expect(callSiteTable(leaked, ['evaluateRecruitment']), `${label}: call-site table`)
+        .toContain('evaluateRecruitment→settleSoundOutAnswer');
+    }
+
+    // FIRING PROOF (e): the evaluator one HELPER deep from the sound-out path.
     const viaHelper = injectInto(
       RECRUITMENT_SRC.replace('export function settleSoundOutAnswer(',
         'function peekWillingness(input: RecruitmentInput): RecruitmentResponse {\n'
@@ -462,7 +593,14 @@ describe('sound-out enforcement scans', () => {
       'export function settleSoundOutAnswer(', '  void peekWillingness(undefined as never);',
     );
     expect(forbiddenReached(parseModule(RECRUITMENT_PATH, viaHelper), SOUND_OUT_ROOTS,
-      ['evaluateRecruitment']), 'a helper hop still reads the evaluator').toEqual(['evaluateRecruitment']);
+      ['evaluateRecruitment'], DISPATCH_CUT), 'a helper hop still reads the evaluator')
+      .toEqual(['evaluateRecruitment']);
+
+    // FIRING PROOF (f): the evaluator read from the shared response DISPATCHER itself.
+    const atDispatcher = parseModule(RECRUITMENT_PATH,
+      leakAtDispatcher('  void evaluateRecruitment(undefined as never);'));
+    expect(forbiddenReached(atDispatcher, SOUND_OUT_ROOTS, ['evaluateRecruitment'], DISPATCH_CUT),
+      'the dispatcher is inside the evaluator boundary too').toEqual(['evaluateRecruitment']);
   });
 });
 
