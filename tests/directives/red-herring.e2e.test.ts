@@ -5,6 +5,7 @@ import { at, dayOf, TICKS_PER_DAY } from '../../src/core/time';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { applyDirective } from '../../src/sim/actions';
 import { positionOf } from '../../src/sim/agents';
+import { applyAction, runLogOn, type Action } from '../../src/sim/campaign';
 import { applyEnemyDecision, captureEvidence, runEnemyDay } from '../../src/sim/counterintel';
 import { enemyDigest } from '../../src/sim/enemy/digest';
 import {
@@ -20,7 +21,7 @@ import type {
 } from '../../src/sim/directives/types';
 import { hashWorld, stableStringify } from '../../src/sim/hash';
 import type { TickEvents } from '../../src/sim/perception';
-import { stepTransaction } from '../../src/sim/phases';
+import { finishTick, prepareTick, stepTransaction } from '../../src/sim/phases';
 import { SOMEONE, type EntityId } from '../../src/sim/rumors/claim';
 import type { Npc, ScheduleOverride, TownFixture, WorldState } from '../../src/sim/types';
 import { buildTownMap, buildWorld, enrollPlayer } from '../../src/sim/world';
@@ -59,6 +60,7 @@ const FIXTURE: TownFixture = {
     npc('gale', 'square', 'guard'),   // the enemy's one observer — ordinarily at 'square'
     npc('mira', 'home-mira'),         // the decoy subject the false brief names
     npc('mole', 'square'),            // the player's asset, secretly turned
+    npc('worker', 'square', 'printer'), // the consequential channel in the real-menial twin
   ],
 };
 
@@ -99,6 +101,18 @@ function staged(seed: string): WorldState {
   return world;
 }
 
+/** Production-replay fixture: the handler is physically absent for the original handoff, then meets. */
+function replayStaged(seed: string): WorldState {
+  const world = staged(seed);
+  for (const id of ['boss', 'gale']) {
+    world.npcs[id]!.schedule = [
+      { days: 'all', from: 0, to: 14, venue: 'backroom' },
+      { days: 'all', from: 15, to: 1439, venue: 'square' },
+    ];
+  }
+  return world;
+}
+
 /** A believable shape brief naming mira — and aimed at an audience mole can never reach. */
 const DECOY_BRIEF: DirectiveBrief = {
   mission: {
@@ -110,6 +124,11 @@ const DECOY_BRIEF: DirectiveBrief = {
   priority: 'important', authority: 'office', discretion: 'quiet', specificity: 'detailed',
   guidance: [], active: { from: 0, until: at(0, 23, 59) },
   report: 'outcome', reportBy: null, purpose: null,
+};
+
+const DECOY_ACTION: Action = {
+  tick: 0, kind: 'directive', recipient: 'mole',
+  handoff: { outboundVia: [], reportVia: [] }, brief: DECOY_BRIEF,
 };
 
 const eventsFor = (speech: NetworkSpeech): TickEvents => ({
@@ -192,11 +211,17 @@ function standTwoNights(world: WorldState, startDay: number): DirectiveRecord {
 }
 
 /** Everything up to (but not including) the nightly that decides the runaround. */
-function upToTwoWastedNights(seed: string): WorldState {
+function upToWatchIssued(seed: string): WorldState {
   const world = staged(seed);
   handOver(world, issueDecoy(world));
   const day1 = nightly(world, 1);
   expect(day1.watches).toEqual([expect.objectContaining({ district: 'd0', subject: 'mira' })]);
+  return world;
+}
+
+/** Everything up to (but not including) the nightly that decides the runaround. */
+function upToTwoWastedNights(seed: string): WorldState {
+  const world = upToWatchIssued(seed);
   standTwoNights(world, 2);
   return world;
 }
@@ -269,13 +294,30 @@ describe('the false brief travels, spends two nights, and buys a runaround', () 
     expect(world.scheduleOverrides.gale!.some((row) => row.sourceRef === 'order:watch:d0:gale')).toBe(true);
   });
 
-  it('the composed loop is replay-exact: the same seed and script reproduce it byte for byte', () => {
-    const a = upToTwoWastedNights('rh-replay');
-    const b = upToTwoWastedNights('rh-replay');
-    nightly(a, 4);
-    nightly(b, 4);
-    expect(hashWorld(b)).toBe(hashWorld(a));
-    expect(stableStringify(b.enemy)).toBe(stableStringify(a.enemy));
+  it('live execution equals seed + successful action-log replay through the production transaction', () => {
+    const seed = 'rh-replay';
+    const until = at(4, 0);
+    const live = replayStaged(seed);
+    while (live.tick < until) {
+      const frame = prepareTick(live, RULES);
+      finishTick(live, RULES, frame, live.tick === DECOY_ACTION.tick
+        ? () => applyAction(live, DECOY_ACTION, RULES, frame)
+        : undefined);
+    }
+    const replay = runLogOn(replayStaged(seed), RULES, [DECOY_ACTION], until);
+
+    // Non-vacuity: the logged false brief really crossed the whole nightly path in BOTH worlds.
+    for (const world of [live, replay]) {
+      expect(world.network.directiveState!.records.some((record) =>
+        record.principal === 'player' && record.recipient === 'mole')).toBe(true);
+      expect(world.enemy.sketch.some((feature) => feature.kind === 'runaround')).toBe(true);
+      expect(world.enemy.actionLedger?.some((row) =>
+        row.kind === 'watch' && row.subject === 'mira' && row.workedDays.length >= 2)).toBe(true);
+    }
+    expect(hashWorld(replay)).toBe(hashWorld(live));
+    expect(stableStringify(replay.enemy)).toBe(stableStringify(live.enemy));
+    expect(stableStringify(enemyDigest(replay.enemy, 4, RULES)))
+      .toBe(stableStringify(enemyDigest(live.enemy, 4, RULES)));
   });
 
   it('the PRODUCTION path (stepTransaction) reaches runaround emission and tail-drop issuance', () => {
@@ -286,6 +328,46 @@ describe('the false brief travels, spends two nights, and buys a runaround', () 
     expect(decision.features.some((f) => f.kind === 'runaround')).toBe(true);
     expect(tailDropsOf(decision)).toHaveLength(1);
     expect(recordWithKey(world, 'cancel:watch:d0:gale')).toBeDefined();
+  });
+
+  it('a delayed or failed original watch delivery creates no worked day and no runaround', () => {
+    const ordered = (seed: string) => {
+      const world = upToWatchIssued(seed);
+      const record = recordWithKey(world, 'watch:d0');
+      const message = messagesOf(world, 'directive').find((row) =>
+        row.payload.kind === 'directive' && row.payload.version.directiveId === record.id)!;
+      return { world, record, message };
+    };
+
+    // Delay: at the message's available beat HQ and the guard are physically separated, so the real
+    // transport cannot hop. With no receipt, settling two nominal windows cannot create a worked day.
+    const delayed = ordered('rh-watch-delayed');
+    const early = delayed.message.availableAfter;
+    delayed.world.tick = early;
+    expect(realizeNetworkForward(delayed.world, delayed.message.id,
+      circle('square', 'boss', 'mole'), early, RULES)).toBeNull();
+    for (const day of [2, 3]) {
+      settleDirectiveApplications(delayed.world, day * TICKS_PER_DAY + WATCH.from + 120, RULES);
+    }
+    expect(delayed.record.received).toBeNull();
+    expect(delayed.world.enemy.actionLedger ?? []).toEqual([]);
+    expect(enemyDigest(delayed.world.enemy, 4, RULES).features.some((feature) =>
+      feature.kind === 'runaround')).toBe(false);
+
+    // Failure: the same real message expires while still held by HQ. `realizeNetworkForward` marks
+    // the route failed before it can speak, so there is likewise no receipt, work ledger, or payoff.
+    const failed = ordered('rh-watch-failed');
+    expect(failed.message.expiresAt).not.toBeNull();
+    const afterExpiry = failed.message.expiresAt! + 1;
+    expect(afterExpiry % 15).toBe(0);
+    failed.world.tick = afterExpiry;
+    expect(realizeNetworkForward(failed.world, failed.message.id,
+      circle('square', 'boss', 'gale'), afterExpiry, RULES)).toBeNull();
+    expect(failed.message.failedAt).toBe(afterExpiry);
+    expect(failed.record.received).toBeNull();
+    expect(failed.world.enemy.actionLedger ?? []).toEqual([]);
+    expect(enemyDigest(failed.world.enemy, dayOf(afterExpiry) + 1, RULES).features.some((feature) =>
+      feature.kind === 'runaround')).toBe(false);
   });
 });
 
@@ -440,7 +522,10 @@ describe('(c) a refused or never-answered cancellation is one-shot either way', 
 
 describe('private authored state is not enemy input', () => {
   it('clone worlds differing only in guidance/purpose/tag/codex/turned are byte-identical to the enemy', () => {
-    const world = upToTwoWastedNights('rh-clone');
+    // Queue the lawful handler copy first, then fork BEFORE any enemy-facing transport/capture,
+    // watch delivery, worked-ledger receipt, or digest pass runs.
+    const world = staged('rh-clone');
+    issueDecoy(world);
     const twin = structuredClone(world);
 
     // Alter ONLY things the player authored privately or that live in hidden truth.
@@ -452,49 +537,135 @@ describe('private authored state is not enemy input', () => {
     twin.intel.codex.push({ npc: 'mira', trait: 'exaggerator', proposedAt: 0 });
     twin.network.assets.find((row) => row.id === 'mole')!.turned = false;
 
-    // The perturbation is real…
+    // The perturbation is real before the driven boundary…
     expect(stableStringify(twin)).not.toBe(stableStringify(world));
-    // …and the enemy boundary plus the digest output are byte-identical.
+    // …then both worlds cross the same production loop: handler transport/capture, nightly watch
+    // issuance and delivery, two returned worked reports, and the runaround digest.
+    runLogOn(world, RULES, [], at(4, 0));
+    runLogOn(twin, RULES, [], at(4, 0));
+    expect(world.enemy.sketch.some((feature) => feature.kind === 'runaround')).toBe(true);
+    expect(twin.enemy.sketch.some((feature) => feature.kind === 'runaround')).toBe(true);
     expect(stableStringify(twin.enemy)).toBe(stableStringify(world.enemy));
     expect(stableStringify(enemyDigest(twin.enemy, 4, RULES)))
       .toBe(stableStringify(enemyDigest(world.enemy, 4, RULES)));
 
-    // Positive control: the SAME probe detects a change the enemy really did capture — one thing
-    // said about mira, at the post, inside the window, on a watched night.
-    const control = structuredClone(world);
-    control.enemy.evidence.push({
-      tick: at(3, 0) + WATCH.from + 30, venue: 'plaza', observer: 'gale', overheard: true,
-      speaker: 'mira', addressedTo: 'gale', kind: 'utterance', mode: 'telling',
-      claimId: 'c-control', family: 'f-decoy',
-      reported: { subject: 'mira', predicate: 'stole', object: null, count: 2, severity: 4,
-        place: null, attribution: SOMEONE },
-      about: null,
-    });
-    expect(stableStringify(control.enemy)).not.toBe(stableStringify(world.enemy));
-    expect(stableStringify(enemyDigest(control.enemy, 4, RULES)))
-      .not.toBe(stableStringify(enemyDigest(world.enemy, 4, RULES)));
+    // Positive control: compare the digest at the nightly boundary where the runaround is decided,
+    // before either decision has been applied. A REAL player speech action moves the avatar to the
+    // staffed post and tells gale about mira during one watched night, making that night productive
+    // through the production perception boundary.
+    const silent = staged('rh-clone');
+    issueDecoy(silent);
+    const control = staged('rh-clone');
+    issueDecoy(control);
+    const arrive = at(2, 0) + WATCH.from;
+    const heard = arrive + 15;
+    const beforeRunaround = at(3, 23, 59);
+    runLogOn(silent, RULES, [], beforeRunaround);
+    runLogOn(control, RULES, [
+      { tick: arrive, kind: 'goTo', venue: 'plaza' },
+      { tick: heard, kind: 'tell', to: 'gale', spec: {
+        subject: 'mira', predicate: 'stole', object: null, count: 2, severity: 4,
+        place: null, attribution: SOMEONE,
+      } },
+    ], beforeRunaround);
+    expect(control.chronicle.some((row) => row.kind === 'telling' && row.tick === heard
+      && row.speaker === 'you' && row.heardBy.some((listener) => listener.id === 'gale'))).toBe(true);
+    const silentDecision = enemyDigest(silent.enemy, 3, RULES);
+    const controlDecision = enemyDigest(control.enemy, 3, RULES);
+    expect(silentDecision.features.some((feature) => feature.kind === 'runaround')).toBe(true);
+    expect(controlDecision.features.some((feature) => feature.kind === 'runaround')).toBe(false);
+    expect(stableStringify(controlDecision)).not.toBe(stableStringify(silentDecision));
   });
 });
 
 describe('the real-menial decoy — presence is not evidence, and no "decoy" flag exists anywhere', () => {
-  it('the watched person may stand at the very post all night and still waste it', () => {
-    const world = upToTwoWastedNights('rh-menial');
-    // Real, lawful, low-value work: mira occupies the watched venue for both watched windows, in
-    // plain sight of the guard. Nothing is SAID, so nothing enters the enemy's evidence log.
-    world.scheduleOverrides.mira = [{
-      fromDay: 2, toDay: 4, from: WATCH.from, to: WATCH.to, venue: 'plaza',
-      source: 'player', sourceRef: 'test:menial:mira',
-    }];
+  it('a real learn/post channel does low-value work while a second real shape channel succeeds', () => {
+    const world = staged('rh-menial');
+    handOver(world, issueDecoy(world));
+    world.network.assets.push(
+      { id: 'mira', mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [] },
+      { id: 'worker', mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [] },
+    );
+    world.intel.informants.push({ id: 'mira', assignedVenue: null });
+    // Keep the two handoff recipients and the shape audience in one uncrowded, real circle with
+    // the avatar. Square has six occupants here and therefore splits into deterministic circles.
+    world.playerVenue = 'backroom';
+    for (const id of ['mira', 'worker', 'boss']) {
+      world.npcs[id]!.schedule = [{ days: 'all', from: 0, to: 1439, venue: 'backroom' }];
+    }
+    world.npcs.mira!.edges.push({ to: 'you', kind: 'friend', trust: 0.9 });
+    world.npcs.worker!.edges.push({ to: 'you', kind: 'friend', trust: 0.9 });
+
+    const issuedAt = at(1, 8, 15);
+    const active = { from: issuedAt, until: at(5, 0) };
+    const postBrief: DirectiveBrief = {
+      mission: { kind: 'learn', target: { kind: 'venue', id: 'plaza' } },
+      priority: 'urgent', authority: 'office', discretion: 'quiet', specificity: 'detailed',
+      guidance: [], active, report: 'outcome', reportBy: null, purpose: null,
+    };
+    const shapeBrief: DirectiveBrief = {
+      mission: {
+        kind: 'shape', operation: 'spread', redirectTo: null,
+        audience: { kind: 'person', id: 'boss' },
+        payload: { family: 'f-consequence', parent: null, claim: {
+          subject: 'worker', predicate: 'stole', object: null, count: 3, severity: 4,
+          place: null, attribution: SOMEONE,
+        } },
+      },
+      priority: 'urgent', authority: 'office', discretion: 'quiet', specificity: 'detailed',
+      guidance: [], active, report: 'outcome', reportBy: null, purpose: null,
+    };
+    world.tick = issuedAt;
+    applyDirective(world, 'mira', { outboundVia: [], reportVia: [] }, postBrief, issuedAt,
+      { kind: 'posting', venue: 'plaza' });
+    applyDirective(world, 'worker', { outboundVia: [], reportVia: [] }, shapeBrief, issuedAt);
+    const playerRecords = world.network.directiveState!.records.filter((record) =>
+      record.principal === 'player' && (record.recipient === 'mira' || record.recipient === 'worker'));
+    for (const record of playerRecords) {
+      const message = messagesOf(world, 'directive').find((row) =>
+        row.payload.kind === 'directive' && row.payload.version.directiveId === record.id)!;
+      deliverTo(world, message, 'backroom', issuedAt);
+    }
+    for (const record of playerRecords) {
+      const due = record.decision!.timing.actAt!;
+      world.tick = due;
+      markDirectiveDue(world, record.id, due);
+      const realized = attemptDirective(world, record.id,
+        record.recipient === 'mira'
+          ? circle('backroom', 'mira', 'worker')
+          : circle('backroom', 'worker', 'boss'),
+        due, RULES);
+      if (record.recipient === 'worker') {
+        expect(realized.tellings).toEqual([expect.objectContaining({
+          speaker: 'worker', addressedTo: 'boss',
+          claim: expect.objectContaining({ family: 'f-consequence' }),
+        })]);
+      }
+    }
+    expect(playerRecords.find((record) => record.recipient === 'mira')!.execution)
+      .toMatchObject({ state: 'attempted' });
+    expect(playerRecords.find((record) => record.recipient === 'worker')!.execution)
+      .toMatchObject({ state: 'completed' });
+    expect(Object.values(world.claims).some((claim) => claim.family === 'f-consequence')).toBe(true);
+
+    const day1 = nightly(world, 1);
+    expect(day1.watches).toEqual([expect.objectContaining({ district: 'd0', subject: 'mira' })]);
+    standTwoNights(world, 2);
+    // Mira's real accepted posting application, not a hand-authored override, puts her at the post.
+    expect(world.scheduleOverrides.mira).toEqual([expect.objectContaining({
+      sourceRef: 'posting:mira', venue: 'plaza', fromDay: 2,
+    })]);
     for (const day of [2, 3]) {
       const tick = day * TICKS_PER_DAY + WATCH.from + 30;
       expect(positionOf(world, world.npcs.mira!, tick)).toBe('plaza');
       expect(positionOf(world, world.npcs.gale!, tick)).toBe('plaza');
-      captureEvidence(world, { tick, positions: { mira: 'plaza', gale: 'plaza' },
-        utterances: [], askings: [] }, RULES);
     }
+    // The only hostile lead is the handler copy the enemy actually captured; mere co-presence and
+    // the consequential channel's uncaptured work add nothing to the enemy evidence log.
     expect(world.enemy.evidence.filter((e) => e.tick >= at(2, 0))).toHaveLength(0);
     const decision = nightly(world, 4);
     expect(decision.features.some((f) => f.kind === 'runaround')).toBe(true);
+    expect(Object.values(world.claims).some((claim) => claim.family === 'f-consequence')).toBe(true);
   });
 
   it('no engine module carries a decoy/red-herring flag — the enemy reads only its own captures', () => {

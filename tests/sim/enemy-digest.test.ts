@@ -154,9 +154,40 @@ describe('purity and determinism', () => {
     ...over,
   });
 
-  it('a watch with no eligible subject-bearing feature in its district keeps all three keys null', () => {
-    expect(w1WatchWith([staged({ id: 'x0' }), staged({ id: 'x1', kind: 'entry-point' })]))
-      .toMatchObject({ subject: null, about: null, leadFeatureId: null });
+  it('a leadless watch omits all three optional keys and keeps the pre-Task-12 bytes', () => {
+    const watch = w1WatchWith([staged({ id: 'x0' }), staged({ id: 'x1', kind: 'entry-point' })])!;
+    expect('subject' in watch).toBe(false);
+    expect('about' in watch).toBe(false);
+    expect('leadFeatureId' in watch).toBe(false);
+    expect(stableStringify(watch)).toBe(stableStringify({
+      district: 'w1',
+      posts: [
+        { guard: 'hugo', venue: 'square-w1' },
+        { guard: 'gale', venue: 'square-w1' },
+      ],
+      startDay: 2,
+    }));
+    expect(stableStringify(watch)).not.toContain('undefined');
+  });
+
+  it('an unbound interrogation omits leadFeatureId while a bound one carries it', () => {
+    const evidence = [
+      heard({}),
+      heard({ tick: 900, claimId: 'c3', speaker: 'otto', mode: 'answer',
+        addressedTo: 'gale', overheard: false,
+        reported: { subject: 'otto', predicate: 'stole', object: null, count: 2, severity: 4,
+          place: null, attribution: 'sten' } }),
+    ];
+    const unbound = enemyDigest(stateWith(evidence), 1, STANDARD_RULES).interrogations[0]!;
+    expect('leadFeatureId' in unbound).toBe(false);
+
+    const lead = staged({
+      id: 'lead-sten', kind: 'carrier-profile', family: 'f0', subject: 'sten', district: 'w0',
+    });
+    const state = stateWith(evidence);
+    state.sketch = [lead];
+    state.featureCounter = 1;
+    expect(enemyDigest(state, 1, STANDARD_RULES).interrogations[0]!.leadFeatureId).toBe('lead-sten');
   });
 
   it('a family-less lead keys its about by SUBJECT, and the oldest (day, id) lead wins', () => {

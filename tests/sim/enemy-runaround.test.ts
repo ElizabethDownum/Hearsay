@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { at, TICKS_PER_DAY } from '../../src/core/time';
 import { STANDARD_RULES } from '../../src/content/rules';
+import { runLogOn, type Action } from '../../src/sim/campaign';
 import { enemyDigest } from '../../src/sim/enemy/digest';
 import {
   emptyEnemyState, INTERROGATION, RUNAROUND_COOLDOWN_DAYS, RUNAROUND_WASTED_NIGHTS, WATCH,
@@ -9,6 +10,8 @@ import {
 } from '../../src/sim/enemy/state';
 import { SOMEONE } from '../../src/sim/rumors/claim';
 import type { DirectiveBrief, DirectiveMission, SpokenNetworkPayload } from '../../src/sim/directives/types';
+import { buildTownMap, buildWorld, enrollPlayer } from '../../src/sim/world';
+import { miniTown } from './helpers/minitown';
 
 /**
  * Task 12 — the runaround: a lawfully captured false lead spends the enemy's own attention, and
@@ -153,6 +156,37 @@ describe('runaround — two truly wasted watched nights', () => {
     expect(second.tailDrops).toBeUndefined();
   });
 
+  it('dedupe is per LEAD: two distinct leads sharing subject/district/family each emit one', () => {
+    // "If no existing runaround for that lead" — lead identity, not a (kind,subject,district,family)
+    // tuple. Two real leads can name the same person in the same district about the same story and
+    // still be two separate purchases of attention; each one the enemy wastes must be priced.
+    const leadA: SketchFeature = { ...LEAD, id: 'lead-0',
+      evidence: [{ tick: at(0, 16), observer: 'gale', claimId: null, messageId: 'n-a' }] };
+    const leadB: SketchFeature = { ...LEAD, id: 'lead-1',
+      evidence: [{ tick: at(0, 17), observer: 'gale', claimId: null, messageId: 'n-b' }] };
+    const state = runaroundState({ evidenceAfterStart: [], sketch: [leadA, leadB], ledger: [
+      watchRow(),
+      watchRow({ orderKey: 'watch:w0#2', leadFeatureId: 'lead-1', scheduleStartDay: 2, workedDays: [1, 2] }),
+    ] });
+    const d = enemyDigest(state, 3, RULES);
+    expect(d.features.filter((x) => x.kind === 'runaround')).toHaveLength(2);
+    expect(d.features.filter((x) => x.kind === 'runaround').map((x) => x.evidence))
+      .toEqual([leadA.evidence, leadB.evidence]);
+    expect(d.tailDrops).toEqual([
+      { leadFeatureId: 'lead-0', subject: 'mira', district: 'w0', watchStartDay: 1, untilDay: 5 },
+      { leadFeatureId: 'lead-1', subject: 'mira', district: 'w0', watchStartDay: 2, untilDay: 5 },
+    ]);
+  });
+
+  it('…and the SAME lead never emits twice, however many extra nights it burns', () => {
+    const state = runaroundState({ evidenceAfterStart: [], ledger: [watchRow({ workedDays: [1, 2, 3, 4] })] });
+    const first = enemyDigest(state, 5, RULES);
+    expect(first.features.filter((x) => x.kind === 'runaround')).toHaveLength(1);
+    const settled: EnemyState = { ...state, sketch: [...state.sketch, ...first.features],
+      featureCounter: state.featureCounter + first.features.length };
+    expect(enemyDigest(settled, 6, RULES).features.some((x) => x.kind === 'runaround')).toBe(false);
+  });
+
   it('two guards working the SAME day spend one action night, not two', () => {
     const twoPosts: WatchPost[] = [{ guard: 'gale', venue: 'square-w0' }, { guard: 'hugo', venue: 'square-w0' }];
     const oneNight = runaroundState({ evidenceAfterStart: [],
@@ -269,6 +303,51 @@ describe('runaround — two truly wasted watched nights', () => {
     expect(enemyDigest(answered, 3, RULES).features.some((x) => x.kind === 'runaround')).toBe(false);
     expect(INTERROGATION.from).toBeLessThanOrEqual(at(0, 15, 30));
   });
+
+  // The plan gives a WATCH the broad subject-touch rule and an INTERROGATION "its exact
+  // guard/venue/about rule". HQ bought an answer about f0; the target talking about f9 at the
+  // right table at the right minute is not that answer, however much she says the word "mira".
+  const interrogationRow = (over: Partial<EnemyActionLedgerEntry> = {}): EnemyActionLedgerEntry => ({
+    orderKey: 'interrogation:mira:f:f0', kind: 'interrogation', directiveIds: ['d1'],
+    leadFeatureId: 'lead-0', subject: 'mira', about: { family: 'f0' }, district: 'w0',
+    scheduleStartDay: 1, posts: [{ guard: 'gale', venue: 'guard-post-w0' }],
+    workedDays: [], askedAt: null, ...over,
+  });
+
+  /** The interrogated subject, at the right post, in the window — talking about an unrelated story. */
+  const unrelatedAtTheTable = (day: number): EvidenceEntry => ({
+    tick: day * TICKS_PER_DAY + INTERROGATION.from + 45, venue: 'guard-post-w0', observer: 'gale',
+    overheard: false, speaker: 'mira', addressedTo: 'gale', kind: 'utterance', mode: 'answer',
+    claimId: `c-f9-${day}`, family: 'f9',
+    reported: { subject: 'rosa', predicate: 'stole', object: null, count: 2, severity: 4,
+      place: null, attribution: SOMEONE },
+    about: null,
+  });
+
+  it('an interrogation night needs its EXACT about — an unrelated story from the target is no answer', () => {
+    const state = runaroundState({
+      evidenceAfterStart: [unrelatedAtTheTable(1), unrelatedAtTheTable(2)],
+      ledger: [
+        interrogationRow({ orderKey: 'interrogation:a', askedAt: at(1, 15, 30) }),
+        interrogationRow({ orderKey: 'interrogation:b', askedAt: at(2, 15, 30) }),
+      ],
+    });
+    const d = enemyDigest(state, 3, RULES);
+    expect(d.features.some((x) => x.kind === 'runaround')).toBe(true);
+    expect(d.tailDrops).toEqual([{
+      leadFeatureId: 'lead-0', subject: 'mira', district: 'w0', watchStartDay: 1, untilDay: 5,
+    }]);
+  });
+
+  it('…while a WATCH keeps the broad rule verbatim: the same unrelated mention still counts', () => {
+    // One rule per order kind, and the difference is observable on identical evidence: the watch's
+    // subject-touch arm fires on the very entry the interrogation's about-rule rejects.
+    const watched = runaroundState({
+      evidenceAfterStart: [{ ...unrelatedAtTheTable(2), venue: 'square-w0',
+        tick: 2 * TICKS_PER_DAY + WATCH.from + 45 }],
+    });
+    expect(enemyDigest(watched, 3, RULES).features.some((x) => x.kind === 'runaround')).toBe(false);
+  });
 });
 
 describe('runaround cooldown — a burnt subject leaves the fresh-lead pool for exactly two days', () => {
@@ -312,13 +391,15 @@ describe('runaround cooldown — a burnt subject leaves the fresh-lead pool for 
 
   it('a runaround inside the cooldown keeps that subject out of the new watch lead', () => {
     const d = enemyDigest(watchableState(4), 4, RULES);
-    const w0 = d.watches.find((w) => w.district === 'w0');
-    expect(w0).toMatchObject({ subject: null, about: null, leadFeatureId: null });
+    const w0 = d.watches.find((w) => w.district === 'w0')!;
+    expect('subject' in w0).toBe(false);
+    expect('about' in w0).toBe(false);
+    expect('leadFeatureId' in w0).toBe(false);
   });
 
   it('the cooldown expires exactly at runaround.day + RUNAROUND_COOLDOWN_DAYS', () => {
     const lastBlocked = enemyDigest(watchableState(4), 4 + RUNAROUND_COOLDOWN_DAYS - 1, RULES);
-    expect(lastBlocked.watches.find((w) => w.district === 'w0')).toMatchObject({ subject: null });
+    expect('subject' in lastBlocked.watches.find((w) => w.district === 'w0')!).toBe(false);
 
     const released = enemyDigest(watchableState(4), 4 + RUNAROUND_COOLDOWN_DAYS, RULES);
     expect(released.watches.find((w) => w.district === 'w0')).toMatchObject({ subject: 'mira' });
@@ -431,12 +512,51 @@ describe('the lawful brief lead — decoy-subject precedence, one rule, evaluate
   });
 
   it('a relay hop that retargeted the brief in transit retargets the lead — channel physics', () => {
-    // The authored brief named SOMEONE; an attributor pinned it on otto BEFORE capture. The lead
-    // binds the RECEIVED subject, because the received copy is the only one the enemy ever heard.
-    const authored = leadOf([capturedBrief(shape(SOMEONE, { kind: 'venue', id: 'square-w1' }, 'redirect'))]);
-    expect(authored).toEqual([expect.objectContaining({ kind: 'district-activity', district: 'w1' })]);
-    const mutated = leadOf([capturedBrief(shape('otto', { kind: 'venue', id: 'square-w1' }, 'redirect'))]);
-    expect(mutated).toEqual([expect.objectContaining({ kind: 'carrier-profile', subject: 'otto' })]);
+    // The authored brief names SOMEONE. At tick 0 the player physically hands it to cyn; at tick 15
+    // cyn's registered attributor trait projects the carried version before speaking it to ada. Ada
+    // is the embodied spymaster and captures only that RECEIVED version.
+    const fixture = miniTown();
+    fixture.npcs = fixture.npcs.map((npc) => npc.id === 'ada'
+      ? { ...npc, schedule: [
+          { days: 'all' as const, from: 0, to: 14, venue: 'backroom' },
+          { days: 'all' as const, from: 15, to: 1439, venue: 'square' },
+        ] }
+      : npc);
+    const world = buildWorld(fixture, 'runaround-real-attributor', RULES);
+    world.enemy.map = buildTownMap(fixture);
+    world.network.spymaster = 'ada';
+    world.enemy.observers = [];
+    enrollPlayer(world, { home: 'square' });
+    world.network.assets.push(
+      { id: 'ada', mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [] },
+      { id: 'cyn', mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [] },
+    );
+    const action: Action = {
+      tick: 0, kind: 'directive', recipient: 'ada',
+      handoff: { outboundVia: ['cyn'], reportVia: [] },
+      brief: briefWith(shape(SOMEONE, { kind: 'venue', id: 'square' }, 'redirect')),
+    };
+    runLogOn(world, RULES, [action], 16);
+
+    const message = world.network.directiveState!.messages.find((row) => row.payload.kind === 'directive')!;
+    expect(message).toMatchObject({
+      route: ['cyn', 'ada'], processedRelayHops: [1], deliveredAt: 15,
+    });
+    expect(message.payload.kind === 'directive'
+      && message.payload.version.brief.mission.kind === 'shape'
+      ? message.payload.version.brief.mission.payload.claim.subject : null).toBe('dov');
+    const received = world.enemy.evidence.find((entry): entry is Extract<EvidenceEntry, { kind: 'network' }> =>
+      entry.kind === 'network' && entry.network.messageId === message.id)!;
+    expect(received.network.spoken.kind === 'directive'
+      && received.network.spoken.brief.mission.kind === 'shape'
+      ? received.network.spoken.brief.mission.payload.claim.subject : null).toBe('dov');
+
+    const lead = enemyDigest(world.enemy, 1, RULES).features.find((feature) =>
+      feature.kind === 'carrier-profile');
+    expect(lead).toMatchObject({ subject: 'dov', district: 'd0' });
+    expect(lead!.evidence).toEqual([{
+      tick: 15, observer: 'ada', claimId: null, messageId: message.id,
+    }]);
   });
 
   it('a lawfully received player handler-brief seeds a lead; the enemy\'s own order never does', () => {
@@ -457,16 +577,31 @@ describe('the lawful brief lead — decoy-subject precedence, one rule, evaluate
     expect(leadOf([own], { issuedDirectiveIds: ['e9'] })).toEqual([]);
   });
 
-  it('an own order can never corroborate a productive night either', () => {
-    const ownAtPost: EvidenceEntry = {
-      ...capturedBrief({ kind: 'learn', target: { kind: 'person', id: 'mira' } }, 'directive',
-        { sourceDirectiveId: 'e9', directiveId: 'e9' }),
+  it('an own directive OR directive-report can never corroborate a productive night', () => {
+    const ownAtPost: Extract<EvidenceEntry, { kind: 'network' }> = {
+      ...(capturedBrief({ kind: 'learn', target: { kind: 'person', id: 'mira' } }, 'directive',
+        { sourceDirectiveId: 'e9', directiveId: 'e9' }) as Extract<EvidenceEntry, { kind: 'network' }>),
       tick: 2 * TICKS_PER_DAY + WATCH.from + 15, venue: 'square-w0', observer: 'gale',
       speaker: 'mira', addressedTo: 'gale',
     };
-    const state = runaroundState({ evidenceAfterStart: [ownAtPost] });
-    state.issuedDirectiveIds = ['e9'];
-    expect(enemyDigest(state, 3, RULES).features.some((x) => x.kind === 'runaround')).toBe(true);
+    const reportAtPost: Extract<EvidenceEntry, { kind: 'network' }> = {
+      ...ownAtPost,
+      network: {
+        messageId: 'n-own-report', sourceDirectiveId: null,
+        spoken: {
+          kind: 'directive-report', directiveId: 'e9',
+          report: {
+            outcome: 'worked', reason: null, evidence: null, source: 'mira', uncertainty: null,
+          },
+          enemyAction: null, factRefs: [], onwardTo: null,
+        },
+      },
+    };
+    for (const entry of [ownAtPost, reportAtPost]) {
+      const state = runaroundState({ evidenceAfterStart: [entry] });
+      state.issuedDirectiveIds = ['e9'];
+      expect(enemyDigest(state, 3, RULES).features.some((x) => x.kind === 'runaround')).toBe(true);
+    }
 
     const foreign = { ...ownAtPost };
     const notOwn = runaroundState({ evidenceAfterStart: [foreign] });
@@ -498,13 +633,81 @@ describe('the lawful brief lead — decoy-subject precedence, one rule, evaluate
   });
 
   it('a field report contributes its CONTAINED original message id, never the envelope id', () => {
-    // This is exactly what `ingestObservedFieldReport` writes: one network entry per contained item,
-    // carrying the inner message id.
-    const contained = capturedBrief({ kind: 'learn', target: { kind: 'person', id: 'mira' } },
-      'handler-brief', { messageId: 'n-inner', sourceDirectiveId: 'p1' });
-    const lead = leadOf([contained]);
-    expect(lead).toEqual([expect.objectContaining({ subject: 'mira' })]);
-    expect(lead[0]!.evidence).toEqual([{ tick: at(0, 16), observer: 'gale', claimId: null, messageId: 'n-inner' }]);
+    // Ada hears the original network speech at square while the spymaster is across town. The real
+    // capture path holds it; Ada then physically carries a field report to cyn at the next beat.
+    const fixture = miniTown();
+    fixture.npcs = fixture.npcs.map((npc) => {
+      if (npc.id === 'ada') return {
+        ...npc,
+        // This fixture exercises field-report provenance, so use Ada's literal pass-through channel
+        // instead of her skeptic gate, which lawfully withholds a one-source report.
+        traits: npc.traits.filter((trait) => trait !== 'skeptic'),
+        schedule: [
+          { days: 'all' as const, from: 0, to: 14, venue: 'square' },
+          { days: 'all' as const, from: 15, to: 1439, venue: 'backroom' },
+        ],
+      };
+      if (npc.id === 'cyn') return { ...npc, schedule: [
+        { days: 'all' as const, from: 0, to: 1439, venue: 'backroom' },
+      ] };
+      return npc;
+    });
+    const world = buildWorld(fixture, 'runaround-contained-provenance', RULES);
+    world.enemy.map = buildTownMap(fixture);
+    world.network.spymaster = 'cyn';
+    world.enemy.observers = [{ id: 'ada', vigilance: 1 }];
+    enrollPlayer(world, { home: 'square' });
+    world.network.assets.push({
+      id: 'bez', mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [],
+    });
+    const action: Action = {
+      tick: 0, kind: 'directive', recipient: 'bez',
+      handoff: { outboundVia: [], reportVia: [] },
+      brief: briefWith({ kind: 'learn', target: { kind: 'person', id: 'dov' } }),
+    };
+    runLogOn(world, RULES, [action], 16);
+
+    const original = world.network.directiveState!.messages.find((row) =>
+      row.payload.kind === 'directive')!;
+    const envelope = world.network.directiveState!.messages.find((row) =>
+      row.payload.kind === 'field-report')!;
+    expect(envelope).toMatchObject({ origin: 'ada', deliveredAt: 15 });
+    const heldOriginal = world.network.directiveState!.heldObservations.find((row) =>
+      row.content.kind === 'raw' && row.content.observation.kind === 'network-speech'
+      && row.content.observation.messageId === original.id);
+    expect(heldOriginal).toMatchObject({
+      observer: 'ada', queuedIn: envelope.id, deliveredAt: 15,
+    });
+    const receivedEnvelope = world.enemy.evidence.find((entry): entry is Extract<
+      EvidenceEntry, { kind: 'network' }
+    > => entry.kind === 'network' && entry.network.messageId === envelope.id);
+    expect(receivedEnvelope?.network.spoken).toMatchObject({
+      kind: 'field-report',
+      // The pass-through reporter lawfully returns everything it heard (the original directive
+      // AND the recipient's overheard spoken response) — the claim is containment, not count.
+      items: expect.arrayContaining([expect.objectContaining({
+        observation: expect.objectContaining({
+          kind: 'network-speech', messageId: original.id,
+        }),
+      })]),
+    });
+
+    const contained = world.enemy.evidence.find((entry) =>
+      entry.kind === 'network' && entry.network.messageId === original.id)!;
+    expect(contained).toMatchObject({ tick: 0, observer: 'ada', speaker: 'you', addressedTo: 'bez' });
+    expect(contained.kind === 'network' ? contained.network.messageId : null).not.toBe(envelope.id);
+    const lead = enemyDigest(world.enemy, 1, RULES).features.find((feature) =>
+      feature.kind === 'carrier-profile' && feature.subject === 'dov')!;
+    expect(lead.evidence).toEqual([{
+      tick: 0, observer: 'ada', claimId: null, messageId: original.id,
+    }]);
+
+    // The fair-cop ref resolves against the production-recorded original speech, not the envelope.
+    const ref = lead.evidence[0]!;
+    const chronicle = world.chronicle.find((row) => row.kind === 'network-speech'
+      && row.tick === ref.tick && row.messageId === ref.messageId
+      && row.heardBy.some((heard) => heard.id === ref.observer));
+    expect(chronicle).toBeDefined();
   });
 
   it('a brief lead never duplicates an existing profile for the same subject', () => {

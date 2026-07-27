@@ -93,7 +93,14 @@ const touchesAbout = (e: EvidenceEntry, about: InquiryKeyData | null): boolean =
 /**
  * Was one spent action night PRODUCTIVE? Every clause is a fact about what the enemy's own posted
  * guard could have heard while standing there: the right day, inside the order's own window, at an
- * accepted post, not its own paperwork, and actually touching the bound subject/about.
+ * accepted post, not its own paperwork, and actually answering what the order was bought for.
+ *
+ * The last clause is the ONE place the two order kinds differ, exactly as the plan splits them. A
+ * WATCH takes the broad subject-touch rule: standing in a district hoping to hear the subject named,
+ * so speaker, addressee, any reported field, or a matching about all count. An INTERROGATION takes
+ * "its exact guard/venue/about rule": HQ compelled one specific answer, so only evidence matching
+ * the interrogation's own `about` is that answer. The target talking about an unrelated story at
+ * the right table in the right minute is precisely the wasted night the runaround exists to price.
  */
 function productiveNight(state: EnemyState, row: EnemyActionLedgerEntry, workedDay: number): boolean {
   const window = row.kind === 'watch' ? WATCH : INTERROGATION;
@@ -103,6 +110,7 @@ function productiveNight(state: EnemyState, row: EnemyActionLedgerEntry, workedD
     if (minute < window.from || minute >= window.to) return false;
     if (!row.posts.some((post) => post.guard === e.observer && post.venue === e.venue)) return false;
     if (isOwnOrder(state, e)) return false;
+    if (row.kind === 'interrogation') return touchesAbout(e, row.about);
     return touchesSubject(e, row.subject) || touchesAbout(e, row.about);
   });
 }
@@ -115,6 +123,16 @@ const spentDays = (row: EnemyActionLedgerEntry): number[] =>
 
 const byStart = (a: EnemyActionLedgerEntry, b: EnemyActionLedgerEntry): number =>
   a.scheduleStartDay - b.scheduleStartDay || byId(a.orderKey, b.orderKey);
+
+/**
+ * "One runaround per LEAD." A runaround deep-copies its lead's exact refs, so the copied trail IS
+ * the lead's identity — no new serialized field, and two genuinely distinct leads that happen to
+ * name the same person, district, and family each still get priced.
+ */
+const sameRefs = (a: readonly SketchEvidenceRef[], b: readonly SketchEvidenceRef[]): boolean =>
+  a.length === b.length && a.every((ref, i) => ref.tick === b[i]!.tick
+    && ref.observer === b[i]!.observer && ref.claimId === b[i]!.claimId
+    && ref.messageId === b[i]!.messageId);
 
 /**
  * Plan 8 Task 10 — exposure escalation tiers (P6 deferral #2). How hard the PLAYER'S OWN
@@ -340,8 +358,7 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
     // Resolve the lead from the PERSISTED sketch; missing, mismatched, or empty means no runaround.
     const lead = state.sketch.find((f) => f.id === leadId);
     if (!lead || lead.subject === null || lead.district === null || lead.evidence.length === 0) continue;
-    if (has((f) => f.kind === 'runaround' && f.subject === lead.subject
-      && f.district === lead.district && f.family === lead.family)) continue;
+    if (has((f) => f.kind === 'runaround' && sameRefs(f.evidence, lead.evidence))) continue;
     addFeature({
       kind: 'runaround', day, family: lead.family, subject: lead.subject, district: lead.district,
       detail: `runaround: ${streak} worked night(s) on ${lead.subject} in ${lead.district} produced nothing (lead ${lead.id})`,
@@ -418,10 +435,11 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
       if (venue === null || usedVenues.has(venue)) return;
       usedVenues.add(venue);
       // Task 12: an interrogation binds only a matching PERSISTED feature for its target/about.
-      // Without one its leadFeatureId is null and it can never generate a runaround.
+      // Without one the optional key is absent and it can never generate a runaround.
       const lead = leadAmong(state.sketch.filter((f) => f.subject === target && f.family === family));
-      interrogations.push({ target, guard, day: day + 1, about: { family }, venue,
-        leadFeatureId: lead?.id ?? null });
+      interrogations.push(lead === null
+        ? { target, guard, day: day + 1, about: { family }, venue }
+        : { target, guard, day: day + 1, about: { family }, venue, leadFeatureId: lead.id });
     });
   }
 
@@ -465,11 +483,12 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
       if (posts.length === 0) continue;
       // Task 12: one subject, one rule, end to end. The oldest un-burnt subject-bearing feature in
       // THIS district is what the watch is for; its subject flows unchanged into the order, the
-      // report, the ledger row, and the runaround touch test. No lead → all three fields null, and
-      // such a watch can never generate a runaround.
+      // report, the ledger row, and the runaround touch test. No lead → the optional keys are absent
+      // (lazy serialization, byte-identical to the pre-Task-12 order shape), and such a watch can
+      // never generate a runaround.
       const lead = leadAmong(allFeatures.filter((f) => f.district === district));
       watches.push(lead === null
-        ? { district, posts, startDay: day + 1, subject: null, about: null, leadFeatureId: null }
+        ? { district, posts, startDay: day + 1 }
         : {
             district, posts, startDay: day + 1, subject: lead.subject,
             about: lead.family !== null ? { family: lead.family } : { subject: lead.subject! },
