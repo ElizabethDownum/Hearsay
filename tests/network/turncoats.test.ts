@@ -46,7 +46,7 @@ function stage(seed: string): { world: WorldState; town: GeneratedTown } {
 function identifyFeature(id: EntityId, sfId = 'sf-id'): SketchFeature {
   return {
     id: sfId, kind: 'carrier-profile', day: 0, family: null, subject: id, district: 'd0',
-    detail: `hop-zero candidate: ${id}`, evidence: [{ tick: 0, observer: id, claimId: null }],
+    detail: `hop-zero candidate: ${id}`, evidence: [{ tick: 0, observer: id, claimId: null, messageId: null }],
   };
 }
 

@@ -176,3 +176,50 @@ describe('I-2 fix — a watch order is never a phantom (schedule-application lay
     expect(world.enemy.pendingOrders).toHaveLength(2);
   });
 });
+
+// ── Task 12: the bound lead is not decoration on the decision object. It has to survive the
+// schedule-application layer intact — into the ISSUED brief the guard will actually read, and from
+// there into the report that builds the ledger row the runaround rule folds over. ──
+describe('the watch lead survives issuance (schedule-application layer)', () => {
+  it('carries the digest-bound subject/about into every post\'s carried application, still landing no post', () => {
+    const observers = [{ id: 'gale', vigilance: 0.9 }, { id: 'hugo', vigilance: 0.3 }];
+    const state: EnemyState = { ...emptyEnemyState(), observers, map: buildTownMap(FIXTURE),
+      evidence: WATCH_EVIDENCE };
+    const d = enemyDigest(state, 1, RULES);
+    const watch = d.watches.find((w) => w.district === 'w0')!;
+    expect(watch.leadFeatureId).not.toBeNull();
+    expect(watch.subject).not.toBeNull();
+
+    const world = worldWith(observers, WATCH_EVIDENCE);
+    applyEnemyDecision(world, { ...d, inquiries: [], interrogations: [] });
+    const orders = world.network.directiveState!.records.filter((record) =>
+      record.correlation?.kind === 'enemy-order' && record.correlation.orderKey === 'watch:w0');
+    expect(orders).toHaveLength(watch.posts.length);
+    for (const record of orders) {
+      expect(record.authored.brief.application).toMatchObject({
+        kind: 'enemy-watch', district: 'w0', startDay: watch.startDay,
+        subject: watch.subject, about: watch.about,
+      });
+      expect((record.correlation as { leadFeatureId: string | null }).leadFeatureId)
+        .toBe(watch.leadFeatureId);
+      // Still only paperwork: the digest's decision lands no operational post by itself.
+      expect(world.scheduleOverrides[record.recipient]).toBeUndefined();
+    }
+  });
+
+  it('a lead-less watch issues a subject-less order — it can never buy a runaround', () => {
+    const observers = [{ id: 'gale', vigilance: 0.9 }, { id: 'hugo', vigilance: 0.3 }];
+    const state: EnemyState = { ...emptyEnemyState(), observers, map: buildTownMap(FIXTURE),
+      evidence: WATCH_EVIDENCE };
+    const d = enemyDigest(state, 1, RULES);
+    const stripped = { ...d, inquiries: [], interrogations: [],
+      watches: d.watches.map((w) => ({ district: w.district, posts: w.posts, startDay: w.startDay,
+        subject: null, about: null, leadFeatureId: null })) };
+    const world = worldWith(observers, WATCH_EVIDENCE);
+    applyEnemyDecision(world, stripped);
+    for (const record of world.network.directiveState!.records) {
+      expect(record.authored.brief.application).toMatchObject({ subject: null, about: null });
+      expect((record.correlation as { leadFeatureId: string | null }).leadFeatureId).toBeNull();
+    }
+  });
+});

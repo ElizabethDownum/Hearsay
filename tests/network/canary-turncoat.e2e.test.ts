@@ -33,7 +33,7 @@ const RULES = STANDARD_RULES;
 function identifyFeature(id: EntityId): SketchFeature {
   return {
     id: `sf-${id}`, kind: 'carrier-profile', day: 0, family: null, subject: id, district: 'w0',
-    detail: `hop-zero candidate: ${id}`, evidence: [{ tick: 0, observer: id, claimId: null }],
+    detail: `hop-zero candidate: ${id}`, evidence: [{ tick: 0, observer: id, claimId: null, messageId: null }],
   };
 }
 

@@ -5,7 +5,8 @@ import { reportThrough } from './reporting';
 import { enemyDigest, pressureFor } from './enemy/digest';
 import { exposureStatus } from './scenario/exposure';
 import type { Rules } from './rules';
-import type { EnemyDecision } from './enemy/state';
+import type { EnemyActionLedgerEntry, EnemyDecision, TailDrop, WatchPost } from './enemy/state';
+import { INTERROGATION as INTERROGATION_WINDOW, WATCH as WATCH_WINDOW } from './enemy/state';
 import type { WorldState } from './types';
 import { stableStringify } from './hash';
 import {
@@ -123,14 +124,11 @@ export function captureEvidence(world: WorldState, events: TickEvents, rules: Ru
   }
 }
 
-// 15-alignment (spec): interrogations 900–1020. Watches retuned to 960–1140 (P6-T8): measured
-// against evening gossip flow — the old {1080,1200} sat in a retell-cooldown lull and caught none
-// of the 480/720/960/1200 bursts (1200 exclusive), so a watch's first capture arrived a day late.
-// {960,1140} straddles the 960 cooldown-burst shoulder: +49% total public-venue utterance exposure
-// over 5 procgen seeds, winning on every seed (tests/harness/watch-window.report.test.ts). Both
-// bounds 15-aligned. INTERROGATION unchanged.
-export const INTERROGATION = { from: 900, to: 1020 } as const;
-export const WATCH = { from: 960, to: 1140 } as const;
+// The interrogation/watch minute windows moved to `src/sim/enemy/state.ts` in Task 12 (one source of
+// truth reachable from the no-omniscience side of the fence — the runaround rule inside `enemyDigest`
+// has to know which minutes a posted guard was actually standing). The values are unchanged; every
+// existing importer keeps reading them from here.
+export { INTERROGATION, WATCH } from './enemy/state';
 
 const aboutKey = (about: { family: string } | { subject: EntityId }): string =>
   'family' in about ? `f:${about.family}` : `s:${about.subject}`;
@@ -151,17 +149,23 @@ export function enemyRoute(world: WorldState, recipient: EntityId): EntityId[] {
   return relay === undefined ? [recipient] : [relay, recipient];
 }
 
+const cancelOrderKey = (district: string, guard: EntityId): string =>
+  `cancel:watch:${district}:${guard}`;
+
+type OrderInput =
+  | { kind: 'inquiry'; order: EnemyDecision['inquiries'][number] }
+  | { kind: 'interrogation'; order: EnemyDecision['interrogations'][number] }
+  | { kind: 'watch'; watch: EnemyDecision['watches'][number]; post: WatchPost }
+  | { kind: 'cancel'; drop: TailDrop; post: WatchPost };
+
 function orderBrief(
-  world: WorldState, decision: EnemyDecision,
-  input:
-    | { kind: 'inquiry'; order: EnemyDecision['inquiries'][number] }
-    | { kind: 'interrogation'; order: EnemyDecision['interrogations'][number] }
-    | { kind: 'watch'; district: string; post: EnemyDecision['watches'][number]['posts'][number]; startDay: number },
+  world: WorldState, decision: EnemyDecision, input: OrderInput,
 ): { key: string; recipient: EntityId; brief: DirectiveBrief; correlation: DirectiveCorrelation } {
   const issueTick = world.tick;
   let key: string;
   let recipient: EntityId;
   let brief: DirectiveBrief;
+  let sourceRef: string | null = null;
   if (input.kind === 'inquiry') {
     const { order } = input;
     key = inquiryOrderKey(order.about); recipient = order.asker;
@@ -181,36 +185,78 @@ function orderBrief(
       mission: { kind: 'learn', target: { kind: 'person', id: order.target } },
       priority: 'urgent', authority: 'compel', discretion: 'quiet', specificity: 'detailed',
       guidance: [{ kind: 'expected-presence', person: order.target, venue: order.venue,
-        at: order.day * TICKS_PER_DAY + INTERROGATION.from }],
-      active: { from: order.day * TICKS_PER_DAY + INTERROGATION.from,
-        until: order.day * TICKS_PER_DAY + INTERROGATION.to - 1 },
+        at: order.day * TICKS_PER_DAY + INTERROGATION_WINDOW.from }],
+      active: { from: order.day * TICKS_PER_DAY + INTERROGATION_WINDOW.from,
+        until: order.day * TICKS_PER_DAY + INTERROGATION_WINDOW.to - 1 },
       report: 'outcome', reportBy: null, purpose: null,
       application: { kind: 'enemy-interrogation', target: order.target,
         about: { ...order.about }, venue: order.venue, day: order.day },
     };
-  } else {
-    key = watchOrderKey(input.district); recipient = input.post.guard;
+  } else if (input.kind === 'watch') {
+    const { watch, post } = input;
+    key = watchOrderKey(watch.district); recipient = post.guard;
     brief = {
-      mission: { kind: 'learn', target: { kind: 'venue', id: input.post.venue } },
+      mission: { kind: 'learn', target: { kind: 'venue', id: post.venue } },
       priority: 'important', authority: 'office', discretion: 'quiet', specificity: 'detailed',
-      guidance: [{ kind: 'expected-presence', person: input.post.guard, venue: input.post.venue,
-        at: input.startDay * TICKS_PER_DAY + WATCH.from }],
-      active: { from: input.startDay * TICKS_PER_DAY + WATCH.from,
-        until: (input.startDay + 7) * TICKS_PER_DAY + WATCH.to - 1 },
+      guidance: [{ kind: 'expected-presence', person: post.guard, venue: post.venue,
+        at: watch.startDay * TICKS_PER_DAY + WATCH_WINDOW.from }],
+      active: { from: watch.startDay * TICKS_PER_DAY + WATCH_WINDOW.from,
+        until: (watch.startDay + 7) * TICKS_PER_DAY + WATCH_WINDOW.to - 1 },
       report: 'outcome', reportBy: null, purpose: null,
-      application: { kind: 'enemy-watch', district: input.district, post: { ...input.post },
-        startDay: input.startDay, subject: null, about: null },
+      // Task 12: the bound lead's subject/about ride the ORDER, so the returned report, the ledger
+      // row, and the runaround touch rule all read one subject that one digest rule chose.
+      application: { kind: 'enemy-watch', district: watch.district, post: { ...post },
+        startDay: watch.startDay, subject: watch.subject ?? null,
+        about: watch.about === undefined || watch.about === null ? null : { ...watch.about } },
+    };
+  } else {
+    // Task 12: stand a tail down. The carried `cancel-watch` application (not the mission) selects
+    // the stand-down behaviour at attempt, via Task 9's total application switch.
+    const { drop, post } = input;
+    key = cancelOrderKey(drop.district, post.guard); recipient = post.guard;
+    sourceRef = `order:watch:${drop.district}:${post.guard}`;
+    brief = {
+      mission: { kind: 'learn', target: { kind: 'venue', id: post.venue } },
+      priority: 'urgent', authority: 'office', discretion: 'quiet', specificity: 'detailed',
+      guidance: [],
+      active: { from: strictNextBeat(issueTick), until: (decision.day + 7) * TICKS_PER_DAY - 1 },
+      report: 'outcome', reportBy: null, purpose: null,
+      application: { kind: 'cancel-watch', district: drop.district, guard: post.guard,
+        venue: post.venue, startDay: drop.watchStartDay },
     };
   }
-  const leadFeatureId = decision.features.find((feature) => {
-    if (input.kind === 'watch') return feature.district === input.district;
-    const about = input.order.about;
-    return 'family' in about ? feature.family === about.family : feature.subject === about.subject;
-  })?.id ?? null;
+  const leadFeatureId = input.kind === 'watch' ? input.watch.leadFeatureId ?? null
+    : input.kind === 'interrogation' ? input.order.leadFeatureId ?? null
+      : input.kind === 'cancel' ? input.drop.leadFeatureId
+        : decision.features.find((feature) => {
+          const about = input.order.about;
+          return 'family' in about ? feature.family === about.family
+            : feature.subject === about.subject;
+        })?.id ?? null;
   return { key, recipient, brief, correlation: {
     kind: 'enemy-order', orderKey: key, leadFeatureId,
-    sourceRef: `order:${key}:${recipient}`,
+    sourceRef: sourceRef ?? `order:${key}:${recipient}`,
   } };
+}
+
+/**
+ * Tail drops travel; they never teleport. HQ can only stand down posts it KNOWS about, so this reads
+ * the enemy's OWN `actionLedger` row for `watch:<district>` at that schedule start day — and the
+ * runaround guarantees the row exists, because the two wasted nights arrived as reports. One
+ * cancellation per REMAINING ledger post, each an ordinary physical order to that exact guard.
+ */
+function cancelSpecs(
+  world: WorldState, decision: EnemyDecision,
+): ReturnType<typeof orderBrief>[] {
+  const ledger: EnemyActionLedgerEntry[] = world.enemy.actionLedger ?? [];
+  return (decision.tailDrops ?? []).flatMap((drop) => {
+    const row = ledger.find((candidate) => candidate.orderKey === watchOrderKey(drop.district)
+      && candidate.scheduleStartDay === drop.watchStartDay);
+    if (!row) return [];
+    return [...row.posts]
+      .sort((a, b) => a.guard.localeCompare(b.guard) || a.venue.localeCompare(b.venue))
+      .map((post) => orderBrief(world, decision, { kind: 'cancel', drop, post }));
+  });
 }
 
 /** Record the digest and issue embodied orders; no remote operation is applied here. */
@@ -227,7 +273,8 @@ export function applyEnemyDecision(world: WorldState, decision: EnemyDecision): 
     ...decision.inquiries.map((order) => orderBrief(world, decision, { kind: 'inquiry', order })),
     ...decision.interrogations.map((order) => orderBrief(world, decision, { kind: 'interrogation', order })),
     ...decision.watches.flatMap((watch) => watch.posts.map((post) =>
-      orderBrief(world, decision, { kind: 'watch', district: watch.district, post, startDay: watch.startDay }))),
+      orderBrief(world, decision, { kind: 'watch', watch, post }))),
+    ...cancelSpecs(world, decision),
   ];
   const grouped = new Map<string, typeof specs>();
   for (const spec of specs) (grouped.get(spec.key) ?? grouped.set(spec.key, []).get(spec.key)!).push(spec);

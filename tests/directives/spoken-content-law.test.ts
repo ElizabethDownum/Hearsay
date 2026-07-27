@@ -125,7 +125,7 @@ describe('spoken content is the complete carried knowledge', () => {
     const value = world();
     value.enemy.sketch.push({
       id: 'sf-law', kind: 'carrier-profile', day: 0, family: null, subject: 'cyn',
-      district: 'd0', detail: 'new hidden wording', evidence: [{ tick: 0, observer: 'ada', claimId: null }],
+      district: 'd0', detail: 'new hidden wording', evidence: [{ tick: 0, observer: 'ada', claimId: null, messageId: null }],
     });
     const id = queueNetworkMessage(value, 'player', 'ada', ['bez', 'cyn'], {
       kind: 'sketch-tip', principal: 'enemy', asset: 'ada', featureId: 'sf-law',

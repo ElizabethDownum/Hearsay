@@ -174,7 +174,7 @@ function stagedWorld(scoreN: number): WorldState {
     const feature: SketchFeature = {
       id: `sf-score-${world.enemy.featureCounter}`, kind: 'carrier-profile', day: 0, family: null,
       subject: id, district: null, detail: 'staged for pressure test — score only, no district',
-      evidence: [{ tick: 0, observer: 'gale', claimId: null }],
+      evidence: [{ tick: 0, observer: 'gale', claimId: null, messageId: null }],
     };
     applyEnemyDecision(world, { day: 0, features: [feature], inquiries: [], watches: [], interrogations: [] });
   }

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { emptyEnemyState, type EnemyState, type EvidenceEntry, type TownMap } from '../../src/sim/enemy/state';
+import {
+  emptyEnemyState, type EnemyState, type EvidenceEntry, type SketchFeature, type TownMap,
+} from '../../src/sim/enemy/state';
 import { enemyDigest } from '../../src/sim/enemy/digest';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { SOMEONE } from '../../src/sim/rumors/claim';
@@ -112,5 +114,56 @@ describe('purity and determinism', () => {
     const b = enemyDigest(state, 0, STANDARD_RULES);
     expect(stableStringify(state)).toBe(before);
     expect(stableStringify(a)).toBe(stableStringify(b));
+  });
+
+  // Task 12 serialization law: `tailDrops` is OMITTED entirely when empty, so a decision without a
+  // runaround serializes exactly as it did before the key existed.
+  it('a decision with no runaround omits tailDrops entirely — not an empty array', () => {
+    const state = stateWith([
+      heard({}), heard({ tick: 600, claimId: 'c2', speaker: 'sten' }),
+      heard({ tick: 900, claimId: 'c3', speaker: 'mira', mode: 'answer', addressedTo: 'gale', overheard: false }),
+    ]);
+    const d = enemyDigest(state, 1, STANDARD_RULES);
+    expect('tailDrops' in d).toBe(false);
+    expect(stableStringify(d)).not.toContain('tailDrops');
+    // …and the watch it DID decide carries its bound lead, one subject end to end. The oldest
+    // subject-bearing w0 feature is the origin-vague on mira, and its family keys the about.
+    expect(d.watches[0]).toMatchObject({
+      district: 'w0', subject: 'mira', about: { family: 'f0' },
+    });
+    expect(d.watches[0]!.leadFeatureId)
+      .toBe(d.features.find((f) => f.kind === 'origin-vague')!.id);
+  });
+
+  /** The same watch geometry with a staged w1 lead pool, so the binding rule is observable alone. */
+  function w1WatchWith(sketch: SketchFeature[]) {
+    const state: EnemyState = {
+      ...stateWith([
+        heard({}), heard({ tick: 600, claimId: 'c2', speaker: 'sten' }),
+        heard({ tick: 900, claimId: 'c3', speaker: 'mira', mode: 'answer', addressedTo: 'gale', overheard: false }),
+      ]),
+      watchedDistricts: ['w0'],
+      sketch, featureCounter: sketch.length,
+    };
+    return enemyDigest(state, 1, STANDARD_RULES).watches.find((w) => w.district === 'w1');
+  }
+
+  const staged = (over: Partial<SketchFeature>): SketchFeature => ({
+    id: 'x0', kind: 'district-activity', day: 0, family: 'fx', subject: null, district: 'w1',
+    detail: 'staged', evidence: [{ tick: 0, observer: 'hugo', claimId: 'cx', messageId: null }],
+    ...over,
+  });
+
+  it('a watch with no eligible subject-bearing feature in its district keeps all three keys null', () => {
+    expect(w1WatchWith([staged({ id: 'x0' }), staged({ id: 'x1', kind: 'entry-point' })]))
+      .toMatchObject({ subject: null, about: null, leadFeatureId: null });
+  });
+
+  it('a family-less lead keys its about by SUBJECT, and the oldest (day, id) lead wins', () => {
+    expect(w1WatchWith([
+      staged({ id: 'x0' }),
+      staged({ id: 'x2', kind: 'carrier-profile', day: 1, family: null, subject: 'quill' }),
+      staged({ id: 'x1', kind: 'carrier-profile', day: 0, family: null, subject: 'rosa' }),
+    ])).toMatchObject({ subject: 'rosa', about: { subject: 'rosa' }, leadFeatureId: 'x1' });
   });
 });

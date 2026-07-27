@@ -217,7 +217,7 @@ describe('generic turncoat content waits for a real handler', () => {
     world.enemy.sketch.push({
       id: 'sf-walk', kind: 'carrier-profile', day: 1, family: null, subject: 'otto',
       district: 'w0', detail: 'Otto carries the watched story',
-      evidence: [{ tick: 0, observer: 'hugo', claimId: null }],
+      evidence: [{ tick: 0, observer: 'hugo', claimId: null, messageId: null }],
     });
     const hints0 = world.intel.log.filter((row) => row.kind === 'hint').length;
     world.tick = at(6, 23, 59);

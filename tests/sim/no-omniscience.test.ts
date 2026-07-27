@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { runUntil, step } from '../../src/sim/step';
 import { applyInject } from '../../src/sim/actions';
@@ -24,8 +26,43 @@ import type { SketchFeature } from '../../src/sim/enemy/state';
  *      belief state it never sampled cannot move its decision (THIS test, prong 1).
  *   3. the import lint — the digest module cannot even name WorldState (Task 1,
  *      determinism-law.test: "the enemy never imports WorldState").
+ *   3b. the source scan below (Task 12 acceptance): the digest's import list is pinned to an exact
+ *      allow-list, so directive, world, and player modules cannot enter even indirectly through a
+ *      new specifier the ESLint pattern list happens not to name.
  * Together they close omniscience without ever asserting a butterfly away.
  */
+
+/** Every distinct `from '...'` specifier in a module, with comments stripped first. */
+export function importSpecifiers(source: string): string[] {
+  const stripped = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  return [...new Set([...stripped.matchAll(/\bfrom\s*['"]([^'"]+)['"]/g)].map((m) => m[1]!))].sort();
+}
+
+describe('no omniscience — the digest imports nothing that could see the world', () => {
+  // The plan's acceptance is a structural scan; an exact allow-list is the strongest form of it,
+  // because it fails CLOSED on any new specifier rather than only on a blacklisted one.
+  const ALLOWED = ['../../core/time', '../rules', '../rumors/claim', './state'];
+
+  it('src/sim/enemy/digest.ts imports exactly the pure-fold allow-list', () => {
+    const source = readFileSync(join(process.cwd(), 'src/sim/enemy/digest.ts'), 'utf8');
+    expect(importSpecifiers(source)).toEqual(ALLOWED);
+  });
+
+  it('the scan FIRES on a directive/world/player import and is not fooled by a comment', () => {
+    const clean = readFileSync(join(process.cwd(), 'src/sim/enemy/digest.ts'), 'utf8');
+    for (const violation of [
+      "import { applicationOf } from '../directives/types';",
+      "import type { WorldState } from '../types';",
+      "import { applyRecruit } from '../actions';",
+      "import { exposureStatus } from '../scenario/exposure';",
+    ]) {
+      expect(importSpecifiers(`${violation}\n${clean}`), violation).not.toEqual(ALLOWED);
+    }
+    // …and a commented-out import is prose, not a crossing.
+    expect(importSpecifiers(`// import x from '../types';\n${clean}`)).toEqual(ALLOWED);
+    expect(importSpecifiers(`/* import x from '../types'; */\n${clean}`)).toEqual(ALLOWED);
+  });
+});
 describe('no omniscience — the digest is bounded to what was observed', () => {
   it('perturbing beliefs the enemy never sampled leaves its decision bit-identical', () => {
     const world = watchfordWorld('omni-1');
@@ -82,7 +119,7 @@ describe('the mirror — the enemy mind leaks nothing until a countermeasure LAN
     const feature: SketchFeature = {
       id: 'sf-test-mirror', kind: 'district-activity', day: 0, family: 'f0', subject: null,
       district: 'w1', detail: 'test-injected feature — never lands as a world fact',
-      evidence: [{ tick: 500, observer: 'hugo', claimId: 'c0' }],
+      evidence: [{ tick: 500, observer: 'hugo', claimId: 'c0', messageId: null }],
     };
     marked.enemy.sketch.push(feature);
 

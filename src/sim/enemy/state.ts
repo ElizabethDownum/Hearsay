@@ -1,8 +1,29 @@
 import type { Tick } from '../../core/time';
 import type { ClaimId, EntityId, PredicateId, RumorId, VenueId } from '../rumors/claim';
 import { SOMEONE } from '../rumors/claim';
-import type { DirectiveId, SpokenNetworkPayload } from '../directives/types';
+import type { DirectiveId, MessageId, SpokenNetworkPayload } from '../directives/types';
 import type { CompartmentFact } from '../network/types';
+
+// 15-alignment (spec): interrogations 900–1020. Watches retuned to 960–1140 (P6-T8): measured
+// against evening gossip flow — the old {1080,1200} sat in a retell-cooldown lull and caught none
+// of the 480/720/960/1200 bursts (1200 exclusive), so a watch's first capture arrived a day late.
+// {960,1140} straddles the 960 cooldown-burst shoulder: +49% total public-venue utterance exposure
+// over 5 procgen seeds, winning on every seed (tests/harness/watch-window.report.test.ts). Both
+// bounds 15-aligned. INTERROGATION unchanged.
+//
+// These live HERE (not in the world-side `counterintel` module that re-exports them) because Task
+// 12's runaround rule — a pure fold inside `enemyDigest` — has to know which minutes of a worked
+// day its own posted guard was actually standing the post. One source of truth, reachable from the
+// no-omniscience side of the fence: `src/sim/counterintel.ts` re-exports both names unchanged.
+export const INTERROGATION = { from: 900, to: 1020 } as const;
+export const WATCH = { from: 960, to: 1140 } as const;
+
+/**
+ * Task 12 v1 implementation pins (constraints: "Two completed unproductive action nights and a
+ * two-day tail cooldown are explicit v1 implementation pins, retunable only in Plan 10").
+ */
+export const RUNAROUND_WASTED_NIGHTS = 2;
+export const RUNAROUND_COOLDOWN_DAYS = 2;
 
 /** An enemy asset: an NPC id + how sharp their sampling is (0..1]. */
 export interface ObserverSpec { id: EntityId; vigilance: number }
@@ -56,23 +77,60 @@ export type EvidenceEntry =
       leaked?: { from: EntityId; fact: CompartmentFact };
     });
 
+/**
+ * One fair-cop pointer at something an observer actually heard. A CLAIM ref resolves by
+ * `(tick, observer, claimId)`; a NETWORK ref resolves by `(tick, observer, messageId)` against a
+ * `network-speech` chronicle row with that id/tick whose `heardBy` names the observer. Exactly one
+ * of the two id fields is non-null for any ref the digest mints.
+ */
+export interface SketchEvidenceRef {
+  tick: Tick;
+  observer: EntityId;
+  claimId: ClaimId | null;
+  messageId: MessageId | null;
+}
+
 export interface SketchFeature {
   id: string;
-  kind: 'district-activity' | 'entry-point' | 'origin-vague' | 'carrier-profile';
+  kind: 'district-activity' | 'entry-point' | 'origin-vague' | 'carrier-profile' | 'runaround';
   day: number;
   family: RumorId | null;
   subject: EntityId | null;
   district: string | null;
   detail: string;
   /** Fair-cop law: never empty; each ref resolves to a chronicle entry the observer heard. */
-  evidence: { tick: Tick; observer: EntityId; claimId: ClaimId | null }[];
+  evidence: SketchEvidenceRef[];
 }
 
 export interface InquiryOrder { asker: EntityId; about: InquiryKeyData; expiresDay: number }
 /** A guard posted to a specific venue for a district watch. */
 export interface WatchPost { guard: EntityId; venue: VenueId }
-export interface WatchOrder { district: string; posts: WatchPost[]; startDay: number }
-export interface InterrogationOrder { target: EntityId; guard: EntityId; day: number; about: InquiryKeyData; venue: VenueId }
+export interface WatchOrder {
+  district: string;
+  posts: WatchPost[];
+  startDay: number;
+  /** The bound lead's subject — the one person this watch is actually about (Task 12). */
+  subject?: EntityId | null;
+  about?: InquiryKeyData | null;
+  leadFeatureId?: string | null;
+}
+export interface InterrogationOrder {
+  target: EntityId; guard: EntityId; day: number; about: InquiryKeyData; venue: VenueId;
+  leadFeatureId?: string | null;
+}
+
+/**
+ * HQ's decision to stand a tail down: the lead it was bought for, the district/day of the ledger
+ * row it believes staffed it, and the day the cooldown on that subject lapses. Travelling the
+ * cancellation to each remaining post is `applyEnemyDecision`'s job — orders never teleport.
+ */
+export interface TailDrop {
+  leadFeatureId: string;
+  subject: EntityId;
+  district: string;
+  watchStartDay: number;
+  untilDay: number;
+}
 
 export interface EnemyDecision {
   day: number;
@@ -80,6 +138,8 @@ export interface EnemyDecision {
   inquiries: InquiryOrder[];
   watches: WatchOrder[];
   interrogations: InterrogationOrder[];
+  /** Omitted entirely when empty, so a decision without runaround keeps pre-Task-12 bytes. */
+  tailDrops?: TailDrop[];
 }
 
 export interface PendingEnemyOrder {

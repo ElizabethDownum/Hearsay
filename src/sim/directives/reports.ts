@@ -168,7 +168,15 @@ export function settleEnemyOrderReport(
     }
     return;
   }
-  const row = world.enemy.actionLedger?.find((candidate) => candidate.orderKey === correlation.orderKey);
+  // A `watch-cancelled` receipt settles the WATCH row it stood down, whose orderKey is
+  // `watch:<district>` — never the cancellation's own `cancel:watch:<district>:<guard>` key. The
+  // shipped by-orderKey lookup is tried first (unchanged for any row that does match), then the
+  // spoken action's own district/startDay resolves the row it names. Removal semantics below are
+  // Task 9's, byte for byte.
+  const row = world.enemy.actionLedger?.find((candidate) => candidate.orderKey === correlation.orderKey)
+    ?? world.enemy.actionLedger?.find((candidate) => candidate.kind === 'watch'
+      && candidate.orderKey === `watch:${action.district}`
+      && candidate.scheduleStartDay === action.scheduleStartDay);
   if (row) {
     row.posts = row.posts.filter((post) => !(post.guard === action.guard && post.venue === action.venue));
     if (row.posts.length === 0 && !world.enemy.actionLedger?.some((candidate) =>

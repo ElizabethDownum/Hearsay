@@ -10,6 +10,10 @@ import { STANDARD_RULES } from '../../src/content/rules';
 import { SOMEONE } from '../../src/sim/rumors/claim';
 import { at } from '../../src/core/time';
 import type { ScenarioDef } from '../../src/sim/scenario/types';
+import { runLogOn } from '../../src/sim/campaign';
+import { assetFor } from '../../src/sim/network/roster';
+import { stableStringify } from '../../src/sim/hash';
+import { pin, recruitWorld, trust } from '../network/helpers/recruit-town';
 import type { EnemyDecision, SketchFeature } from '../../src/sim/enemy/state';
 import type { GeneratedTown } from '../../src/world/types';
 import type { InstitutionRecord, WorldState } from '../../src/sim/types';
@@ -57,7 +61,7 @@ function stage(world: WorldState, overrides: Partial<SketchFeature>): void {
   const feature: SketchFeature = {
     id: `sf-stage-${world.enemy.featureCounter}`, kind: 'carrier-profile', day: 0, family: 'f0',
     subject: null, district: null, detail: 'staged for exposure test',
-    evidence: [{ tick: world.tick, observer: 'gale', claimId: null }],
+    evidence: [{ tick: world.tick, observer: 'gale', claimId: null, messageId: null }],
     ...overrides,
   };
   const decision: EnemyDecision = { day: 0, features: [feature], inquiries: [], watches: [], interrogations: [] };
@@ -122,6 +126,41 @@ describe('exposure — the sketch-identification loss', () => {
     stage(world, { subject: 'otto' }); // the usurper: neither the avatar nor an informant
     stage(world, { subject: null });
     expect(exposureStatus(world)).toEqual({ score: 0, identified: false, features: [] });
+  });
+
+  // Task 12: a runaround feature is an ORDINARY subject-bearing feature. It needs no exposure
+  // special case — recruit the person the enemy already burnt attention on and you inherit their
+  // file through the same distinct-(kind, subject) mechanism every other feature uses.
+  it('(g) recruiting a runaround subject through the real accepted path raises exposure, sketch untouched', () => {
+    const world = recruitWorld('exp-runaround');
+    pin(world, 'square', 'you', 'cass');
+    trust(world, 'cass', 'you', 0.8);
+    const runaround: SketchFeature = {
+      id: 'sf-runaround', kind: 'runaround', day: 0, family: 'f0', subject: 'cass', district: 'd0',
+      detail: 'runaround: two watched nights on cass produced nothing',
+      evidence: [{ tick: 0, observer: 'gil', claimId: 'c0', messageId: null }],
+    };
+    applyEnemyDecision(world, { day: 0, features: [runaround], inquiries: [], watches: [], interrogations: [] });
+    expect(exposureStatus(world).score).toBe(0); // she is nobody of yours yet
+
+    const sketchBefore = stableStringify(world.enemy.sketch);
+    runLogOn(world, STANDARD_RULES, [{ tick: 0, kind: 'recruit', target: 'cass',
+      mice: 'money', leverageFamily: null }], 1);
+    expect(assetFor(world, 'player', 'cass')).not.toBeNull();
+    expect(world.intel.informants.map((row) => row.id)).toContain('cass');
+
+    expect(stableStringify(world.enemy.sketch)).toBe(sketchBefore); // the enemy learned nothing
+    expect(exposureStatus(world)).toMatchObject({ score: 1, identified: false });
+    expect(exposureStatus(world).features).toEqual([{ featureId: 'sf-runaround', subject: 'cass' }]);
+
+    // …and it is the ordinary distinct-key rule, not a runaround clause: a SECOND runaround on the
+    // same subject adds nothing, while a different kind on the same subject adds one.
+    applyEnemyDecision(world, { day: 1, features: [{ ...runaround, id: 'sf-runaround-2', day: 1 }],
+      inquiries: [], watches: [], interrogations: [] });
+    expect(exposureStatus(world).score).toBe(1);
+    applyEnemyDecision(world, { day: 1, features: [{ ...runaround, id: 'sf-carrier',
+      kind: 'carrier-profile', day: 1 }], inquiries: [], watches: [], interrogations: [] });
+    expect(exposureStatus(world).score).toBe(2);
   });
 
   it('(f) precedence pinned: staged win quorum AND identification the same night → won (ties go to the player; PROVISIONAL for Ellie’s ratification)', () => {

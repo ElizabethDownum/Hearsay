@@ -182,7 +182,7 @@ describe('the mirror — enemy sketch state cannot reach the Counter-Sketch boar
     const feature: SketchFeature = {
       id: 'sf-test-mirror', kind: 'district-activity', day: 0, family: 'f0', subject: null,
       district: 'w1', detail: 'test-injected feature — never lands as a world fact',
-      evidence: [{ tick: 500, observer: 'hugo', claimId: 'c0' }],
+      evidence: [{ tick: 500, observer: 'hugo', claimId: 'c0', messageId: null }],
     };
     markedWorld.enemy.sketch.push(feature); // counter untouched — not a landed decision
     const marked = runLogOn(markedWorld, STANDARD_RULES, actionLog, at(1, 0));

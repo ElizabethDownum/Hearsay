@@ -150,7 +150,7 @@ function damagingSpymasterBelief(spymaster: EntityId, credence: number): Belief 
 /** A carrier-profile feature whose SUBJECT is `id` — a real sketch feature a walk-in can reveal. */
 function identifyFeature(id: EntityId) {
   return { id: `sf-${id}`, kind: 'carrier-profile' as const, day: 0, family: null, subject: id,
-    district: 'd0', detail: `hop-zero candidate: ${id}`, evidence: [{ tick: 0, observer: id, claimId: null }] };
+    district: 'd0', detail: `hop-zero candidate: ${id}`, evidence: [{ tick: 0, observer: id, claimId: null, messageId: null }] };
 }
 
 const dmg = (subject: string, attribution: string): ReportedClaim =>
