@@ -4,13 +4,15 @@ import './theme.css';
 
 // ── Composition root: engine VALUE imports are legal ONLY here and in loop/** (the composition-root
 // fence). Everything below the panels boundary receives props; nothing there reaches the engine. ──
-import { newSession, type NonLocalActionIntent } from './loop/session';
+import { newSession, type LocalActionIntent, type NonLocalActionIntent } from './loop/session';
 import { makeClock } from './loop/clock';
 import { KEYMAP, VERB_TERM, type UIAction } from './input/actions';
 import { TERMS } from '../../src/content/terms';
 import { computeLayout } from './town/layout';
 import { TownCanvas } from './town/TownCanvas';
 import { playerView, networkView, courierRouteView } from '../../src/sim/fieldwork';
+import { directiveView } from '../../src/sim/directives/view';
+import { recruitmentHistoryView } from '../../src/sim/network/recruitment';
 import { boardView } from '../../src/intel/board';
 import { counterSketchView } from '../../src/intel/countersketch';
 import { corroborations } from '../../src/intel/codex';
@@ -33,6 +35,7 @@ import { DayPlanner } from './panels/DayPlanner';
 import { TermsCodex } from './panels/TermsCodex';
 import { Network } from './panels/Network';
 import { Treasury } from './panels/Treasury';
+import { Directives } from './panels/Directives';
 
 const SEED = 'cor-1';
 type PanelKind = Extract<UIAction, { kind: 'open-panel' }>['panel'];
@@ -42,6 +45,7 @@ const TABS: { key: PanelKind; term: string }[] = [
   { key: 'ledger', term: 'ledger' }, { key: 'planner', term: 'day-planner' },
   { key: 'network', term: 'network' }, { key: 'treasury', term: 'treasury' },
   { key: 'report', term: 'evening-report' }, { key: 'terms', term: 'terms-codex' },
+  { key: 'directives', term: 'directive' },
 ];
 
 /** The next rest-day (day-of-week 6) on or after `day` — when the weekly stipend next credits. */
@@ -185,6 +189,21 @@ function App() {
     if (!result.refused) setToast(`Local moment requested for ${fmtTick(result.requestedFor)} — unpause to reach it`);
     force();
   };
+  // The ONLY way a local act leaves this shell: composed against the token the session froze, so the
+  // venue/circle it was chosen in is provably the venue/circle it executes in (offer/execution
+  // identity). A refusal is the ENGINE's word, surfaced verbatim — the composer never pre-judges it.
+  const chooseLocal = (intent: LocalActionIntent) => {
+    const offer = session.localOffer();
+    if (!offer) return;
+    try {
+      const { queuedFor } = session.chooseLocal(offer.token, intent);
+      setLocalRequested(false);
+      setToast(`${TERMS[VERB_TERM[intent.kind]]!.label} chosen for ${fmtTick(queuedFor)} — unpause to play the beat`);
+    } catch (err) {
+      setToast(err instanceof Error ? err.message : String(err));
+    }
+    force();
+  };
 
   const status = world.scenario?.status;
   if (status && status !== 'running') return <EndingScreen status={status} />;
@@ -207,6 +226,9 @@ function App() {
   // The network surface (Task 11): the roster/treasury/courier folds, all through epistemic selectors.
   const net = networkView(world);
   const courierRoutes = courierRouteView(world);
+  // The directive desk + the public approach history: two more epistemic selectors, same fence.
+  const directives = directiveView(world);
+  const approaches = recruitmentHistoryView(world);
   const stipendDay = nextStipendDay(view.scenario?.day ?? dayOf(world.tick));
   const localOffer = session.localOffer();
 
@@ -271,10 +293,11 @@ function App() {
               view={view} paused={speed === 0}
               coin={world.coin} economy={STANDARD_RULES.economy} onVerb={submitVerb}
               onRequestLocal={requestLocal}
-              offeredNames={localOffer?.circleMembers.map((id) => world.npcs[id]?.name ?? id) ?? []}
+              offer={localOffer} net={net} board={board} onLocal={chooseLocal}
               localPending={localRequested || localOffer !== null} />
           )}
-          {panel === 'network' && <Network view={net} />}
+          {panel === 'network' && <Network view={net} history={approaches} />}
+          {panel === 'directives' && <Directives view={directives} />}
           {panel === 'treasury' && <Treasury coin={world.coin} stipendDay={stipendDay} economy={STANDARD_RULES.economy} />}
           {panel === 'report' && <EveningReport report={eveningReport(log, view.scenario?.day ?? dayOf(world.tick))} onOpenBoard={() => setPanel('board')} />}
           {panel === 'terms' && <TermsCodex />}

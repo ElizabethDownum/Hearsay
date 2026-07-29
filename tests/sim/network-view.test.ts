@@ -4,8 +4,9 @@ import { worldFromTown, attachPlayer } from '../../src/world/attach';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT } from '../../src/content/gen/standard';
 import {
-  networkView, courierRouteView, playerView, STRIKE_BAR_PENALTY,
+  captureIntel, networkView, courierRouteView, playerView, STRIKE_BAR_PENALTY,
 } from '../../src/sim/fieldwork';
+import { directiveView } from '../../src/sim/directives/view';
 import { recordFact, recordPlayerKnownFact } from '../../src/sim/network/compartment';
 import { blankIntel } from '../../src/sim/fieldwork';
 import { at } from '../../src/core/time';
@@ -80,6 +81,24 @@ describe('networkView — the roster surface exposes ONLY player-known bookkeepi
     inf.assignedVenue = 'safehouse';
     world.intel.requestedPosts = [{ informant: asset.id, venue: 'market', authoredAt: world.tick }];
     expect(networkView(world).assets.find((a) => a.id === asset.id)!.requestedVenue).toBe('market');
+  });
+
+  // Plan 11 Task 13 — "requested post is not operational post", made structural across the WHOLE
+  // selector family (playerView / networkView / courierRouteView / directiveView). The operational
+  // field has exactly ONE lawful reader: `captureIntel`, the perception gate that decides whose
+  // remote observations are held. No player-facing selector body may so much as name it.
+  it('no player-facing selector body names the operational `assignedVenue`', () => {
+    for (const [label, body] of [
+      ['playerView', playerView.toString()],
+      ['networkView', networkView.toString()],
+      ['courierRouteView', courierRouteView.toString()],
+      ['directiveView', directiveView.toString()],
+    ] as const) {
+      expect(body.length, `${label} body was not read`).toBeGreaterThan(0);
+      expect(body.includes('assignedVenue'), `${label} reads the operational post`).toBe(false);
+    }
+    // Non-vacuity: the scan really does catch the name where it lawfully lives.
+    expect(captureIntel.toString().includes('assignedVenue')).toBe(true);
   });
 });
 

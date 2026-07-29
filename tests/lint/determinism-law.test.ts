@@ -312,6 +312,44 @@ describe('townview law — the unfenced barrel can never smuggle an engine value
       expect(statement).toMatch(/^import\s+type\b/);
     }
   });
+
+  // Plan 11 Task 13 widened this barrel from 4 re-exports to the whole directive/composer type
+  // surface, so the pin matters more than ever: prove it FIRES rather than merely that it passes.
+  // These synthetic sources are run through the same `topLevelStatements` extractor the real scan
+  // uses, so a regression in the extractor shows up here first.
+  it('FIRES: a synthetic VALUE export / import through the barrel trips the pin', () => {
+    const exportsOf = (src: string) => topLevelStatements(src, 'export');
+    for (const smuggled of [
+      "export { directiveView } from '../../src/sim/directives/view';",
+      "export const BEAT = 15;",
+      "export function directiveView() {}",
+      "export default 1;",
+      "export * from '../../src/sim/directives/view';",
+      "export type { A } from './a'\nexport { b } from './b'\n",   // ASI bypass
+    ]) {
+      const statements = exportsOf(smuggled);
+      expect(statements.length, `nothing extracted from: ${smuggled}`).toBeGreaterThan(0);
+      expect(
+        statements.some((statement) => !/^export\s+type\b/.test(statement)),
+        `the pin missed a value export in: ${smuggled}`,
+      ).toBe(true);
+    }
+    for (const smuggled of [
+      "import { directiveView } from '../../src/sim/directives/view';",
+      "import '../../src/sim/directives/view';",
+      "import { type A, directiveView } from '../../src/sim/directives/view';",
+    ]) {
+      const statements = topLevelStatements(smuggled, 'import');
+      expect(statements.length, `nothing extracted from: ${smuggled}`).toBeGreaterThan(0);
+      expect(
+        statements.some((statement) => !/^import\s+type\b/.test(statement)),
+        `the pin missed a value import in: ${smuggled}`,
+      ).toBe(true);
+    }
+    // …and the barrel's own legal forms stay clean under the very same extractor.
+    expect(exportsOf("export type { DirectiveLedgerView } from '../../src/sim/directives/view';")
+      .every((statement) => /^export\s+type\b/.test(statement))).toBe(true);
+  });
 });
 
 describe('composition-root fence — only main.tsx + loop/** may import engine values', () => {

@@ -23,6 +23,7 @@ describe('KEYMAP — the default keyboard-to-UIAction map (data, rebindable late
       t: { kind: 'open-panel', panel: 'terms' },
       n: { kind: 'open-panel', panel: 'network' },
       y: { kind: 'open-panel', panel: 'treasury' },
+      d: { kind: 'open-panel', panel: 'directives' },
       Escape: { kind: 'close' },
     };
     expect(KEYMAP).toEqual(expected);
@@ -34,9 +35,20 @@ describe('KEYMAP — the default keyboard-to-UIAction map (data, rebindable late
       .toEqual([0.25, 0.5, 1, 2, 4]);
   });
 
-  it('b/c/x/w/l/p/r/t/n/y open the ten panels; Escape closes', () => {
-    const panels = 'bcxwlprtny'.split('').map((k) => (KEYMAP[k] as { panel: string }).panel);
-    expect(panels).toEqual(['board', 'codex', 'counter', 'web', 'ledger', 'planner', 'report', 'terms', 'network', 'treasury']);
+  it('b/c/x/w/l/p/r/t/n/y/d open the eleven panels; Escape closes', () => {
+    const panels = 'bcxwlprtnyd'.split('').map((k) => (KEYMAP[k] as { panel: string }).panel);
+    expect(panels).toEqual(['board', 'codex', 'counter', 'web', 'ledger', 'planner', 'report', 'terms', 'network', 'treasury', 'directives']);
     expect(KEYMAP.Escape).toEqual({ kind: 'close' });
+  });
+
+  // Task 13 — the directive desk joins the panel union. `d` was FREE at Task-12 HEAD (verified at
+  // dispatch); this pins the binding and, with the exhaustive map above, that nothing else moved.
+  it('the panel union and the keymap agree exactly (no orphan panel, no orphan key)', () => {
+    const bound = Object.values(KEYMAP)
+      .filter((action): action is Extract<UIAction, { kind: 'open-panel' }> => action.kind === 'open-panel')
+      .map((action) => action.panel);
+    expect(new Set(bound).size).toBe(bound.length);      // one key per panel, no double binding
+    expect(bound).toContain('directives');
+    expect(KEYMAP.d).toEqual({ kind: 'open-panel', panel: 'directives' });
   });
 });

@@ -500,17 +500,49 @@ describe('turncoats are invisible player-side — the flag is not the game', () 
     expect(nv).not.toMatch(/turned/);
     expect(nv).not.toMatch(/isTurnedAsset/);
 
+    // T13 obligation MET: the directive desk's selector joins the same scan. It is a whole module
+    // (not a slice), and it shows authored levers + physically returned reports only — so the flip
+    // flag is as absent there as it is here. The desk's OWN, much wider hidden-name scan (receipt,
+    // decision, execution, scrutiny, transit, enemy) lives in tests/directives/view.test.ts; this
+    // prong keeps the turncoat pillar's single adversarial sweep authoritative over every selector.
+    // Comments are prose, not reads (the jargon-scan precedent) — and the desk's own doc legitimately
+    // narrates what it may not do. The CODE is what is scanned, with the flag matched as a whole word
+    // so the desk may still speak of a "returned report".
+    const desk = readFileSync(join(process.cwd(), 'src/sim/directives/view.ts'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (m) => (m.startsWith('/*') ? ' ' : ''));
+    expect(desk).toMatch(/export function directiveView/);   // non-vacuous
+    expect(desk).not.toMatch(/\bturned\b/);
+    expect(desk).not.toMatch(/isTurnedAsset/);
+    expect(desk).not.toMatch(/enemyAssets/);
+
     // No app surface reads the roster's turncoat state at all.
     const walk = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
       const p = join(dir, name);
       return statSync(p).isDirectory() ? walk(p) : [p];
     });
-    for (const file of walk(join(process.cwd(), 'app/src')).filter((f) => /\.tsx?$/.test(f))) {
+    const appFiles = walk(join(process.cwd(), 'app/src')).filter((f) => /\.tsx?$/.test(f));
+    // Non-vacuity: the sweep really reaches the Task-13 surfaces it now has to police.
+    const appPaths = appFiles.map((f) => f.replace(/\\/g, '/'));
+    expect(appPaths.some((f) => f.endsWith('app/src/panels/Directives.tsx'))).toBe(true);
+    expect(appPaths.some((f) => f.endsWith('app/src/panels/DayPlanner.tsx'))).toBe(true);
+    for (const file of appFiles) {
       const src = readFileSync(file, 'utf8');
       expect(src, `${file} reads network roster`).not.toMatch(/network\.(enemyA|a)ssets/);
       expect(src, `${file} reads isTurnedAsset`).not.toMatch(/isTurnedAsset/);
       expect(src, `${file} reads .turned`).not.toMatch(/\.turned\b/);
     }
+  });
+
+  it('the adversarial scan FIRES on an injected violation of each of its three prongs', () => {
+    // The rider's demand: prove the scan is real by running it against violations, not by asserting
+    // that it exists. These are the exact patterns the sweep above applies, fed the code it bans.
+    expect(/\.turned\b/.test('if (asset.turned) return;')).toBe(true);
+    expect(/isTurnedAsset/.test('const t = isTurnedAsset(world, id);')).toBe(true);
+    expect(/network\.(enemyA|a)ssets/.test('world.network.enemyAssets.map(a => a.id)')).toBe(true);
+    expect(/network\.(enemyA|a)ssets/.test('world.network.assets.map(a => a.id)')).toBe(true);
+    // …and leaves the lawful selector-fed shapes alone.
+    expect(/\.turned\b/.test('view.assets.map((a) => a.id)')).toBe(false);
+    expect(/network\.(enemyA|a)ssets/.test('const net = networkView(world);')).toBe(false);
   });
 });
 

@@ -5,7 +5,14 @@ import type { InquiryKey } from '../sim/perception';
 import type { ReportedClaim } from '../sim/enemy/state';
 import type { MessageId, SpokenNetworkPayload } from '../sim/directives/types';
 
-/** A recruited informant and where the player has posted them (null = unassigned). */
+/**
+ * A recruited informant and the venue they have OPERATIONALLY taken up (null = none).
+ *
+ * This is not "where the player posted them": under the Plan-11 "requested post is not operational
+ * post" law the player's authored mark lives in `requestedPosts` below, and only a physically
+ * received, autonomously accepted application ever writes this field. It gates observations, so it
+ * is sim truth — and it is absent from every player-facing view by construction.
+ */
 export interface InformantSpec { id: EntityId; assignedVenue: VenueId | null }
 
 /** A player-authored hypothesis on the Evidence Board. */
@@ -58,6 +65,9 @@ export interface TagNote {
   updatedTick: Tick;
 }
 
+/** One network utterance the player lawfully witnessed. Public by construction — it carries only the
+ *  SPOKEN projection — which is why Plan 11 Task 13 re-exports this type to the app through
+ *  `app/src/townview.ts` for the panels to read. */
 export interface NetworkIntelEntry {
   tick: Tick;
   venue: VenueId;

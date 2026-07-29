@@ -16,14 +16,14 @@ export type UIAction =
   | { kind: 'speed'; speed: 0.25 | 0.5 | 1 | 2 | 4 }
   | { kind: 'select-venue'; id: string }
   | { kind: 'select-npc'; id: string }
-  | { kind: 'open-panel'; panel: 'board' | 'codex' | 'counter' | 'web' | 'ledger' | 'planner' | 'report' | 'terms' | 'network' | 'treasury' }
+  | { kind: 'open-panel'; panel: 'board' | 'codex' | 'counter' | 'web' | 'ledger' | 'planner' | 'report' | 'terms' | 'network' | 'treasury' | 'directives' }
   | { kind: 'assist'; level: 0 | 1 | 2 | 3 }
   | { kind: 'close' }
   | { kind: 'verb'; action: Action };
 
 /**
  * The shipped default keyboard map (DATA, so it is rebindable later — keybindings ship v1.1).
- * Space pause · 1-5 speeds (0.25/0.5/1/2/4) · b/c/x/w/l/p/r/t/n/y panels (in panel-union order) · Escape close.
+ * Space pause · 1-5 speeds (0.25/0.5/1/2/4) · b/c/x/w/l/p/r/t/n/y/d panels (in panel-union order) · Escape close.
  * Keys are `KeyboardEvent.key` values; `select-venue`/`select-npc`/`assist`/`verb` are pointer-driven
  * (they need an id/level/payload) and so are intentionally absent from the static key map.
  */
@@ -44,6 +44,7 @@ export const KEYMAP: Record<string, UIAction> = {
   t: { kind: 'open-panel', panel: 'terms' },
   n: { kind: 'open-panel', panel: 'network' },
   y: { kind: 'open-panel', panel: 'treasury' },
+  d: { kind: 'open-panel', panel: 'directives' },
   Escape: { kind: 'close' },
 };
 

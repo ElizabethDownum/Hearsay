@@ -20,3 +20,22 @@ export type { TownMap } from '../../src/sim/enemy/state';
 // erased-type-only re-export discipline: names flow to the fenced panels, zero runtime coupling.
 export type { NetworkView, NetworkAssetView, NetworkDropView, CourierRoute } from '../../src/sim/fieldwork';
 export type { EconomyDef } from '../../src/sim/rules';
+
+// ── Plan 11 Task 13 — the directive desk and the local composers ────────────────────────────────
+// Same erased-type-only discipline. The desk panel and the composer are props-only like every other
+// panel; these names are the ONLY way the fenced app/src/panels/** tree learns the shapes of the
+// directive ledger, the frozen local offer, the eight handoff levers, the public approach history,
+// and the public network intel row. A VALUE export here would fire the townview scan-pin in
+// tests/lint/determinism-law.test.ts, so the runtime fence stays intact: types flow, values do not.
+export type { DirectiveLedgerView, DirectiveLedgerRow } from '../../src/sim/directives/view';
+export type {
+  DirectiveBrief, DirectiveHandoff, DirectiveMission, DirectiveTarget, ShapePayload,
+  PlayerDirectiveApplication, DirectivePriority, DirectiveAuthority, DirectiveDiscretion,
+  DirectiveSpecificity, ReportExpectation, AdvisoryGuidance,
+  DirectiveReportPayload, DirectiveReportEvidence,
+} from '../../src/sim/directives/types';
+export type { Mice } from '../../src/sim/network/types';
+export type { RecruitmentHistoryRow } from '../../src/sim/network/recruitment';
+export type { NetworkIntelEntry } from '../../src/intel/entry';
+export type { InjectSpec } from '../../src/sim/actions';
+export type { LocalOffer, LocalActionIntent, NonLocalActionIntent } from './loop/session';

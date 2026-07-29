@@ -136,6 +136,67 @@ describe('registry-driven wiring — ids rendered by ITERATING a registry, not b
   });
 });
 
+// ── Task 13: the directive desk's registry obligation ────────────────────────────────────────────
+// The panel glob above ALREADY auto-covers app/src/panels/Directives.tsx (the scan reads the whole
+// directory), so every <Term id="..."> the new desk renders is swept by the law with no edit here.
+// What the glob cannot check is the registry side of the bargain: that the eight promised nouns
+// really landed, that `verb-directive` was NOT double-registered (it shipped in Task 6), and that
+// the copy the presets speak no longer PROMISES a remote NPC will comply.
+describe('Task 13 registry — exactly eight new nouns, and no copy that promises compliance', () => {
+  /** The registry size at Task-12 HEAD (commit 1aad346), counted from the source at dispatch. */
+  const TASK_12_HEAD_TERM_COUNT = 133;
+  const NEW_TERM_IDS = [
+    'directive', 'brief', 'priority', 'purpose', 'report-expectation', 'scrutiny',
+    'sound-out', 'runaround',
+  ];
+
+  it('the registry grew by exactly 8 from Task-12 HEAD', () => {
+    expect(Object.keys(TERMS).length).toBe(TASK_12_HEAD_TERM_COUNT + 8);
+  });
+
+  it.each(NEW_TERM_IDS)('registers "%s" with a label and a <=120 char short line', (id) => {
+    const term = TERMS[id];
+    expect(term, `Task 13 owes TERMS a '${id}' entry`).toBeDefined();
+    expect(term!.id).toBe(id);
+    expect(term!.label.length).toBeGreaterThan(0);
+    expect(term!.short.length).toBeGreaterThan(0);
+    expect(term!.short.length).toBeLessThanOrEqual(120);
+  });
+
+  it('`verb-directive` is NOT re-registered — Task 6 landed it and it still resolves', () => {
+    expect(NEW_TERM_IDS).not.toContain('verb-directive');
+    expect(TERMS['verb-directive']).toBeDefined();
+    expect(VERB_TERM.directive).toBe('verb-directive');
+  });
+
+  it('the scrutiny entry says in long form that it is inferred behaviour, never a shown meter', () => {
+    const entry = TERMS['scrutiny']!.entry;
+    expect(entry, 'scrutiny owes a long-form codex entry').not.toBeNull();
+    expect(entry!.toLowerCase()).toContain('infer');
+    expect(entry!.toLowerCase()).toMatch(/never a (shown |visible )?meter|no meter|never shown/);
+  });
+
+  // "You set the mission; the asset owns the moment": no preset's copy may state that a requested
+  // detail WILL happen. These are the four the task names, plus the posting preset the
+  // "requested post is not operational post" law reaches.
+  it.each(['verb-recruit', 'recruit', 'verb-courier', 'courier', 'verb-meet', 'verb-host', 'hosting', 'verb-post'])(
+    '"%s" copy no longer promises compliance',
+    (id) => {
+      const copy = `${TERMS[id]!.short} ${TERMS[id]!.entry ?? ''}`.toLowerCase();
+      for (const promise of [
+        'bring an in-circle npc onto your roster',
+        'turn a townsperson into an asset',
+        'pull one asset to your safehouse',
+        'they keep the mid-day post',
+        'task an asset to carry your story to a target',
+        'you pick the guest circle',
+      ]) {
+        expect(copy, `${id} still promises: "${promise}"`).not.toContain(promise);
+      }
+    },
+  );
+});
+
 describe('raw-label sweep (deferred scope #6 — warning list, report-only, never a failing gate in v1)', () => {
   // A label rendered as a bare JSX text node (not through <Term>) is not (yet) illegal — deferred
   // scope #6 pins the raw-label sweep at "warns", hard-fail arrives once the panel surface

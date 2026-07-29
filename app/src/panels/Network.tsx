@@ -1,5 +1,6 @@
 import { UI_GLYPHS } from '../assets';
-import type { NetworkView } from '../townview';
+import { dayOf, minuteOfDay } from '../../../src/core/time';
+import type { NetworkView, RecruitmentHistoryRow } from '../townview';
 import { Term } from './Term';
 
 /**
@@ -11,7 +12,7 @@ import { Term } from './Term';
  * it can't, the flag isn't in its props; the way you catch a turncoat is by cross-checking channels,
  * never a roster tell. That habit is spelled out in the footnote.
  */
-export function Network({ view }: { view: NetworkView }) {
+export function Network({ view, history }: { view: NetworkView; history: readonly RecruitmentHistoryRow[] }) {
   return (
     <section className="panel">
       <h2><Term id="network" /></h2>
@@ -26,7 +27,7 @@ export function Network({ view }: { view: NetworkView }) {
                 <th><Term id="standing" /></th>
                 <th><Term id="wage" /></th>
                 <th><Term id="compartment" /></th>
-                <th><Term id="verb-post" /></th>
+                <th>Requested post</th>
               </tr>
             </thead>
             <tbody>
@@ -45,17 +46,58 @@ export function Network({ view }: { view: NetworkView }) {
             </tbody>
           </table>
         )}
+      <p className="desk-note">
+        A post is what you ASKED for. Whether they took it up is theirs to decide and yours to find out.
+      </p>
       {view.drops.length > 0 && (
         <>
           <h3>{UI_GLYPHS['dead-drop']} <Term id="dead-drop" /></h3>
           <ul>{view.drops.map((d) => <li key={d.id}>{d.id} @ {d.venue}</li>)}</ul>
         </>
       )}
+      <ApproachHistory history={history} />
       <p className="desk-note">
         Trust itself is never shown — the bar reads only your own bookkeeping. Watch for a{' '}
         <Term id="turncoat" />: cross-check one channel against another to catch it.
       </p>
     </section>
+  );
+}
+
+const pad = (n: number) => String(n).padStart(2, '0');
+const fmtTick = (t: number) => `day ${dayOf(t)} · ${pad(Math.floor(minuteOfDay(t) / 60))}:${pad(minuteOfDay(t) % 60)}`;
+
+/**
+ * The PUBLIC approach history (Plan 11): every approach and every answer that lawfully reached the
+ * player — through their own presence, or a channel that physically carried it. `recruitmentHistoryView`
+ * structurally cannot hand over a reason, an eligibility grade, a protected role, or an enemy link,
+ * so this table has nothing to decorate with. An answer is one of exactly three words; a hesitation
+ * says "asks for time", because that is all anybody in the room actually saw.
+ */
+function ApproachHistory({ history }: { history: readonly RecruitmentHistoryRow[] }) {
+  if (history.length === 0) return null;
+  const said = (response: RecruitmentHistoryRow['response']): string =>
+    response === 'accept' ? 'accepted' : response === 'refuse' ? 'refused it' : 'asks for time';
+  return (
+    <>
+      <h3><Term id="recruit" /> · approaches</h3>
+      <table className="board-table">
+        <thead>
+          <tr><th>when</th><th><Term id="circle" /></th><th>who</th><th>what was said</th><th><Term id="via" /></th></tr>
+        </thead>
+        <tbody>
+          {history.map((row, index) => (
+            <tr key={index}>
+              <td>{fmtTick(row.tick)}</td>
+              <td>{row.venue}</td>
+              <td>{row.target}</td>
+              <td>{row.stage === 'approach' ? 'was approached' : said(row.response)}</td>
+              <td>{row.via}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   );
 }
 

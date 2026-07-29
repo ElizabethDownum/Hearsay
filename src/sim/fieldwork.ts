@@ -118,7 +118,10 @@ export function captureIntel(world: WorldState, events: TickEvents, rules: Rules
   const candidates: { observer: EntityId; observation: Observation }[] = [];
   for (const informant of [...world.intel.informants].sort((a, b) => a.id.localeCompare(b.id))) {
     // Operational ownership only: accepted assignment + actual event position gate remote holds.
-    // The three player-facing selectors below never read this field or turn it into live occupancy.
+    // This is the ONE lawful reader of the operational post. No player-facing selector — the three
+    // below, nor `directiveView` (src/sim/directives/view.ts, the Plan-11 directive desk) — reads
+    // this field or turns it into live occupancy: "requested post is not operational post", pinned
+    // structurally in tests/sim/network-view.test.ts.
     if (!world.npcs[informant.id] || informant.assignedVenue === null) continue;
     if (events.positions[informant.id] !== informant.assignedVenue) continue;
     for (const observation of observationsFor(informant.id, events).observations) {
