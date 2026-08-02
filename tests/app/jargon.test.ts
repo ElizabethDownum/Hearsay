@@ -75,6 +75,38 @@ const scanned = scannedPaths.map((p) => {
 
 const allHits: Hit[] = scanned.flatMap(({ file, stripped }) => collectHits(stripped, file));
 
+/** The one diagnostic the law actually raises: a collected hit whose id is not in the registry. */
+const unregistered = (hits: Hit[]): Hit[] => hits.filter((h) => TERMS[h.id] === undefined);
+
+// ── The law's firing proof (Plan 11 Task 13 fix wave) ────────────────────────────────────────────
+// The live sweep above reads repository files only, so — by construction — every id it examines is
+// already registered and no assertion in it can ever be OBSERVED firing. This block pushes a
+// synthetic unregistered term through the SAME `stripComments` → `collectHits` → `TERMS[id]`
+// pipeline the live sweep runs, and asserts the diagnostic appears. The live sweep is untouched.
+describe('the no-unregistered-jargon law FIRES on an injected term (proof, not presence)', () => {
+  const VIOLATION = [
+    'export function Ghost() {',
+    '  return <p><Term id="ghost-jsx" /> {TERMS[\'ghost-lookup\']!.label}</p>;',
+    '}',
+    "const TABS = [{ key: 'ghost', term: 'ghost-record' }];",
+    '// <Term id="ghost-comment" /> — a commented-out render is not a render, and must NOT be collected',
+  ].join('\n');
+  const injected = collectHits(stripComments(VIOLATION), 'synthetic.tsx');
+
+  it('the REAL extractor collects all three literal forms, and skips the commented one', () => {
+    expect(injected.map((h) => h.id).sort()).toEqual(['ghost-jsx', 'ghost-lookup', 'ghost-record']);
+  });
+
+  it('the REAL diagnostic reports every injected id (this is the assertion the live sweep runs)', () => {
+    expect(unregistered(injected).map((h) => h.id).sort())
+      .toEqual(['ghost-jsx', 'ghost-lookup', 'ghost-record']);
+  });
+
+  it('…and stays silent on the real surface: no live hit is unregistered', () => {
+    expect(unregistered(allHits)).toEqual([]);
+  });
+});
+
 describe('no-unregistered-jargon scan (amendment #5c) — every string-literal Term/TERMS reference resolves', () => {
   it('the scan is not vacuous: it really finds <Term id> / TERMS[...] / term: literals across panels + main.tsx', () => {
     expect(allHits.length).toBeGreaterThan(50);

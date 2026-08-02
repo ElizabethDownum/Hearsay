@@ -243,72 +243,131 @@ describe('directiveView — the authored ledger is blind to every hidden dimensi
 const repoRoot = process.cwd();
 const SELECTOR_FILE = join(repoRoot, 'src/sim/directives/view.ts');
 
-/** Comment text is prose, not a read — strip it (the jargon-scan precedent). */
-function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (m) => (m.startsWith('/*') ? ' ' : ''));
+/**
+ * Normalize a source down to "the code that could actually REACH a field", so ONE word-bounded
+ * pattern per forbidden name reports every common access form instead of one chosen spelling:
+ *   1. comments out — prose is not a read (the jargon-scan precedent);
+ *   2. computed access with a literal key rewritten to dotted form (`x['name']` ⇒ `x.name`), so the
+ *      bracket spelling has become the dotted spelling before any pattern runs;
+ *   3. string-literal TEXT out — player-facing copy is not a read either (main.tsx's ending card
+ *      lawfully contains the sentence "The council turned on the usurper"). Template `${…}`
+ *      expressions are CODE, so they survive step 3 and stay in scope for the patterns.
+ * Order is load-bearing: (2) must run before (3), or a bracket key would be erased as a string
+ * before it could be normalized into an access. After this pass `x.name`, `x['name']`, `{ name }`
+ * and `{ name: alias }` are all, uniformly, a word-bounded occurrence of `name`.
+ */
+function scannableSource(src: string): string {
+  const noComments = src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (m) => (m.startsWith('/*') ? ' ' : ''));
+  const dotted = noComments.replace(/\[\s*(['"])([A-Za-z_$][\w$]*)\1\s*\]/g, '.$2');
+  const codeOnlyTemplates = dotted.replace(
+    /`(?:\\.|\$\{(?:[^{}]|\{[^{}]*\})*\}|[^`\\])*`/g,
+    (tpl) => `\`${[...tpl.matchAll(/\$\{(?:[^{}]|\{[^{}]*\})*\}/g)].map((m) => m[0]).join('')}\``,
+  );
+  return codeOnlyTemplates.replace(/'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"/g, "''");
 }
 
+/** One forbidden name, the single pattern that reports it, and the forms that pattern MUST report.
+ *  Carrying the proofs on the prong itself makes the 1:1 pairing structural — a prong cannot be
+ *  added without its firing evidence, and no index bookkeeping can drift. */
+interface Prong { label: string; pattern: RegExp; violations: string[] }
+
+/** The four access spellings a word-bounded name prong has to catch, given an owner expression. */
+const accessForms = (owner: string, name: string): string[] => [
+  `const a = ${owner}.${name};`,
+  `const b = ${owner}['${name}'];`,
+  `const { ${name} } = ${owner};`,
+  `const { ${name}: alias } = ${owner};`,
+];
+
+const named = (label: string, owner: string, name: string, pattern = new RegExp(`\\b${name}\\b`)): Prong =>
+  ({ label, pattern, violations: accessForms(owner, name) });
+
+/** Fail-closed (the T11 convention): a source scan cannot follow an alias, so binding the world to
+ *  anything but the canonical `world`, or reaching it with a computed key, is itself the failure —
+ *  those forms must go RED rather than silently walk past the world-rooted prongs below. */
+const WORLD_ALIAS_PRONGS: Prong[] = [
+  {
+    label: 'a destructured world (fail-closed: the scan cannot follow the alias)',
+    pattern: /(?:const|let|var)\s*\{[^}]*\}\s*=\s*[\w.]*\bworld\b/,
+    violations: ['const { network } = world;', 'const { npcs, beliefs } = session.world;'],
+  },
+  {
+    label: 'a world bound under another name (fail-closed)',
+    pattern: /(?:const|let|var)\s+(?!world\b)[A-Za-z_$][\w$]*\s*=\s*[\w.]*\.world\b/,
+    violations: ['const w = session.world;', 'let hidden = this.world;'],
+  },
+  {
+    label: 'a computed world reach (fail-closed)',
+    pattern: /\bworld\s*\[/,
+    violations: ['const a = world[key];'],
+  },
+];
+
 /** Every hidden name the constraints forbid the DESK SELECTOR from reading. */
-const FORBIDDEN_IN_SELECTOR: [string, RegExp][] = [
-  ['.received (the mutated version)', /\.received\b/],
-  ['.decision', /\.decision\b/],
-  ['.execution', /\.execution\b/],
-  ['.turned', /\.turned\b/],
-  ['enemyAssets', /enemyAssets/],
-  ['enemy.sketch', /enemy\s*\.\s*sketch/],
-  ['perceivedScrutiny', /perceivedScrutiny/],
-  ['scrutiny', /\bscrutiny\b/],
-  ['recruitmentApproaches', /recruitmentApproaches/],
-  ['enemyLinked', /enemyLinked/],
-  ['message transit (deliveredAt)', /deliveredAt/],
-  ['message transit (failedAt)', /failedAt/],
-  ['message transit (nextHop)', /nextHop/],
-  ['the message queue', /\.messages\b/],
-  ['heldObservations', /heldObservations/],
-  ['world.npcs', /world\s*\.\s*npcs/],
-  ['world.beliefs', /world\s*\.\s*beliefs/],
+const FORBIDDEN_IN_SELECTOR: Prong[] = [
+  named('received (the mutated version)', 'record', 'received'),
+  named('decision', 'record', 'decision'),
+  named('execution', 'record', 'execution'),
+  named('turned', 'asset', 'turned'),
+  named('enemyAssets', 'world.network', 'enemyAssets'),
+  named('sketch', 'world.enemy', 'sketch'),
+  named('perceivedScrutiny', 'row', 'perceivedScrutiny'),
+  named('scrutiny', 'state', 'scrutiny'),
+  named('recruitmentApproaches', 'state', 'recruitmentApproaches'),
+  { label: 'enemyLinked (in any suffixed spelling)', pattern: /\benemyLinked/,
+    violations: [...accessForms('row', 'enemyLinked'), 'const c = row.enemyLinkedAtDecision;'] },
+  named('message transit (deliveredAt)', 'message', 'deliveredAt'),
+  named('message transit (failedAt)', 'message', 'failedAt'),
+  named('message transit (nextHop)', 'message', 'nextHop'),
+  named('the message queue', 'state', 'messages'),
+  named('heldObservations', 'state', 'heldObservations'),
+  named('npcs (the roster behind the views)', 'world', 'npcs'),
+  named('beliefs', 'world', 'beliefs'),
+  ...WORLD_ALIAS_PRONGS,
 ];
 
 describe('hidden-name source scan — the selector cannot name what it must not know', () => {
-  const selectorSource = stripComments(readFileSync(SELECTOR_FILE, 'utf8'));
+  const selectorSource = scannableSource(readFileSync(SELECTOR_FILE, 'utf8'));
 
   it('the scan is not vacuous: the selector source really was read', () => {
     expect(selectorSource).toMatch(/export function directiveView/);
+    expect(selectorSource).toMatch(/receivedReports/); // the ONE lawful near-neighbour survives
   });
 
-  it.each(FORBIDDEN_IN_SELECTOR)('never names %s', (_label, pattern) => {
+  it.each(FORBIDDEN_IN_SELECTOR)('never names $label', ({ pattern }) => {
     expect(pattern.test(selectorSource)).toBe(false);
   });
 
-  it('FIRES: an injected violation of every prong is caught (the scan is real)', () => {
-    const injected = [
-      'const a = record.received;', 'const b = record.decision;', 'const c = record.execution;',
-      'const d = asset.turned;', 'world.network.enemyAssets', 'world.enemy.sketch',
-      'perceivedScrutiny(world, a, b, c)', 'const s = scrutiny;', 'state.recruitmentApproaches',
-      'row.enemyLinked', 'm.deliveredAt', 'm.failedAt', 'm.nextHop', 'state.messages',
-      'state.heldObservations', 'world.npcs[id]', 'world.beliefs[id]',
-    ];
-    expect(injected).toHaveLength(FORBIDDEN_IN_SELECTOR.length);
-    FORBIDDEN_IN_SELECTOR.forEach(([label, pattern], index) => {
-      expect(pattern.test(injected[index]!), `${label} must fire on '${injected[index]}'`).toBe(true);
-    });
+  it.each(FORBIDDEN_IN_SELECTOR)('FIRES: $label is reported in every access form', ({ pattern, violations }) => {
+    expect(violations.length).toBeGreaterThan(0);
+    for (const form of violations) {
+      expect(pattern.test(scannableSource(form)), `must report the form: ${form}`).toBe(true);
+    }
   });
 });
 
-/** Hidden names no APP file (composition root included) may reach for. */
-const FORBIDDEN_IN_APP: [string, RegExp][] = [
-  ['the raw directive substrate', /directiveState/],
-  ['enemyAssets', /enemyAssets/],
-  ['enemy.sketch', /enemy\s*\.\s*sketch/],
-  ['perceivedScrutiny', /perceivedScrutiny/],
-  ['.turned', /\.turned\b/],
-  ['evaluateReceivedBrief', /evaluateReceivedBrief/],
-  ['heldObservations', /heldObservations/],
-  ['recruitmentApproaches', /recruitmentApproaches/],
-  ['world.npcs (the roster behind the views)', /world\s*\.\s*npcs/],
-  ['world.beliefs', /world\s*\.\s*beliefs/],
-  ['world.inquiries', /world\s*\.\s*inquiries/],
-  ['world.network.assets', /world\s*\.\s*network\s*\.\s*assets/],
+/** Hidden names no APP file (composition root included) may reach for — in ANY access form, and
+ *  whether the record is reached through the raw world or through an imported helper under an
+ *  alias, which is why these are word-bounded NAME prongs and not dotted-path prongs. */
+const FORBIDDEN_IN_APP: Prong[] = [
+  named('the raw directive substrate', 'world.network', 'directiveState'),
+  named('received (the mutated version)', 'record', 'received'),
+  named('decision', 'record', 'decision'),
+  named('execution', 'record', 'execution'),
+  named('enemyAssets', 'world.network', 'enemyAssets'),
+  named('sketch', 'world.enemy', 'sketch'),
+  named('perceivedScrutiny', 'row', 'perceivedScrutiny'),
+  named('turned', 'asset', 'turned'),
+  named('evaluateReceivedBrief', 'engine', 'evaluateReceivedBrief'),
+  named('heldObservations', 'state', 'heldObservations'),
+  named('recruitmentApproaches', 'state', 'recruitmentApproaches'),
+  named('the message queue', 'state', 'messages'),
+  named('npcs (the roster behind the views)', 'world', 'npcs'),
+  named('beliefs', 'world', 'beliefs'),
+  named('inquiries', 'world', 'inquiries'),
+  { label: 'the world roster behind NetworkView', pattern: /\bworld\s*\.\s*network\s*\.\s*assets\b/,
+    violations: ['const a = world.network.assets;', "const b = world['network']['assets'];"] },
+  ...WORLD_ALIAS_PRONGS,
 ];
 
 function walk(dir: string): string[] {
@@ -328,23 +387,38 @@ describe('hidden-name source scan — no app surface reaches behind its selector
     expect(appFiles.length).toBeGreaterThan(10);
   });
 
-  it.each(FORBIDDEN_IN_APP)('no app file names %s', (label, pattern) => {
+  it('the app scan is not vacuous: normalization leaves real code standing', () => {
+    const main = scannableSource(readFileSync(join(repoRoot, 'app/src/main.tsx'), 'utf8'));
+    expect(main).toMatch(/const world = session\.world;/);
+    expect(main).toMatch(/directiveView\(world\)/);
+  });
+
+  it.each(FORBIDDEN_IN_APP)('no app file names $label', ({ label, pattern }) => {
     for (const file of appFiles) {
-      const src = stripComments(readFileSync(file, 'utf8'));
+      const src = scannableSource(readFileSync(file, 'utf8'));
       expect(pattern.test(src), `${file.replace(/\\/g, '/')} names ${label}`).toBe(false);
     }
   });
 
-  it('FIRES: each app prong catches its injected violation', () => {
-    const injected = [
-      'world.network.directiveState', 'world.network.enemyAssets', 'world.enemy.sketch',
-      'perceivedScrutiny(w, a, b, 0)', 'asset.turned', 'evaluateReceivedBrief(x)',
-      'state.heldObservations', 'state.recruitmentApproaches', 'world.npcs[id]?.name',
-      'world.beliefs[id]', 'world.inquiries[id]', 'world.network.assets',
-    ];
-    expect(injected).toHaveLength(FORBIDDEN_IN_APP.length);
-    FORBIDDEN_IN_APP.forEach(([label, pattern], index) => {
-      expect(pattern.test(injected[index]!), `${label} must fire on '${injected[index]}'`).toBe(true);
-    });
+  it.each(FORBIDDEN_IN_APP)('FIRES: $label is reported in every access form', ({ pattern, violations }) => {
+    expect(violations.length).toBeGreaterThan(0);
+    for (const form of violations) {
+      expect(pattern.test(scannableSource(form)), `must report the form: ${form}`).toBe(true);
+    }
+  });
+
+  // The exact coverage counterexamples the frontier review demonstrated against the old dotted-only
+  // patterns: five real access forms the app scan walked straight past. Each is now pinned to the
+  // prong that owns it, and the whole app prong list has to report it.
+  it.each([
+    ['received (the mutated version)', 'const { received } = record;'],
+    ['decision', "const x = record['decision'];"],
+    ['execution', 'const { execution: x } = record;'],
+    ['turned', "const x = asset['turned'];"],
+    ['the message queue', 'const { messages } = state;'],
+  ])('FIRES: the form a dotted-only scan let through — %s', (label, form) => {
+    const prong = FORBIDDEN_IN_APP.find((p) => p.label === label);
+    expect(prong, `no app prong is labelled '${label}'`).toBeDefined();
+    expect(prong!.pattern.test(scannableSource(form)), `still silent on: ${form}`).toBe(true);
   });
 });

@@ -6,7 +6,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { WebViewPanel } from '../../app/src/panels/WebViewPanel';
 import { Codex, type CodexDetailRow } from '../../app/src/panels/Codex';
 import {
-  DayPlanner, directiveIntentFrom, defaultDirectiveDraft, type DirectiveDraft,
+  DayPlanner, directiveIntentFrom, directiveIssues, defaultDirectiveDraft,
+  missionDraftFor, standardMissionFor,
+  type DirectiveDraft, type DirectiveMissionDraft,
 } from '../../app/src/panels/DayPlanner';
 import { Directives } from '../../app/src/panels/Directives';
 import { Network } from '../../app/src/panels/Network';
@@ -388,6 +390,19 @@ function deskWorld(seed: string): WorldState {
   return world;
 }
 
+/** The same staged town, but your ONE asset (`dov`) stands in the market. The composer may still
+ *  name them as the final recipient; there is simply nobody in this moment to hand the brief to. */
+function remoteOnlyDeskWorld(seed: string): WorldState {
+  const world = buildWorld(deskTown(), seed, STANDARD_RULES);
+  enrollPlayer(world, { home: 'square' });
+  world.enemy.map = buildTownMap(deskTown());
+  world.station = 'noble';
+  world.coin = 200;
+  world.network.assets.push({ id: 'dov', mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [] });
+  world.intel.informants.push({ id: 'dov', assignedVenue: null });
+  return world;
+}
+
 /** One DELIVERED board row — the player physically heard family `f-desk` as this reported version. */
 function deliverBoardRow(world: WorldState, family = 'f-desk', claimId = 'c-desk'): void {
   world.intel.log.push({
@@ -428,6 +443,14 @@ function optionsOf(page: string, label: string): string[] {
   const block = page.match(new RegExp(`<select[^>]*aria-label="${label}"[^>]*>([\\s\\S]*?)</select>`));
   if (!block) throw new Error(`no <select aria-label="${label}"> in the rendered page`);
   return [...block[1]!.matchAll(/<option[^>]*value="([^"]*)"/g)].map((m) => m[1]!);
+}
+
+/** Is the aria-labelled button greyed? Throws when the button is missing, so a control that quietly
+ *  disappeared can never read as "greyed" — the same non-vacuity guard `optionsOf` carries. */
+function isDisabled(page: string, label: string): boolean {
+  const tag = page.match(new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`));
+  if (!tag) throw new Error(`no <button aria-label="${label}"> in the rendered page`);
+  return /\sdisabled(?:=""|\s|>)/.test(tag[0]);
 }
 
 // ── The desk panel ───────────────────────────────────────────────────────────────────────────────
@@ -608,6 +631,9 @@ describe('the directive composer exposes ten independent levers', () => {
       'directive recipient',                                              // 1
       'directive first hop', 'directive outbound relay', 'directive report relay', // 2
       'directive application', 'directive mission',                       // 3
+      'directive shape operation',                                        // 3 — spread vs suppress
+      'directive rendezvous from', 'directive rendezvous until',          // 3 — the meeting window
+      'directive meeting venue', 'directive meeting from', 'directive meeting until', // 3 — sound-out
       'directive specificity', 'directive guidance kind',                 // 4
       'directive priority',                                              // 5
       'directive authority',                                             // 6
@@ -619,13 +645,14 @@ describe('the directive composer exposes ten independent levers', () => {
       expect(page, `lever control "${label}" is missing`).toContain(`aria-label="${label}"`);
     }
     expect(page).toContain('aria-label="withhold purpose"');
+    expect(page).toContain('aria-label="request a meeting"');
     expect(page).toContain('aria-label="submit directive"');
   });
 
   /** Change one draft field; the serialized intent must differ in exactly that one JSON path. */
-  const changedPaths = (over: Partial<DirectiveDraft>): string[] => {
-    const before = directiveIntentFrom(base()) as unknown;
-    const after = directiveIntentFrom({ ...base(), ...over } as DirectiveDraft) as unknown;
+  const changedPaths = (over: Partial<DirectiveDraft>, from: DirectiveDraft = base()): string[] => {
+    const before = directiveIntentFrom(from) as unknown;
+    const after = directiveIntentFrom({ ...from, ...over } as DirectiveDraft) as unknown;
     const paths: string[] = [];
     const walk = (a: unknown, b: unknown, path: string): void => {
       if (stableStringify(a) === stableStringify(b)) return;
@@ -676,6 +703,185 @@ describe('the directive composer exposes ten independent levers', () => {
     const page = html(createElement(DayPlanner, deskProps(world)));
     const recipient = optionsOf(page, 'directive recipient')[0]!;
     expect(optionsOf(page, 'directive sound-out target')).not.toContain(recipient);
+  });
+
+  // ── Lever 3's typed subfields are levers in their own right ─────────────────────────────────────
+  // The engine's mission/application contract carries a shape OPERATION, a sound-out MEETING request,
+  // and a rendezvous WINDOW. Each gets its own control and joins the exactly-one-path-moves proof.
+  const shapeMission = (operation: 'spread' | 'suppress'): DirectiveMissionDraft => ({
+    application: 'standard', mission: 'shape', operation, audience: 'eve',
+    payload: base().payloads['f-desk']!,
+  });
+  const soundOutMission = (meeting: { venue: string; from: number; until: number } | null): DirectiveMissionDraft =>
+    ({ application: 'standard', mission: 'sound-out', target: 'eve', topic: 'recruitment', handle: null, meeting });
+  const rendezvousMission = (from: number, until: number): DirectiveMissionDraft =>
+    ({ application: 'rendezvous', venue: 'market', from, until });
+
+  it('the shape OPERATION is its own lever: spread → suppress moves exactly that field', () => {
+    const from = { ...base(), mission: shapeMission('spread') };
+    expect(changedPaths({ mission: shapeMission('suppress') }, from))
+      .toEqual(['brief.mission.operation']);
+  });
+
+  it('the sound-out MEETING request is its own lever', () => {
+    const from = { ...base(), mission: soundOutMission(null) };
+    expect(changedPaths({ mission: soundOutMission({ venue: 'market', from: 30, until: 45 }) }, from))
+      .toEqual(['brief.mission.meeting']);
+  });
+
+  it('the rendezvous window is TWO levers, and does not follow the active window', () => {
+    const from = { ...base(), mission: rendezvousMission(30, 60) };
+    expect(changedPaths({ mission: rendezvousMission(15, 60) }, from)).toEqual(['application.from']);
+    expect(changedPaths({ mission: rendezvousMission(30, 90) }, from)).toEqual(['application.until']);
+    // …and lever 8 no longer drags it: moving activeFrom moves activeFrom, and nothing else.
+    expect(changedPaths({ activeFrom: 45 }, from)).toEqual(['brief.active.from']);
+  });
+});
+
+// ── The Board is the ONLY story-payload source ───────────────────────────────────────────────────
+
+describe('story family / parent / payload come only from delivered board rows', () => {
+  it('an empty board holds no payload, and no claim the player never heard is constructible', () => {
+    const world = deskWorld('payload-empty');            // nothing was ever delivered
+    const sources = deskProps(world);
+    const draft = defaultDirectiveDraft(sources);
+    expect(draft.payloads).toEqual({});
+
+    const payloadless: DirectiveMissionDraft[] = [
+      { application: 'courier', target: 'eve', payload: null },
+      { application: 'standard', mission: 'shape', operation: 'spread', audience: 'eve', payload: null },
+      { application: 'standard', mission: 'shape', operation: 'suppress', audience: 'eve', payload: null },
+      { application: 'standard', mission: 'shape-redirect', audience: 'eve', redirectTo: 'bez', payload: null },
+    ];
+    for (const mission of payloadless) {
+      expect(directiveIntentFrom({ ...draft, mission }), stableStringify(mission)).toBeNull();
+      expect(directiveIssues({ ...draft, mission }, sources)).toContain('no delivered story to send');
+    }
+  });
+
+  it('the payload-bearing options stay VISIBLE and say plainly why nothing can be sent', () => {
+    const page = html(createElement(DayPlanner, deskProps(deskWorld('payload-visible'))));
+    // What you hold is a public fact about you, so this greys — it never hides the control.
+    expect(optionsOf(page, 'directive application')).toContain('courier');
+    expect(optionsOf(page, 'directive mission')).toEqual(expect.arrayContaining(['shape', 'shape-redirect']));
+    expect(optionsOf(page, 'directive mission story')).toEqual(['']);
+    expect(page).toContain('aria-label="directive payload note"');
+    expect(page).toContain('no delivered story to send');
+  });
+
+  it('the REAL option transitions mint nothing when the board is empty', () => {
+    const world = deskWorld('payload-transition');
+    const draft = defaultDirectiveDraft(deskProps(world));
+    const options = { people: ['eve', 'bez'], venues: ['market'], families: [], tick: 0 };
+    const minted = [
+      missionDraftFor('courier', draft, options),
+      standardMissionFor('shape', draft, options),
+      standardMissionFor('shape-redirect', draft, options),
+    ];
+    for (const mission of minted) {
+      // A manufactured claim would have to carry a severity and a predicate; there is none to carry.
+      expect(stableStringify(mission), 'a payload was minted').not.toContain('"severity"');
+      expect(directiveIntentFrom({ ...draft, mission })).toBeNull();
+    }
+  });
+
+  it('one delivered row composes exactly that family, parented on the claim the player heard', () => {
+    const world = deskWorld('payload-one');
+    deliverBoardRow(world);
+    const draft = defaultDirectiveDraft(deskProps(world));
+    expect(Object.keys(draft.payloads)).toEqual(['f-desk']);
+    const shaped = stableStringify(directiveIntentFrom({
+      ...draft, mission: { application: 'courier', target: 'eve', payload: draft.payloads['f-desk']! },
+    }));
+    expect(shaped).toContain('"family":"f-desk"');
+    expect(shaped).toContain('"parent":"c-desk"');
+    expect(shaped).toContain('"severity":4');       // the version the player HEARD, not world truth
+    expect(shaped).not.toContain('"family":null');  // …and never a minted one
+    expect(shaped).not.toContain('"parent":null');
+  });
+});
+
+// ── Client validation: well-formed routes and times only, computed from public facts ─────────────
+
+describe('the composer greys its own submit on routes and times the engine must refuse', () => {
+  const world = deskWorld('validate');
+  deliverBoardRow(world);
+  const sources = () => deskProps(world);
+  const base = (): DirectiveDraft => defaultDirectiveDraft(sources());
+  const soundOut = (target: string, meeting: { venue: string; from: number; until: number } | null = null):
+  DirectiveMissionDraft => ({
+    application: 'standard', mission: 'sound-out', target, topic: 'recruitment', handle: null, meeting,
+  });
+  const rendezvous = (from: number, until: number): DirectiveMissionDraft =>
+    ({ application: 'rendezvous', venue: 'market', from, until });
+
+  it('the staged draft is well formed: nothing is raised, so the cases below are not vacuous', () => {
+    expect(directiveIssues(base(), sources())).toEqual([]);
+    expect(base().recipient).toBe('ada');           // the local asset; `dov` is the remote one
+  });
+
+  it.each([
+    ['a remote final recipient handed over in person',
+      { recipient: 'dov' }, 'hand it over in person only to someone in this moment',
+      { outboundVia: ['ada'] }],
+    ['an outbound relay that IS the final recipient',
+      { outboundVia: ['ada'] }, 'an outbound relay cannot be the final recipient',
+      { recipient: 'dov' }],
+    ['a report relay that IS the final recipient',
+      { reportVia: ['ada'] }, 'a report relay cannot be the final recipient',
+      { reportVia: ['dov'] }],
+    ['the first hop selected again through add-outbound-relay',
+      { recipient: 'dov', outboundVia: ['ada', 'ada'] }, 'the outbound route repeats a relay',
+      { outboundVia: ['ada'] }],
+    ['a duplicated report relay',
+      { reportVia: ['dov', 'dov'] }, 'the report route repeats a relay',
+      { reportVia: ['dov'] }],
+    ['a sound-out target that collides with a changed recipient',
+      { mission: soundOut('ada') }, 'an asset cannot be asked to sound themselves out',
+      { mission: soundOut('eve') }],
+    ['a reversed active window',
+      { activeFrom: 200, activeUntil: 100, reportBy: null }, 'the active window runs backwards',
+      { activeFrom: 100, activeUntil: 200 }],
+    ['a report deadline outside the active window',
+      { reportBy: 99999 }, 'the report deadline falls outside the active window',
+      { reportBy: 120 }],
+    ['a reversed rendezvous window',
+      { mission: rendezvous(60, 30) }, 'the rendezvous window runs backwards',
+      { mission: rendezvous(30, 60) }],
+    ['a rendezvous window off the conversation beat',
+      { mission: rendezvous(31, 61) }, 'the rendezvous window must sit on a conversation beat',
+      { mission: rendezvous(30, 60) }],
+    ['a sound-out meeting window off the conversation beat',
+      { mission: soundOut('eve', { venue: 'market', from: 31, until: 61 }) },
+      'the meeting window must sit on a conversation beat',
+      { mission: soundOut('eve', { venue: 'market', from: 30, until: 60 }) }],
+  ])('%s is reported, and clears the moment it is fixed', (_label, over, note, fix) => {
+    const broken = { ...base(), ...over } as DirectiveDraft;
+    expect(directiveIssues(broken, sources()), `unreported: ${note}`).toContain(note);
+    expect(directiveIssues({ ...broken, ...fix } as DirectiveDraft, sources())).toEqual([]);
+  });
+
+  it('an active window that has already closed is reported against the offered beat', () => {
+    const late = {
+      ...deskProps(world),
+      offer: { tick: 99999, venue: 'square', circleMembers: ['ada', 'cyn'], token: 'desk#late' },
+    };
+    expect(directiveIssues(base(), late)).toContain('the active window has already closed');
+  });
+
+  it('the greying is REAL: an undeliverable draft disables submit and prints its note on the page', () => {
+    const page = html(createElement(DayPlanner, deskProps(remoteOnlyDeskWorld('validate-render'))));
+    expect(isDisabled(page, 'submit directive')).toBe(true);
+    expect(page).toContain('aria-label="directive notes"');
+    expect(page).toContain('hand it over in person only to someone in this moment');
+    // The option itself is never hidden — the remote asset stays nameable as the final recipient.
+    expect(optionsOf(page, 'directive recipient')).toEqual(['dov']);
+  });
+
+  it('a well-formed desk draft leaves the submit live', () => {
+    const page = html(createElement(DayPlanner, deskProps(world)));
+    expect(isDisabled(page, 'submit directive')).toBe(false);
+    expect(page).not.toContain('aria-label="directive notes"');
   });
 });
 
@@ -791,6 +997,73 @@ describe('preset and fully composed custom applications reach the SAME typed exe
 
 // ── Twin worlds and the public bundle ────────────────────────────────────────────────────────────
 
+/** Every hidden RECRUITMENT field, moved on an approach record the public history never reads.
+ *  `recruitmentHistoryView` folds delivered player intel (`world.intel.network`) alone, so the
+ *  willingness class, the decided answer, the handle, the leverage, and the real enemy linkage are
+ *  all invisible by construction — which is exactly what these mutations have to prove. */
+function flipRecruitmentHidden(world: WorldState): void {
+  for (const approach of ensureDirectiveState(world).recruitmentApproaches) {
+    approach.initial = 'accept';               // the willingness the approach actually met
+    approach.decided = 'refuse';               // …and the answer it actually reached
+    approach.status = 'closed';
+    approach.mice = 'coercion';
+    approach.leverageFamily = 'f-hidden';
+    approach.resolveAt = 45;
+    approach.decisionDueAt = 90;
+    approach.sourceDirectiveId = 'd-hidden';
+    approach.enemyLinkedAtDecision = true;     // the real enemy linkage
+  }
+}
+
+/** One reader per `EnemyState` category, so "every enemy field" can be CHECKED rather than claimed.
+ *  `map` is absent on purpose: the street map is public knowledge `playerView` lawfully serves. */
+const ENEMY_STATE_CATEGORIES: ((w: WorldState) => boolean)[] = [
+  (w) => w.enemy.observers.length > 0,
+  (w) => w.enemy.evidence.length > 0,
+  (w) => w.enemy.digestedThrough > 0,
+  (w) => w.enemy.sketch.length > 0,
+  (w) => w.enemy.watchedDistricts.length > 0,
+  (w) => w.enemy.decisions.length > 0,
+  (w) => w.enemy.featureCounter > 0,
+  (w) => w.enemy.interrogated.length > 0,
+  (w) => w.enemy.inquiriesIssued.length > 0,
+  (w) => (w.enemy.pendingOrders ?? []).length > 0,
+  (w) => (w.enemy.issuedDirectiveIds ?? []).length > 0,
+  (w) => (w.enemy.actionLedger ?? []).length > 0,
+];
+
+/** Every ENEMY-STATE category, moved together — the arm's label claims "every enemy field", so it
+ *  owes each one. `enemy.map` is deliberately excluded: the street map is PUBLIC knowledge that
+ *  `playerView` lawfully serves, so moving it would be a real change, not a hidden one. */
+function flipEnemyState(world: WorldState): void {
+  const enemy = world.enemy;
+  enemy.observers.push({ id: 'bez', vigilance: 0.9 });
+  enemy.evidence.push({
+    kind: 'utterance', tick: 0, venue: 'market', observer: 'bez', overheard: true, speaker: 'eve',
+    addressedTo: 'dov', mode: 'telling', claimId: 'c-hidden', family: 'f-hidden', about: null,
+    reported: { subject: 'eve', predicate: 'stole', object: null, count: null, severity: 3,
+      place: null, attribution: SOMEONE },
+  });
+  enemy.digestedThrough = 1;
+  enemy.sketch.push({
+    id: 'sf-hidden', kind: 'carrier-profile', day: 1, family: null, subject: 'ada',
+    district: 'd0', detail: 'hidden',
+    evidence: [{ tick: 0, observer: 'bez', claimId: null, messageId: null }],
+  });
+  enemy.watchedDistricts.push('d0');
+  enemy.decisions.push({ day: 1, features: [], inquiries: [], watches: [], interrogations: [] });
+  enemy.featureCounter = 7;
+  enemy.interrogated.push('ada:s:you');
+  enemy.inquiriesIssued.push('s:you');
+  enemy.pendingOrders = [{ key: 'o-hidden', issuedDay: 1, reconsiderAfterDay: 3, directiveIds: [] }];
+  enemy.issuedDirectiveIds = ['d-enemy'];
+  enemy.actionLedger = [{
+    orderKey: 'o-hidden', kind: 'watch', directiveIds: [], leadFeatureId: null, subject: 'ada',
+    about: null, district: 'd0', scheduleStartDay: 1,
+    posts: [{ guard: 'bez', venue: 'market' }], workedDays: [1], askedAt: null,
+  }];
+}
+
 /** Every hidden dimension the player may never see, flipped in one call. */
 function flipHidden(world: WorldState): void {
   const state = ensureDirectiveState(world);
@@ -821,11 +1094,8 @@ function flipHidden(world: WorldState): void {
     id: 'bez', mice: 'money', wagePaidThroughDay: 0, strikes: 0, facts: [], turned: true,
   });
   world.network.pendingCouriers = [];
-  world.enemy.sketch.push({
-    id: 'sf-hidden', kind: 'carrier-profile', day: 1, family: null, subject: 'ada',
-    district: 'd0', detail: 'hidden',
-    evidence: [{ tick: 0, observer: 'bez', claimId: null, messageId: null }],
-  });
+  flipRecruitmentHidden(world);
+  flipEnemyState(world);
   world.scheduleOverrides['dov'] = [{ fromDay: 0, toDay: 9, from: 0, to: 1440, venue: 'salon', source: 'vignette' }];
 }
 
@@ -846,6 +1116,13 @@ function bundleWorld(seed: string): WorldState {
     spec: { subject: 'eve', predicate: 'stole', object: null, count: null, severity: 3,
       place: null, attribution: SOMEONE },
     pickedUpAt: 0, expiresAt: 3 * TICKS_PER_DAY,
+  });
+  // One open recruitment approach, so the hidden-field mutations below MUTATE a real record rather
+  // than merely adding one (the same non-vacuity fix the courier-removal prong needed).
+  ensureDirectiveState(world).recruitmentApproaches.push({
+    id: 'ap-0', principal: 'player', recruiter: 'you', target: 'eve', mice: 'money',
+    leverageFamily: null, openedAt: 0, resolveAt: null, decisionDueAt: null, status: 'waiting',
+    initial: 'hesitate', decided: null, sourceDirectiveId: null, enemyLinkedAtDecision: false,
   });
   return world;
 }
@@ -876,26 +1153,43 @@ describe('hidden-state twins render byte-identical bundles and byte-identical ma
     const clean = bundleWorld('twin-clean');
     const flipped = bundleWorld('twin-clean');
     flipHidden(flipped);
+    // Non-vacuity: the flip really reached the recruitment record and EVERY enemy-state category.
+    expect(ensureDirectiveState(flipped).recruitmentApproaches.length).toBeGreaterThan(0);
+    expect(ensureDirectiveState(flipped).recruitmentApproaches
+      .every((a) => a.initial === 'accept' && a.decided === 'refuse' && a.enemyLinkedAtDecision)).toBe(true);
+    expect(ENEMY_STATE_CATEGORIES.filter((read) => !read(flipped))).toEqual([]);
+    expect(ENEMY_STATE_CATEGORIES.filter((read) => read(clean))).toEqual([]);
+
     expect(publicBundle(flipped)).toBe(publicBundle(clean));
     expect(deskMarkup(flipped)).toBe(deskMarkup(clean));
   });
 
+  /** Each arm carries the check that it really MOVED what its label names — an arm that quietly
+   *  mutates nothing would otherwise assert byte-identity against itself and prove nothing. */
   it.each([
     ['a remote schedule/position', (w: WorldState) => {
       w.scheduleOverrides['dov'] = [{ fromDay: 0, toDay: 9, from: 0, to: 1440, venue: 'salon', source: 'vignette' }];
-    }],
+    }, (w: WorldState) => (w.scheduleOverrides['dov'] ?? []).length > 0],
     ['message holder/cursor/delivery/failure/expiry', (w: WorldState) => {
       for (const m of ensureDirectiveState(w).messages) {
         m.holder = 'dov'; m.nextHop = 1; m.deliveredAt = 30; m.failedAt = 45; m.expiresAt = 900;
       }
-    }],
-    ['a received brief/profile/execution', (w: WorldState) => {
+    }, (w: WorldState) => ensureDirectiveState(w).messages.every((m) => m.deliveredAt === 30)],
+    ['a received brief / decision profile / execution', (w: WorldState) => {
       for (const r of ensureDirectiveState(w).records) {
         r.received = { tick: 30, version: { ...r.authored, id: 'v-x', brief: {
           ...r.authored.brief, purpose: 'MUTATED' } }, handoffFrom: 'dov', messageId: 'm-x' };
+        r.decision = {
+          interpretation: { kind: 'learn', target: { kind: 'person', id: 'dov' } },
+          commitment: 'refuse', initiative: 'adaptive', risk: 'bold', method: { kind: 'hold' },
+          timing: { actAt: 30, reportAt: 45 },
+          disclosure: { outcome: false, reason: false, evidence: false, source: false, uncertainty: false },
+          candor: 'doctored',
+        };
         r.execution = { state: 'completed', changedAt: 40, dueAt: null, waiting: null };
       }
-    }],
+    }, (w: WorldState) => ensureDirectiveState(w).records.every(
+      (r) => r.received !== null && r.decision !== null && r.execution !== null)],
     ['held observation queue state', (w: WorldState) => {
       ensureDirectiveState(w).heldObservations.push({
         id: 'o-x', fingerprint: 'f', rootFingerprint: 'r', principal: 'player', observer: 'ada',
@@ -903,22 +1197,30 @@ describe('hidden-state twins render byte-identical bundles and byte-identical ma
         content: { kind: 'raw', observation: { kind: 'presence', tick: 0, venue: 'market', actor: 'eve' } },
         sourceDirectiveId: null, route: [], factRefs: [], queuedIn: null, deliveredAt: null,
       });
-    }],
+    }, (w: WorldState) => ensureDirectiveState(w).heldObservations.length > 0],
     ['raw compartment facts', (w: WorldState) => {
       for (const a of w.network.assets) a.facts.push({ tick: 0, kind: 'carried-story', ref: 'f-raw' });
-    }],
-    ['a runtime courier removal', (w: WorldState) => { w.network.pendingCouriers = []; }],
+    }, (w: WorldState) => w.network.assets.every((a) => a.facts.length > 0)],
+    ['a runtime courier removal', (w: WorldState) => { w.network.pendingCouriers = []; },
+      (w: WorldState) => w.network.pendingCouriers.length === 0],
+    ['recruitment willingness / decided answer / handle / leverage / enemy linkage',
+      flipRecruitmentHidden,
+      (w: WorldState) => ensureDirectiveState(w).recruitmentApproaches.every(
+        (a) => a.initial === 'accept' && a.decided === 'refuse' && a.enemyLinkedAtDecision)],
     ['every turned / scrutiny / enemy field', (w: WorldState) => {
       for (const a of w.network.assets) a.turned = true;
       ensureDirectiveState(w).scrutiny.push({ observer: 'ada', principal: 'you', observedAt: 0, cause: 'confrontation' });
       w.network.enemyAssets.push({ id: 'bez', mice: 'ego', wagePaidThroughDay: 0, strikes: 0, facts: [], turned: true });
-      w.enemy.sketch.push({ id: 'sf-x', kind: 'entry-point', day: 1, family: null, subject: 'ada',
-        district: 'd0', detail: 'x', evidence: [{ tick: 0, observer: 'bez', claimId: null, messageId: null }] });
-    }],
-  ])('mutating %s moves neither the public bundle nor the desk markup', (_label, mutate) => {
+      flipEnemyState(w);
+    }, (w: WorldState) => w.network.assets.every((a) => a.turned === true)
+      && ensureDirectiveState(w).scrutiny.length > 0 && w.network.enemyAssets.length > 0
+      && ENEMY_STATE_CATEGORIES.every((read) => read(w))],
+  ])('mutating %s moves neither the public bundle nor the desk markup', (_label, mutate, moved) => {
     const control = bundleWorld('matrix');
     const probe = bundleWorld('matrix');
+    expect(moved(control), 'the arm is vacuous BEFORE it runs — nothing left to move').toBe(false);
     mutate(probe);
+    expect(moved(probe), 'the arm did not move the state its label names').toBe(true);
     expect(publicBundle(probe)).toBe(publicBundle(control));
     expect(deskMarkup(probe)).toBe(deskMarkup(control));
   });
@@ -999,21 +1301,102 @@ describe('remote work never pauses and never toasts; a requested offer always pa
     expect(session.localOffer()).not.toBeNull();
   });
 
-  it('main.tsx pauses only on a local offer or a terminal campaign, and toasts no remote event', () => {
+  it('main.tsx pauses only on a local offer or a terminal campaign', () => {
     const src = readFileSync(join(process.cwd(), 'app/src/main.tsx'), 'utf8');
     // The ONE pause reason: the local offer. (A terminal campaign leaves the loop through the
     // scenario early-return, not through a stop reason.)
     expect(src).toMatch(/result\.stopped === 'local-offer'/);
     expect(src).not.toMatch(/stopped === 'complete'/);
-    // No event-driven remote toast: setToast is never handed a delivery/execution/report noun.
-    const calls = [...src.matchAll(/setToast\(([\s\S]{0,200}?)\)[;,\s]/g)].map((m) => m[1]!);
-    expect(calls.length).toBeGreaterThan(0);
-    for (const call of calls) {
-      for (const noun of ['delivered', 'received', 'report', 'execut', 'pickup', 'picked up', 'failed']) {
-        expect(call.toLowerCase(), `a toast must not announce remote "${noun}"`).not.toContain(noun);
-      }
-    }
     // The only event listener the shell installs is the keyboard.
     expect([...src.matchAll(/addEventListener\('([a-z]+)'/g)].map((m) => m[1])).toEqual(['keydown']);
+  });
+});
+
+// ── The toast policy, fail-closed ────────────────────────────────────────────────────────────────
+
+/**
+ * Every `setToast(...)` argument in a source, extracted by walking balanced parentheses (string and
+ * template contents skipped), so the argument this check judges is the WHOLE argument — never a
+ * prefix a length cap happened to leave behind.
+ */
+function toastArguments(src: string): string[] {
+  const args: string[] = [];
+  const needle = 'setToast(';
+  for (let start = src.indexOf(needle); start >= 0; start = src.indexOf(needle, start + 1)) {
+    let i = start + needle.length;
+    let depth = 1;
+    let quote: string | null = null;
+    while (i < src.length && depth > 0) {
+      const c = src[i]!;
+      if (quote !== null) {
+        if (c === '\\') i += 1;
+        else if (c === quote) quote = null;
+      } else if (c === "'" || c === '"' || c === '`') quote = c;
+      else if (c === '(') depth += 1;
+      else if (c === ')') depth -= 1;
+      i += 1;
+    }
+    args.push(src.slice(start + needle.length, i - 1).replace(/\s+/g, ' ').trim());
+  }
+  return args;
+}
+
+/** The engine's own refusal, surfaced verbatim. The ONE non-literal argument the policy allows, and
+ *  it is pinned to this exact spelling — an "engine refusal" variable by any other name is a miss. */
+const ENGINE_REFUSAL = 'err instanceof Error ? err.message : String(err)';
+const STRING_LITERAL = String.raw`(?:'[^']*'|"[^"]*"|\`(?:[^\`\\]|\\.)*\`)`;
+/** Fail-closed: only a literal, a ternary CHOOSING between two literals, or the pinned refusal. */
+const LAWFUL_TOAST_ARG = new RegExp(
+  `^(?:${STRING_LITERAL}|[\\w.!?[\\]]+ \\? ${STRING_LITERAL} : ${STRING_LITERAL})$`,
+);
+const REMOTE_NOUNS = ['delivered', 'received', 'report', 'execut', 'pickup', 'picked up', 'failed'];
+
+/** Both halves of the policy, as one reporter: the forms it rejects and why. */
+function toastViolations(src: string): string[] {
+  const out: string[] = [];
+  for (const arg of toastArguments(src)) {
+    if (arg !== ENGINE_REFUSAL && !LAWFUL_TOAST_ARG.test(arg)) {
+      out.push(`non-literal toast argument: ${arg}`);
+      continue; // its text is not in the source, so the noun scan below cannot judge it
+    }
+    for (const noun of REMOTE_NOUNS) {
+      if (arg.toLowerCase().includes(noun)) out.push(`toast announces remote "${noun}": ${arg}`);
+    }
+  }
+  return out;
+}
+
+describe('the toast policy reports every remote announcement, literal or carried', () => {
+  const src = readFileSync(join(process.cwd(), 'app/src/main.tsx'), 'utf8');
+
+  it('the extractor is not vacuous: it finds main.tsx’s real setToast call sites', () => {
+    const args = toastArguments(src);
+    expect(args.length).toBeGreaterThan(4);
+    expect(args).toContain(ENGINE_REFUSAL);          // the one allowed passthrough, by exact name
+  });
+
+  it('main.tsx announces no remote event, and hands setToast nothing but literals', () => {
+    expect(toastViolations(src)).toEqual([]);
+  });
+
+  it.each([
+    ['a violating literal', "setToast('the report was delivered');", 'toast announces remote "delivered"'],
+    ['a variable carrying remote text',
+      "const remoteNotice = 'report received';\n  setToast(remoteNotice);", 'non-literal toast argument'],
+    ['a helper call whose text the scan cannot see', 'setToast(describeRemote(msg));', 'non-literal toast argument'],
+    ['a concatenation onto a variable', "setToast(prefix + ' arrived');", 'non-literal toast argument'],
+  ])('FIRES on %s', (_label, snippet, expected) => {
+    const found = toastViolations(snippet);
+    expect(found.length, `silent on: ${snippet}`).toBeGreaterThan(0);
+    expect(found.join(' | ')).toContain(expected);
+  });
+
+  it.each([
+    ["setToast('');", 'the clearing literal'],
+    ['setToast(`queued for ${fmtTick(t)} — unpause to fire`);', 'a template with interpolations'],
+    ["setToast(refused ? `a` : `b`);", 'a ternary choosing between two literals'],
+    [`setToast(${ENGINE_REFUSAL});`, 'the pinned engine-refusal passthrough'],
+  ])('stays silent on %s (%s)', (snippet) => {
+    expect(toastViolations(snippet)).toEqual([]);
   });
 });

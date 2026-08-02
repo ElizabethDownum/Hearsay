@@ -55,16 +55,23 @@ const GUIDANCE_KINDS = ['expected-presence', 'avoid-person', 'avoid-venue', 'not
 
 // ── The composer's form state: ten levers, each its own field ────────────────────────────────────
 
+/** A meeting the sound-out may ASK for — the `meeting` field the typed mission contract carries.
+ *  Asking is all it is: the recipient still owns the moment, and may never arrange it. */
+export interface MeetingRequestDraft { venue: string; from: number; until: number }
+
 export type DirectiveMissionDraft =
   | { application: 'standard'; mission: 'learn-person'; person: string }
   | { application: 'standard'; mission: 'learn-venue'; venue: string }
   | { application: 'standard'; mission: 'learn-story'; family: string }
-  | { application: 'standard'; mission: 'shape'; operation: 'spread' | 'suppress'; audience: string; payload: ShapePayload }
-  | { application: 'standard'; mission: 'shape-redirect'; audience: string; redirectTo: string; payload: ShapePayload }
-  | { application: 'standard'; mission: 'sound-out'; target: string; topic: 'recruitment' | 'cooperation'; handle: Mice | null }
+  | { application: 'standard'; mission: 'shape'; operation: 'spread' | 'suppress'; audience: string; payload: ShapePayload | null }
+  | { application: 'standard'; mission: 'shape-redirect'; audience: string; redirectTo: string; payload: ShapePayload | null }
+  | {
+      application: 'standard'; mission: 'sound-out'; target: string;
+      topic: 'recruitment' | 'cooperation'; handle: Mice | null; meeting: MeetingRequestDraft | null;
+    }
   | { application: 'posting'; venue: string }
   | { application: 'rendezvous'; venue: string; from: number; until: number }
-  | { application: 'courier'; target: string; payload: ShapePayload };
+  | { application: 'courier'; target: string; payload: ShapePayload | null };
 
 export interface DirectiveDraft {
   /** 1 — the final recipient (roster). */
@@ -158,12 +165,14 @@ export function defaultDirectiveDraft(sources: ComposerSources): DirectiveDraft 
   };
 }
 
-function missionOf(draft: DirectiveMissionDraft): DirectiveMission {
+/** The typed mission this draft composes — or `null` when it would need a story the player never
+ *  heard. There is no fallback payload: a claim absent from the Board is not composable at all. */
+function missionOf(draft: DirectiveMissionDraft): DirectiveMission | null {
   if (draft.application === 'posting' || draft.application === 'rendezvous') {
     return { kind: 'learn', target: { kind: 'venue', id: draft.venue } };
   }
   if (draft.application === 'courier') {
-    return {
+    return draft.payload === null ? null : {
       kind: 'shape', operation: 'spread', payload: draft.payload,
       audience: { kind: 'person', id: draft.target }, redirectTo: null,
     };
@@ -172,16 +181,17 @@ function missionOf(draft: DirectiveMissionDraft): DirectiveMission {
     case 'learn-person': return { kind: 'learn', target: { kind: 'person', id: draft.person } };
     case 'learn-venue': return { kind: 'learn', target: { kind: 'venue', id: draft.venue } };
     case 'learn-story': return { kind: 'learn', target: { kind: 'story', family: draft.family } };
-    case 'shape': return {
+    case 'shape': return draft.payload === null ? null : {
       kind: 'shape', operation: draft.operation, payload: draft.payload,
       audience: { kind: 'person', id: draft.audience }, redirectTo: null,
     };
-    case 'shape-redirect': return {
+    case 'shape-redirect': return draft.payload === null ? null : {
       kind: 'shape', operation: 'redirect', payload: draft.payload,
       audience: { kind: 'person', id: draft.audience }, redirectTo: draft.redirectTo,
     };
     default: return {
-      kind: 'sound-out', target: draft.target, topic: draft.topic, handle: draft.handle, meeting: null,
+      kind: 'sound-out', target: draft.target, topic: draft.topic, handle: draft.handle,
+      meeting: draft.meeting === null ? null : { ...draft.meeting },
     };
   }
 }
@@ -196,14 +206,20 @@ function applicationOfDraft(draft: DirectiveMissionDraft): PlayerDirectiveApplic
 }
 
 /** The whole composer, as a PURE function of its form state: ten levers in, one typed action out.
- *  Nothing here consults the world — which is why changing one lever can only move one field. */
-export function directiveIntentFrom(draft: DirectiveDraft): LocalActionIntent {
+ *  Nothing here consults the world — which is why changing one lever can only move one field.
+ *
+ *  `null` means the draft is not composable AT ALL, and there is exactly one way to reach it: a
+ *  payload-bearing mission with no delivered story behind it. The function cannot manufacture the
+ *  missing claim, so the fabricated-story form is structurally unreachable from this surface. */
+export function directiveIntentFrom(draft: DirectiveDraft): LocalActionIntent | null {
+  const mission = missionOf(draft.mission);
+  if (mission === null) return null;
   return {
     kind: 'directive',
     recipient: draft.recipient,
     handoff: { outboundVia: [...draft.outboundVia], reportVia: [...draft.reportVia] },
     brief: {
-      mission: missionOf(draft.mission),
+      mission,
       priority: draft.priority,
       authority: draft.authority,
       discretion: draft.discretion,
@@ -216,6 +232,60 @@ export function directiveIntentFrom(draft: DirectiveDraft): LocalActionIntent {
     },
     application: applicationOfDraft(draft.mission),
   };
+}
+
+/** Beat-aligned, non-empty: the two things the engine checks about any window it is handed. */
+function windowNotes(label: string, from: number, until: number): string[] {
+  const notes: string[] = [];
+  if (from >= until) notes.push(`the ${label} window runs backwards`);
+  if (from % BEAT !== 0 || until % BEAT !== 0) notes.push(`the ${label} window must sit on a conversation beat`);
+  return notes;
+}
+
+/**
+ * Client validation, in EXACTLY the scope the design allows it: well-formed times and routes, plus
+ * the visible facts (what you hold, who is standing in front of you). Every input is the draft
+ * itself or a public view — never a trait, a relationship, an eligibility, an enemy linkage, or a
+ * likely outcome. The engine remains the authority; this only stops the compositions it *must*
+ * refuse from being submitted, and it says plainly why each one is greyed.
+ */
+export function directiveIssues(draft: DirectiveDraft, sources: ComposerSources): string[] {
+  const notes: string[] = [];
+  const circle = new Set(sources.offer?.circleMembers ?? []);
+  const tick = sources.offer?.tick ?? sources.view.tick;
+
+  const firstHop = draft.outboundVia[0] ?? draft.recipient;
+  if (!circle.has(firstHop)) {
+    notes.push(draft.outboundVia.length === 0
+      ? 'hand it over in person only to someone in this moment'
+      : 'the first hop must be someone in this moment');
+  }
+  const routeNotes = (label: string, route: readonly string[]): void => {
+    if (route.includes(draft.recipient)) notes.push(`${label === 'outbound' ? 'an' : 'a'} ${label} relay cannot be the final recipient`);
+    if (new Set(route).size !== route.length) notes.push(`the ${label} route repeats a relay`);
+  };
+  routeNotes('outbound', draft.outboundVia);
+  routeNotes('report', draft.reportVia);
+
+  if (draft.activeFrom > draft.activeUntil) notes.push('the active window runs backwards');
+  if (draft.activeUntil < tick) notes.push('the active window has already closed');
+  if (draft.reportBy !== null
+    && (draft.reportBy < draft.activeFrom || draft.reportBy > draft.activeUntil)) {
+    notes.push('the report deadline falls outside the active window');
+  }
+
+  const mission = draft.mission;
+  if (mission.application === 'rendezvous') {
+    notes.push(...windowNotes('rendezvous', mission.from, mission.until));
+  }
+  if (mission.application === 'standard' && mission.mission === 'sound-out') {
+    if (mission.target === draft.recipient) notes.push('an asset cannot be asked to sound themselves out');
+    if (mission.meeting !== null) {
+      notes.push(...windowNotes('meeting', mission.meeting.from, mission.meeting.until));
+    }
+  }
+  if (missionOf(mission) === null) notes.push('no delivered story to send');
+  return notes;
 }
 
 // ── The panel ────────────────────────────────────────────────────────────────────────────────────
@@ -642,6 +712,10 @@ function DirectiveComposer(props: DayPlannerProps & { offer: LocalOffer }) {
   const people = directoryIds(view);
   const venues = venueIds(view);
   const families = Object.keys(draft.payloads).sort();
+  const missionOptions: MissionOptions = { people, venues, families, tick: offer.tick };
+  const issues = directiveIssues(draft, sources);
+  const rendezvous = rendezvousWindowOf(draft, offer.tick);
+  const meeting = meetingOf(draft);
   const firstHop = draft.outboundVia[0] ?? '';
   const laterHops = draft.outboundVia.slice(1);
   const [relay, setRelay] = useState('');
@@ -698,13 +772,17 @@ function DirectiveComposer(props: DayPlannerProps & { offer: LocalOffer }) {
         <legend>3 · mission</legend>
         <label>application <select className="desk-btn" aria-label="directive application"
           value={draft.mission.application}
-          onChange={(e) => set('mission', missionDraftFor(e.target.value, draft, { people, venues, families }))}>
+          onChange={(e) => set('mission', missionDraftFor(e.target.value, draft, missionOptions))}>
           {['standard', 'posting', 'rendezvous', 'courier'].map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
         <label>mission <select className="desk-btn" aria-label="directive mission"
           value={draft.mission.application === 'standard' ? draft.mission.mission : draft.mission.application}
-          onChange={(e) => set('mission', standardMissionFor(e.target.value, draft, { people, venues, families }))}>
+          onChange={(e) => set('mission', standardMissionFor(e.target.value, draft, missionOptions))}>
           {['learn-person', 'learn-venue', 'learn-story', 'shape', 'shape-redirect', 'sound-out']
             .map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
+        <label>operation <select className="desk-btn" aria-label="directive shape operation"
+          value={shapeOperationOf(draft)}
+          onChange={(e) => set('mission', withShapeOperation(draft, e.target.value as 'spread' | 'suppress'))}>
+          {['spread', 'suppress'].map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
         <label>person <select className="desk-btn" aria-label="directive mission person" value={missionPersonOf(draft)}
           onChange={(e) => set('mission', withMissionPerson(draft, e.target.value))}>
           {people.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
@@ -716,6 +794,9 @@ function DirectiveComposer(props: DayPlannerProps & { offer: LocalOffer }) {
           {families.length === 0
             ? <option value="">— none held —</option>
             : families.map((f) => <option key={f} value={f}>{f}</option>)}</select></label>
+        {families.length === 0 && (
+          <span className="desk-note" aria-label="directive payload note">no delivered story to send</span>
+        )}
         <label>redirect to <select className="desk-btn" aria-label="directive redirect to" value={redirectOf(draft, people)}
           onChange={(e) => set('mission', withRedirect(draft, e.target.value))}>
           {people.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
@@ -730,6 +811,25 @@ function DirectiveComposer(props: DayPlannerProps & { offer: LocalOffer }) {
           onChange={(e) => set('mission', withSoundOutHandle(draft, e.target.value === '' ? null : e.target.value as Mice))}>
           <option value="">— none —</option>
           {MICE.map((m) => <option key={m} value={m}>{TERMS[`mice-${m}`]!.label}</option>)}</select></label>
+        <label><input type="checkbox" aria-label="request a meeting" checked={meeting !== null}
+          onChange={(e) => set('mission', withMeeting(draft,
+            e.target.checked ? { venue: venues[0] ?? '', ...seedWindow(offer.tick) } : null))} /> ask for a meeting</label>
+        <label>meet at <select className="desk-btn" aria-label="directive meeting venue"
+          value={meeting?.venue ?? venues[0] ?? ''}
+          onChange={(e) => meeting && set('mission', withMeeting(draft, { ...meeting, venue: e.target.value }))}>
+          {venues.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
+        <label>meet from <input className="desk-btn" style={{ width: 88 }} type="number" aria-label="directive meeting from"
+          value={meeting?.from ?? seedWindow(offer.tick).from}
+          onChange={(e) => meeting && set('mission', withMeeting(draft, { ...meeting, from: Number(e.target.value) }))} /></label>
+        <label>meet until <input className="desk-btn" style={{ width: 88 }} type="number" aria-label="directive meeting until"
+          value={meeting?.until ?? seedWindow(offer.tick).until}
+          onChange={(e) => meeting && set('mission', withMeeting(draft, { ...meeting, until: Number(e.target.value) }))} /></label>
+        <label>rendezvous from <input className="desk-btn" style={{ width: 88 }} type="number" aria-label="directive rendezvous from"
+          value={rendezvous.from}
+          onChange={(e) => set('mission', withRendezvousWindow(draft, 'from', Number(e.target.value)))} /></label>
+        <label>rendezvous until <input className="desk-btn" style={{ width: 88 }} type="number" aria-label="directive rendezvous until"
+          value={rendezvous.until}
+          onChange={(e) => set('mission', withRendezvousWindow(draft, 'until', Number(e.target.value)))} /></label>
       </fieldset>
 
       <fieldset className="desk-fieldset">
@@ -785,8 +885,16 @@ function DirectiveComposer(props: DayPlannerProps & { offer: LocalOffer }) {
           onChange={(e) => set('purpose', e.target.checked ? null : '')} /> withhold <Term id="purpose" /></label>
       </fieldset>
 
-      <button className="desk-btn" aria-label="submit directive"
-        onClick={() => onLocal(directiveIntentFrom(draft))}>hand over the <Term id="brief" /></button>
+      <button className="desk-btn" aria-label="submit directive" disabled={issues.length > 0}
+        onClick={() => {
+          const intent = directiveIntentFrom(draft);
+          if (intent !== null) onLocal(intent);
+        }}>hand over the <Term id="brief" /></button>
+      {issues.length > 0 && (
+        <ul className="desk-note" aria-label="directive notes">
+          {issues.map((note) => <li key={note}>{note}</li>)}
+        </ul>
+      )}
       <p className="desk-note">
         Times are ticks. Well-formed times and routes are checked here; everything else is the
         engine&apos;s to judge, and theirs.
@@ -797,47 +905,54 @@ function DirectiveComposer(props: DayPlannerProps & { offer: LocalOffer }) {
 
 // ── Mission-draft transitions. Each one rewrites ONLY lever 3; no other lever is ever touched. ────
 
-interface MissionOptions { people: string[]; venues: string[]; families: string[] }
-
-function firstPayload(draft: DirectiveDraft, families: string[]): ShapePayload {
-  const family = families[0];
-  return family === undefined
-    ? { family: null, parent: null, claim: {
-      subject: SOMEONE, predicate: PREDICATES[0]!.id, object: null, count: null,
-      severity: 3, place: null, attribution: SOMEONE,
-    } }
-    : draft.payloads[family]!;
+export interface MissionOptions {
+  people: string[];
+  venues: string[];
+  families: string[];
+  /** The offered beat. Sub-windows seed from THIS, never from another lever's current value. */
+  tick: number;
 }
 
-function missionDraftFor(kind: string, draft: DirectiveDraft, o: MissionOptions): DirectiveMissionDraft {
+/** The first story the player actually HOLDS, or null. There is no manufactured fallback: a claim
+ *  the player never heard is not theirs to hand on, so the mission simply carries no payload and
+ *  says so (`directiveIssues`) instead of inventing one. */
+function heldPayload(draft: DirectiveDraft, families: string[]): ShapePayload | null {
+  const family = families[0];
+  return family === undefined ? null : draft.payloads[family] ?? null;
+}
+
+/** A fresh sub-window, seeded from the offered beat alone — lever 8 never drags it. */
+const seedWindow = (tick: number) => ({ from: tick + BEAT, until: tick + 2 * BEAT });
+
+export function missionDraftFor(kind: string, draft: DirectiveDraft, o: MissionOptions): DirectiveMissionDraft {
   switch (kind) {
     case 'posting': return { application: 'posting', venue: o.venues[0] ?? '' };
     case 'rendezvous': return {
-      application: 'rendezvous', venue: o.venues[0] ?? '',
-      from: draft.activeFrom, until: draft.activeFrom + BEAT,
+      application: 'rendezvous', venue: o.venues[0] ?? '', ...seedWindow(o.tick),
     };
     case 'courier': return {
-      application: 'courier', target: o.people[0] ?? '', payload: firstPayload(draft, o.families),
+      application: 'courier', target: o.people[0] ?? '', payload: heldPayload(draft, o.families),
     };
     default: return { application: 'standard', mission: 'learn-person', person: o.people[0] ?? '' };
   }
 }
 
-function standardMissionFor(kind: string, draft: DirectiveDraft, o: MissionOptions): DirectiveMissionDraft {
+export function standardMissionFor(kind: string, draft: DirectiveDraft, o: MissionOptions): DirectiveMissionDraft {
   switch (kind) {
     case 'learn-venue': return { application: 'standard', mission: 'learn-venue', venue: o.venues[0] ?? '' };
     case 'learn-story': return { application: 'standard', mission: 'learn-story', family: o.families[0] ?? '' };
     case 'shape': return {
       application: 'standard', mission: 'shape', operation: 'spread',
-      audience: o.people[0] ?? '', payload: firstPayload(draft, o.families),
+      audience: o.people[0] ?? '', payload: heldPayload(draft, o.families),
     };
     case 'shape-redirect': return {
       application: 'standard', mission: 'shape-redirect', audience: o.people[0] ?? '',
-      redirectTo: o.people[1] ?? o.people[0] ?? '', payload: firstPayload(draft, o.families),
+      redirectTo: o.people[1] ?? o.people[0] ?? '', payload: heldPayload(draft, o.families),
     };
     case 'sound-out': return {
       application: 'standard', mission: 'sound-out',
-      target: o.people.find((id) => id !== draft.recipient) ?? '', topic: 'recruitment', handle: null,
+      target: o.people.find((id) => id !== draft.recipient) ?? '', topic: 'recruitment',
+      handle: null, meeting: null,
     };
     default: return { application: 'standard', mission: 'learn-person', person: o.people[0] ?? '' };
   }
@@ -874,22 +989,47 @@ const withMissionVenue = (draft: DirectiveDraft, venue: string): DirectiveMissio
 const missionFamilyOf = (draft: DirectiveDraft, families: string[]): string => {
   const m = draft.mission;
   if (m.application === 'standard' && m.mission === 'learn-story') return m.family;
-  if (m.application === 'courier') return m.payload.family ?? '';
+  if (m.application === 'courier') return m.payload?.family ?? '';
   if (m.application === 'standard' && (m.mission === 'shape' || m.mission === 'shape-redirect')) {
-    return m.payload.family ?? '';
+    return m.payload?.family ?? '';
   }
   return families[0] ?? '';
 };
 const withMissionFamily = (draft: DirectiveDraft, family: string): DirectiveMissionDraft => {
   const m = draft.mission;
-  const payload = draft.payloads[family];
+  const payload = draft.payloads[family] ?? null;
   if (m.application === 'standard' && m.mission === 'learn-story') return { ...m, family };
-  if (payload === undefined) return m;
   if (m.application === 'courier') return { ...m, payload };
   if (m.application === 'standard' && (m.mission === 'shape' || m.mission === 'shape-redirect')) {
     return { ...m, payload };
   }
   return m;
+};
+const shapeOperationOf = (draft: DirectiveDraft): 'spread' | 'suppress' => {
+  const m = draft.mission;
+  return m.application === 'standard' && m.mission === 'shape' ? m.operation : 'spread';
+};
+const withShapeOperation = (draft: DirectiveDraft, operation: 'spread' | 'suppress'): DirectiveMissionDraft => {
+  const m = draft.mission;
+  return m.application === 'standard' && m.mission === 'shape' ? { ...m, operation } : m;
+};
+const rendezvousWindowOf = (draft: DirectiveDraft, tick: number): { from: number; until: number } => {
+  const m = draft.mission;
+  return m.application === 'rendezvous' ? { from: m.from, until: m.until } : seedWindow(tick);
+};
+const withRendezvousWindow = (
+  draft: DirectiveDraft, edge: 'from' | 'until', value: number,
+): DirectiveMissionDraft => {
+  const m = draft.mission;
+  return m.application === 'rendezvous' ? { ...m, [edge]: value } : m;
+};
+const meetingOf = (draft: DirectiveDraft): MeetingRequestDraft | null => {
+  const m = draft.mission;
+  return m.application === 'standard' && m.mission === 'sound-out' ? m.meeting : null;
+};
+const withMeeting = (draft: DirectiveDraft, meeting: MeetingRequestDraft | null): DirectiveMissionDraft => {
+  const m = draft.mission;
+  return m.application === 'standard' && m.mission === 'sound-out' ? { ...m, meeting } : m;
 };
 const redirectOf = (draft: DirectiveDraft, people: string[]): string => {
   const m = draft.mission;
