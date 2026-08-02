@@ -261,21 +261,57 @@ const SELECTOR_FILE = join(repoRoot, 'src/sim/directives/view.ts');
  *     Template `${…}` expressions and JSX `{…}` containers ARE code and are walked like any other
  *     subtree.
  *   - ONE MECHANISM COVERS EVERY ACCESS SPELLING. `x.name`, `x?.name`, `x['name']`, `{ name }`,
- *     `{ name: alias }` and object shorthand all deposit the same NAME in the same set, so a prong
- *     asks about a name and never about a spelling.
+ *     `{ name: alias }`, object shorthand and a private field `#name` all deposit the same NAME in
+ *     the same set, so a prong asks about a name and never about a spelling. (The private field is
+ *     the one construct whose node text is not its name — TypeScript keeps the `#` — so it is
+ *     canonicalized on the way in rather than trusted.)
  *   - RECEIVERS DO NOT MATTER. A `.network.assets` reach is reported whether the receiver is a
- *     plain identifier, a parenthesized expression, an optional chain, or a call result.
+ *     plain identifier, a parenthesized expression, an optional chain, or a call result — and the
+ *     BINDING that would split that chain in two (`const n = world.network;`) is reported too.
  *   - WHAT CANNOT BE READ AT PARSE TIME FAILS CLOSED. A computed key only the running program
- *     knows (`world[whichever]`) is reported as unresolvable rather than skipped.
+ *     knows (`world[whichever]`) is reported as unresolvable rather than skipped, and a source the
+ *     parser only RECOVERED from is refused outright rather than scanned as clean.
  */
+
+/**
+ * The parser's OWN verdict on the source it just read. `ts.createSourceFile` records its parse
+ * diagnostics but does not expose them on the public `SourceFile` type; `getSyntacticDiagnostics`
+ * is the supported access path to exactly that list, so the already-parsed file is handed to a
+ * one-file program rather than reparsed. The host is virtual and the options are `noResolve` +
+ * `noLib`: nothing outside this text is ever read, and nothing semantic is ever asked.
+ */
+function syntaxErrors(file: ts.SourceFile): readonly ts.Diagnostic[] {
+  const host: ts.CompilerHost = {
+    getSourceFile: (name) => (name === file.fileName ? file : undefined),
+    getDefaultLibFileName: () => 'lib.d.ts',
+    writeFile: () => {},
+    getCurrentDirectory: () => '',
+    getCanonicalFileName: (name) => name,
+    useCaseSensitiveFileNames: () => true,
+    getNewLine: () => '\n',
+    fileExists: (name) => name === file.fileName,
+    readFile: () => undefined,
+  };
+  return ts.createProgram([file.fileName], { noResolve: true, noLib: true }, host)
+    .getSyntacticDiagnostics(file);
+}
 
 /** `.tsx` is parsed as TSX, so JSX prose is JSX prose and not punctuation. */
 function parseSource(text: string, fileName: string): ts.SourceFile {
   const kind = fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
   const file = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true, kind);
-  // Fail closed: a source the parser could not turn into statements must never scan as "clean".
+  // FAIL CLOSED. The parser does not REJECT bad syntax, it REPAIRS it: a half-open JSX element
+  // still yields statements, and the repair reclassifies the live code below it as JSX text — so
+  // the scan would call a file `tsc` refuses "clean". A statement count cannot see that; the
+  // parser's diagnostics can. Either symptom — a syntactic diagnostic, or a recovery so total that
+  // no statement survives — means this text is not the language the scan is reading.
+  const [firstError] = syntaxErrors(file);
+  if (firstError !== undefined) {
+    throw new Error(`the hidden-name scan could not parse ${fileName}: `
+      + ts.flattenDiagnosticMessageText(firstError.messageText, ' '));
+  }
   if (text.trim().length > 0 && file.statements.length === 0) {
-    throw new Error(`the hidden-name scan could not parse ${fileName}`);
+    throw new Error(`the hidden-name scan could not parse ${fileName}: no statements`);
   }
   return file;
 }
@@ -293,6 +329,10 @@ function unwrap(node: ts.Node): ts.Node {
     return current;
   }
 }
+
+/** A private field is the one construct whose node text is not its name: TypeScript keeps the `#`
+ *  sigil, so `#decision` and `decision` are the same NAME reached two ways. */
+const canonicalName = (text: string): string => (text.startsWith('#') ? text.slice(1) : text);
 
 /** A key with a PARSE-TIME answer: `x['decision']` yes, `x[whichever]` no. */
 function literalKey(node: ts.Node | undefined): string | null {
@@ -358,6 +398,14 @@ function isWorldSource(node: ts.Node): boolean {
 const touchesWorld = (node: ts.Node): boolean =>
   chainNames(leadingExpression(node)).includes('world');
 
+/** Is this initializer the RAW ROSTER ITSELF — a chain rooted at `world`/`….world` and ending
+ *  `.network`? Deliberately NARROW: only the composition root's own shape counts, so a selector
+ *  call (`networkView(world)`) hands back a view and is never mistaken for the roster. */
+const isRawNetworkSource = (node: ts.Node): boolean => {
+  const target = unwrap(node);
+  return isAccess(target) && accessedName(target) === 'network' && isWorldSource(target.expression);
+};
+
 /** A `<receiver>.network.assets` reach, and whether its receiver is the canonical world binding. */
 interface RosterReach { rootedAtWorld: boolean; text: string }
 /** The four ways to put the world behind a name the scan cannot follow. */
@@ -369,6 +417,8 @@ interface ScanFacts {
   names: ReadonlySet<string>;
   roster: readonly RosterReach[];
   aliases: readonly WorldAlias[];
+  /** The composition root's RAW roster put behind a name: `const n = world.network;`. */
+  networkBindings: readonly string[];
   /** Reaches through world/network whose key only the running program knows. */
   unresolved: readonly string[];
 }
@@ -382,6 +432,7 @@ function scanSource(text: string, fileName: string): ScanFacts {
   const names = new Set<string>();
   const roster: RosterReach[] = [];
   const aliases: WorldAlias[] = [];
+  const networkBindings: string[] = [];
   const unresolved: string[] = [];
   const show = (node: ts.Node): string => node.getText(file).replace(/\s+/g, ' ').slice(0, 90);
 
@@ -389,10 +440,10 @@ function scanSource(text: string, fileName: string): ScanFacts {
     if (ts.isJSDoc(node)) return;                       // documentation is prose, not a read
 
     // 1. NAMES — one mechanism for every spelling a field access can wear.
-    if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) names.add(node.text);
+    if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) names.add(canonicalName(node.text));
     if (isAccess(node)) {
       const key = accessedName(node);
-      if (key !== null) names.add(key);                 // `x['decision']` names it as `x.decision` does
+      if (key !== null) names.add(canonicalName(key));  // `x['decision']` names it as `x.decision` does
     }
     for (const position of namePositions(node)) {
       const spelled = staticStringName(position);
@@ -424,6 +475,18 @@ function scanSource(text: string, fileName: string): ScanFacts {
       if (!canonical) aliases.push({ kind: 'assigned', text: show(node) });
     }
 
+    // 3b. THE RAW ROSTER BEHIND A NAME. `const n = world.network;` stops one step short of the
+    //     `network.assets` chain section 2 owns, and the read that follows (`n.assets`) then rides
+    //     a plain identifier no source scan can resolve. So the BINDING is the report — the app
+    //     consumes selector views, never the composition root's own roster. Narrow by intent: the
+    //     initializer must be the raw `world`/`….world` chain ending `.network`, nothing inferred.
+    const boundSource = ts.isVariableDeclaration(node) ? node.initializer
+      : ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
+        ? node.right : undefined;
+    if (boundSource !== undefined && isRawNetworkSource(boundSource)) {
+      networkBindings.push(show(node));
+    }
+
     // 4. FAIL CLOSED — a world/network reach whose key only the running program knows.
     if (ts.isElementAccessExpression(node) && literalKey(node.argumentExpression) === null
       && chainNames(node.expression).some((name) => DYNAMIC_ROOTS.has(name))) {
@@ -433,7 +496,7 @@ function scanSource(text: string, fileName: string): ScanFacts {
     ts.forEachChild(node, visit);
   };
   visit(file);
-  return { names, roster, aliases, unresolved };
+  return { names, roster, aliases, networkBindings, unresolved };
 }
 
 /** A synthetic probe source. TSX, so a JSX counterexample is parsed as the TSX it really is. */
@@ -501,6 +564,36 @@ describe('the scan classifies its sources on the TypeScript AST', () => {
     expect(scan('const v = <p>{record.decision}</p>;').names.has('decision')).toBe(true);
     expect(scan('const v = <Row decision={record.decision} />;').names.has('decision')).toBe(true);
   });
+
+  // A private field is the one spelling whose NODE text is not its name: TypeScript keeps the `#`
+  // sigil, so `#decision` would answer a `decision` question with silence unless it is canonicalized
+  // on the way into the name set.
+  it('canonicalizes a PRIVATE field — `#decision` deposits the name `decision`', () => {
+    const fixture = 'class Box {\n  #decision = 1;\n  read() { return this.#decision; }\n}';
+    expect(scan(fixture).names.has('decision'), 'the declared-and-read private field').toBe(true);
+    expect(scan(fixture).names.has('#decision'), 'the sigil is not part of the name').toBe(false);
+    expect(scan('class Box { #count = 1; read() { return this.#count; } }').names.has('count'))
+      .toBe(true);
+  });
+
+  // FAIL CLOSED ON A RECOVERED PARSE. `ts.createSourceFile` does not reject bad syntax — it repairs
+  // it and hands back statements, and the repair can reclassify live code as prose (a half-open JSX
+  // element swallows the read below it as JSX text). A statement count therefore proves nothing;
+  // only the parser's own diagnostics do.
+  it.each([
+    ['a malformed JSX fragment whose recovery reclassifies the read as JSX text',
+      'const ok = 1;\nconst v = <p>\nrecord.decision'],
+    ['a malformed TypeScript statement', 'const ok=1; const x = ;'],
+  ])('THROWS on a source the parser only RECOVERED from — %s', (_label, form) => {
+    expect(() => scan(form), `scanned a source the parser rejected: ${form}`)
+      .toThrow(/could not parse/);
+  });
+
+  it('a source that really parses is scanned — both script kinds, and the real selector file', () => {
+    expect(() => scanSource('const v = <p>{record.decision}</p>;', 'clean.tsx')).not.toThrow();
+    expect(() => scanSource('export const x: number = 1;', 'clean.ts')).not.toThrow();
+    expect(() => scanSource(readFileSync(SELECTOR_FILE, 'utf8'), SELECTOR_FILE)).not.toThrow();
+  });
 });
 
 /** One forbidden name, the question that reports it, and the forms that question MUST answer yes.
@@ -509,7 +602,9 @@ describe('the scan classifies its sources on the TypeScript AST', () => {
 interface Prong { label: string; reports: (facts: ScanFacts) => boolean; violations: string[] }
 
 /** The access spellings ONE name question has to answer, given an owner expression. The old scan
- *  needed a normalization rule per spelling; on the AST they are all just the name. */
+ *  needed a normalization rule per spelling; on the AST they are all just the name. The last form
+ *  is the one spelling whose node text is NOT its name — a private field carries a `#` sigil — so
+ *  every prong now proves the canonicalization rather than trusting it. */
 const accessForms = (owner: string, name: string): string[] => [
   `const a = ${owner}.${name};`,
   `const b = ${owner}['${name}'];`,
@@ -517,6 +612,7 @@ const accessForms = (owner: string, name: string): string[] => [
   `const { ${name} } = ${owner};`,
   `const { ${name}: alias } = ${owner};`,
   `const d = { ${name} };`,
+  `class Holder { #${name} = 1; read() { return this.#${name}; } }`,
 ];
 
 const named = (label: string, owner: string, name: string): Prong => ({
@@ -648,6 +744,24 @@ const FORBIDDEN_IN_APP: Prong[] = [
       'const z = roster.network.assets;', 'const p = (w).network.assets;',
       'const q = w?.network.assets;', 'const r = pick(session).network.assets;'],
   },
+  // …and the step before that reach: binding the raw roster ITSELF. `const n = world.network;`
+  // then `const x = n.assets;` splits the chain across two statements, so neither prong above sees
+  // it — the second half is an ordinary `n.assets` read. Pinning the composition-root BINDING keeps
+  // the same law ("the app consumes selector views, never the raw roster") without asking a source
+  // scan to follow data flow: only the literal `world`/`….world` → `.network` shape reports, so the
+  // lawful `networkView(world)` call and every NetworkView-derived local stay silent.
+  {
+    label: 'the RAW roster bound off the composition root (`world.network` under a name)',
+    reports: (facts) => facts.networkBindings.length > 0,
+    violations: [
+      'const n = world.network;\nconst x = n.assets;',
+      'let n;\nn = world.network;\nconst x = n.assets;',
+      'const n = session.world.network;',
+      'const n = (world).network;',
+      'const n = world?.network;',
+      'cache.net = world.network;',
+    ],
+  },
   ...WORLD_ALIAS_PRONGS,
 ];
 
@@ -719,8 +833,23 @@ describe('hidden-name source scan — no app surface reaches behind its selector
     ['an OPTIONAL-CHAIN receiver off a call result',
       'const w = pick(session.world);\nconst x = w?.network.assets;'],
     ['a CALL-RESULT receiver', 'const x = pick(session).network.assets;'],
+    // …and the two-step form, where the raw roster is bound FIRST and read through a plain name a
+    // step later, so no single chain ever ends `network.assets`. The binding is the report.
+    ['a TWO-STEP binding of the raw roster', 'const n = world.network;\nconst x = n.assets;'],
+    ['a TWO-STEP binding by ASSIGNMENT', 'let n;\nn = world.network;\nconst x = n.assets;'],
   ])('FIRES: the roster reach a rooted-path scan let through — %s', (_label, form) => {
     expect(reportingProngs(form), `no app prong reports: ${form}`).not.toEqual([]);
+  });
+
+  // The spelling whose node text is not its name. TypeScript keeps the `#` sigil on a private
+  // field, so without canonicalization the real prong list answers a `decision` question with
+  // silence — the parity regression a word-bounded scan did not have.
+  it.each([
+    ['DECLARED', 'class Box { #decision = 1; }'],
+    ['DECLARED and READ through `this`',
+      'class Box {\n  #decision = 1;\n  read() { return this.#decision; }\n}'],
+  ])('FIRES: the hidden name spelled as a PRIVATE field — %s', (_label, form) => {
+    expect(reportingProngs(form), `no app prong reports: ${form}`).toContain('decision');
   });
 
   // The lexical counterexamples that closed this class, now asked of the REAL app prong list rather
@@ -753,6 +882,12 @@ describe('hidden-name source scan — no app surface reaches behind its selector
       + 'const parts = npcId.split(/[-_\\s]+/);\nconst m = /^(.*)-d\\d+$/.exec(id);'],
     ['the lawful NetworkView roster read',
       'const a = view.assets;\nconst b = net.assets.map((row) => row.id);'],
+    ['the composition root\'s real selector call — a VIEW comes back, never the roster',
+      'const net = networkView(world);'],
+    ['a NetworkView-derived local reading its own lawful field',
+      'const net = networkView(world);\nconst ids = net.assets.map((a) => a.id);'],
+    ['a private field carrying a lawful name',
+      'class Box { #count = 1; read() { return this.#count; } }'],
   ])('LAWFUL: no prong reports %s', (_label, form) => {
     expect(reportingProngs(form), `a prong reports the lawful form: ${form}`).toEqual([]);
   });
