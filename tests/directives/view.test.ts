@@ -243,28 +243,170 @@ describe('directiveView — the authored ledger is blind to every hidden dimensi
 const repoRoot = process.cwd();
 const SELECTOR_FILE = join(repoRoot, 'src/sim/directives/view.ts');
 
+const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
+
 /**
  * Normalize a source down to "the code that could actually REACH a field", so ONE word-bounded
  * pattern per forbidden name reports every common access form instead of one chosen spelling:
  *   1. comments out — prose is not a read (the jargon-scan precedent);
  *   2. computed access with a literal key rewritten to dotted form (`x['name']` ⇒ `x.name`), so the
  *      bracket spelling has become the dotted spelling before any pattern runs;
- *   3. string-literal TEXT out — player-facing copy is not a read either (main.tsx's ending card
- *      lawfully contains the sentence "The council turned on the usurper"). Template `${…}`
- *      expressions are CODE, so they survive step 3 and stay in scope for the patterns.
- * Order is load-bearing: (2) must run before (3), or a bracket key would be erased as a string
- * before it could be normalized into an access. After this pass `x.name`, `x['name']`, `{ name }`
- * and `{ name: alias }` are all, uniformly, a word-bounded occurrence of `name`.
+ *   3. every other string literal's TEXT out — player-facing copy is not a read either (main.tsx's
+ *      ending card lawfully contains the sentence "The council turned on the usurper");
+ *   4. template PROSE out, template `${…}` expressions KEPT — those are code.
+ * After this pass `x.name`, `x['name']`, `{ name }` and `{ name: alias }` are all, uniformly, a
+ * word-bounded occurrence of `name`.
+ *
+ * This is ONE left-to-right pass, not a stack of independent regexes, and that is the whole point:
+ * comments and string literals have to be recognized JOINTLY. A comment stripper that runs first
+ * erases live code whenever a string happens to carry a comment marker — the frontier re-review
+ * demonstrated `const s = "http://x"; const x = record.decision;` normalizing to `const s = "http:`
+ * with the hidden read walking free. Every position here is classified once, as exactly one of
+ * comment / string / template / code, so a marker inside a string is just text.
+ *
+ * An unterminated quote is deliberately NOT a literal (JSX prose apostrophes: "the player's desk"),
+ * which matches the language — a normal string literal cannot span a raw newline.
  */
 function scannableSource(src: string): string {
-  const noComments = src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (m) => (m.startsWith('/*') ? ' ' : ''));
-  const dotted = noComments.replace(/\[\s*(['"])([A-Za-z_$][\w$]*)\1\s*\]/g, '.$2');
-  const codeOnlyTemplates = dotted.replace(
-    /`(?:\\.|\$\{(?:[^{}]|\{[^{}]*\})*\}|[^`\\])*`/g,
-    (tpl) => `\`${[...tpl.matchAll(/\$\{(?:[^{}]|\{[^{}]*\})*\}/g)].map((m) => m[0]).join('')}\``,
-  );
-  return codeOnlyTemplates.replace(/'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"/g, "''");
+  return scanCode(src, 0, false).out;
 }
+
+/** A quoted literal that really terminates on its own line — or `null`, meaning the quote was
+ *  ordinary prose and must be left standing rather than swallowing the rest of the line. */
+function readQuotedLiteral(
+  src: string, start: number, quote: string,
+): { value: string; end: number } | null {
+  let i = start + 1;
+  let value = '';
+  while (i < src.length) {
+    const ch = src.charAt(i);
+    if (ch === '\\') { value += src.slice(i, i + 2); i += 2; continue; }
+    if (ch === '\n') return null;
+    if (ch === quote) return { value, end: i + 1 };
+    value += ch;
+    i += 1;
+  }
+  return null;
+}
+
+/** A template literal reduced to its `${…}` expressions — the prose between them is not code.
+ *  Expressions are normalized recursively, so a string (or another template) nested inside one is
+ *  classified by the same single pass. */
+function readTemplateLiteral(src: string, start: number): { out: string; end: number } {
+  let i = start + 1;
+  let out = '';
+  while (i < src.length) {
+    const ch = src.charAt(i);
+    if (ch === '\\') { i += 2; continue; }
+    if (ch === '`') { i += 1; break; }
+    if (ch === '$' && src.charAt(i + 1) === '{') {
+      const expression = scanCode(src, i + 2, true);
+      out += `\${${expression.out}}`;
+      i = expression.end + 1;
+      continue;
+    }
+    i += 1;
+  }
+  return { out: `\`${out}\``, end: i };
+}
+
+/** The pass itself. `insideExpression` makes it stop at the `}` closing a template `${…}`. */
+function scanCode(src: string, from: number, insideExpression: boolean): { out: string; end: number } {
+  let out = '';
+  let i = from;
+  let braces = 0;
+  while (i < src.length) {
+    const ch = src.charAt(i);
+    const next = src.charAt(i + 1);
+    if (ch === '/' && next === '/') {                    // line comment — only to the newline
+      while (i < src.length && src.charAt(i) !== '\n') i += 1;
+      continue;
+    }
+    if (ch === '/' && next === '*') {                    // block comment — newlines PRESERVED, so a
+      const close = src.indexOf('*/', i + 2);            // literal on a later line stays line-bounded
+      const body = src.slice(i, close === -1 ? src.length : close + 2);
+      out += ` ${'\n'.repeat((body.match(/\n/g) ?? []).length)}`;
+      i = close === -1 ? src.length : close + 2;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      const literal = readQuotedLiteral(src, i, ch);
+      if (literal === null) { out += ch; i += 1; continue; }
+      const before = out.replace(/[^\S\n]+$/, '');
+      let after = literal.end;
+      while (after < src.length && /[^\S\n]/.test(src.charAt(after))) after += 1;
+      if (before.endsWith('[') && src.charAt(after) === ']' && IDENTIFIER.test(literal.value)) {
+        out = `${before.slice(0, -1)}.${literal.value}`;  // x['name'] ⇒ x.name, BEFORE the text goes
+        i = after + 1;
+        continue;
+      }
+      out += "''";
+      i = literal.end;
+      continue;
+    }
+    if (ch === '`') {
+      const template = readTemplateLiteral(src, i);
+      out += template.out;
+      i = template.end;
+      continue;
+    }
+    if (insideExpression) {
+      if (ch === '{') braces += 1;
+      else if (ch === '}') {
+        if (braces === 0) return { out, end: i };
+        braces -= 1;
+      }
+    }
+    out += ch;
+    i += 1;
+  }
+  return { out, end: i };
+}
+
+describe('the scan normalizer classifies comments and strings JOINTLY', () => {
+  // The frontier re-review's three Node-replicated counterexamples, verbatim. A comment marker
+  // carried inside an ordinary string must not erase the code that follows it.
+  it.each([
+    ['a line-comment marker in a prior string', 'const s = "http://x"; const x = record.decision;'],
+    ['block-comment markers in strings', 'const a = "/*"; const x = record.decision; const b = "*/";'],
+    ['the plain dotted form (regression guard)', 'const x = record.decision;'],
+  ])('REPORTS the hidden name through %s', (_label, form) => {
+    const normalized = scannableSource(form);
+    expect(/\bdecision\b/.test(normalized), `silent on: ${form} → ${JSON.stringify(normalized)}`)
+      .toBe(true);
+  });
+
+  // Over-stripping is itself a failure. These anchors sit AFTER a string-contained comment marker,
+  // so a future normalizer that erases live code drops them and goes red here first — the same
+  // tripwire shape as the two "the scan is not vacuous" cases below, applied to the marker forms.
+  it.each([
+    ['a line-comment marker in a string', 'const s = "http://x"; const anchorAfterUrl = 1;',
+      'anchorAfterUrl'],
+    ['block-comment markers in strings',
+      'const a = "/*"; const anchorBetweenMarkers = 1; const b = "*/";', 'anchorBetweenMarkers'],
+    ['a comment marker in a template literal',
+      'const s = `http://x`; const anchorAfterTemplate = 1;', 'anchorAfterTemplate'],
+    ['a block-comment marker split across two strings',
+      'const a = "/*"; const anchorSplit = 1;\nconst b = "*/"; const anchorAfterClose = 2;',
+      'anchorAfterClose'],
+  ])('does not OVER-strip past %s', (_label, form, anchor) => {
+    const normalized = scannableSource(form);
+    expect(normalized, `over-stripped: ${form} → ${JSON.stringify(normalized)}`).toContain(anchor);
+  });
+
+  it('still erases what is NOT code — comments, string text, and template prose', () => {
+    expect(scannableSource('// const x = record.decision;\nconst ok = 1;')).not.toMatch(/\bdecision\b/);
+    expect(scannableSource('/* record.decision */\nconst ok = 1;')).not.toMatch(/\bdecision\b/);
+    expect(scannableSource("const s = 'the council turned on the usurper';")).not.toMatch(/\bturned\b/);
+    expect(scannableSource('const s = `a turned asset: ${row.id}`;')).not.toMatch(/\bturned\b/);
+    expect(scannableSource('const s = `an asset: ${row.decision}`;')).toMatch(/\bdecision\b/);
+  });
+
+  it('an unterminated quote is prose, not a literal — JSX apostrophes leave the code standing', () => {
+    const src = "<p>the player's own paperwork</p>\nconst x = record.decision;";
+    expect(scannableSource(src)).toMatch(/\bdecision\b/);
+  });
+});
 
 /** One forbidden name, the single pattern that reports it, and the forms that pattern MUST report.
  *  Carrying the proofs on the prong itself makes the 1:1 pairing structural — a prong cannot be
@@ -284,7 +426,10 @@ const named = (label: string, owner: string, name: string, pattern = new RegExp(
 
 /** Fail-closed (the T11 convention): a source scan cannot follow an alias, so binding the world to
  *  anything but the canonical `world`, or reaching it with a computed key, is itself the failure —
- *  those forms must go RED rather than silently walk past the world-rooted prongs below. */
+ *  those forms must go RED rather than silently walk past the world-rooted prongs below.
+ *  All THREE ways to bind an alias are prongs: a declaration off a `.world` property, a direct copy
+ *  of the canonical binding, and an assignment into an existing binding. The composition root's own
+ *  `const world = session.world;` is the one lawful shape and is excluded by name. */
 const WORLD_ALIAS_PRONGS: Prong[] = [
   {
     label: 'a destructured world (fail-closed: the scan cannot follow the alias)',
@@ -292,9 +437,23 @@ const WORLD_ALIAS_PRONGS: Prong[] = [
     violations: ['const { network } = world;', 'const { npcs, beliefs } = session.world;'],
   },
   {
-    label: 'a world bound under another name (fail-closed)',
+    label: 'a world DECLARED under another name (fail-closed)',
     pattern: /(?:const|let|var)\s+(?!world\b)[A-Za-z_$][\w$]*\s*=\s*[\w.]*\.world\b/,
     violations: ['const w = session.world;', 'let hidden = this.world;'],
+  },
+  {
+    label: 'a DIRECT alias of the canonical world binding (fail-closed)',
+    pattern: /(?:const|let|var)\s+(?!world\b)[A-Za-z_$][\w$]*\s*=\s*world\b(?!\s*[.[(])/,
+    violations: ['const w = world;', 'let w = world;', 'const w = world; const x = w.network.assets;'],
+  },
+  {
+    label: 'a world ASSIGNED into an existing binding (fail-closed)',
+    pattern: /(?<![.\w$])(?:[A-Za-z_$][\w$]*\s*\.\s*)*(?!world\b)[A-Za-z_$][\w$]*\s*=(?![=>])\s*(?:[A-Za-z_$][\w$]*\s*\.\s*)*world\b(?!\s*[.[(])/,
+    violations: [
+      'let w; w = session.world; const x = w.network.assets;',
+      'w = world;',
+      'cache.w = session.world;',
+    ],
   },
   {
     label: 'a computed world reach (fail-closed)',
@@ -367,6 +526,14 @@ const FORBIDDEN_IN_APP: Prong[] = [
   named('inquiries', 'world', 'inquiries'),
   { label: 'the world roster behind NetworkView', pattern: /\bworld\s*\.\s*network\s*\.\s*assets\b/,
     violations: ['const a = world.network.assets;', "const b = world['network']['assets'];"] },
+  // `assets` is the lawful NetworkView field every roster panel reads, so this one cannot be
+  // leaf-widened to a bare name. It is widened by FORM instead: ANY binding that is not the
+  // canonical `world` reaching `.network.assets` is reported, whatever it is spelled, so an alias
+  // is caught at the point of USE and not only at the point of binding.
+  { label: 'a non-`world` binding reaching the roster behind NetworkView',
+    pattern: /\b(?!world\b)[A-Za-z_$][\w$]*\s*\.\s*network\s*\.\s*assets\b/,
+    violations: ['const x = w.network.assets;', "const y = w['network'].assets;",
+      'const z = roster.network.assets;'] },
   ...WORLD_ALIAS_PRONGS,
 ];
 
@@ -420,5 +587,28 @@ describe('hidden-name source scan — no app surface reaches behind its selector
     const prong = FORBIDDEN_IN_APP.find((p) => p.label === label);
     expect(prong, `no app prong is labelled '${label}'`).toBeDefined();
     expect(prong!.pattern.test(scannableSource(form)), `still silent on: ${form}`).toBe(true);
+  });
+
+  /** Which app prongs report a source — the whole list, so an alias only has to be caught SOMEWHERE
+   *  (at the binding or at the use) rather than by one nominated pattern. */
+  const reportingProngs = (form: string): string[] => {
+    const normalized = scannableSource(form);
+    return FORBIDDEN_IN_APP.filter((p) => p.pattern.test(normalized)).map((p) => p.label);
+  };
+
+  // The re-review's world-alias counterexamples: the roster behind NetworkView reached through a
+  // binding the rooted-path prong could not follow. All three binding shapes must now be reported.
+  it.each([
+    ['a declaration alias', 'const w = session.world; const x = w.network.assets;'],
+    ['a DIRECT alias', 'const w = world; const x = w.network.assets;'],
+    ['an ASSIGNMENT alias', 'let w; w = session.world; const x = w.network.assets;'],
+  ])('FIRES: the world alias a rooted-path scan let through — %s', (_label, form) => {
+    expect(reportingProngs(form), `no app prong reports: ${form}`).not.toEqual([]);
+  });
+
+  // …and the composition root's own binding stays lawful, which is what keeps the fail-closed
+  // posture honest: the whole app scan above runs over the REAL main.tsx and must stay green.
+  it('the canonical composition root is NOT an alias (regression guard)', () => {
+    expect(reportingProngs('const world = session.world;\nconst view = playerView(world);')).toEqual([]);
   });
 });

@@ -1015,8 +1015,10 @@ function flipRecruitmentHidden(world: WorldState): void {
   }
 }
 
-/** One reader per `EnemyState` category, so "every enemy field" can be CHECKED rather than claimed.
- *  `map` is absent on purpose: the street map is public knowledge `playerView` lawfully serves. */
+/** One reader per HIDDEN `EnemyState` category, so "every hidden enemy field" can be CHECKED rather
+ *  than claimed. `map` is absent on purpose and is NOT one of the categories this list claims: the
+ *  street map is public knowledge `playerView` lawfully serves, so moving it would move the public
+ *  bundle. The arm's title says "hidden enemy field" for exactly that reason. */
 const ENEMY_STATE_CATEGORIES: ((w: WorldState) => boolean)[] = [
   (w) => w.enemy.observers.length > 0,
   (w) => w.enemy.evidence.length > 0,
@@ -1032,9 +1034,10 @@ const ENEMY_STATE_CATEGORIES: ((w: WorldState) => boolean)[] = [
   (w) => (w.enemy.actionLedger ?? []).length > 0,
 ];
 
-/** Every ENEMY-STATE category, moved together — the arm's label claims "every enemy field", so it
- *  owes each one. `enemy.map` is deliberately excluded: the street map is PUBLIC knowledge that
- *  `playerView` lawfully serves, so moving it would be a real change, not a hidden one. */
+/** Every HIDDEN enemy-state category, moved together — the arm's label claims "every hidden enemy
+ *  field", so it owes each one. `enemy.map` is deliberately outside that claim: the street map is
+ *  PUBLIC knowledge that `playerView` lawfully serves, so moving it would be a real change, not a
+ *  hidden one, and asserting byte-identity over it would assert something false. */
 function flipEnemyState(world: WorldState): void {
   const enemy = world.enemy;
   enemy.observers.push({ id: 'bez', vigilance: 0.9 });
@@ -1153,7 +1156,8 @@ describe('hidden-state twins render byte-identical bundles and byte-identical ma
     const clean = bundleWorld('twin-clean');
     const flipped = bundleWorld('twin-clean');
     flipHidden(flipped);
-    // Non-vacuity: the flip really reached the recruitment record and EVERY enemy-state category.
+    // Non-vacuity: the flip really reached the recruitment record and EVERY HIDDEN enemy-state
+    // category (`enemy.map` is public and deliberately outside the claim — see the list above).
     expect(ensureDirectiveState(flipped).recruitmentApproaches.length).toBeGreaterThan(0);
     expect(ensureDirectiveState(flipped).recruitmentApproaches
       .every((a) => a.initial === 'accept' && a.decided === 'refuse' && a.enemyLinkedAtDecision)).toBe(true);
@@ -1207,7 +1211,7 @@ describe('hidden-state twins render byte-identical bundles and byte-identical ma
       flipRecruitmentHidden,
       (w: WorldState) => ensureDirectiveState(w).recruitmentApproaches.every(
         (a) => a.initial === 'accept' && a.decided === 'refuse' && a.enemyLinkedAtDecision)],
-    ['every turned / scrutiny / enemy field', (w: WorldState) => {
+    ['every turned / scrutiny / hidden enemy field', (w: WorldState) => {
       for (const a of w.network.assets) a.turned = true;
       ensureDirectiveState(w).scrutiny.push({ observer: 'ada', principal: 'you', observedAt: 0, cause: 'confrontation' });
       w.network.enemyAssets.push({ id: 'bez', mice: 'ego', wagePaidThroughDay: 0, strikes: 0, facts: [], turned: true });
