@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import ts from 'typescript';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { buildWorld, enrollPlayer } from '../../src/sim/world';
 import { ensureDirectiveState, issueDirectiveRecord } from '../../src/sim/directives/state';
@@ -243,142 +244,227 @@ describe('directiveView — the authored ledger is blind to every hidden dimensi
 const repoRoot = process.cwd();
 const SELECTOR_FILE = join(repoRoot, 'src/sim/directives/view.ts');
 
-const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
-
 /**
- * Normalize a source down to "the code that could actually REACH a field", so ONE word-bounded
- * pattern per forbidden name reports every common access form instead of one chosen spelling:
- *   1. comments out — prose is not a read (the jargon-scan precedent);
- *   2. computed access with a literal key rewritten to dotted form (`x['name']` ⇒ `x.name`), so the
- *      bracket spelling has become the dotted spelling before any pattern runs;
- *   3. every other string literal's TEXT out — player-facing copy is not a read either (main.tsx's
- *      ending card lawfully contains the sentence "The council turned on the usurper");
- *   4. template PROSE out, template `${…}` expressions KEPT — those are code.
- * After this pass `x.name`, `x['name']`, `{ name }` and `{ name: alias }` are all, uniformly, a
- * word-bounded occurrence of `name`.
+ * THE CLASSIFIER — the scan reads the PARSE TREE, never the text.
  *
- * This is ONE left-to-right pass, not a stack of independent regexes, and that is the whole point:
- * comments and string literals have to be recognized JOINTLY. A comment stripper that runs first
- * erases live code whenever a string happens to carry a comment marker — the frontier re-review
- * demonstrated `const s = "http://x"; const x = record.decision;` normalizing to `const s = "http:`
- * with the hidden read walking free. Every position here is classified once, as exactly one of
- * comment / string / template / code, so a marker inside a string is just text.
+ * Two review rounds each minted a fresh parser-valid source that a hand-written text normalizer
+ * mis-read: first a comment marker carried inside an ordinary string (`"http://x"`), then a pair
+ * of perfectly ordinary JSX apostrophes closing over live code
+ * (`<p>player's desk</p>{record.decision}<p>asset's file</p>`). Both are the same defect, not two
+ * bugs: a lexer guessing at a language it does not parse will always have one more counterexample
+ * in it. So this scan stops guessing. It hands each source to the repo's own TypeScript parser —
+ * the `tests/helpers/callgraph.ts` and determinism-law precedent — and asks the tree:
  *
- * An unterminated quote is deliberately NOT a literal (JSX prose apostrophes: "the player's desk"),
- * which matches the language — a normal string literal cannot span a raw newline.
+ *   - PROSE IS INVISIBLE BY CONSTRUCTION. String text, template TEXT chunks, JSX text, comments,
+ *     and regular-expression literals are simply not name-bearing nodes; there is no "erase the
+ *     prose" pass that can over- or under-reach, because prose is never read in the first place.
+ *     Template `${…}` expressions and JSX `{…}` containers ARE code and are walked like any other
+ *     subtree.
+ *   - ONE MECHANISM COVERS EVERY ACCESS SPELLING. `x.name`, `x?.name`, `x['name']`, `{ name }`,
+ *     `{ name: alias }` and object shorthand all deposit the same NAME in the same set, so a prong
+ *     asks about a name and never about a spelling.
+ *   - RECEIVERS DO NOT MATTER. A `.network.assets` reach is reported whether the receiver is a
+ *     plain identifier, a parenthesized expression, an optional chain, or a call result.
+ *   - WHAT CANNOT BE READ AT PARSE TIME FAILS CLOSED. A computed key only the running program
+ *     knows (`world[whichever]`) is reported as unresolvable rather than skipped.
  */
-function scannableSource(src: string): string {
-  return scanCode(src, 0, false).out;
-}
 
-/** A quoted literal that really terminates on its own line — or `null`, meaning the quote was
- *  ordinary prose and must be left standing rather than swallowing the rest of the line. */
-function readQuotedLiteral(
-  src: string, start: number, quote: string,
-): { value: string; end: number } | null {
-  let i = start + 1;
-  let value = '';
-  while (i < src.length) {
-    const ch = src.charAt(i);
-    if (ch === '\\') { value += src.slice(i, i + 2); i += 2; continue; }
-    if (ch === '\n') return null;
-    if (ch === quote) return { value, end: i + 1 };
-    value += ch;
-    i += 1;
+/** `.tsx` is parsed as TSX, so JSX prose is JSX prose and not punctuation. */
+function parseSource(text: string, fileName: string): ts.SourceFile {
+  const kind = fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  const file = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true, kind);
+  // Fail closed: a source the parser could not turn into statements must never scan as "clean".
+  if (text.trim().length > 0 && file.statements.length === 0) {
+    throw new Error(`the hidden-name scan could not parse ${fileName}`);
   }
-  return null;
+  return file;
 }
 
-/** A template literal reduced to its `${…}` expressions — the prose between them is not code.
- *  Expressions are normalized recursively, so a string (or another template) nested inside one is
- *  classified by the same single pass. */
-function readTemplateLiteral(src: string, start: number): { out: string; end: number } {
-  let i = start + 1;
-  let out = '';
-  while (i < src.length) {
-    const ch = src.charAt(i);
-    if (ch === '\\') { i += 2; continue; }
-    if (ch === '`') { i += 1; break; }
-    if (ch === '$' && src.charAt(i + 1) === '{') {
-      const expression = scanCode(src, i + 2, true);
-      out += `\${${expression.out}}`;
-      i = expression.end + 1;
+/** Syntactic wrappers that change nothing about which name an expression reaches. */
+function unwrap(node: ts.Node): ts.Node {
+  let current = node;
+  for (;;) {
+    if (ts.isParenthesizedExpression(current) || ts.isNonNullExpression(current)
+      || ts.isAsExpression(current) || ts.isSatisfiesExpression(current)
+      || ts.isTypeAssertionExpression(current) || ts.isAwaitExpression(current)) {
+      current = current.expression;
       continue;
     }
-    i += 1;
+    return current;
   }
-  return { out: `\`${out}\``, end: i };
 }
 
-/** The pass itself. `insideExpression` makes it stop at the `}` closing a template `${…}`. */
-function scanCode(src: string, from: number, insideExpression: boolean): { out: string; end: number } {
-  let out = '';
-  let i = from;
-  let braces = 0;
-  while (i < src.length) {
-    const ch = src.charAt(i);
-    const next = src.charAt(i + 1);
-    if (ch === '/' && next === '/') {                    // line comment — only to the newline
-      while (i < src.length && src.charAt(i) !== '\n') i += 1;
-      continue;
+/** A key with a PARSE-TIME answer: `x['decision']` yes, `x[whichever]` no. */
+function literalKey(node: ts.Node | undefined): string | null {
+  if (node === undefined) return null;
+  const target = unwrap(node);
+  return ts.isStringLiteral(target) || ts.isNoSubstitutionTemplateLiteral(target)
+    ? target.text : null;
+}
+
+type Access = ts.PropertyAccessExpression | ts.ElementAccessExpression;
+const isAccess = (node: ts.Node): node is Access =>
+  ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node);
+
+/** The property NAME a member access reads — `null` when only the running program knows. */
+function accessedName(node: Access): string | null {
+  return ts.isPropertyAccessExpression(node) ? node.name.text : literalKey(node.argumentExpression);
+}
+
+/** A property-name POSITION spelled as a string rather than an identifier (`{ 'decision': x }`). */
+function staticStringName(node: ts.Node | undefined): string | null {
+  if (node === undefined) return null;
+  if (ts.isComputedPropertyName(node)) return literalKey(node.expression);
+  return ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) ? node.text : null;
+}
+
+/** Where a declaration spells a property name that is NOT an ordinary identifier child. */
+function namePositions(node: ts.Node): (ts.Node | undefined)[] {
+  if (ts.isPropertyAssignment(node) || ts.isPropertySignature(node) || ts.isPropertyDeclaration(node)
+    || ts.isMethodDeclaration(node) || ts.isMethodSignature(node) || ts.isEnumMember(node)
+    || ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node)) return [node.name];
+  if (ts.isBindingElement(node)) return [node.propertyName];
+  return [];
+}
+
+/** Every name on an access chain, root first: `session.world.network` ⇒ session, world, network. */
+function chainNames(node: ts.Node): string[] {
+  const target = unwrap(node);
+  if (ts.isIdentifier(target)) return [target.text];
+  if (isAccess(target)) return [...chainNames(target.expression), accessedName(target) ?? '*'];
+  if (ts.isCallExpression(target)) return chainNames(target.expression);
+  return [];
+}
+
+/** What an initializer LEADS with — `session.world ?? fallback` leads with `session.world`. */
+function leadingExpression(node: ts.Node): ts.Node {
+  const target = unwrap(node);
+  if (ts.isBinaryExpression(target)) return leadingExpression(target.left);
+  if (ts.isConditionalExpression(target)) return leadingExpression(target.condition);
+  return target;
+}
+
+/** Does this expression hand over the world OBJECT itself? (`world`, `session.world`, `(s?.world)`) */
+function isWorldSource(node: ts.Node): boolean {
+  const leading = leadingExpression(node);
+  if (ts.isIdentifier(leading)) return leading.text === 'world';
+  for (let cursor: ts.Node = leading; isAccess(cursor); cursor = unwrap(cursor.expression)) {
+    if (accessedName(cursor) === 'world') return true;
+  }
+  return false;
+}
+
+/** Does this expression reach ANYWHERE through the world? (`world.network`, `session.world.x`) */
+const touchesWorld = (node: ts.Node): boolean =>
+  chainNames(leadingExpression(node)).includes('world');
+
+/** A `<receiver>.network.assets` reach, and whether its receiver is the canonical world binding. */
+interface RosterReach { rootedAtWorld: boolean; text: string }
+/** The four ways to put the world behind a name the scan cannot follow. */
+type WorldAliasKind = 'destructured' | 'declared' | 'direct' | 'assigned';
+interface WorldAlias { kind: WorldAliasKind; text: string }
+
+interface ScanFacts {
+  /** Every name a CODE construct in this source reaches, in any spelling. */
+  names: ReadonlySet<string>;
+  roster: readonly RosterReach[];
+  aliases: readonly WorldAlias[];
+  /** Reaches through world/network whose key only the running program knows. */
+  unresolved: readonly string[];
+}
+
+/** Roots whose dynamic reach fails closed. Every OTHER forbidden root is already a name prong, so
+ *  `record[whichever]` is reported by the `record`-side names it must eventually spell. */
+const DYNAMIC_ROOTS = new Set(['world', 'network']);
+
+function scanSource(text: string, fileName: string): ScanFacts {
+  const file = parseSource(text, fileName);
+  const names = new Set<string>();
+  const roster: RosterReach[] = [];
+  const aliases: WorldAlias[] = [];
+  const unresolved: string[] = [];
+  const show = (node: ts.Node): string => node.getText(file).replace(/\s+/g, ' ').slice(0, 90);
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isJSDoc(node)) return;                       // documentation is prose, not a read
+
+    // 1. NAMES — one mechanism for every spelling a field access can wear.
+    if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) names.add(node.text);
+    if (isAccess(node)) {
+      const key = accessedName(node);
+      if (key !== null) names.add(key);                 // `x['decision']` names it as `x.decision` does
     }
-    if (ch === '/' && next === '*') {                    // block comment — newlines PRESERVED, so a
-      const close = src.indexOf('*/', i + 2);            // literal on a later line stays line-bounded
-      const body = src.slice(i, close === -1 ? src.length : close + 2);
-      out += ` ${'\n'.repeat((body.match(/\n/g) ?? []).length)}`;
-      i = close === -1 ? src.length : close + 2;
-      continue;
+    for (const position of namePositions(node)) {
+      const spelled = staticStringName(position);
+      if (spelled !== null) names.add(spelled);         // `{ 'decision': x }`, `{ ['decision']: x }`
     }
-    if (ch === "'" || ch === '"') {
-      const literal = readQuotedLiteral(src, i, ch);
-      if (literal === null) { out += ch; i += 1; continue; }
-      const before = out.replace(/[^\S\n]+$/, '');
-      let after = literal.end;
-      while (after < src.length && /[^\S\n]/.test(src.charAt(after))) after += 1;
-      if (before.endsWith('[') && src.charAt(after) === ']' && IDENTIFIER.test(literal.value)) {
-        out = `${before.slice(0, -1)}.${literal.value}`;  // x['name'] ⇒ x.name, BEFORE the text goes
-        i = after + 1;
-        continue;
+
+    // 2. THE ROSTER REACH — receiver-agnostic: any chain ENDING `network.assets`, however spelled.
+    if (isAccess(node) && accessedName(node) === 'assets') {
+      const inner = unwrap(node.expression);
+      if (isAccess(inner) && accessedName(inner) === 'network') {
+        roster.push({ rootedAtWorld: isWorldSource(inner.expression), text: show(node) });
       }
-      out += "''";
-      i = literal.end;
-      continue;
     }
-    if (ch === '`') {
-      const template = readTemplateLiteral(src, i);
-      out += template.out;
-      i = template.end;
-      continue;
-    }
-    if (insideExpression) {
-      if (ch === '{') braces += 1;
-      else if (ch === '}') {
-        if (braces === 0) return { out, end: i };
-        braces -= 1;
+
+    // 3. THE WORLD BEHIND A NAME — fail-closed, because a source scan cannot follow an alias.
+    if (ts.isVariableDeclaration(node) && node.initializer !== undefined) {
+      const bound = ts.isIdentifier(node.name) ? node.name.text : null;
+      const leading = leadingExpression(node.initializer);
+      if (bound === null) {
+        if (touchesWorld(node.initializer)) aliases.push({ kind: 'destructured', text: show(node) });
+      } else if (bound !== 'world' && isWorldSource(node.initializer)) {
+        aliases.push({ kind: ts.isIdentifier(leading) ? 'direct' : 'declared', text: show(node) });
       }
     }
-    out += ch;
-    i += 1;
-  }
-  return { out, end: i };
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
+      && isWorldSource(node.right)) {
+      const target = unwrap(node.left);
+      const canonical = ts.isIdentifier(target) && target.text === 'world';
+      if (!canonical) aliases.push({ kind: 'assigned', text: show(node) });
+    }
+
+    // 4. FAIL CLOSED — a world/network reach whose key only the running program knows.
+    if (ts.isElementAccessExpression(node) && literalKey(node.argumentExpression) === null
+      && chainNames(node.expression).some((name) => DYNAMIC_ROOTS.has(name))) {
+      unresolved.push(show(node));
+    }
+
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return { names, roster, aliases, unresolved };
 }
 
-describe('the scan normalizer classifies comments and strings JOINTLY', () => {
-  // The frontier re-review's three Node-replicated counterexamples, verbatim. A comment marker
-  // carried inside an ordinary string must not erase the code that follows it.
+/** A synthetic probe source. TSX, so a JSX counterexample is parsed as the TSX it really is. */
+const scan = (source: string): ScanFacts => scanSource(source, 'probe.tsx');
+
+const factsCache = new Map<string, ScanFacts>();
+function factsFor(file: string): ScanFacts {
+  const cached = factsCache.get(file);
+  if (cached !== undefined) return cached;
+  const facts = scanSource(readFileSync(file, 'utf8'), file);
+  factsCache.set(file, facts);
+  return facts;
+}
+
+describe('the scan classifies its sources on the TypeScript AST', () => {
+  // Every parser-valid counterexample two review rounds minted against the old TEXT normalizer.
+  // Each one is now answered by construction rather than by another normalization rule.
   it.each([
     ['a line-comment marker in a prior string', 'const s = "http://x"; const x = record.decision;'],
     ['block-comment markers in strings', 'const a = "/*"; const x = record.decision; const b = "*/";'],
+    ['paired JSX apostrophes around the read',
+      "const v = <><p>player's desk</p>{record.decision}<p>asset's file</p></>;"],
+    ['a regex literal carrying a quote character', "const r = /'/; const x = record.decision;"],
     ['the plain dotted form (regression guard)', 'const x = record.decision;'],
   ])('REPORTS the hidden name through %s', (_label, form) => {
-    const normalized = scannableSource(form);
-    expect(/\bdecision\b/.test(normalized), `silent on: ${form} → ${JSON.stringify(normalized)}`)
-      .toBe(true);
+    expect(scan(form).names.has('decision'), `silent on: ${form}`).toBe(true);
   });
 
-  // Over-stripping is itself a failure. These anchors sit AFTER a string-contained comment marker,
-  // so a future normalizer that erases live code drops them and goes red here first — the same
-  // tripwire shape as the two "the scan is not vacuous" cases below, applied to the marker forms.
+  // The other half of the same law: prose must not swallow the code BESIDE it. These anchors sit
+  // next to a construct whose text carries markers or quotes, so any future classifier that starts
+  // consuming live source drops them and goes red here first.
   it.each([
     ['a line-comment marker in a string', 'const s = "http://x"; const anchorAfterUrl = 1;',
       'anchorAfterUrl'],
@@ -389,76 +475,93 @@ describe('the scan normalizer classifies comments and strings JOINTLY', () => {
     ['a block-comment marker split across two strings',
       'const a = "/*"; const anchorSplit = 1;\nconst b = "*/"; const anchorAfterClose = 2;',
       'anchorAfterClose'],
-  ])('does not OVER-strip past %s', (_label, form, anchor) => {
-    const normalized = scannableSource(form);
-    expect(normalized, `over-stripped: ${form} → ${JSON.stringify(normalized)}`).toContain(anchor);
+    ['a regex literal carrying a quote character',
+      "const r = /'/; const anchorAfterRegex = 1;", 'anchorAfterRegex'],
+  ])('still sees the code beside %s', (_label, form, anchor) => {
+    expect(scan(form).names.has(anchor), `swallowed the code after: ${form}`).toBe(true);
   });
 
-  it('still erases what is NOT code — comments, string text, and template prose', () => {
-    expect(scannableSource('// const x = record.decision;\nconst ok = 1;')).not.toMatch(/\bdecision\b/);
-    expect(scannableSource('/* record.decision */\nconst ok = 1;')).not.toMatch(/\bdecision\b/);
-    expect(scannableSource("const s = 'the council turned on the usurper';")).not.toMatch(/\bturned\b/);
-    expect(scannableSource('const s = `a turned asset: ${row.id}`;')).not.toMatch(/\bturned\b/);
-    expect(scannableSource('const s = `an asset: ${row.decision}`;')).toMatch(/\bdecision\b/);
+  it('never reads prose: comments, doc comments, string text, and template prose', () => {
+    expect(scan('// const x = record.decision;\nconst ok = 1;').names.has('decision')).toBe(false);
+    expect(scan('/* record.decision */\nconst ok = 1;').names.has('decision')).toBe(false);
+    expect(scan('/** @see record.decision */\nconst ok = 1;').names.has('decision')).toBe(false);
+    expect(scan("const s = 'the council turned on the usurper';").names.has('turned')).toBe(false);
+    expect(scan('const s = `a turned asset: ${row.id}`;').names.has('turned')).toBe(false);
+    expect(scan('const s = `an asset: ${row.decision}`;').names.has('decision')).toBe(true);
   });
 
-  it('an unterminated quote is prose, not a literal — JSX apostrophes leave the code standing', () => {
-    const src = "<p>the player's own paperwork</p>\nconst x = record.decision;";
-    expect(scannableSource(src)).toMatch(/\bdecision\b/);
+  it('never reads a regular expression — but reads the code around it', () => {
+    expect(scan('const r = /decision|turned|npcs/;').names.has('decision')).toBe(false);
+    expect(scan('const r = /decision/; const x = record.decision;').names.has('decision')).toBe(true);
+  });
+
+  it('JSX text is prose; a JSX expression container is code', () => {
+    expect(scan("const v = <p>the player's own paperwork</p>;").names.has('decision')).toBe(false);
+    expect(scan("const v = <p>a turned asset's file</p>;").names.has('turned')).toBe(false);
+    expect(scan('const v = <p>{record.decision}</p>;').names.has('decision')).toBe(true);
+    expect(scan('const v = <Row decision={record.decision} />;').names.has('decision')).toBe(true);
   });
 });
 
-/** One forbidden name, the single pattern that reports it, and the forms that pattern MUST report.
+/** One forbidden name, the question that reports it, and the forms that question MUST answer yes.
  *  Carrying the proofs on the prong itself makes the 1:1 pairing structural — a prong cannot be
  *  added without its firing evidence, and no index bookkeeping can drift. */
-interface Prong { label: string; pattern: RegExp; violations: string[] }
+interface Prong { label: string; reports: (facts: ScanFacts) => boolean; violations: string[] }
 
-/** The four access spellings a word-bounded name prong has to catch, given an owner expression. */
+/** The access spellings ONE name question has to answer, given an owner expression. The old scan
+ *  needed a normalization rule per spelling; on the AST they are all just the name. */
 const accessForms = (owner: string, name: string): string[] => [
   `const a = ${owner}.${name};`,
   `const b = ${owner}['${name}'];`,
+  `const c = ${owner}?.${name};`,
   `const { ${name} } = ${owner};`,
   `const { ${name}: alias } = ${owner};`,
+  `const d = { ${name} };`,
 ];
 
-const named = (label: string, owner: string, name: string, pattern = new RegExp(`\\b${name}\\b`)): Prong =>
-  ({ label, pattern, violations: accessForms(owner, name) });
+const named = (label: string, owner: string, name: string): Prong => ({
+  label,
+  reports: (facts) => facts.names.has(name),
+  violations: accessForms(owner, name),
+});
 
 /** Fail-closed (the T11 convention): a source scan cannot follow an alias, so binding the world to
- *  anything but the canonical `world`, or reaching it with a computed key, is itself the failure —
- *  those forms must go RED rather than silently walk past the world-rooted prongs below.
- *  All THREE ways to bind an alias are prongs: a declaration off a `.world` property, a direct copy
- *  of the canonical binding, and an assignment into an existing binding. The composition root's own
- *  `const world = session.world;` is the one lawful shape and is excluded by name. */
+ *  anything but the canonical `world`, or reaching it with a key only the running program knows, is
+ *  itself the failure. All four ways to bind are prongs — a destructuring, a declaration off a
+ *  `.world` property, a direct copy of the canonical binding, and an assignment into an existing
+ *  binding — and every one of them is receiver-agnostic, so a parenthesis or an optional chain
+ *  changes nothing. The composition root's own `const world = session.world;` is the one lawful
+ *  shape and is excluded by name. */
+const aliasProng = (label: string, kind: WorldAliasKind, violations: string[]): Prong => ({
+  label, reports: (facts) => facts.aliases.some((alias) => alias.kind === kind), violations,
+});
+
 const WORLD_ALIAS_PRONGS: Prong[] = [
+  aliasProng('a destructured world (fail-closed: the scan cannot follow the alias)', 'destructured', [
+    'const { network } = world;',
+    'const { npcs, beliefs } = session.world;',
+    'const { assets } = world.network;',
+  ]),
+  aliasProng('a world DECLARED under another name (fail-closed)', 'declared', [
+    'const w = session.world;',
+    'let hidden = this.world;',
+    'const w = (session.world);',
+    'const w = session?.world;',
+    'const w = session.world ?? fallback;',
+  ]),
+  aliasProng('a DIRECT alias of the canonical world binding (fail-closed)', 'direct', [
+    'const w = world;', 'let w = world;', 'const w = world; const x = w.network.assets;',
+  ]),
+  aliasProng('a world ASSIGNED into an existing binding (fail-closed)', 'assigned', [
+    'let w; w = session.world; const x = w.network.assets;',
+    'w = world;',
+    'cache.w = session.world;',
+    'w = (session.world);',
+  ]),
   {
-    label: 'a destructured world (fail-closed: the scan cannot follow the alias)',
-    pattern: /(?:const|let|var)\s*\{[^}]*\}\s*=\s*[\w.]*\bworld\b/,
-    violations: ['const { network } = world;', 'const { npcs, beliefs } = session.world;'],
-  },
-  {
-    label: 'a world DECLARED under another name (fail-closed)',
-    pattern: /(?:const|let|var)\s+(?!world\b)[A-Za-z_$][\w$]*\s*=\s*[\w.]*\.world\b/,
-    violations: ['const w = session.world;', 'let hidden = this.world;'],
-  },
-  {
-    label: 'a DIRECT alias of the canonical world binding (fail-closed)',
-    pattern: /(?:const|let|var)\s+(?!world\b)[A-Za-z_$][\w$]*\s*=\s*world\b(?!\s*[.[(])/,
-    violations: ['const w = world;', 'let w = world;', 'const w = world; const x = w.network.assets;'],
-  },
-  {
-    label: 'a world ASSIGNED into an existing binding (fail-closed)',
-    pattern: /(?<![.\w$])(?:[A-Za-z_$][\w$]*\s*\.\s*)*(?!world\b)[A-Za-z_$][\w$]*\s*=(?![=>])\s*(?:[A-Za-z_$][\w$]*\s*\.\s*)*world\b(?!\s*[.[(])/,
-    violations: [
-      'let w; w = session.world; const x = w.network.assets;',
-      'w = world;',
-      'cache.w = session.world;',
-    ],
-  },
-  {
-    label: 'a computed world reach (fail-closed)',
-    pattern: /\bworld\s*\[/,
-    violations: ['const a = world[key];'],
+    label: 'a DYNAMIC computed world reach (fail-closed: only the running program knows the key)',
+    reports: (facts) => facts.unresolved.length > 0,
+    violations: ['const a = world[key];', 'const b = world.network[key];', 'const c = (world)[key];'],
   },
 ];
 
@@ -473,8 +576,11 @@ const FORBIDDEN_IN_SELECTOR: Prong[] = [
   named('perceivedScrutiny', 'row', 'perceivedScrutiny'),
   named('scrutiny', 'state', 'scrutiny'),
   named('recruitmentApproaches', 'state', 'recruitmentApproaches'),
-  { label: 'enemyLinked (in any suffixed spelling)', pattern: /\benemyLinked/,
-    violations: [...accessForms('row', 'enemyLinked'), 'const c = row.enemyLinkedAtDecision;'] },
+  {
+    label: 'enemyLinked (in any suffixed spelling)',
+    reports: (facts) => [...facts.names].some((name) => name.startsWith('enemyLinked')),
+    violations: [...accessForms('row', 'enemyLinked'), 'const e = row.enemyLinkedAtDecision;'],
+  },
   named('message transit (deliveredAt)', 'message', 'deliveredAt'),
   named('message transit (failedAt)', 'message', 'failedAt'),
   named('message transit (nextHop)', 'message', 'nextHop'),
@@ -486,28 +592,29 @@ const FORBIDDEN_IN_SELECTOR: Prong[] = [
 ];
 
 describe('hidden-name source scan — the selector cannot name what it must not know', () => {
-  const selectorSource = scannableSource(readFileSync(SELECTOR_FILE, 'utf8'));
+  const selectorFacts = factsFor(SELECTOR_FILE);
 
-  it('the scan is not vacuous: the selector source really was read', () => {
-    expect(selectorSource).toMatch(/export function directiveView/);
-    expect(selectorSource).toMatch(/receivedReports/); // the ONE lawful near-neighbour survives
+  it('the scan is not vacuous: the selector really was parsed as code', () => {
+    expect(selectorFacts.names.has('directiveView')).toBe(true);
+    expect(selectorFacts.names.has('receivedReports')).toBe(true); // the lawful near-neighbour…
+    expect(selectorFacts.names.has('received')).toBe(false);       // …is not the banned name
   });
 
-  it.each(FORBIDDEN_IN_SELECTOR)('never names $label', ({ pattern }) => {
-    expect(pattern.test(selectorSource)).toBe(false);
+  it.each(FORBIDDEN_IN_SELECTOR)('never names $label', ({ reports }) => {
+    expect(reports(selectorFacts)).toBe(false);
   });
 
-  it.each(FORBIDDEN_IN_SELECTOR)('FIRES: $label is reported in every access form', ({ pattern, violations }) => {
+  it.each(FORBIDDEN_IN_SELECTOR)('FIRES: $label is reported in every access form', ({ reports, violations }) => {
     expect(violations.length).toBeGreaterThan(0);
     for (const form of violations) {
-      expect(pattern.test(scannableSource(form)), `must report the form: ${form}`).toBe(true);
+      expect(reports(scan(form)), `must report the form: ${form}`).toBe(true);
     }
   });
 });
 
 /** Hidden names no APP file (composition root included) may reach for — in ANY access form, and
  *  whether the record is reached through the raw world or through an imported helper under an
- *  alias, which is why these are word-bounded NAME prongs and not dotted-path prongs. */
+ *  alias, which is why these are NAME questions and not dotted-path patterns. */
 const FORBIDDEN_IN_APP: Prong[] = [
   named('the raw directive substrate', 'world.network', 'directiveState'),
   named('received (the mutated version)', 'record', 'received'),
@@ -524,16 +631,23 @@ const FORBIDDEN_IN_APP: Prong[] = [
   named('npcs (the roster behind the views)', 'world', 'npcs'),
   named('beliefs', 'world', 'beliefs'),
   named('inquiries', 'world', 'inquiries'),
-  { label: 'the world roster behind NetworkView', pattern: /\bworld\s*\.\s*network\s*\.\s*assets\b/,
-    violations: ['const a = world.network.assets;', "const b = world['network']['assets'];"] },
-  // `assets` is the lawful NetworkView field every roster panel reads, so this one cannot be
-  // leaf-widened to a bare name. It is widened by FORM instead: ANY binding that is not the
-  // canonical `world` reaching `.network.assets` is reported, whatever it is spelled, so an alias
-  // is caught at the point of USE and not only at the point of binding.
-  { label: 'a non-`world` binding reaching the roster behind NetworkView',
-    pattern: /\b(?!world\b)[A-Za-z_$][\w$]*\s*\.\s*network\s*\.\s*assets\b/,
+  {
+    label: 'the world roster behind NetworkView',
+    reports: (facts) => facts.roster.some((reach) => reach.rootedAtWorld),
+    violations: ['const a = world.network.assets;', "const b = world['network']['assets'];",
+      'const c = session.world.network.assets;'],
+  },
+  // `assets` is the lawful NetworkView field every roster panel reads, so this reach cannot be
+  // leaf-widened to a bare name. It is widened by SHAPE instead: any chain ending `network.assets`
+  // is reported whatever its receiver is, so an alias is caught at the point of USE — a parenthesis,
+  // an optional chain, or a call result is not a hiding place, and no receiver spelling is enumerated.
+  {
+    label: 'a non-`world` binding reaching the roster behind NetworkView',
+    reports: (facts) => facts.roster.some((reach) => !reach.rootedAtWorld),
     violations: ['const x = w.network.assets;', "const y = w['network'].assets;",
-      'const z = roster.network.assets;'] },
+      'const z = roster.network.assets;', 'const p = (w).network.assets;',
+      'const q = w?.network.assets;', 'const r = pick(session).network.assets;'],
+  },
   ...WORLD_ALIAS_PRONGS,
 ];
 
@@ -554,25 +668,30 @@ describe('hidden-name source scan — no app surface reaches behind its selector
     expect(appFiles.length).toBeGreaterThan(10);
   });
 
-  it('the app scan is not vacuous: normalization leaves real code standing', () => {
-    const main = scannableSource(readFileSync(join(repoRoot, 'app/src/main.tsx'), 'utf8'));
-    expect(main).toMatch(/const world = session\.world;/);
-    expect(main).toMatch(/directiveView\(world\)/);
+  it('the app scan is not vacuous: the composition root really was parsed as code', () => {
+    const main = factsFor(join(repoRoot, 'app/src/main.tsx'));
+    expect(main.names.has('directiveView')).toBe(true);
+    expect(main.names.has('networkView')).toBe(true);
+    expect(main.names.has('world')).toBe(true);     // `const world = session.world;` — the lawful root
   });
 
-  it.each(FORBIDDEN_IN_APP)('no app file names $label', ({ label, pattern }) => {
+  it.each(FORBIDDEN_IN_APP)('no app file names $label', ({ label, reports }) => {
     for (const file of appFiles) {
-      const src = scannableSource(readFileSync(file, 'utf8'));
-      expect(pattern.test(src), `${file.replace(/\\/g, '/')} names ${label}`).toBe(false);
+      expect(reports(factsFor(file)), `${file.replace(/\\/g, '/')} names ${label}`).toBe(false);
     }
   });
 
-  it.each(FORBIDDEN_IN_APP)('FIRES: $label is reported in every access form', ({ pattern, violations }) => {
+  it.each(FORBIDDEN_IN_APP)('FIRES: $label is reported in every access form', ({ reports, violations }) => {
     expect(violations.length).toBeGreaterThan(0);
     for (const form of violations) {
-      expect(pattern.test(scannableSource(form)), `must report the form: ${form}`).toBe(true);
+      expect(reports(scan(form)), `must report the form: ${form}`).toBe(true);
     }
   });
+
+  /** Which app prongs report a source — the whole list, so an alias only has to be caught SOMEWHERE
+   *  (at the binding or at the use) rather than by one nominated pattern. */
+  const reportingProngs = (form: string): string[] =>
+    FORBIDDEN_IN_APP.filter((prong) => prong.reports(scan(form))).map((prong) => prong.label);
 
   // The exact coverage counterexamples the frontier review demonstrated against the old dotted-only
   // patterns: five real access forms the app scan walked straight past. Each is now pinned to the
@@ -586,29 +705,55 @@ describe('hidden-name source scan — no app surface reaches behind its selector
   ])('FIRES: the form a dotted-only scan let through — %s', (label, form) => {
     const prong = FORBIDDEN_IN_APP.find((p) => p.label === label);
     expect(prong, `no app prong is labelled '${label}'`).toBeDefined();
-    expect(prong!.pattern.test(scannableSource(form)), `still silent on: ${form}`).toBe(true);
+    expect(prong!.reports(scan(form)), `still silent on: ${form}`).toBe(true);
   });
 
-  /** Which app prongs report a source — the whole list, so an alias only has to be caught SOMEWHERE
-   *  (at the binding or at the use) rather than by one nominated pattern. */
-  const reportingProngs = (form: string): string[] => {
-    const normalized = scannableSource(form);
-    return FORBIDDEN_IN_APP.filter((p) => p.pattern.test(normalized)).map((p) => p.label);
-  };
-
-  // The re-review's world-alias counterexamples: the roster behind NetworkView reached through a
-  // binding the rooted-path prong could not follow. All three binding shapes must now be reported.
+  // The world-alias counterexamples of BOTH review rounds: the roster behind NetworkView reached
+  // through a binding the rooted-path patterns could not follow, and then through the receiver
+  // spellings the widened pattern still could not — parentheses, an optional chain, a call result.
   it.each([
     ['a declaration alias', 'const w = session.world; const x = w.network.assets;'],
     ['a DIRECT alias', 'const w = world; const x = w.network.assets;'],
     ['an ASSIGNMENT alias', 'let w; w = session.world; const x = w.network.assets;'],
-  ])('FIRES: the world alias a rooted-path scan let through — %s', (_label, form) => {
+    ['a PARENTHESIZED receiver', 'const w = (session.world);\nconst x = (w).network.assets;'],
+    ['an OPTIONAL-CHAIN receiver off a call result',
+      'const w = pick(session.world);\nconst x = w?.network.assets;'],
+    ['a CALL-RESULT receiver', 'const x = pick(session).network.assets;'],
+  ])('FIRES: the roster reach a rooted-path scan let through — %s', (_label, form) => {
     expect(reportingProngs(form), `no app prong reports: ${form}`).not.toEqual([]);
   });
 
-  // …and the composition root's own binding stays lawful, which is what keeps the fail-closed
-  // posture honest: the whole app scan above runs over the REAL main.tsx and must stay green.
-  it('the canonical composition root is NOT an alias (regression guard)', () => {
-    expect(reportingProngs('const world = session.world;\nconst view = playerView(world);')).toEqual([]);
+  // The lexical counterexamples that closed this class, now asked of the REAL app prong list rather
+  // than of the classifier alone: prose can no longer hide a read from the scan that ships.
+  it.each([
+    ['a comment marker inside a prior string',
+      'const s = "http://x"; const x = record.decision;'],
+    ['paired JSX apostrophes around the read',
+      "const v = <><p>player's desk</p>{record.decision}<p>asset's file</p></>;"],
+    ['a regex literal carrying a quote character',
+      "const r = /'/; const x = record.decision;"],
+  ])('FIRES: the read a TEXT normalizer erased — %s', (_label, form) => {
+    expect(reportingProngs(form), `no app prong reports: ${form}`).not.toEqual([]);
+  });
+
+  // …and the lawful surface stays lawful. The whole app scan above runs over the REAL app/src tree,
+  // so its staying green IS the false-positive regression proof; these name the shapes that proof
+  // depends on, so a future over-eager classifier says exactly which one it broke.
+  it.each([
+    ['the canonical composition root',
+      'const world = session.world;\nconst view = playerView(world);'],
+    ['player-facing prose containing a forbidden word',
+      "const label = 'The council turned on the usurper';"],
+    ['a registered term id containing a forbidden word', "const id = 'counter-sketch';"],
+    ['a string containing the word decision', 'const note = "the decision was the player\'s own";'],
+    ['JSX prose with paired apostrophes and no code between',
+      "const v = <><p>player's desk</p><p>asset's file</p></>;"],
+    ['the three regex literals the real app source contains',
+      'const ok = /^(INPUT|SELECT|TEXTAREA)$/.test(tag);\n'
+      + 'const parts = npcId.split(/[-_\\s]+/);\nconst m = /^(.*)-d\\d+$/.exec(id);'],
+    ['the lawful NetworkView roster read',
+      'const a = view.assets;\nconst b = net.assets.map((row) => row.id);'],
+  ])('LAWFUL: no prong reports %s', (_label, form) => {
+    expect(reportingProngs(form), `a prong reports the lawful form: ${form}`).toEqual([]);
   });
 });
