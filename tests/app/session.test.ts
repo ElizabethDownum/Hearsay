@@ -9,6 +9,7 @@ import { hashWorld } from '../../src/sim/hash';
 import { scheduleSetup } from '../../src/sim/phases';
 import { CONVERSATION_BEAT } from '../../src/sim/rumors/propagation';
 import { SOMEONE, type EntityId } from '../../src/sim/rumors/claim';
+import type { DirectiveBrief } from '../../src/sim/directives/types';
 
 const SEED = 'cor-1';
 const poison = (subject: EntityId): InjectSpec => ({ subject, predicate: 'poisoned', object: SOMEONE,
@@ -358,6 +359,48 @@ describe('requested-beat local offer', () => {
     expect(session.submit({ kind: 'tag', op: 'add', id: 'y', target: 'npc:probe', text: 'y' }))
       .toEqual({ queuedFor: 15, refused: true });
     expect(session.log).toEqual([]);
+  });
+
+  // Plan 11 added two local verbs — `directive` and `recruit` — whose participant lives in a
+  // different field from every verb the fence was originally pinned on (`tell`'s `to`). The
+  // offered circle is the whole of the "driver when present" law at the submit seam, so each new
+  // arm of `localParticipants` (session.ts:71-88) needs its own firing proof.
+  it('the offered circle fences Plan 11\'s directive and recruit arms, with zero residue', () => {
+    const { session, offer, members } = requestStagedOffer(2);
+    const outsider = Object.keys(session.world.npcs)
+      .find((id) => id !== session.world.playerId && !offer.circleMembers.includes(id))!;
+    expect(outsider, 'the staged room really leaves somebody outside').toBeDefined();
+    const brief: DirectiveBrief = {
+      mission: { kind: 'learn', target: { kind: 'venue', id: 'offer-room' } },
+      priority: 'routine', authority: 'office', discretion: 'quiet', specificity: 'outcome-only',
+      guidance: [], active: { from: offer.tick, until: offer.tick + TICKS_PER_DAY },
+      report: 'outcome', reportBy: null, purpose: null,
+    };
+    const beforeHash = hashWorld(session.world);
+    const beforeSave = session.save();
+
+    // A brief handed to somebody who is not in the room is refused before the sim is reached…
+    expect(() => session.chooseLocal(offer.token, {
+      kind: 'directive', recipient: outsider, handoff: { outboundVia: [], reportVia: [] }, brief,
+    })).toThrow(/circle/i);
+    // …and so is an approach to somebody who is not standing there to be approached.
+    expect(() => session.chooseLocal(offer.token, {
+      kind: 'recruit', target: outsider, mice: 'money', leverageFamily: null,
+    })).toThrow(/circle/i);
+    // The token is checked first for these verbs too: a stale token refuses an in-circle recruit.
+    expect(() => session.chooseLocal('offer-stale', {
+      kind: 'recruit', target: members[0]!, mice: 'money', leverageFamily: null,
+    })).toThrow(/token/i);
+    // Three refusals, and the world and the save-relevant log are byte-unmoved by all of them.
+    expect(hashWorld(session.world)).toBe(beforeHash);
+    expect(session.save()).toEqual(beforeSave);
+    expect(session.localOffer()!.token).toBe(offer.token);
+
+    // POSITIVE CONTROL: the identical approach to an actual member is accepted for that beat, so
+    // the three refusals above are the fence firing and not a verb that cannot be chosen at all.
+    expect(session.chooseLocal(offer.token, {
+      kind: 'recruit', target: members[0]!, mice: 'money', leverageFamily: null,
+    })).toEqual({ queuedFor: offer.tick });
   });
 });
 
