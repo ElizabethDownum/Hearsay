@@ -13,7 +13,9 @@ import { assetFor, dispositionOf, setDispositionEdge } from '../../src/sim/netwo
 import { recordFact } from '../../src/sim/network/compartment';
 import { captureIntel, playerView, networkView, courierRouteView, blankIntel } from '../../src/sim/fieldwork';
 import { captureEvidence } from '../../src/sim/counterintel';
-import { realizeNetworkForward } from '../../src/sim/directives/transport';
+import { queueNetworkMessage, realizeNetworkForward } from '../../src/sim/directives/transport';
+import { buildDirectiveReport } from '../../src/sim/directives/reports';
+import { issueDirectiveRecord } from '../../src/sim/directives/state';
 import { queueUnqueuedFieldReports } from '../../src/sim/directives/field-reports';
 import { reportThrough } from '../../src/sim/reporting';
 import { runUntil } from '../../src/sim/step';
@@ -28,6 +30,9 @@ import type { ReportedClaim, SketchFeature } from '../../src/sim/enemy/state';
 import type { Belief, WorldState } from '../../src/sim/types';
 import type { GeneratedTown } from '../../src/world/types';
 import type { AssetRecord } from '../../src/sim/network/types';
+import type {
+  DirectiveBrief, DirectiveCandor, DirectiveDecisionProfile, DirectiveExecutionResult,
+} from '../../src/sim/directives/types';
 import type { TickEvents } from '../../src/sim/perception';
 
 const RULES = STANDARD_RULES;
@@ -225,6 +230,178 @@ describe('doctored channel — divergence IS the catchable signature (same event
     set('ego', false); const rE = pick7(reportThrough(world, npc, claim, RULES, 'player'));
     set('ego', true); const rET = pick7(reportThrough(world, npc, claim, RULES, 'player'));
     expect(rET).toEqual(applyMini(rE));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The spoken-content law at the HQ bookkeeping seam. `knownAssetFacts` — and therefore the roster
+// panel's `factsCount` — is player KNOWLEDGE, so it may only ever grow from what an asset actually
+// SAID after candor and disclosure. The report payload's own `factRefs` is relay-immune metadata:
+// it survives the hop untouched unless the projection strips it, which is exactly why the receipt
+// handler must read the spoken copy and never the record it came from.
+describe('what the books learn is what was said — knownAssetFacts after candor and disclosure', () => {
+  /** Watchford with the avatar at home and `mira` a player asset holding ONE compartment fact. */
+  function withReportingMira(seed: string): WorldState {
+    const world = watchfordWorld(seed);
+    enrollPlayer(world, { home: 'home-gs' });
+    world.network.assets.push({
+      id: 'mira', mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [],
+    });
+    recordFact(world, 'player', 'mira', { kind: 'carried-story', ref: 'f-carried' });
+    expect(assetFor(world, 'player', 'mira')!.facts).toHaveLength(1);
+    return world;
+  }
+
+  const BRIEF: DirectiveBrief = {
+    mission: { kind: 'learn', target: { kind: 'venue', id: 'square-w0' } },
+    priority: 'important', authority: 'office', discretion: 'quiet', specificity: 'detailed',
+    guidance: [], active: { from: 0, until: at(2, 0) },
+    report: 'outcome', reportBy: null, purpose: null,
+  };
+
+  /** The real courier-run result shape: the ONE production result that carries fact refs. */
+  const RESULT: DirectiveExecutionResult = {
+    outcome: 'courier delivered', reason: 'the carrier and target physically shared a circle',
+    evidence: [], source: 'mira', uncertainty: 'low', reportedClaim: null,
+    factRefs: [{ asset: 'mira', factIndex: 0 }],
+  };
+
+  const profileWith = (
+    candor: DirectiveCandor, sourceDisclosed: boolean,
+  ): DirectiveDecisionProfile => ({
+    interpretation: BRIEF.mission, commitment: 'attempt', initiative: 'literal', risk: 'measured',
+    method: { kind: 'observe', target: { kind: 'venue', id: 'square-w0' } },
+    timing: { actAt: null, reportAt: null },
+    disclosure: { outcome: true, reason: true, evidence: true, source: sourceDisclosed, uncertainty: true },
+    candor,
+  });
+
+  const learned = (world: WorldState): { asset: EntityId; factIndex: number }[] =>
+    (world.intel.knownAssetFacts ?? []).map(({ asset, factIndex }) => ({ asset, factIndex }));
+
+  const shownCount = (world: WorldState): number =>
+    networkView(world).assets.find((row) => row.id === 'mira')!.factsCount;
+
+  it('THE MOUTH: the reporter names a fact only when candid AND disclosing its own source', () => {
+    const world = withReportingMira('books-mouth');
+    const record = issueDirectiveRecord(world, {
+      principal: 'player', principalId: 'you', recipient: 'mira',
+      handoff: { outboundVia: [], reportVia: [] }, brief: BRIEF, tick: 0, cause: null, queue: false,
+    });
+    const refsFor = (candor: DirectiveCandor, sourceDisclosed: boolean) =>
+      buildDirectiveReport(world, record, profileWith(candor, sourceDisclosed), RESULT, RULES).factRefs;
+
+    expect(refsFor('ordinary', true)).toEqual([{ asset: 'mira', factIndex: 0 }]);
+    for (const candor of ['guarded', 'omissive', 'doctored'] as const) {
+      expect(refsFor(candor, true), `${candor} names no facts`).toEqual([]);
+    }
+    expect(refsFor('ordinary', false), 'an undisclosed source names no facts').toEqual([]);
+    // …and the RESULT the reporter was working from is untouched in every branch: the fact is real,
+    // it simply was not said.
+    expect(RESULT.factRefs).toEqual([{ asset: 'mira', factIndex: 0 }]);
+  });
+
+  it('THE EAR: the books grow from the spoken copy alone, and equal it exactly', () => {
+    const cells: { label: string; candor: DirectiveCandor; sourceDisclosed: boolean }[] = [
+      { label: 'ordinary + disclosed', candor: 'ordinary', sourceDisclosed: true },
+      { label: 'doctored', candor: 'doctored', sourceDisclosed: true },
+      { label: 'ordinary + source withheld', candor: 'ordinary', sourceDisclosed: false },
+    ];
+    for (const { label, candor, sourceDisclosed } of cells) {
+      const world = withReportingMira(`books-ear-${candor}-${sourceDisclosed}`);
+      const record = issueDirectiveRecord(world, {
+        principal: 'player', principalId: 'you', recipient: 'mira',
+        handoff: { outboundVia: [], reportVia: [] }, brief: BRIEF, tick: 0, cause: null, queue: false,
+      });
+      // What mira actually SAYS, built by the production composer for this candor/disclosure pair…
+      const built = buildDirectiveReport(world, record, profileWith(candor, sourceDisclosed), RESULT, RULES);
+      const id = queueNetworkMessage(world, 'player', 'mira', ['you'], {
+        kind: 'directive-report', directiveId: record.id, report: built.report,
+        factRefs: built.factRefs, enemyAction: null,
+      }, 0, null, null);
+      // …and the avatar physically standing there to hear it.
+      const speech = realizeNetworkForward(world, id, {
+        venue: 'home-gs', members: ['mira', 'you'],
+      }, 0, RULES);
+      expect(speech, `${label}: the report was physically spoken`).not.toBeNull();
+      captureIntel(world, {
+        tick: speech!.tick, positions: {}, utterances: [], askings: [], networkSpeeches: [speech!],
+      }, RULES);
+      const spoken = speech!.spoken;
+      if (spoken.kind !== 'directive-report') throw new Error('directive-report');
+
+      // The BOOKS are a function of the SPOKEN copy and of nothing else — not the execution result
+      // the report was built from, and not any transport metadata riding alongside it.
+      expect(learned(world), `${label}: the books equal what was said`).toEqual(spoken.factRefs);
+      const taught = candor === 'ordinary' && sourceDisclosed;
+      expect(learned(world), label).toEqual(taught ? [{ asset: 'mira', factIndex: 0 }] : []);
+      expect(shownCount(world), `${label}: factsCount`).toBe(taught ? 1 : 0);
+      // …while in every cell the underlying compartment fact really exists. The two silent channels
+      // produce a gap in HQ's books, never a missing fact in the world.
+      expect(assetFor(world, 'player', 'mira')!.facts, `${label}: the fact is real`).toHaveLength(1);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The other half of "remote observations wait for handlers too": the principal's OWN senses are a
+// local consequence. The avatar's side of this is pinned in tests/sim/fieldwork.test.ts; this is
+// the enemy mirror — the embodied spymaster standing in the room himself.
+describe('local consequence at the handler — his own ears are not a field report', () => {
+  const DULL: Claim = {
+    id: 'c-dull', family: 'f-dull', parent: null, subject: 'otto', predicate: 'owes-money-to',
+    object: null, count: 2, severity: 3, place: null, attribution: SOMEONE,
+  };
+
+  /** One OVERHEARD telling in square-w1, with `listener` standing in the circle. */
+  const overheardBy = (listener: EntityId): TickEvents => ({
+    tick: at(0, 8), positions: {}, askings: [],
+    utterances: [{
+      tick: at(0, 8), venue: 'square-w1', circleMembers: ['quill', 'rosa', listener],
+      speaker: 'quill', addressedTo: 'rosa', claim: DULL, mode: 'telling',
+    }],
+  });
+
+  it('the vigilance gate stops a dull guard, and never applies to the spymaster\'s own ears', () => {
+    // (a) hugo (vigilance 0.3) is standing right there — and 'owes-money-to' is too dull to notice.
+    const guarded = watchfordWorld('local-guard');
+    guarded.network.spymaster = 'otto';
+    captureEvidence(guarded, overheardBy('hugo'), RULES);
+    expect(guarded.enemy.evidence).toEqual([]);
+    expect(guarded.network.directiveState?.heldObservations ?? []).toEqual([]);
+
+    // (b) the SAME dull words, with the spymaster himself in the circle instead. A principal's own
+    //     senses pass through no observer gate at all, so the evidence lands in that very tick…
+    const heard = watchfordWorld('local-self');
+    heard.network.spymaster = 'otto';
+    captureEvidence(heard, overheardBy('otto'), RULES);
+    expect(heard.enemy.evidence).toHaveLength(1);
+    expect(heard.enemy.evidence[0]).toMatchObject({
+      observer: 'otto', kind: 'utterance', overheard: true, claimId: 'c-dull', family: 'f-dull',
+    });
+    // …and it is a LOCAL CONSEQUENCE, not a queued field report waiting on a handler meeting.
+    expect(heard.network.directiveState?.heldObservations ?? []).toEqual([]);
+    // Non-vacuity: the enemy mind really moved, and the twin that heard nothing really did not.
+    expect(stableStringify(enemyDigest(heard.enemy, 1, RULES)))
+      .not.toBe(stableStringify(enemyDigest(guarded.enemy, 1, RULES)));
+  });
+
+  it('a keen guard in the same room still only HOLDS it — his ears are not his handler\'s', () => {
+    const world = watchfordWorld('local-held');
+    world.network.spymaster = 'otto';
+    // gale is the keen guard (vigilance 0.9), so nothing here turns on the dullness of an ear.
+    captureEvidence(world, {
+      ...overheardBy('gale'),
+      utterances: [{
+        tick: at(0, 8), venue: 'square-w0', circleMembers: ['mira', 'sten', 'gale'],
+        speaker: 'mira', addressedTo: 'sten', claim: { ...DULL, predicate: 'stole', severity: 5 },
+        mode: 'telling',
+      }],
+    }, RULES);
+    expect(world.enemy.evidence, 'seeing it is not the handler knowing it').toEqual([]);
+    expect(world.network.directiveState!.heldObservations).toMatchObject([
+      { observer: 'gale', principal: 'enemy', deliveredAt: null },
+    ]);
   });
 });
 
