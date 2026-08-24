@@ -172,6 +172,13 @@ export interface Save {
  * whose effect is spoken in phase 2 must validate against the frame's frozen circles, not against a
  * live projection an earlier same-tick action may already have moved. All three production paths
  * (session, bot runner, replay) hold the frame and forward it here.
+ *
+ * P11-18: every LOCAL verb now consumes `frame.circles` — `recruit` (Task 11's correction) plus
+ * `tell`, `ask`, `sell`, `debrief`, `courier`, `host`, `meet`, and `directive`. Each still falls
+ * back to a live projection when no frame is supplied, which is the pre-existing compatibility
+ * posture of the direct `apply*` call sites. `assignInformant` is deliberately NOT bound here: it
+ * sits outside the eight the ruling names, and moving it is a semantic change nobody has
+ * adjudicated (disclosed in the fix-wave-2 report).
  */
 export function applyAction(
   world: WorldState, action: Action, rules?: Rules, frame?: PreparedTick,
@@ -187,10 +194,10 @@ export function applyAction(
       applyGoTo(world, action.venue);
       break;
     case 'tell':
-      applyTell(world, action.to, action.spec, action.tick);
+      applyTell(world, action.to, action.spec, action.tick, frame?.circles);
       break;
     case 'ask':
-      applyAsk(world, action.to, action.about, action.tick);
+      applyAsk(world, action.to, action.about, action.tick, frame?.circles);
       break;
     case 'assignInformant':
       applyAssignInformant(world, action.informant, action.venue, action.tick);
@@ -216,28 +223,34 @@ export function applyAction(
       break;
     case 'courier':
       if (!rules) throw new Error('applyAction: courier requires rules (economy prices + predicate valence)');
-      applyCourier(world, action.asset, action.spec, action.target, action.viaDrop, action.tick, rules);
+      applyCourier(
+        world, action.asset, action.spec, action.target, action.viaDrop, action.tick, rules,
+        frame?.circles,
+      );
       break;
     case 'meet':
       // A meet is FREE (the walk is the price) — no rules needed, like tell/goTo.
-      applyMeet(world, action.asset, action.tick);
+      applyMeet(world, action.asset, action.tick, frame?.circles);
       break;
     case 'host':
       if (!rules) throw new Error('applyAction: host requires rules (economy prices)');
-      applyHost(world, action.venue, action.invitees, action.tick, rules);
+      applyHost(world, action.venue, action.invitees, action.tick, rules, frame?.circles);
       break;
     case 'debrief':
       // Not priced in coin (the meet precedent) — but the ideology refusal reads predicate valence
       // and the intel entry rides reportThrough's trait chain, so rules is required all the same.
       if (!rules) throw new Error('applyAction: debrief requires rules (predicate valence + reportThrough traits)');
-      applyDebrief(world, action.asset, action.tick, rules);
+      applyDebrief(world, action.asset, action.tick, rules, frame?.circles);
       break;
     case 'sell':
       if (!rules) throw new Error('applyAction: sell requires rules (economy prices)');
-      applySell(world, action.buyer, action.family, action.tick, rules);
+      applySell(world, action.buyer, action.family, action.tick, rules, frame?.circles);
       break;
     case 'directive':
-      applyDirective(world, action.recipient, action.handoff, action.brief, action.tick, action.application);
+      applyDirective(
+        world, action.recipient, action.handoff, action.brief, action.tick, action.application,
+        frame?.circles,
+      );
       break;
     default: {
       // Saves are untrusted JSON — an unknown kind must fail loudly, never silently no-op.

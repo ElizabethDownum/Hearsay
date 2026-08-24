@@ -32,6 +32,20 @@ export interface InjectSpec {
   attribution: Claim['attribution'];
 }
 
+/**
+ * OFFER/EXECUTION IDENTITY (P11-18, the recruit precedent generalized). Every local verb takes the
+ * prepared tick's frozen `circles` as `offered` when one exists, and falls back to a live
+ * `circlesAt` projection only for the frameless compatibility call sites that predate the frame.
+ * The locality a verb VALIDATES against is then always the locality its offer was composed from —
+ * an earlier same-tick action can no longer move the answer out from under it.
+ */
+type OfferedCircles = readonly Circle[] | undefined;
+
+/** The one place the offered-or-live choice is spelled. */
+function localityFor(world: WorldState, tick: Tick, offered: OfferedCircles): readonly Circle[] {
+  return offered ?? circlesAt(world, tick);
+}
+
 /** Author one player-side outcome brief. Delivery is a separate physical phase. */
 export function applyDirective(
   world: WorldState,
@@ -40,8 +54,9 @@ export function applyDirective(
   brief: DirectiveBrief,
   tick: Tick,
   application: PlayerDirectiveApplication = { kind: 'standard' },
+  offered?: readonly Circle[],
 ): void {
-  applyDirectiveWithCause(world, recipient, handoff, brief, tick, application, 'directive');
+  applyDirectiveWithCause(world, recipient, handoff, brief, tick, application, 'directive', offered);
 }
 
 function applyDirectiveWithCause(
@@ -52,6 +67,7 @@ function applyDirectiveWithCause(
   tick: Tick,
   application: PlayerDirectiveApplication,
   causeAction: NonNullable<NetworkSpeech['cause']>['action'],
+  offered?: readonly Circle[],
 ): void {
   const principalId = world.playerId;
   if (principalId === null) throw new Error('directive: no player is enrolled');
@@ -118,7 +134,8 @@ function applyDirectiveWithCause(
   validateRelayRoute('outbound', handoff.outboundVia);
   validateRelayRoute('report', handoff.reportVia);
   const firstHop = handoff.outboundVia[0] ?? recipient;
-  const circle = circlesAt(world, tick).find((candidate) => candidate.members.includes(principalId));
+  const circle = localityFor(world, tick, offered)
+    .find((candidate) => candidate.members.includes(principalId));
   if (!circle || !circle.members.includes(firstHop)) {
     throw new Error(`directive: first handoff '${firstHop}' is not in the offered circle`);
   }
@@ -164,13 +181,15 @@ export function applyInject(
 
 /** The avatar speaks: hop zero made flesh. Valid only on a beat, to a circle-mate. Records the
  *  pending telling; the same tick's step mints the claim and emits the utterance (replay-exact). */
-export function applyTell(world: WorldState, to: EntityId, spec: InjectSpec, tick: Tick): void {
+export function applyTell(
+  world: WorldState, to: EntityId, spec: InjectSpec, tick: Tick, offered?: readonly Circle[],
+): void {
   if (world.playerId === null) throw new Error('tell: no player is enrolled');
   if (world.playerVenue === null) throw new Error('tell: the avatar is nowhere');
   if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) throw new Error('tell: speech happens on conversation beats');
   if (!world.npcs[to]) throw new Error(`tell: unknown npc '${to}'`);
   if (world.pendingTell) throw new Error('tell: one telling per beat');
-  const circle = circlesAt(world, tick).find((c) => c.members.includes(world.playerId!));
+  const circle = localityFor(world, tick, offered).find((c) => c.members.includes(world.playerId!));
   if (!circle || !circle.members.includes(to)) {
     throw new Error(`tell: '${to}' is not in the avatar's circle this beat`);
   }
@@ -212,13 +231,16 @@ function bestIntelVersion(world: WorldState, family: RumorId): IntelEntry | null
  * `apparentSources: [avatar]` so they now retell it by ordinary tellability), because it is the
  * SAME family entering their mind, never a fresh one.
  */
-export function applySell(world: WorldState, buyer: EntityId, family: RumorId, tick: Tick, rules: Rules): void {
+export function applySell(
+  world: WorldState, buyer: EntityId, family: RumorId, tick: Tick, rules: Rules,
+  offered?: readonly Circle[],
+): void {
   if (world.playerId === null) throw new Error('sell: no player is enrolled');
   if (world.playerVenue === null) throw new Error('sell: the avatar is nowhere');
   if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) throw new Error('sell: speech happens on conversation beats');
   if (!world.npcs[buyer]) throw new Error(`sell: unknown npc '${buyer}'`);
   if (world.pendingSell) throw new Error('sell: one sale per beat');
-  const circle = circlesAt(world, tick).find((c) => c.members.includes(world.playerId!));
+  const circle = localityFor(world, tick, offered).find((c) => c.members.includes(world.playerId!));
   if (!circle || !circle.members.includes(buyer)) {
     throw new Error(`sell: '${buyer}' is not in the avatar's circle this beat`);
   }
@@ -240,12 +262,14 @@ export function applySell(world: WorldState, buyer: EntityId, family: RumorId, t
  * could never fire; the normal path retires it the instant it fires. NPC inquiry-task semantics are
  * untouched (they place no addressee). It still never auto-answers — the human's testimony is not sim-driven.
  */
-export function applyAsk(world: WorldState, to: EntityId, about: InquiryKey, tick: Tick): void {
+export function applyAsk(
+  world: WorldState, to: EntityId, about: InquiryKey, tick: Tick, offered?: readonly Circle[],
+): void {
   if (world.playerId === null) throw new Error('ask: no player is enrolled');
   if (world.playerVenue === null) throw new Error('ask: the avatar is nowhere');
   if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) throw new Error('ask: speech happens on conversation beats');
   if (!world.npcs[to]) throw new Error(`ask: unknown npc '${to}'`);
-  const circle = circlesAt(world, tick).find((c) => c.members.includes(world.playerId!));
+  const circle = localityFor(world, tick, offered).find((c) => c.members.includes(world.playerId!));
   if (!circle || !circle.members.includes(to)) {
     throw new Error(`ask: '${to}' is not in the avatar's circle this beat`);
   }
@@ -292,8 +316,7 @@ export function applyRecruit(
 
   // Co-circle basis (recruitment is a conversation — the same validation shape as tell), read from
   // the OFFERED frame when one exists so validation and delivery share one snapshot.
-  const circles = offered ?? circlesAt(world, tick);
-  const circle = circles.find((c) => c.members.includes(world.playerId!));
+  const circle = localityFor(world, tick, offered).find((c) => c.members.includes(world.playerId!));
   if (!circle || !circle.members.includes(target)) {
     throw new Error(`recruit: '${target}' is not in the avatar's circle this beat`);
   }
@@ -366,7 +389,7 @@ export function applySetDrop(world: WorldState, id: string, venue: VenueId, rule
  */
 export function applyCourier(
   world: WorldState, asset: EntityId, spec: InjectSpec, target: EntityId, viaDrop: string | null,
-  tick: Tick, rules: Rules,
+  tick: Tick, rules: Rules, offered?: readonly Circle[],
 ): void {
   if (world.playerId === null) throw new Error('courier: no player is enrolled');
   const record = world.network.assets.find((a) => a.id === asset);
@@ -387,7 +410,7 @@ export function applyCourier(
   if (viaDrop === null) {
     if (world.playerVenue === null) throw new Error('courier: the avatar is nowhere for a face handoff');
     if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) throw new Error('courier: a face handoff happens on conversation beats');
-    const circle = circlesAt(world, tick).find((c) => c.members.includes(world.playerId!));
+    const circle = localityFor(world, tick, offered).find((c) => c.members.includes(world.playerId!));
     if (!circle || !circle.members.includes(asset)) {
       throw new Error(`courier: '${asset}' is not in the avatar's circle this beat for the handoff`);
     }
@@ -398,7 +421,8 @@ export function applyCourier(
     if (world.playerVenue !== drop.venue) {
       throw new Error(`courier: the avatar must be at dead drop '${viaDrop}' to place the payload`);
     }
-    const circle = circlesAt(world, tick).find((candidate) => candidate.members.includes(world.playerId!));
+    const circle = localityFor(world, tick, offered)
+      .find((candidate) => candidate.members.includes(world.playerId!));
     if (!drop.knownBy.includes(asset) && !(circle?.members.includes(asset) ?? false)) {
       throw new Error(`courier: '${asset}' neither knows nor is present to learn dead drop '${viaDrop}'`);
     }
@@ -429,7 +453,7 @@ export function applyCourier(
     recordPlayerKnownFact(world, asset, { kind: 'met-asset', ref: world.playerId });
     applyDirectiveWithCause(
       world, asset, { outboundVia: [], reportVia: [] }, brief, tick,
-      { kind: 'courier', target }, 'courier',
+      { kind: 'courier', target }, 'courier', offered,
     );
   } else {
     const drop = world.network.drops.find((d) => d.id === viaDrop)!;
@@ -461,13 +485,16 @@ export const HOST_EVENT = { from: 1080, to: 1200 } as const;
  * evaluator owns acceptance and timing; only its later application attempt may schedule the asset.
  * The avatar is never moved, and `met-asset` is recorded only for actual joint attendance.
  */
-export function applyMeet(world: WorldState, asset: EntityId, tick: Tick): void {
+export function applyMeet(
+  world: WorldState, asset: EntityId, tick: Tick, offered?: readonly Circle[],
+): void {
   if (world.playerId === null) throw new Error('meet: no player is enrolled');
   if (!world.venues['safehouse']) throw new Error('meet: this world has no safehouse');
   if (!world.network.assets.some((a) => a.id === asset)) {
     throw new Error(`meet: '${asset}' is not one of your assets`);
   }
-  const circle = circlesAt(world, tick).find((candidate) => candidate.members.includes(world.playerId!));
+  const circle = localityFor(world, tick, offered)
+    .find((candidate) => candidate.members.includes(world.playerId!));
   if (!circle || !circle.members.includes(asset)) {
     throw new Error(`meet: '${asset}' is not in the offered circle`);
   }
@@ -481,7 +508,7 @@ export function applyMeet(world: WorldState, asset: EntityId, tick: Tick): void 
   applyDirectiveWithCause(
     world, asset, { outboundVia: [], reportVia: [] }, brief, tick,
     { kind: 'rendezvous', venue: 'safehouse', from: nextBeat, until: nextBeat + CONVERSATION_BEAT },
-    'meet',
+    'meet', offered,
   );
 }
 
@@ -504,6 +531,7 @@ function isHostRoom(station: 'noble' | 'lowlife', venue: VenueId): boolean {
  */
 export function applyHost(
   world: WorldState, venue: VenueId, invitees: EntityId[], tick: Tick, rules: Rules,
+  offeredCircles?: readonly Circle[],
 ): void {
   if (world.playerId === null) throw new Error('host: no player is enrolled');
   if (world.station === null) throw new Error('host: no standing to host an event');
@@ -518,7 +546,8 @@ export function applyHost(
     throw new Error(`host: the invitee cap is ${HOST_INVITEE_CAP} (got ${invitees.length})`);
   }
   if (new Set(invitees).size !== invitees.length) throw new Error('host: duplicate invitee');
-  const offered = circlesAt(world, tick).find((candidate) => candidate.members.includes(world.playerId!));
+  const offered = localityFor(world, tick, offeredCircles)
+    .find((candidate) => candidate.members.includes(world.playerId!));
   if (!offered) throw new Error('host: the avatar has no offered circle');
   for (const id of invitees) {
     if (id === world.playerId) throw new Error('host: the avatar cannot be their own invitee');
@@ -605,13 +634,15 @@ function oldestConfirmableBelief(
  * no belief the asset can be compelled to confirm (empty store OR all beliefs floored), the ideology
  * refusal — throws before any state change (zero residue).
  */
-export function applyDebrief(world: WorldState, asset: EntityId, tick: Tick, rules: Rules): void {
+export function applyDebrief(
+  world: WorldState, asset: EntityId, tick: Tick, rules: Rules, offered?: readonly Circle[],
+): void {
   if (world.playerId === null) throw new Error('debrief: no player is enrolled');
   const record = world.network.assets.find((a) => a.id === asset);
   if (!record) throw new Error(`debrief: '${asset}' is not one of your assets`);
   if (world.playerVenue !== 'safehouse') throw new Error('debrief: the avatar must be at the safehouse');
   if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) throw new Error('debrief: debriefing happens on conversation beats');
-  const circle = circlesAt(world, tick).find((c) => c.members.includes(world.playerId!));
+  const circle = localityFor(world, tick, offered).find((c) => c.members.includes(world.playerId!));
   if (!circle || !circle.members.includes(asset)) {
     throw new Error(`debrief: '${asset}' is not with you at the safehouse this beat`);
   }
