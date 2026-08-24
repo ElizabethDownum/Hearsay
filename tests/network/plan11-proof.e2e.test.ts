@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Network } from '../../app/src/panels/Network';
 import { Directives } from '../../app/src/panels/Directives';
+import { localParticipants, type LocalActionIntent } from '../../app/src/loop/session';
 import { at, dayOf, TICKS_PER_DAY } from '../../src/core/time';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { positionOf } from '../../src/sim/agents';
@@ -50,13 +51,6 @@ interface LocalOffer {
 }
 
 /**
- * A submitted intent: an `Action` before the beat stamps its tick. `Omit` over a discriminated union
- * collapses it to the keys every arm shares (which is none of the interesting ones), so distribute
- * the omit and let each arm keep its own fields.
- */
-type Intent<A extends Action = Action> = A extends unknown ? Omit<A, 'tick'> : never;
-
-/**
  * `session.requestLocalInteraction()` + `session.localOffer()` at the engine seam: prepare the tick,
  * find the avatar's frozen circle, and freeze the token. Same three lines the session runs
  * (`session.ts:205-220`) — a test-local surface over the SAME `prepareTick`, never a parallel one.
@@ -76,32 +70,14 @@ function requestLocalOffer(world: WorldState): LocalOffer {
 }
 
 /**
- * `session.ts:71-88`'s `localParticipants`, mirrored arm for arm. The engine seam is the switch, not
- * a two-field guess: a `recruit` is gated on its `target`, a `directive` on its first relay or else
- * its recipient. Mirrored exactly so the membership fence this file leans on is the shipped one.
+ * `session.chooseLocal(token, intent)` + the advance that runs it: token identity, then the beat.
+ * The membership fence is the SHIPPED `localParticipants` (`app/src/loop/session.ts`), imported
+ * rather than mirrored — a mirror of a switch statement is a copy that can drift away from the
+ * thing it is supposed to be proving, and this file's whole claim is that the crown scenario rides
+ * production seams.
  */
-function localParticipants(intent: Intent): EntityId[] {
-  const value = intent as unknown as {
-    kind: string; to?: EntityId; buyer?: EntityId; target?: EntityId; asset?: EntityId;
-    informant?: EntityId; invitees?: EntityId[]; viaDrop?: string | null;
-    outboundVia?: EntityId[]; recipient?: EntityId;
-  };
-  switch (value.kind) {
-    case 'tell': case 'ask': return [value.to!];
-    case 'sell': return [value.buyer!];
-    case 'recruit': return [value.target!];
-    case 'debrief': case 'meet': return [value.asset!];
-    case 'host': return [...(value.invitees ?? [])];
-    case 'assignInformant': return [value.informant!];
-    case 'courier': return value.viaDrop === null ? [value.asset!] : [];
-    case 'directive': return [value.outboundVia?.[0] ?? value.recipient!];
-    default: return [];
-  }
-}
-
-/** `session.chooseLocal(token, intent)` + the advance that runs it: token identity, then the beat. */
 function chooseLocalAndAdvance(
-  world: WorldState, offer: LocalOffer, token: string, intents: Intent[],
+  world: WorldState, offer: LocalOffer, token: string, intents: LocalActionIntent[],
 ): void {
   if (token !== offer.token) throw new Error('session: stale or invalid local offer token');
   const members = new Set(offer.circleMembers);
@@ -201,6 +177,10 @@ const person = (
   rivals: [], schedule: allDay(venue), edges: [],
 });
 
+// CONTROLLER-AMENDED SUBSTRATE (ledger P11-17, 2026-08-23): the brief's "existing Testford/Watchford
+// helpers" instruction is amended for this fixture. Provingford is a hand-authored world built
+// through the real production attachment APIs (`buildWorld`/`buildTownMap`/`enrollPlayer`/
+// `applyEnemyDecision`) with no production force hooks — the review's Minor M-1 disposition.
 const PROVINGFORD: TownFixture = {
   venues: [
     { id: 'plaza', district: 'd0', access: 'public' },       // the post the digest picks
@@ -259,6 +239,13 @@ function provingWorld(seed: string, options: StageOptions = {}): WorldState {
   }
   world.npcs.gale!.edges.push({ to: 'boss', kind: 'colleague', trust: 0.8 });
   world.npcs.mole!.edges.push({ to: 'relay', kind: 'friend', trust: 0.6 });
+  // B is NOT in the room when the brief is handed over — he walks in on the next beat. That is what
+  // makes the offer-tick fence decision route-driven here too: the avatar hands the brief to the
+  // relay standing in front of him, for a recipient who is provably somewhere else (I-1).
+  world.scheduleOverrides['mole'] = [{
+    fromDay: 0, toDay: 1, from: 0, to: 10, venue: 'lane',
+    source: 'player', sourceRef: 'test:mole-arrives-late',
+  }];
   if (options.handlerMeeting !== false) {
     world.scheduleOverrides['boss'] = [{ ...HANDLER_MEETING }];
   }
@@ -299,12 +286,12 @@ const CONSEQUENCE_BRIEF: DirectiveBrief = {
   report: 'outcome', reportBy: null, purpose: null,
 };
 
-const DECOY_ACTION: Intent = {
+const DECOY_ACTION: LocalActionIntent = {
   kind: 'directive', recipient: 'mole',
   handoff: { outboundVia: ['relay'], reportVia: [] }, brief: DECOY_BRIEF,
 };
 
-const CONSEQUENCE_ACTION: Intent = {
+const CONSEQUENCE_ACTION: LocalActionIntent = {
   kind: 'directive', recipient: 'worker',
   handoff: { outboundVia: [], reportVia: [] }, brief: CONSEQUENCE_BRIEF,
 };
@@ -345,6 +332,9 @@ function playCrownA(world: WorldState, until: number): WorldState {
   // The decision inputs: the offered circle names the relay, and the roster says he is an asset.
   expect(offerA.circleMembers).toContain('relay');
   expect(networkView(world).assets.map((a) => a.id)).toContain('relay');
+  // …and B, the brief's actual recipient, is NOT standing here. The shipped fence lets this through
+  // on the FIRST HOP alone, so this offer beat is route-driven, not accidentally co-located.
+  expect(offerA.circleMembers, 'the recipient is elsewhere at the handover').not.toContain('mole');
   chooseLocalAndAdvance(world, offerA, offerA.token, [DECOY_ACTION]);
   return runLogOn(world, RULES, PLAYER_LOG.slice(1), until);
 }
@@ -611,7 +601,7 @@ function hesitantTwin(compromised: boolean): WorldState {
   return world;
 }
 
-const RECRUIT_CASS: Intent = {
+const RECRUIT_CASS: LocalActionIntent = {
   kind: 'recruit', target: 'cass', mice: 'money', leverageFamily: null,
 };
 

@@ -68,11 +68,21 @@ function queuedTickFor(intent: ActionIntent, now: Tick): Tick {
   return now;
 }
 
-function localParticipants(intent: LocalActionIntent): EntityId[] {
+/**
+ * Who the avatar must actually be standing with for this intent to be choosable. Exported so tests
+ * fence against the SHIPPED extractor rather than a mirror of it that can drift.
+ *
+ * The `directive` arm is the one that is not simply "the person it is for": a relayed brief is
+ * handed to its FIRST HOP, and the final recipient may be anywhere. `handoff.outboundVia[0] ??
+ * recipient` is the same rule the engine enforces (`src/sim/actions.ts:120-124`) and the same one
+ * the composer greys on (`app/src/panels/DayPlanner.tsx:257`); this is the third copy, at the
+ * submit seam.
+ */
+export function localParticipants(intent: LocalActionIntent): EntityId[] {
   const value = intent as unknown as {
     kind: string; to?: EntityId; buyer?: EntityId; target?: EntityId; asset?: EntityId;
     informant?: EntityId; invitees?: EntityId[]; viaDrop?: string | null;
-    outboundVia?: EntityId[]; recipient?: EntityId;
+    handoff?: { outboundVia?: EntityId[] }; recipient?: EntityId;
   };
   switch (value.kind) {
     case 'tell': case 'ask': return [value.to!];
@@ -82,7 +92,7 @@ function localParticipants(intent: LocalActionIntent): EntityId[] {
     case 'host': return [...(value.invitees ?? [])];
     case 'assignInformant': return [value.informant!];
     case 'courier': return value.viaDrop === null ? [value.asset!] : [];
-    case 'directive': return [value.outboundVia?.[0] ?? value.recipient!];
+    case 'directive': return [value.handoff?.outboundVia?.[0] ?? value.recipient!];
     default: return [];
   }
 }

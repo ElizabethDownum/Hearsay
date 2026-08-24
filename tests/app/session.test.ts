@@ -2,14 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { loadSession, newSession } from '../../app/src/loop/session';
 import { CORONATION } from '../../src/content/scenarios/coronation';
 import { STANDARD_ECONOMY } from '../../src/content/economy';
+import { STANDARD_RULES } from '../../src/content/rules';
 import { at, minuteOfDay, TICKS_PER_DAY } from '../../src/core/time';
 import { canEnter, type InjectSpec } from '../../src/sim/actions';
 import { circlesAt } from '../../src/sim/agents';
+import { runLogOn } from '../../src/sim/campaign';
 import { hashWorld } from '../../src/sim/hash';
 import { scheduleSetup } from '../../src/sim/phases';
 import { CONVERSATION_BEAT } from '../../src/sim/rumors/propagation';
 import { SOMEONE, type EntityId } from '../../src/sim/rumors/claim';
 import type { DirectiveBrief } from '../../src/sim/directives/types';
+import type { WorldState } from '../../src/sim/types';
 
 const SEED = 'cor-1';
 const poison = (subject: EntityId): InjectSpec => ({ subject, predicate: 'poisoned', object: SOMEONE,
@@ -65,6 +68,62 @@ function requestStagedOffer(memberCount = 2) {
   const offer = session.localOffer()!;
   expect(offer.circleMembers).toEqual(members);
   return { session, offer, members, venue };
+}
+
+const ROUTE_ROOM = 'route-room';
+const ROUTE_ELSEWHERE = 'route-elsewhere';
+
+/**
+ * The routed-handoff room. Exactly two of the player's own assets: one standing in front of the
+ * avatar (`inRoom`), one provably somewhere else (`elsewhere`). Both are real roster entries, so
+ * either may lawfully be a relay OR the final recipient — which is what makes the two directions
+ * below an exact inverse pair rather than two different fixtures.
+ *
+ * The staging is world-level (a venue, two schedule overrides, two roster rows), so replay is
+ * checked against an identically staged twin: `loadSession`'s fresh `stageWorld` regrows the seed's
+ * town and cannot know about a test-only room.
+ */
+function stageRoutedRoom(world: WorldState): { inRoom: EntityId; elsewhere: EntityId } {
+  const guardIds = new Set(world.enemy.observers.map((observer) => observer.id));
+  const [inRoom, elsewhere] = Object.keys(world.npcs)
+    .filter((id) => id !== world.playerId && !guardIds.has(id))
+    .sort() as [EntityId, EntityId];
+  for (const venue of [ROUTE_ROOM, ROUTE_ELSEWHERE]) {
+    world.venues[venue] = { id: venue, district: 'd0', access: 'public' };
+  }
+  world.scheduleOverrides[inRoom] = [{
+    fromDay: 0, toDay: 1, from: 0, to: 1440, venue: ROUTE_ROOM, source: 'vignette',
+  }];
+  world.scheduleOverrides[elsewhere] = [{
+    fromDay: 0, toDay: 1, from: 0, to: 1440, venue: ROUTE_ELSEWHERE, source: 'vignette',
+  }];
+  for (const id of [inRoom, elsewhere]) {
+    world.network.assets.push({ id, mice: 'money', wagePaidThroughDay: 0, strikes: 0, facts: [] });
+    world.npcs[id]!.edges.push({ to: world.playerId!, kind: 'friend', trust: 0.8 });
+  }
+  return { inRoom, elsewhere };
+}
+
+/** An ordinary standing brief — nothing about it decides who the avatar hands it to. */
+const routedBrief = (tick: number): DirectiveBrief => ({
+  mission: { kind: 'learn', target: { kind: 'venue', id: ROUTE_ELSEWHERE } },
+  priority: 'routine', authority: 'office', discretion: 'quiet', specificity: 'outcome-only',
+  guidance: [], active: { from: tick, until: tick + TICKS_PER_DAY },
+  report: 'outcome', reportBy: null, purpose: null,
+});
+
+/** Drive a fresh session into the staged routed room and stop on its real prepared offer. */
+function routedOffer() {
+  const session = newSession(SEED);
+  const { inRoom, elsewhere } = stageRoutedRoom(session.world);
+  session.submit({ kind: 'goTo', venue: ROUTE_ROOM });
+  session.advance(7);
+  expect(session.requestLocalInteraction()).toEqual({ requestedFor: 15, refused: false });
+  expect(session.advance(20)).toEqual({ advanced: 8, stopped: 'local-offer' });
+  const offer = session.localOffer()!;
+  expect(offer.venue).toBe(ROUTE_ROOM);
+  expect(offer.circleMembers, 'the relay is the only person in the room').toEqual([inRoom]);
+  return { session, offer, inRoom, elsewhere };
 }
 
 /** Re-stage a discovered actual offer on a fresh standard world, optionally adding the replay tag. */
@@ -400,6 +459,77 @@ describe('requested-beat local offer', () => {
     // the three refusals above are the fence firing and not a verb that cannot be chosen at all.
     expect(session.chooseLocal(offer.token, {
       kind: 'recruit', target: members[0]!, mice: 'money', leverageFamily: null,
+    })).toEqual({ queuedFor: offer.tick });
+  });
+});
+
+/**
+ * The whole point of a relayed brief is that the person it is FOR does not have to be standing
+ * there. The engine already says so — `applyDirective` fences on
+ * `handoff.outboundVia[0] ?? recipient` (`src/sim/actions.ts:120-124`), and so does the composer's
+ * visible validation (`app/src/panels/DayPlanner.tsx:257`). The session's own pre-check is the
+ * third copy of that rule, and these two tests are its exact inverse pair: same room, same two
+ * assets, the roles swapped. Only the first hop may decide.
+ */
+describe('the routed-directive fence fires on the person actually in hand', () => {
+  it('relay in the room, recipient elsewhere: accepted, executes at the offered tick, replays exactly', () => {
+    const { session, offer, inRoom, elsewhere } = routedOffer();
+    // The decision inputs are public: who is standing here, and who is on the roster.
+    expect(offer.circleMembers).not.toContain(elsewhere);
+    expect(session.world.network.assets.map((asset) => asset.id))
+      .toEqual(expect.arrayContaining([inRoom, elsewhere]));
+
+    expect(session.chooseLocal(offer.token, {
+      kind: 'directive', recipient: elsewhere,
+      handoff: { outboundVia: [inRoom], reportVia: [] }, brief: routedBrief(offer.tick),
+    })).toEqual({ queuedFor: offer.tick });
+
+    expect(session.advance(1)).toEqual({ advanced: 1, stopped: 'complete' });
+    expect(session.localOffer()).toBeNull();
+    expect(session.log.at(-1)).toMatchObject({
+      kind: 'directive', tick: offer.tick, recipient: elsewhere,
+    });
+
+    // It really issued, and the physical brief starts its journey at the relay in hand.
+    const state = session.world.network.directiveState!;
+    expect(state.records.map((record) => record.recipient)).toEqual([elsewhere]);
+    expect(state.records[0]!.issuedAt).toBe(offer.tick);
+    const message = state.messages.find((row) => row.payload.kind === 'directive')!;
+    expect(message.route).toEqual([inRoom, elsewhere]);
+    expect(message.origin).toBe(session.world.playerId);
+    expect(message.holder, 'the relay in hand really took it at the offered beat').toBe(inRoom);
+    expect(message.deliveredAt, 'the recipient is elsewhere, so nothing reached him').toBeNull();
+
+    // …and the live world equals the replay of its own log on an identically staged twin.
+    const twin = newSession(SEED);
+    stageRoutedRoom(twin.world);
+    runLogOn(twin.world, STANDARD_RULES, session.save().log, session.world.tick);
+    expect(twin.world.tick).toBe(session.world.tick);
+    expect(hashWorld(twin.world)).toBe(hashWorld(session.world));
+  });
+
+  it('the inverse: recipient in the room, first relay elsewhere is refused with zero residue', () => {
+    const { session, offer, inRoom, elsewhere } = routedOffer();
+    const beforeHash = hashWorld(session.world);
+    const beforeSave = session.save();
+
+    // The recipient is right here — and that is not the question the fence asks.
+    expect(() => session.chooseLocal(offer.token, {
+      kind: 'directive', recipient: inRoom,
+      handoff: { outboundVia: [elsewhere], reportVia: [] }, brief: routedBrief(offer.tick),
+    })).toThrow(new RegExp(`local participant '${elsewhere}' is not in the offered circle`));
+
+    expect(hashWorld(session.world)).toBe(beforeHash);
+    expect(session.save()).toEqual(beforeSave);
+    expect(session.world.network.directiveState).toBeUndefined();
+    expect(session.localOffer()!.token).toBe(offer.token);
+
+    // POSITIVE CONTROL: swap the two roles back and the identical verb is accepted for this beat,
+    // so the refusal above is the fence firing on the absent relay, not a directive that cannot be
+    // chosen from this offer at all.
+    expect(session.chooseLocal(offer.token, {
+      kind: 'directive', recipient: elsewhere,
+      handoff: { outboundVia: [inRoom], reportVia: [] }, brief: routedBrief(offer.tick),
     })).toEqual({ queuedFor: offer.tick });
   });
 });
