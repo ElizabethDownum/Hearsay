@@ -376,7 +376,7 @@ describe('enemy orders use physical directives', () => {
     expect(pendingOrdersOf(world)?.[0]?.directiveIds).toEqual([reissued.id]);
   });
 
-  it('hand-issued cancel-watch removes only exact sourceRef+fromDay and queues one report', () => {
+  it('hand-issued cancel-watch removes only the watch instance it names and queues one report', () => {
     const world = enemyWorld();
     world.scheduleOverrides.bez = [
       { fromDay: 1, toDay: 9, from: 960, to: 1140, venue: 'square', source: 'enemy',
@@ -420,6 +420,89 @@ describe('enemy orders use physical directives', () => {
     } });
     expect(world.enemy.actionLedger).toBeUndefined();
     expect(world.enemy.watchedDistricts).toEqual([]);
+  });
+
+  /**
+   * I-1 (whole-branch review). A watch ATTEMPTED after its authored start day installs its street
+   * override on the EFFECTIVE day — `Math.max(application.startDay, dayOf(tick))`, the enemy-watch
+   * arm of `startApplication`. The cancellation that stands that post down still names the AUTHORED
+   * start day, because that is what the worked-night report carried into the ledger row
+   * (`scheduleStartDay`, reports.ts) and therefore what the tail drop copies into
+   * `cancel-watch.startDay` (digest.ts:371 → counterintel.ts:225). Correlating the removal on
+   * `fromDay` therefore missed exactly the late row: the guard kept standing the post while the
+   * returned 'watch cancelled' report cleared HQ's books. The report-fed honesty law says a
+   * delivered cancellation report must reflect a real street removal, so this pins the whole loop:
+   * the override is gone at the cancellation's ATTEMPT, and HQ's ledger/`watchedDistricts` clear
+   * only when the report physically comes back.
+   */
+  it('a LATE-attempted watch is really removed by its own cancellation, and HQ clears only on the returned report', () => {
+    const world = enemyWorld();
+    // The post is the backroom, not the guard's ordinary square — the red-herring fixture's own
+    // shape, and what makes the installed override the thing that physically moves him.
+    applyEnemyDecision(world, { day: 0, features: [], inquiries: [], interrogations: [],
+      watches: [{ district: 'd0', posts: [{ guard: 'bez', venue: 'backroom' }], startDay: 1 }] });
+    const watch = recordFor(world);
+
+    // HQ's order reaches the guard and is due on its authored day 1 — but the guard shares no
+    // conversation beat until day 2, so the standing intent is only realized then. Nothing is
+    // forced: `attemptDirective` runs exactly as the autonomous phase runs it, one day later.
+    deliverOrder(world, watch);
+    markDirectiveDue(world, watch.id, watch.decision!.timing.actAt!);
+    const late = 2 * TICKS_PER_DAY + 975;
+    world.tick = late;
+    attemptDirective(world, watch.id, { venue: 'square', members: ['bez', 'cyn'] },
+      late, STANDARD_RULES);
+    expect(watch.execution).toMatchObject({ state: 'attempted' });
+    expect(world.scheduleOverrides.bez).toEqual([
+      expect.objectContaining({ sourceRef: 'order:watch:d0:bez', fromDay: 2, toDay: 9 }),
+    ]);
+
+    // One worked night returns to HQ — that physical report is what puts the district in the books.
+    const worked = late + CONVERSATION_BEAT;
+    world.tick = worked;
+    settleDirectiveApplications(world, worked, STANDARD_RULES);
+    expect(watch.execution?.workedDays).toEqual([2]);
+    deliverDirectReport(world, watch);
+    expect(world.enemy.watchedDistricts).toEqual(['d0']);
+    expect(world.enemy.actionLedger?.[0]).toMatchObject({
+      orderKey: 'watch:d0', scheduleStartDay: 1, posts: [{ guard: 'bez', venue: 'backroom' }],
+    });
+
+    // The tail drop's cancellation, authored exactly as `cancelSpecs` authors one: it names the
+    // ledger row's `scheduleStartDay` (1), never the day the guard actually started (2).
+    const issuedAt = world.tick;
+    const cancel = issueDirectiveRecord(world, {
+      principal: 'enemy', principalId: 'ada', recipient: 'bez',
+      handoff: { outboundVia: [], reportVia: [] },
+      brief: {
+        mission: { kind: 'learn', target: { kind: 'venue', id: 'backroom' } },
+        priority: 'urgent', authority: 'office', discretion: 'quiet', specificity: 'detailed',
+        guidance: [], active: { from: issuedAt, until: 9 * TICKS_PER_DAY - 1 },
+        report: 'outcome', reportBy: null, purpose: null,
+        application: { kind: 'cancel-watch', district: 'd0', guard: 'bez',
+          venue: 'backroom', startDay: 1 },
+      },
+      correlation: { kind: 'enemy-order', orderKey: 'cancel:watch:d0:bez', leadFeatureId: null,
+        sourceRef: 'order:watch:d0:bez' }, tick: issuedAt, cause: null,
+    });
+    expect(realizeNetworkForward(world, messageFor(world, cancel).id,
+      { venue: 'square', members: ['ada', 'bez'] }, issuedAt, STANDARD_RULES)).not.toBeNull();
+    expect(cancel.decision?.commitment).toBe('attempt');
+    const due = cancel.decision!.timing.actAt!;
+    world.tick = due;
+    markDirectiveDue(world, cancel.id, due);
+    attemptDirective(world, cancel.id, { venue: 'square', members: ['bez', 'cyn'] },
+      due, STANDARD_RULES);
+
+    // The street is really clear…
+    expect(world.scheduleOverrides.bez).toBeUndefined();
+    // …and HQ still believes the tail is up, because nobody has reported in yet.
+    expect(world.enemy.watchedDistricts).toEqual(['d0']);
+    expect(world.enemy.actionLedger?.[0]?.posts).toEqual([{ guard: 'bez', venue: 'backroom' }]);
+
+    deliverDirectReport(world, cancel);
+    expect(world.enemy.watchedDistricts).toEqual([]);
+    expect(world.enemy.actionLedger?.[0]?.posts).toEqual([]);
   });
 
   it('interrogation never messages or overrides the target and asks only the exact co-present target', () => {

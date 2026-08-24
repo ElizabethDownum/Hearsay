@@ -27,6 +27,14 @@ import { startSoundOut } from '../network/recruitment';
 
 const priorityRank = { urgent: 2, important: 4, routine: 6 } as const;
 
+/**
+ * How many days a standing watch order covers, counted from its AUTHORED start day (the enemy
+ * digest's `startDay`). One spelling for three readers — the installed override's exclusive
+ * `toDay`, the worked-night window, and the cancellation's correlation back to the row this order
+ * installed — so the identity they share cannot drift apart.
+ */
+const WATCH_ORDER_DAYS = 8;
+
 function knownFactions(world: WorldState, npc: Npc): Record<EntityId, Npc['faction']> {
   const result: Record<EntityId, Npc['faction']> = { [npc.id]: npc.faction };
   for (const rival of npc.rivals) {
@@ -537,7 +545,11 @@ function startApplication(
       const sourceRef = `order:watch:${application.district}:${record.recipient}`;
       world.scheduleOverrides[record.recipient] = [
         ...(world.scheduleOverrides[record.recipient] ?? []).filter((row) => row.sourceRef !== sourceRef),
-        { fromDay: Math.max(application.startDay, dayOf(tick)), toDay: application.startDay + 8,
+        // A watch attempted AFTER its authored start day begins the day the guard actually took
+        // the post; `toDay` is unclamped, so it always spells the AUTHORED start day (see the
+        // cancel-watch arm, which reads it back).
+        { fromDay: Math.max(application.startDay, dayOf(tick)),
+          toDay: application.startDay + WATCH_ORDER_DAYS,
           from: 960, to: 1140, venue: application.post.venue,
           source: 'enemy', sourceRef },
       ];
@@ -547,8 +559,17 @@ function startApplication(
     }
     case 'cancel-watch': {
       const sourceRef = `order:watch:${application.district}:${application.guard}`;
+      // A cancellation names the watch order by its AUTHORED start day: that is what the guard's
+      // worked-night report carried into the ledger row (`scheduleStartDay`, reports.ts) and so
+      // what the tail drop copies here (digest.ts → counterintel.ts). But the installed row's
+      // `fromDay` is the EFFECTIVE start — `Math.max(startDay, dayOf(tick))` above — so
+      // correlating removal on `fromDay` silently missed every late-attempted watch: the guard
+      // kept standing the post while the returned 'watch cancelled' report cleared HQ's books.
+      // `toDay` is the field that max-clamp never touches, so it recovers the authored start day
+      // exactly and identifies the one row this order installed, on time or late alike.
+      const authoredUntilDay = application.startDay + WATCH_ORDER_DAYS;
       const kept = (world.scheduleOverrides[application.guard] ?? []).filter((row) =>
-        !(row.sourceRef === sourceRef && row.fromDay === application.startDay));
+        !(row.sourceRef === sourceRef && row.toDay === authoredUntilDay));
       if (kept.length > 0) world.scheduleOverrides[application.guard] = kept;
       else delete world.scheduleOverrides[application.guard];
       completeWithApplicationReport(world, record, profile, tick, rules, 'watch cancelled',
@@ -826,7 +847,8 @@ export function settleDirectiveApplications(world: WorldState, tick: Tick, rules
     } else if (application.kind === 'enemy-watch'
       && record.execution.changedAt < tick
       && tick % CONVERSATION_BEAT === 0
-      && dayOf(tick) >= application.startDay && dayOf(tick) < application.startDay + 8
+      && dayOf(tick) >= application.startDay
+      && dayOf(tick) < application.startDay + WATCH_ORDER_DAYS
       && tick % TICKS_PER_DAY >= 960 && tick % TICKS_PER_DAY < 1140
       && positionOf(world, world.npcs[record.recipient]!, tick) === application.post.venue) {
       const worked = record.execution.workedDays ?? (record.execution.workedDays = []);
