@@ -132,6 +132,91 @@ function aliasTable(file: ts.SourceFile): Map<string, string> {
   return resolved;
 }
 
+/**
+ * The parser's OWN verdict on the source it just read. `ts.createSourceFile` records its parse
+ * diagnostics but does not expose them on the public `SourceFile` type; `getSyntacticDiagnostics`
+ * is the supported access path to exactly that list, so the already-parsed file is handed to a
+ * one-file program rather than reparsed. The host is virtual and the options are `noResolve` +
+ * `noLib`: nothing outside this text is ever read, and nothing semantic is ever asked.
+ *
+ * (Lifted to this shared home by fix wave 2 so the receipt scan and the determinism scan share one
+ * fail-closed parse instead of each growing a private copy — the same duplication the wave's `(r)`
+ * closure removes from production. `tests/directives/view.test.ts` keeps its own copy: that file is
+ * outside this wave's scope, and converging it is a Plan-10 cleanup.)
+ */
+export function syntaxErrors(file: ts.SourceFile): readonly ts.Diagnostic[] {
+  const host: ts.CompilerHost = {
+    getSourceFile: (name) => (name === file.fileName ? file : undefined),
+    getDefaultLibFileName: () => 'lib.d.ts',
+    writeFile: () => {},
+    getCurrentDirectory: () => '',
+    getCanonicalFileName: (name) => name,
+    useCaseSensitiveFileNames: () => true,
+    getNewLine: () => '\n',
+    fileExists: (name) => name === file.fileName,
+    readFile: () => undefined,
+  };
+  return ts.createProgram([file.fileName], { noResolve: true, noLib: true }, host)
+    .getSyntacticDiagnostics(file);
+}
+
+/**
+ * THE FAIL-CLOSED PARSE. `ts.createSourceFile` does not REJECT bad syntax, it REPAIRS it — and a
+ * repaired parse can silently reclassify live code, so a scan would call a source `tsc` refuses
+ * "clean". Either symptom — a syntactic diagnostic, or a recovery so total that no statement
+ * survives — means this text is not the language the scan is reading, and the scan must refuse it.
+ */
+export function assertParsed(file: ts.SourceFile, scanName: string): void {
+  const [firstError] = syntaxErrors(file);
+  if (firstError !== undefined) {
+    throw new Error(`${scanName} could not parse ${file.fileName}: `
+      + ts.flattenDiagnosticMessageText(firstError.messageText, ' '));
+  }
+  if (file.text.trim().length > 0 && file.statements.length === 0) {
+    throw new Error(`${scanName} could not parse ${file.fileName}: no statements`);
+  }
+}
+
+export type Access = ts.PropertyAccessExpression | ts.ElementAccessExpression;
+
+/** A member read, in either spelling — `payload.fact` and `payload['fact']` are the same read. */
+export function isAccess(node: ts.Node): node is Access {
+  return ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node);
+}
+
+/** The property NAME a member access reads — `null` when only the running program knows. */
+export function accessedName(node: Access): string | null {
+  return ts.isPropertyAccessExpression(node) ? node.name.text : literalElementKey(node.argumentExpression);
+}
+
+/** Syntactic wrappers that change nothing about which name an expression reaches (node-level). */
+export function unwrapNode(node: ts.Node): ts.Node {
+  let current = node;
+  for (;;) {
+    if (ts.isParenthesizedExpression(current) || ts.isNonNullExpression(current)
+      || ts.isAsExpression(current) || ts.isSatisfiesExpression(current)
+      || ts.isTypeAssertionExpression(current) || ts.isAwaitExpression(current)) {
+      current = current.expression;
+      continue;
+    }
+    return current;
+  }
+}
+
+/** Every name on an access chain, root first: `message.payload.fact` ⇒ message, payload, fact. */
+export function chainNames(node: ts.Node): string[] {
+  const target = unwrapNode(node);
+  if (ts.isIdentifier(target)) return [target.text];
+  if (isAccess(target)) return [...chainNames(target.expression), accessedName(target) ?? '*'];
+  if (ts.isCallExpression(target)) return chainNames(target.expression);
+  return [];
+}
+
+/** A property-name position spelled statically (`{ fact: x }`, `{ 'fact': x }`, `{ ['fact']: x }`). */
+export function staticNamePosition(node: ts.Node | undefined): string | null {
+  return staticPropertyName(node);
+}
+
 export function parseModule(relativePath: string, sourceOverride?: string): ModuleGraph {
   const source = sourceOverride ?? readFileSync(join(process.cwd(), relativePath), 'utf8');
   const file = ts.createSourceFile(relativePath, source, ts.ScriptTarget.ESNext, true);
