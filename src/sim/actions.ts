@@ -18,6 +18,7 @@ import { allocateDirectiveId, ensureDirectiveState, issueDirectiveRecord } from 
 import { queueNetworkMessage } from './directives/transport';
 import { appendInvitation } from './network/invitations';
 import { recordScrutiny } from './directives/scrutiny';
+import { firstHandoffHop } from './directives/types';
 import type {
   DirectiveBrief, DirectiveHandoff, NetworkSpeech, PlayerDirectiveApplication,
 } from './directives/types';
@@ -133,7 +134,7 @@ function applyDirectiveWithCause(
   };
   validateRelayRoute('outbound', handoff.outboundVia);
   validateRelayRoute('report', handoff.reportVia);
-  const firstHop = handoff.outboundVia[0] ?? recipient;
+  const firstHop = firstHandoffHop(handoff, recipient);
   const circle = localityFor(world, tick, offered)
     .find((candidate) => candidate.members.includes(principalId));
   if (!circle || !circle.members.includes(firstHop)) {

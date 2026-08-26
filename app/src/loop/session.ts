@@ -8,6 +8,7 @@ import { attachScenario, isTerminal } from '../../../src/sim/scenario/referee';
 import { applyAction, runLogOn, type Action } from '../../../src/sim/campaign';
 import { CONVERSATION_BEAT } from '../../../src/sim/rumors/propagation';
 import { finishTick, prepareTick, type PreparedTick } from '../../../src/sim/phases';
+import { firstHandoffHop } from '../../../src/sim/directives/types';
 import type { EntityId, VenueId } from '../../../src/sim/rumors/claim';
 import type { WorldState } from '../../../src/sim/types';
 
@@ -73,27 +74,31 @@ function queuedTickFor(intent: ActionIntent, now: Tick): Tick {
  * fence against the SHIPPED extractor rather than a mirror of it that can drift.
  *
  * The `directive` arm is the one that is not simply "the person it is for": a relayed brief is
- * handed to its FIRST HOP, and the final recipient may be anywhere. `handoff.outboundVia[0] ??
- * recipient` is the same rule the engine enforces (`src/sim/actions.ts:120-124`) and the same one
- * the composer greys on (`app/src/panels/DayPlanner.tsx:257`); this is the third copy, at the
- * submit seam.
+ * handed to its FIRST HOP, and the final recipient may be anywhere. That rule is now
+ * `firstHandoffHop`, shared with the engine's own validation instead of respelled here.
+ *
+ * The switch is over the REAL discriminated union, with no cast. Its predecessor read the intent
+ * through a hand-written optional-field shape — which is exactly how a phantom `outboundVia` on
+ * `DirectiveAction` compiled and shipped a fence that refused valid routed handoffs. A field that
+ * does not exist is now a compile error, and the `never` arm makes an unhandled local kind one too:
+ * the class dies structurally rather than by inspection.
  */
 export function localParticipants(intent: LocalActionIntent): EntityId[] {
-  const value = intent as unknown as {
-    kind: string; to?: EntityId; buyer?: EntityId; target?: EntityId; asset?: EntityId;
-    informant?: EntityId; invitees?: EntityId[]; viaDrop?: string | null;
-    handoff?: { outboundVia?: EntityId[] }; recipient?: EntityId;
-  };
-  switch (value.kind) {
-    case 'tell': case 'ask': return [value.to!];
-    case 'sell': return [value.buyer!];
-    case 'recruit': return [value.target!];
-    case 'debrief': case 'meet': return [value.asset!];
-    case 'host': return [...(value.invitees ?? [])];
-    case 'assignInformant': return [value.informant!];
-    case 'courier': return value.viaDrop === null ? [value.asset!] : [];
-    case 'directive': return [value.handoff?.outboundVia?.[0] ?? value.recipient!];
-    default: return [];
+  switch (intent.kind) {
+    case 'tell': case 'ask': return [intent.to];
+    case 'sell': return [intent.buyer];
+    case 'recruit': return [intent.target];
+    case 'debrief': case 'meet': return [intent.asset];
+    case 'host': return [...intent.invitees];
+    case 'assignInformant': return [intent.informant];
+    case 'courier': return intent.viaDrop === null ? [intent.asset] : [];
+    case 'directive': return [firstHandoffHop(intent.handoff, intent.recipient)];
+    default: {
+      // Every local kind is handled above; adding one without an arm fails to compile here.
+      const unhandled: never = intent;
+      void unhandled;
+      return [];
+    }
   }
 }
 

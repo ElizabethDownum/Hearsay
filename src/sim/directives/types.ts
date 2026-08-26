@@ -123,6 +123,23 @@ export interface DirectiveHandoff {
   reportVia: EntityId[];
 }
 
+/**
+ * THE FIRST PHYSICAL HOP — the one person the avatar must actually be standing with for a directive
+ * to leave their hands. A relayed brief is handed to `outboundVia[0]`; an unrouted one is handed to
+ * the recipient directly, and the final recipient of a routed brief may be anywhere in town.
+ *
+ * This rule was independently spelled in three places (the engine's validation, the composer's
+ * greying, and the session's submit fence). The duplication is not academic: two of the three copies
+ * disagreed and shipped the Task-14 defect that refused a valid routed handoff on the wrong person.
+ * It lives here, beside the handoff it reads, so the engine and the session share one spelling.
+ *
+ * `app/src/panels/**` cannot import the sim (the panels lint fence), so the composer's copy in
+ * `DayPlanner.tsx` stays inline by law and is bound to this function by a parity test instead.
+ */
+export function firstHandoffHop(handoff: DirectiveHandoff, recipient: EntityId): EntityId {
+  return handoff.outboundVia[0] ?? recipient;
+}
+
 export type DirectiveCommitment = 'refuse' | 'defer' | 'attempt';
 export type DirectiveInitiative = 'literal' | 'adaptive';
 export type DirectiveRiskPosture = 'avoidant' | 'measured' | 'bold';

@@ -254,6 +254,9 @@ export function directiveIssues(draft: DirectiveDraft, sources: ComposerSources)
   const circle = new Set(sources.offer?.circleMembers ?? []);
   const tick = sources.offer?.tick ?? sources.view.tick;
 
+  // THE FIRST PHYSICAL HOP. The engine and the session share `firstHandoffHop` (src/sim/directives/
+  // types.ts); the panels lint fence forbids importing the sim from here, so this copy stays inline
+  // by law and is bound to that helper by the parity pin in tests/app/panels.test.ts.
   const firstHop = draft.outboundVia[0] ?? draft.recipient;
   if (!circle.has(firstHop)) {
     notes.push(draft.outboundVia.length === 0

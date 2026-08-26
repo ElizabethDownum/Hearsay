@@ -1,6 +1,10 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+import {
+  type ModuleGraph, assertParsed, chainNames, parseModule, reachable,
+} from '../helpers/callgraph';
 import { at, TICKS_PER_DAY } from '../../src/core/time';
 import { STANDARD_RULES } from '../../src/content/rules';
 import {
@@ -276,5 +280,152 @@ describe('legacy courier loop enforcement', () => {
       `${anchor}\nconst injected = deliverCouriers(world, tick, rules);`,
     )).toBe(true);
     expect(files.filter((path) => productionHasLegacyCall(readFileSync(path, 'utf8')))).toEqual([]);
+  });
+});
+
+/**
+ * NO COMPATIBILITY COMMAND BUS — the STRUCTURAL half (carry `(q)`, whole-branch M-1).
+ *
+ * `plan11-constraints.md`: "Compatibility action kinds may remain, but not their old guaranteed
+ * remote-control effects." The per-verb behavioural tests above prove the present actions do not
+ * move anyone's schedule; what they cannot prove is the architectural statement, that no compat
+ * apply function CAN. A schedule is moved by writing `world.scheduleOverrides`, and the lawful
+ * writers are all downstream of physical receipt — `directives/execution.ts` (an accepted
+ * application), `directives/transport.ts` (an accepted invitation), `phases.ts` (prior setup) and
+ * `vignettes/engine.ts`. `src/sim/actions.ts` — where the player's verbs are applied, before
+ * anything has physically arrived — must contain no such write anywhere.
+ *
+ * The scan is on the AST, over the closure of every exported `apply*` entry point, and it resolves
+ * in-module aliases: `const s = world.scheduleOverrides; s[who] = []` is the same write as the
+ * direct one. Writes are assignments (plain and compound), `delete`, and the array mutators.
+ */
+describe('no compatibility command-bus writes — the structural fence', () => {
+  const MUTATORS = ['push', 'unshift', 'splice', 'pop', 'shift', 'sort', 'reverse', 'fill'];
+  const GUARDED = 'scheduleOverrides';
+
+  interface WriteSite { kind: 'assign' | 'delete' | 'mutate'; enclosing: string; line: number; text: string }
+
+  /** Chain names with in-module aliases resolved: `s[who]` becomes `scheduleOverrides.*`. */
+  const namesOf = (graph: ModuleGraph, node: ts.Node): string[] =>
+    chainNames(node).map((name) => graph.aliases.get(name) ?? name);
+
+  const touchesGuarded = (graph: ModuleGraph, node: ts.Node): boolean =>
+    namesOf(graph, node).includes(GUARDED);
+
+  /**
+   * A mutator's receiver is not always a plain chain: `(world.scheduleOverrides[x] ?? []).push(row)`
+   * hides it inside a `??`, and a ternary would hide it inside two branches. Any mention of the
+   * guarded name anywhere in the receiver expression is the receiver, so the whole subtree is read.
+   */
+  const receiverTouchesGuarded = (graph: ModuleGraph, node: ts.Node): boolean => {
+    let hit = false;
+    const walk = (current: ts.Node): void => {
+      if (hit) return;
+      const named = ts.isIdentifier(current) ? current.text
+        : ts.isPropertyAccessExpression(current) ? current.name.text : null;
+      if (named !== null && (graph.aliases.get(named) ?? named) === GUARDED) hit = true;
+      else ts.forEachChild(current, walk);
+    };
+    walk(node);
+    return hit;
+  };
+
+  function scheduleWrites(
+    relativePath: string, roots: readonly string[] | null, sourceOverride?: string,
+  ): WriteSite[] {
+    const graph = parseModule(relativePath, sourceOverride);
+    assertParsed(graph.file, 'the schedule-write fence');
+    const inScope = roots === null ? null : reachable(graph, roots);
+    const sites: WriteSite[] = [];
+    const at = (node: ts.Node): { line: number; text: string } => ({
+      line: graph.file.getLineAndCharacterOfPosition(node.getStart(graph.file)).line + 1,
+      text: node.getText(graph.file).replace(/\s+/g, ' ').slice(0, 80),
+    });
+
+    const visit = (node: ts.Node, owner: string): void => {
+      let current = owner;
+      if ((ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node))
+        && node.name !== undefined && ts.isIdentifier(node.name)) current = node.name.text;
+      const counts = inScope === null || inScope.has(current);
+
+      if (counts && ts.isBinaryExpression(node)
+        && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+        && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+        && touchesGuarded(graph, node.left)) {
+        sites.push({ kind: 'assign', enclosing: current, ...at(node) });
+      }
+      if (counts && ts.isDeleteExpression(node) && touchesGuarded(graph, node.expression)) {
+        sites.push({ kind: 'delete', enclosing: current, ...at(node) });
+      }
+      if (counts && ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+        && MUTATORS.includes(node.expression.name.text)
+        && receiverTouchesGuarded(graph, node.expression.expression)) {
+        sites.push({ kind: 'mutate', enclosing: current, ...at(node) });
+      }
+      ts.forEachChild(node, (child) => { visit(child, current); });
+    };
+    visit(graph.file, '<module>');
+    return sites;
+  }
+
+  const ACTIONS = 'src/sim/actions.ts';
+  const applyEntryPoints = (): string[] =>
+    [...parseModule(ACTIONS).functions.keys()].filter((name) => name.startsWith('apply')).sort();
+
+  it('the scanned closure really is the compat verb surface (the scan is not vacuous)', () => {
+    const entries = applyEntryPoints();
+    // Every compatibility kind the constraints name has an entry point in the scanned set.
+    expect(entries).toEqual(expect.arrayContaining([
+      'applyAssignInformant', 'applyCourier', 'applyDirective', 'applyHost', 'applyMeet',
+      'applySetDrop', 'applyDebrief', 'applyTell', 'applyAsk', 'applySell', 'applyRecruit',
+    ]));
+    expect(reachable(parseModule(ACTIONS), entries).size).toBeGreaterThanOrEqual(entries.length);
+  });
+
+  it('no apply function in src/sim/actions.ts writes a schedule override', () => {
+    expect(scheduleWrites(ACTIONS, applyEntryPoints())
+      .map((site) => `${site.kind}@${site.enclosing}:${site.line} ${site.text}`)).toEqual([]);
+  });
+
+  it('POSITIVE CONTROL: the same scanner finds the lawful writers downstream of receipt', () => {
+    // If the detector could not see a real write, the clean verdict above would prove nothing.
+    const execution = scheduleWrites('src/sim/directives/execution.ts', null);
+    expect(execution.length).toBeGreaterThan(0);
+    expect(new Set(execution.map((site) => site.kind))).toEqual(new Set(['assign', 'delete']));
+    expect(scheduleWrites('src/sim/directives/transport.ts', null).length).toBeGreaterThan(0);
+    expect(scheduleWrites('src/sim/vignettes/engine.ts', null).length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['a direct assignment', 'world.scheduleOverrides[asset] = [];', 'assign'],
+    ['a compound assignment', 'world.scheduleOverrides[asset] ??= [];', 'assign'],
+    ['a spread prepend', 'world.scheduleOverrides[asset] = [row, ...(world.scheduleOverrides[asset] ?? [])];', 'assign'],
+    ['a delete', 'delete world.scheduleOverrides[asset];', 'delete'],
+    ['an array mutator', '(world.scheduleOverrides[asset] ?? []).push(row);', 'mutate'],
+    ['an aliased assignment', 'const bus = world.scheduleOverrides; bus[asset] = [];', 'assign'],
+    ['an aliased mutator', 'const bus = world.scheduleOverrides; bus[asset]!.unshift(row);', 'mutate'],
+  ])('FIRES on %s injected into a compat apply function', (_label, statement, kind) => {
+    const source = readFileSync(join(process.cwd(), ACTIONS), 'utf8');
+    const anchor = "export function applyMeet(";
+    const brace = source.indexOf('{', source.indexOf(anchor));
+    const injected = `${source.slice(0, brace + 1)}\n  ${statement}\n${source.slice(brace + 1)}`;
+    const found = scheduleWrites(ACTIONS, ['applyMeet'], injected);
+    expect(found.map((site) => site.kind)).toContain(kind);
+    expect(found.every((site) => site.enclosing === 'applyMeet')).toBe(true);
+  });
+
+  it('a write OUTSIDE the scanned closure is correctly not attributed to the compat verbs', () => {
+    // The closure is the point: this scanner reports what the compat surface can reach, and a
+    // lawful writer elsewhere in another module is not a finding here.
+    const source = readFileSync(join(process.cwd(), ACTIONS), 'utf8');
+    const injected = `${source}\nfunction unrelated(world, asset) { world.scheduleOverrides[asset] = []; }\n`;
+    expect(scheduleWrites(ACTIONS, applyEntryPoints(), injected)).toEqual([]);
+    expect(scheduleWrites(ACTIONS, ['unrelated'], injected).length).toBe(1);
+  });
+
+  it('the fence refuses a source the parser only recovered from', () => {
+    const source = readFileSync(join(process.cwd(), ACTIONS), 'utf8');
+    expect(() => scheduleWrites(ACTIONS, ['applyMeet'], `${source}\nfunction broken( {`))
+      .toThrow(/could not parse/);
   });
 });

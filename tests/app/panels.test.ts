@@ -17,6 +17,7 @@ import { TownCanvas } from '../../app/src/town/TownCanvas';
 import { computeLayout } from '../../app/src/town/layout';
 import { VERB_TERM } from '../../app/src/input/actions';
 import { newSession, type LocalOffer } from '../../app/src/loop/session';
+import { firstHandoffHop } from '../../src/sim/directives/types';
 import { TERMS } from '../../src/content/terms';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { webView, type WebView } from '../../src/intel/web';
@@ -859,6 +860,47 @@ describe('the composer greys its own submit on routes and times the engine must 
     const broken = { ...base(), ...over } as DirectiveDraft;
     expect(directiveIssues(broken, sources()), `unreported: ${note}`).toContain(note);
     expect(directiveIssues({ ...broken, ...fix } as DirectiveDraft, sources())).toEqual([]);
+  });
+
+  /**
+   * THE PANELS-FENCE PARITY PIN (carry `(r)`, whole-branch M-2).
+   *
+   * The first-physical-hop rule now lives once, as `firstHandoffHop` in the sim, shared by the
+   * engine's validation and the session's submit fence. The composer cannot join them: the panels
+   * lint fence forbids `app/src/panels/**` from importing the sim at all, so `directiveIssues`
+   * keeps its own inline spelling by law. This test is what binds the third copy — for every
+   * routed/unrouted arrangement, the greying the player SEES must agree with the hop the engine
+   * will actually require. A test may import both; a panel may not.
+   */
+  it('the composer greys on exactly the hop firstHandoffHop names', () => {
+    const circle = new Set(deskProps(world).offer?.circleMembers ?? []);
+    expect(circle.size).toBeGreaterThan(0);
+    const FIRST_HOP_NOTES = [
+      'hand it over in person only to someone in this moment',
+      'the first hop must be someone in this moment',
+    ];
+    const arrangements: { recipient: string; outboundVia: string[] }[] = [
+      { recipient: 'ada', outboundVia: [] },              // unrouted, local recipient
+      { recipient: 'dov', outboundVia: [] },              // unrouted, remote recipient
+      { recipient: 'dov', outboundVia: ['ada'] },         // routed through the local relay
+      { recipient: 'ada', outboundVia: ['dov'] },         // routed through a REMOTE relay
+      { recipient: 'dov', outboundVia: ['ada', 'eve'] },  // multi-hop, local first hop
+      { recipient: 'ada', outboundVia: ['dov', 'ada'] },  // multi-hop, remote first hop
+    ];
+    for (const { recipient, outboundVia } of arrangements) {
+      const draft = { ...base(), recipient, outboundVia } as DirectiveDraft;
+      const hop = firstHandoffHop({ outboundVia, reportVia: draft.reportVia }, recipient);
+      const notes = directiveIssues(draft, sources());
+      expect(
+        notes.some((note) => FIRST_HOP_NOTES.includes(note)),
+        `${recipient} via [${outboundVia.join(',')}] — helper hop '${hop}', notes ${JSON.stringify(notes)}`,
+      ).toBe(!circle.has(hop));
+    }
+    // Non-vacuity: these arrangements really do exercise both verdicts.
+    expect(arrangements.some(({ recipient, outboundVia }) =>
+      circle.has(firstHandoffHop({ outboundVia, reportVia: [] }, recipient)))).toBe(true);
+    expect(arrangements.some(({ recipient, outboundVia }) =>
+      !circle.has(firstHandoffHop({ outboundVia, reportVia: [] }, recipient)))).toBe(true);
   });
 
   it('an active window that has already closed is reported against the offered beat', () => {
