@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import { fileURLToPath } from 'node:url';
+import { accessedName, assertParsed, chainNames, isAccess, unwrapNode } from '../helpers/callgraph';
 
 // The determinism law is only real if every prong PROVABLY fires. We pull the
 // computed config for a real engine file (glob application included) and run
@@ -394,5 +395,244 @@ describe('headless-sim law — the engine never imports app/UI code', () => {
     const rules = await importRulesFor('src/sim/step.ts');
     expect(violations("import main from '../../app/src/main';", rules)).toBeGreaterThan(0);
     expect(violations("import { predicates } from '../content/predicates';", rules)).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * THE DETERMINISM FENCE, BINDING-AWARE (whole-branch finding I-4).
+ *
+ * THE SCAN'S CHARTER. The ESLint prongs above are SPELLING rules: `no-restricted-properties` matches
+ * the literal receiver `Math`/`Date`, and `no-restricted-syntax` matches the literal callee name
+ * `Date`. The reviewer ran the configured ESLint API against a deterministic-core filename and got:
+ *
+ *     Math.random()               -> diagnostic        globalThis.Math.random()    -> NONE
+ *     Date.now()                  -> diagnostic        const D=Date; D.now()       -> NONE
+ *     new Date()                  -> diagnostic        const C=Date; new C()       -> NONE
+ *                                                      Reflect.construct(Date, []) -> NONE
+ *
+ * Semantically identical wall-clock and entropy calls could therefore be introduced while the
+ * claimed fence stayed green. This layer answers the question a spelling rule cannot: *which
+ * expressions in the deterministic core REACH `Math.random`, `Date.now`, or a zero-argument `Date`
+ * construction, however they are spelled?*
+ *
+ * It resolves bindings IN-MODULE — `const M = Math`, `const { random } = Math`, `const r = Math.random`,
+ * an alias of an alias, `globalThis.` qualification, static bracket keys — and reports a reach
+ * wherever it lands, including a bare reference handed off as a callback and a reflective
+ * construction. A key only the running program knows resolves to `.*` and is reported rather than
+ * skipped; a source the parser only RECOVERED from is refused outright rather than scanned as clean.
+ *
+ * WHERE THE MANDATE LINE IS. Resolution stops at the module boundary. A deterministic-core file that
+ * imports a helper which itself calls the wall clock is not visible here, and enumerating that class
+ * would mean a whole-program analyzer. That residual is the accepted P11-13/P11-16 data-flow class:
+ * this scan asserts everything resolvable and deliberately goes no further. The engine/content and
+ * headless-sim import fences above are what bound which modules the core may reach at all.
+ *
+ * The ESLint prongs are KEPT, not replaced: they fire in the editor and in `npm run lint` at the
+ * moment of typing, which a test-time scan cannot do. This layer is the completeness backstop.
+ */
+const DETERMINISTIC_ROOTS = [
+  'src/core', 'src/sim', 'src/content', 'src/world', 'src/bots', 'src/harness',
+];
+
+/** A canonical reach: what an expression names once aliases and qualification are stripped. */
+const GUARDED_CALLS = ['Math.random', 'Date.now'];
+const GUARDED_CONSTRUCTOR = 'Date';
+const REFLECTIVE = ['Reflect.construct', 'Reflect.apply'];
+
+interface EntropyReach {
+  /** The canonical thing reached, e.g. `Math.random`, or `new Date` for a bare construction. */
+  reach: string;
+  /** How it was spelled, for the failure message. */
+  text: string;
+  line: number;
+}
+
+function buildAliases(file: ts.SourceFile): Map<string, string> {
+  const aliases = new Map<string, string>();
+  // A fixpoint: `const A = Math; const B = A; B.random()` needs the second pass to see the first.
+  for (let pass = 0; pass < 4; pass += 1) {
+    const before = aliases.size;
+    const visit = (node: ts.Node): void => {
+      if (ts.isVariableDeclaration(node) && node.initializer !== undefined) {
+        const reach = reachOf(node.initializer, aliases);
+        if (reach !== null) {
+          if (ts.isIdentifier(node.name)) aliases.set(node.name.text, reach);
+          else if (ts.isObjectBindingPattern(node.name)) {
+            for (const element of node.name.elements) {
+              const key = element.propertyName !== undefined
+                ? (ts.isIdentifier(element.propertyName) || ts.isStringLiteral(element.propertyName)
+                  ? element.propertyName.text : null)
+                : (ts.isIdentifier(element.name) ? element.name.text : null);
+              if (key !== null && ts.isIdentifier(element.name)) {
+                aliases.set(element.name.text, `${reach}.${key}`);
+              }
+            }
+          }
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(file);
+    if (aliases.size === before) break;
+  }
+  return aliases;
+}
+
+/** The canonical global an expression reaches, or `null` when it reaches none. */
+function reachOf(node: ts.Node, aliases: ReadonlyMap<string, string>): string | null {
+  const target = unwrapNode(node);
+  if (ts.isIdentifier(target)) {
+    if (target.text === 'Math' || target.text === 'Date' || target.text === 'Reflect') return target.text;
+    return aliases.get(target.text) ?? null;
+  }
+  if (isAccess(target)) {
+    const base = reachOf(target.expression, aliases);
+    if (base === null) {
+      // `globalThis.Math` / `globalThis.Date` — the qualification names the same global.
+      const chain = chainNames(target);
+      const [root, next] = chain;
+      return chain.length === 2 && root === 'globalThis'
+        && (next === 'Math' || next === 'Date' || next === 'Reflect') ? next! : null;
+    }
+    const key = accessedName(target);
+    return key === null ? `${base}.*` : `${base}.${key}`;
+  }
+  return null;
+}
+
+/** Type annotations name `Date` without reaching its value. */
+function inTypePosition(node: ts.Node): boolean {
+  for (let cursor: ts.Node | undefined = node; cursor !== undefined; cursor = cursor.parent) {
+    if (ts.isTypeNode(cursor) || ts.isTypeAliasDeclaration(cursor) || ts.isInterfaceDeclaration(cursor)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function entropyReaches(source: string, fileName: string): EntropyReach[] {
+  const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  assertParsed(file, 'the determinism scan');
+  const aliases = buildAliases(file);
+  const found: EntropyReach[] = [];
+  const at = (node: ts.Node): EntropyReach => ({
+    reach: '', text: node.getText(file).replace(/\s+/g, ' ').slice(0, 80),
+    line: file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1,
+  });
+
+  const visit = (node: ts.Node): void => {
+    // A zero-argument construction of whatever `Date` is called here — the wall clock made flesh.
+    if (ts.isNewExpression(node) && (node.arguments?.length ?? 0) === 0
+      && reachOf(node.expression, aliases) === GUARDED_CONSTRUCTOR) {
+      found.push({ ...at(node), reach: 'new Date' });
+    }
+    // `Reflect.construct(Date, [])` / `Reflect.apply(Date.now, ...)` — construction by indirection.
+    if (ts.isCallExpression(node)) {
+      const callee = reachOf(node.expression, aliases);
+      if (callee !== null && REFLECTIVE.includes(callee)) {
+        const first = node.arguments[0];
+        const subject = first === undefined ? null : reachOf(first, aliases);
+        if (subject !== null
+          && (subject === GUARDED_CONSTRUCTOR || GUARDED_CALLS.includes(subject) || subject.endsWith('.*'))) {
+          found.push({ ...at(node), reach: `${callee}(${subject})` });
+        }
+      }
+    }
+    // Any expression that REACHES the guarded call — called, aliased, or handed off as a callback.
+    if (ts.isIdentifier(node) || isAccess(node)) {
+      const parent: ts.Node | undefined = node.parent;
+      const isReceiver = parent !== undefined && isAccess(parent) && parent.expression === node;
+      if (!isReceiver && !inTypePosition(node)) {
+        const reach = reachOf(node, aliases);
+        if (reach !== null
+          && (GUARDED_CALLS.includes(reach)
+            || (reach.endsWith('.*') && (reach === 'Math.*' || reach === 'Date.*')))) {
+          found.push({ ...at(node), reach });
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return found;
+}
+
+function scanRoot(root: string): { files: number; reaches: (EntropyReach & { file: string })[] } {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const repoRoot = path.resolve(here, '../..');
+  const full = path.join(repoRoot, root);
+  const files = listFilesRecursive(full).filter((file) => file.endsWith('.ts'));
+  const reaches = files.flatMap((file) => {
+    const relative = path.relative(repoRoot, file).replace(/\\/g, '/');
+    return entropyReaches(fs.readFileSync(file, 'utf8'), relative)
+      .map((reach) => ({ ...reach, file: relative }));
+  });
+  return { files: files.length, reaches };
+}
+
+const probe = (src: string): EntropyReach[] => entropyReaches(src, 'src/sim/probe.ts');
+
+describe('determinism law — the AST layer sees qualified, aliased, and reflective spellings', () => {
+  it.each(DETERMINISTIC_ROOTS)('%s carries the ESLint determinism rules the scan backs up', async (root) => {
+    // The scan's roots are exactly the fenced globs — it can never drift off the law it completes.
+    const cfg = await new ESLint().calculateConfigForFile(`${root}/probe.ts`);
+    expect(isOn(cfg.rules?.['no-restricted-properties'])).toBe(true);
+    expect(isOn(cfg.rules?.['no-restricted-syntax'])).toBe(true);
+  }, 20000);
+
+  it('the whole deterministic core is clean under the AST layer', () => {
+    const all = DETERMINISTIC_ROOTS.flatMap((root) => scanRoot(root).reaches);
+    expect(all.map((r) => `${r.file}:${r.line} ${r.reach} — ${r.text}`)).toEqual([]);
+  });
+
+  it('and the scan really read the core (it is not passing on an empty file set)', () => {
+    const scanned = DETERMINISTIC_ROOTS.reduce((total, root) => total + scanRoot(root).files, 0);
+    expect(scanned).toBeGreaterThan(50);
+  });
+
+  it.each([
+    ['direct call', 'const x = Math.random();', 'Math.random'],
+    ['qualified global', 'const x = globalThis.Math.random();', 'Math.random'],
+    ['bracket key', "const x = Math['random']();", 'Math.random'],
+    ['object alias', 'const M = Math; const x = M.random();', 'Math.random'],
+    ['alias of an alias', 'const A = Math; const B = A; const x = B.random();', 'Math.random'],
+    ['destructured member', 'const { random } = Math; const x = random();', 'Math.random'],
+    ['function alias', 'const r = Math.random; const x = r();', 'Math.random'],
+    ['callback hand-off', 'const xs = [1, 2].map(Math.random);', 'Math.random'],
+    ['direct clock', 'const t = Date.now();', 'Date.now'],
+    ['qualified clock', 'const t = globalThis.Date.now();', 'Date.now'],
+    ['aliased clock', 'const D = Date; const t = D.now();', 'Date.now'],
+    ['destructured clock', 'const { now } = Date; const t = now();', 'Date.now'],
+    ['argless construction', 'const d = new Date();', 'new Date'],
+    ['aliased construction', 'const C = Date; const d = new C();', 'new Date'],
+    ['qualified construction', 'const d = new globalThis.Date();', 'new Date'],
+    ['reflective construction', 'const d = Reflect.construct(Date, []);', 'Reflect.construct(Date)'],
+    ['reflective aliased construction', 'const C = Date; const d = Reflect.construct(C, []);',
+      'Reflect.construct(Date)'],
+    ['reflective apply', 'const t = Reflect.apply(Date.now, Date, []);', 'Reflect.apply(Date.now)'],
+  ])('FIRES on %s', (_form, src, reach) => {
+    expect(probe(src).map((found) => found.reach)).toContain(reach);
+  });
+
+  it.each([
+    ['a seeded Date', 'const d = new Date(0);'],
+    ['an aliased seeded Date', 'const C = Date; const d = new C(1755993600000);'],
+    ['lawful Math helpers', 'const f = Math.floor(2.5); const m = Math.max(1, 2);'],
+    ['lawful aliased Math helpers', 'const M = Math; const f = M.floor(2.5);'],
+    ['Date.parse', "const p = Date.parse('2026-01-01');"],
+    ['a Date TYPE annotation', 'function at(d: Date): Date { return d; }'],
+    ['an unrelated object with its own random', 'const rng = makeRng(); const x = rng.random();'],
+    ['an unrelated now', 'const clock = { now: () => 0 }; const t = clock.now();'],
+  ])('stays SILENT on %s', (_form, src) => {
+    expect(probe(src)).toEqual([]);
+  });
+
+  it('a key only the running program knows fails closed rather than passing', () => {
+    expect(probe('const key = pick(); const x = Math[key]();').map((f) => f.reach))
+      .toContain('Math.*');
+  });
+
+  it('the scan refuses a source the parser only recovered from', () => {
+    expect(() => probe('function broken( {')).toThrow(/could not parse/);
   });
 });
