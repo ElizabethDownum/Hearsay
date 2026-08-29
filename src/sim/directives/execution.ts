@@ -567,9 +567,23 @@ function startApplication(
       // kept standing the post while the returned 'watch cancelled' report cleared HQ's books.
       // `toDay` is the field that max-clamp never touches, so it recovers the authored start day
       // exactly and identifies the one row this order installed, on time or late alike.
+      //
+      // Removal is a FILTER, so it can also match NOTHING — the order was superseded by a later
+      // watch, already stood down, or its correlation is stale. Reporting 'watch cancelled' anyway
+      // claims a street removal that did not happen, and that claim is exactly what strikes the
+      // district out of HQ's books at receipt (`settleEnemyOrderReport`, reports.ts). So the counts
+      // are compared, and a cancellation that removed nothing takes this file's ordinary
+      // no-lawful-opportunity form instead: an aborted record whose report is the plain refusal with
+      // its reason, carrying NO enemy action, which leaves HQ's ledger exactly as it found it.
       const authoredUntilDay = application.startDay + WATCH_ORDER_DAYS;
-      const kept = (world.scheduleOverrides[application.guard] ?? []).filter((row) =>
+      const installed = world.scheduleOverrides[application.guard] ?? [];
+      const kept = installed.filter((row) =>
         !(row.sourceRef === sourceRef && row.toDay === authoredUntilDay));
+      if (kept.length === installed.length) {
+        abortRecord(world, record, profile, tick, rules,
+          'the named watch was no longer installed to stand down');
+        return true;
+      }
       if (kept.length > 0) world.scheduleOverrides[application.guard] = kept;
       else delete world.scheduleOverrides[application.guard];
       completeWithApplicationReport(world, record, profile, tick, rules, 'watch cancelled',

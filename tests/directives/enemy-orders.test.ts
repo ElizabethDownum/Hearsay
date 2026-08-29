@@ -505,6 +505,101 @@ describe('enemy orders use physical directives', () => {
     expect(world.enemy.actionLedger?.[0]?.posts).toEqual([]);
   });
 
+  /**
+   * I-1 (fix-wave-2 re-review). Removal is a FILTER, so a cancellation naming a row nobody installed
+   * leaves the ledger untouched — and the branch reported `watch cancelled` anyway. That report is
+   * what strikes the district out of HQ's books on physical receipt, so a stale, duplicated, or
+   * superseded cancellation could clear the books while a guard was still standing a post.
+   *
+   * The honesty law is the same one that drove the correlation fix above: a returned cancellation
+   * report must reflect a real street removal. A cancellation that removes nothing therefore takes
+   * the file's ordinary no-lawful-opportunity form — an aborted record whose report is `refused`
+   * with its reason and NO enemy action — and HQ's books are left exactly as they were.
+   *
+   * The staging is entirely real: one watch, then two physically delivered cancellations of it. The
+   * first really removes the post but its report is still in transit, which is the T12 designed
+   * disagreement (HQ's ledger honestly disagrees with the street). The second finds nothing left to
+   * remove. Delivering the second must change nothing; delivering the first still clears the books,
+   * which is the "only then" direction the re-review found unproven.
+   */
+  it('a cancellation that removes no installed row reports no removal and clears no books', () => {
+    const world = enemyWorld();
+    // The same real staging the late-cancellation pin uses: the post is the backroom, and the guard
+    // takes it a day late, so the installed row is the one a cancellation must find by `toDay`.
+    applyEnemyDecision(world, { day: 0, features: [], inquiries: [], interrogations: [],
+      watches: [{ district: 'd0', posts: [{ guard: 'bez', venue: 'backroom' }], startDay: 1 }] });
+    const watch = recordFor(world);
+    deliverOrder(world, watch);
+    markDirectiveDue(world, watch.id, watch.decision!.timing.actAt!);
+    const late = 2 * TICKS_PER_DAY + 975;
+    world.tick = late;
+    attemptDirective(world, watch.id, { venue: 'square', members: ['bez', 'cyn'] },
+      late, STANDARD_RULES);
+    const worked = late + CONVERSATION_BEAT;
+    world.tick = worked;
+    settleDirectiveApplications(world, worked, STANDARD_RULES);
+    deliverDirectReport(world, watch);
+    expect(world.enemy.watchedDistricts).toEqual(['d0']);
+    expect(world.scheduleOverrides.bez).toEqual([
+      expect.objectContaining({ sourceRef: 'order:watch:d0:bez', toDay: 9 }),
+    ]);
+
+    /** The tail drop's cancellation, authored exactly as `cancelSpecs` authors one. */
+    const handIssueCancel = (): DirectiveRecord => {
+      const issuedAt = world.tick;
+      const record = issueDirectiveRecord(world, {
+        principal: 'enemy', principalId: 'ada', recipient: 'bez',
+        handoff: { outboundVia: [], reportVia: [] },
+        brief: {
+          mission: { kind: 'learn', target: { kind: 'venue', id: 'backroom' } },
+          priority: 'urgent', authority: 'office', discretion: 'quiet', specificity: 'detailed',
+          guidance: [], active: { from: issuedAt, until: issuedAt + 3 * TICKS_PER_DAY },
+          report: 'outcome', reportBy: null, purpose: null,
+          application: { kind: 'cancel-watch', district: 'd0', guard: 'bez',
+            venue: 'backroom', startDay: 1 },
+        },
+        correlation: { kind: 'enemy-order', orderKey: 'cancel:watch:d0:bez', leadFeatureId: null,
+          sourceRef: 'order:watch:d0:bez' }, tick: issuedAt, cause: null,
+      });
+      expect(realizeNetworkForward(world, messageFor(world, record).id,
+        { venue: 'square', members: ['ada', 'bez'] }, issuedAt, STANDARD_RULES)).not.toBeNull();
+      const due = record.decision!.timing.actAt!;
+      world.tick = due;
+      markDirectiveDue(world, record.id, due);
+      attemptDirective(world, record.id, { venue: 'square', members: ['bez', 'cyn'] },
+        due, STANDARD_RULES);
+      return record;
+    };
+
+    // The first cancellation really stands the post down; its report has not reached HQ yet.
+    const real = handIssueCancel();
+    expect(world.scheduleOverrides.bez).toBeUndefined();
+    expect(reportFor(world, real).payload).toMatchObject({
+      report: expect.objectContaining({ outcome: 'watch cancelled' }),
+      enemyAction: expect.objectContaining({ kind: 'watch-cancelled' }),
+    });
+    expect(world.enemy.watchedDistricts).toEqual(['d0']);
+
+    // The second finds nothing to remove — and says so, carrying no cancellation for the books.
+    const stale = handIssueCancel();
+    expect(stale.execution).toMatchObject({ state: 'aborted' });
+    expect(reportFor(world, stale).payload).toMatchObject({
+      report: expect.objectContaining({ outcome: 'refused' }),
+      enemyAction: null,
+    });
+    expect(world.scheduleOverrides.bez).toBeUndefined();
+
+    // Delivering it changes nothing HQ believes…
+    deliverDirectReport(world, stale);
+    expect(world.enemy.watchedDistricts).toEqual(['d0']);
+    expect(world.enemy.actionLedger?.[0]?.posts).toEqual([{ guard: 'bez', venue: 'backroom' }]);
+
+    // …and the real removal's own report, arriving late, still clears them.
+    deliverDirectReport(world, real);
+    expect(world.enemy.watchedDistricts).toEqual([]);
+    expect(world.enemy.actionLedger?.[0]?.posts).toEqual([]);
+  });
+
   it('interrogation never messages or overrides the target and asks only the exact co-present target', () => {
     const world = enemyWorld();
     applyEnemyDecision(world, decisionFor('interrogation'));
