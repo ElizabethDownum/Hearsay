@@ -297,13 +297,30 @@ describe('legacy courier loop enforcement', () => {
  *
  * The scan is on the AST, over the closure of every exported `apply*` entry point, and it resolves
  * in-module aliases: `const s = world.scheduleOverrides; s[who] = []` is the same write as the
- * direct one. Writes are assignments (plain and compound), `delete`, and the array mutators.
+ * direct one. Writes are assignments (plain and compound), `delete`, the array mutators — and,
+ * fail-closed, any use of the ledger the fence cannot READ: handed to a call, or reached through a
+ * method that is neither an enumerated mutator nor a known non-writing read. That last rule is what
+ * makes "no write anywhere" a claim rather than a list; see the doctrine note beside it below.
  */
 describe('no compatibility command-bus writes — the structural fence', () => {
   const MUTATORS = ['push', 'unshift', 'splice', 'pop', 'shift', 'sort', 'reverse', 'fill'];
+  /**
+   * Array and object methods that return a value and write nothing. A method outside BOTH lists is
+   * unrecognized — see the fail-closed rule below — so this list is the only thing standing between
+   * a lawful read and a report, and every entry on it is a non-writing operation by definition.
+   */
+  const READS = ['filter', 'find', 'findIndex', 'findLast', 'findLastIndex', 'some', 'every',
+    'map', 'flatMap', 'flat', 'slice', 'concat', 'includes', 'indexOf', 'lastIndexOf', 'join',
+    'reduce', 'reduceRight', 'at', 'forEach', 'entries', 'keys', 'values', 'toString',
+    'toSorted', 'toReversed', 'toSpliced', 'with'];
   const GUARDED = 'scheduleOverrides';
 
-  interface WriteSite { kind: 'assign' | 'delete' | 'mutate'; enclosing: string; line: number; text: string }
+  interface WriteSite {
+    kind: 'assign' | 'delete' | 'mutate' | 'unrecognized';
+    enclosing: string;
+    line: number;
+    text: string;
+  }
 
   /** Chain names with in-module aliases resolved: `s[who]` becomes `scheduleOverrides.*`. */
   const namesOf = (graph: ModuleGraph, node: ts.Node): string[] =>
@@ -362,6 +379,22 @@ describe('no compatibility command-bus writes — the structural fence', () => {
         && receiverTouchesGuarded(graph, node.expression.expression)) {
         sites.push({ kind: 'mutate', enclosing: current, ...at(node) });
       }
+      // THE FAIL-CLOSED DEFAULT. Enumerating spellings can never make good on "no write anywhere":
+      // `Reflect.set` and `Object.assign` write the ledger without matching any form above, and the
+      // next reflective spelling would need another enumeration. So a use of the ledger this fence
+      // cannot READ counts as a write — handing it to a call, or calling a method on it that is
+      // neither an enumerated mutator (reported above) nor a known non-writing read.
+      if (counts && ts.isCallExpression(node)) {
+        const callee = ts.isPropertyAccessExpression(node.expression) ? node.expression : null;
+        const method = callee?.name.text ?? null;
+        const handedOver = node.arguments.some((argument) => receiverTouchesGuarded(graph, argument));
+        const unknownMethod = callee !== null && method !== null
+          && !MUTATORS.includes(method) && !READS.includes(method)
+          && receiverTouchesGuarded(graph, callee.expression);
+        if (handedOver || unknownMethod) {
+          sites.push({ kind: 'unrecognized', enclosing: current, ...at(node) });
+        }
+      }
       ts.forEachChild(node, (child) => { visit(child, current); });
     };
     visit(graph.file, '<module>');
@@ -371,6 +404,14 @@ describe('no compatibility command-bus writes — the structural fence', () => {
   const ACTIONS = 'src/sim/actions.ts';
   const applyEntryPoints = (): string[] =>
     [...parseModule(ACTIONS).functions.keys()].filter((name) => name.startsWith('apply')).sort();
+
+  /** Inject one statement at the top of the real `applyMeet` — the 1:1 firing vehicle. */
+  const injectedWrites = (statement: string): WriteSite[] => {
+    const source = readFileSync(join(process.cwd(), ACTIONS), 'utf8');
+    const brace = source.indexOf('{', source.indexOf('export function applyMeet('));
+    return scheduleWrites(ACTIONS, ['applyMeet'],
+      `${source.slice(0, brace + 1)}\n  ${statement}\n${source.slice(brace + 1)}`);
+  };
 
   it('the scanned closure really is the compat verb surface (the scan is not vacuous)', () => {
     const entries = applyEntryPoints();
@@ -405,13 +446,37 @@ describe('no compatibility command-bus writes — the structural fence', () => {
     ['an aliased assignment', 'const bus = world.scheduleOverrides; bus[asset] = [];', 'assign'],
     ['an aliased mutator', 'const bus = world.scheduleOverrides; bus[asset]!.unshift(row);', 'mutate'],
   ])('FIRES on %s injected into a compat apply function', (_label, statement, kind) => {
-    const source = readFileSync(join(process.cwd(), ACTIONS), 'utf8');
-    const anchor = "export function applyMeet(";
-    const brace = source.indexOf('{', source.indexOf(anchor));
-    const injected = `${source.slice(0, brace + 1)}\n  ${statement}\n${source.slice(brace + 1)}`;
-    const found = scheduleWrites(ACTIONS, ['applyMeet'], injected);
+    const found = injectedWrites(statement);
     expect(found.map((site) => site.kind)).toContain(kind);
     expect(found.every((site) => site.enclosing === 'applyMeet')).toBe(true);
+  });
+
+  /**
+   * THE FAIL-CLOSED DEFAULT (whole-branch M-1). Enumerating write SPELLINGS cannot make good on the
+   * claim that no compat verb writes a schedule "anywhere": the reviewer recovered the same write
+   * through `Reflect.set` and `Object.assign`, and the next reflective spelling would need another
+   * enumeration. So the rule is inverted — a use of the ledger this fence cannot READ is a write
+   * until proven otherwise. Handing it to a call, or calling a method on it that is neither an
+   * enumerated mutator nor a known non-writing read, is reported.
+   */
+  it.each([
+    ['a reflective set', 'Reflect.set(world.scheduleOverrides, asset, []);'],
+    ['an object merge', 'Object.assign(world.scheduleOverrides, { [asset]: [] });'],
+    ['a defined property', 'Object.defineProperty(world.scheduleOverrides, asset, { value: [] });'],
+    ['an aliased reflective set',
+      'const bus = world.scheduleOverrides; Reflect.set(bus, asset, []);'],
+    ['a hand-off to an unreadable helper', 'installOverride(world.scheduleOverrides, asset);'],
+    ['an unenumerated array mutator', 'world.scheduleOverrides[asset]!.copyWithin(0, 1);'],
+  ])('FIRES on %s injected into a compat apply function', (_label, statement) => {
+    expect(injectedWrites(statement).map((site) => site.kind)).toContain('unrecognized');
+  });
+
+  it.each([
+    ['a filtered read', "void (world.scheduleOverrides[asset] ?? []).filter((row) => row.venue === 'x');"],
+    ['a searched read', "void (world.scheduleOverrides[asset] ?? []).find((row) => row.source === 'player');"],
+    ['a plain index read', 'const venue = world.scheduleOverrides[asset]?.[0]?.venue;'],
+  ])('stays SILENT on %s — the fence reports uses it cannot read, not reads', (_label, statement) => {
+    expect(injectedWrites(statement)).toEqual([]);
   });
 
   it('a write OUTSIDE the scanned closure is correctly not attributed to the compat verbs', () => {
