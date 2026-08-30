@@ -333,13 +333,19 @@ describe('no compatibility command-bus writes — the structural fence', () => {
    * A mutator's receiver is not always a plain chain: `(world.scheduleOverrides[x] ?? []).push(row)`
    * hides it inside a `??`, and a ternary would hide it inside two branches. Any mention of the
    * guarded name anywhere in the receiver expression is the receiver, so the whole subtree is read.
+   *
+   * The name itself is read through the SAME `isAccess`/`accessedName` pair the callee resolution
+   * uses, so `world['scheduleOverrides']` names the ledger exactly as `world.scheduleOverrides`
+   * does. Receiver and callee therefore share one spelling rule instead of two that can drift; a key
+   * only the running program knows (`world[whichever]`) still resolves to nothing here, and the
+   * subtree walk continues past it.
    */
   const receiverTouchesGuarded = (graph: ModuleGraph, node: ts.Node): boolean => {
     let hit = false;
     const walk = (current: ts.Node): void => {
       if (hit) return;
       const named = ts.isIdentifier(current) ? current.text
-        : ts.isPropertyAccessExpression(current) ? current.name.text : null;
+        : isAccess(current) ? accessedName(current) : null;
       if (named !== null && (graph.aliases.get(named) ?? named) === GUARDED) hit = true;
       else ts.forEachChild(current, walk);
     };
@@ -454,6 +460,7 @@ describe('no compatibility command-bus writes — the structural fence', () => {
     ['an aliased assignment', 'const bus = world.scheduleOverrides; bus[asset] = [];', 'assign'],
     ['an aliased mutator', 'const bus = world.scheduleOverrides; bus[asset]!.unshift(row);', 'mutate'],
     ['a static bracket mutator', "world.scheduleOverrides[asset]!['unshift'](row);", 'mutate'],
+    ['a bracket-spelled ledger name in the receiver', "world['scheduleOverrides'][asset].push(row);", 'mutate'],
   ])('FIRES on %s injected into a compat apply function', (_label, statement, kind) => {
     const found = injectedWrites(statement);
     expect(found.map((site) => site.kind)).toContain(kind);
@@ -474,6 +481,25 @@ describe('no compatibility command-bus writes — the structural fence', () => {
     expect(kindsOf("world.scheduleOverrides[asset]!['copyWithin'](0, 1);"))
       .toEqual(kindsOf('world.scheduleOverrides[asset]!.copyWithin(0, 1);'));
     expect(kindsOf("void (world.scheduleOverrides[asset] ?? [])['filter']((r) => r.venue === 'x');"))
+      .toEqual(kindsOf("void (world.scheduleOverrides[asset] ?? []).filter((r) => r.venue === 'x');"));
+  });
+
+  /**
+   * THE SAME PARITY, ONE LEVEL OUT. The pin above fixes how the METHOD may be spelled; this fixes
+   * how the LEDGER may be spelled inside that method's RECEIVER. `world['scheduleOverrides']` names
+   * the ledger exactly as `world.scheduleOverrides` does, so an enumerated mutator reached through it
+   * must still be `mutate`, an unenumerated one `unrecognized`, and a lawful read silent. Callee and
+   * receiver read names through the same `isAccess`/`accessedName` pair, and equality against the dot
+   * form is what stops the two spelling rules from drifting apart again.
+   */
+  it('reads a bracket-spelled ledger name in a receiver exactly as its dot-spelled twin', () => {
+    const kindsOf = (statement: string): string[] =>
+      injectedWrites(statement).map((site) => site.kind);
+    expect(kindsOf("world['scheduleOverrides'][asset].push(row);"))
+      .toEqual(kindsOf('world.scheduleOverrides[asset].push(row);'));
+    expect(kindsOf("world['scheduleOverrides'][asset]!.copyWithin(0, 1);"))
+      .toEqual(kindsOf('world.scheduleOverrides[asset]!.copyWithin(0, 1);'));
+    expect(kindsOf("void (world['scheduleOverrides'][asset] ?? []).filter((r) => r.venue === 'x');"))
       .toEqual(kindsOf("void (world.scheduleOverrides[asset] ?? []).filter((r) => r.venue === 'x');"));
   });
 
