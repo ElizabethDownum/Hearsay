@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import {
-  type ModuleGraph, assertParsed, chainNames, parseModule, reachable,
+  type ModuleGraph, accessedName, assertParsed, chainNames, isAccess, parseModule, reachable,
 } from '../helpers/callgraph';
 import { at, TICKS_PER_DAY } from '../../src/core/time';
 import { STANDARD_RULES } from '../../src/content/rules';
@@ -365,6 +365,15 @@ describe('no compatibility command-bus writes — the structural fence', () => {
         && node.name !== undefined && ts.isIdentifier(node.name)) current = node.name.text;
       const counts = inScope === null || inScope.has(current);
 
+      // A method call's CALLEE, in either spelling. `rows.push(row)` and `rows['push'](row)` name
+      // the same method, so both arms below read the callee through the shared `isAccess` /
+      // `accessedName` pair rather than through `PropertyAccessExpression` alone. `method` is
+      // `null` exactly when only the running program knows the name (`rows[whichever](row)`) —
+      // the fail-closed arm reports that rather than skipping it.
+      const callee = ts.isCallExpression(node) && isAccess(node.expression)
+        ? node.expression : null;
+      const method = callee === null ? null : accessedName(callee);
+
       if (counts && ts.isBinaryExpression(node)
         && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
         && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
@@ -374,22 +383,21 @@ describe('no compatibility command-bus writes — the structural fence', () => {
       if (counts && ts.isDeleteExpression(node) && touchesGuarded(graph, node.expression)) {
         sites.push({ kind: 'delete', enclosing: current, ...at(node) });
       }
-      if (counts && ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
-        && MUTATORS.includes(node.expression.name.text)
-        && receiverTouchesGuarded(graph, node.expression.expression)) {
+      if (counts && callee !== null && method !== null && MUTATORS.includes(method)
+        && receiverTouchesGuarded(graph, callee.expression)) {
         sites.push({ kind: 'mutate', enclosing: current, ...at(node) });
       }
       // THE FAIL-CLOSED DEFAULT. Enumerating spellings can never make good on "no write anywhere":
       // `Reflect.set` and `Object.assign` write the ledger without matching any form above, and the
       // next reflective spelling would need another enumeration. So a use of the ledger this fence
       // cannot READ counts as a write — handing it to a call, or calling a method on it that is
-      // neither an enumerated mutator (reported above) nor a known non-writing read.
+      // neither an enumerated mutator (reported above) nor a known non-writing read. A method whose
+      // NAME the fence cannot read either (`ledger[whichever](...)`) is the same failure to read,
+      // so it lands here too rather than falling out of both arms unclassified.
       if (counts && ts.isCallExpression(node)) {
-        const callee = ts.isPropertyAccessExpression(node.expression) ? node.expression : null;
-        const method = callee?.name.text ?? null;
         const handedOver = node.arguments.some((argument) => receiverTouchesGuarded(graph, argument));
-        const unknownMethod = callee !== null && method !== null
-          && !MUTATORS.includes(method) && !READS.includes(method)
+        const unknownMethod = callee !== null
+          && (method === null || (!MUTATORS.includes(method) && !READS.includes(method)))
           && receiverTouchesGuarded(graph, callee.expression);
         if (handedOver || unknownMethod) {
           sites.push({ kind: 'unrecognized', enclosing: current, ...at(node) });
@@ -445,10 +453,28 @@ describe('no compatibility command-bus writes — the structural fence', () => {
     ['an array mutator', '(world.scheduleOverrides[asset] ?? []).push(row);', 'mutate'],
     ['an aliased assignment', 'const bus = world.scheduleOverrides; bus[asset] = [];', 'assign'],
     ['an aliased mutator', 'const bus = world.scheduleOverrides; bus[asset]!.unshift(row);', 'mutate'],
+    ['a static bracket mutator', "world.scheduleOverrides[asset]!['unshift'](row);", 'mutate'],
   ])('FIRES on %s injected into a compat apply function', (_label, statement, kind) => {
     const found = injectedWrites(statement);
     expect(found.map((site) => site.kind)).toContain(kind);
     expect(found.every((site) => site.enclosing === 'applyMeet')).toBe(true);
+  });
+
+  /**
+   * SPELLING PARITY. `toContain` above proves a bracket-spelled method is REPORTED; this proves it
+   * is reported as the SAME THING as its dot-spelled twin — an enumerated mutator stays `mutate`
+   * and does not degrade into `unrecognized`, an unenumerated one stays `unrecognized`, and a read
+   * stays silent. Equality against the dot form is the claim, so neither spelling can drift alone.
+   */
+  it('classifies a bracket-spelled method exactly as its dot-spelled twin', () => {
+    const kindsOf = (statement: string): string[] =>
+      injectedWrites(statement).map((site) => site.kind);
+    expect(kindsOf("world.scheduleOverrides[asset]!['unshift'](row);"))
+      .toEqual(kindsOf('world.scheduleOverrides[asset]!.unshift(row);'));
+    expect(kindsOf("world.scheduleOverrides[asset]!['copyWithin'](0, 1);"))
+      .toEqual(kindsOf('world.scheduleOverrides[asset]!.copyWithin(0, 1);'));
+    expect(kindsOf("void (world.scheduleOverrides[asset] ?? [])['filter']((r) => r.venue === 'x');"))
+      .toEqual(kindsOf("void (world.scheduleOverrides[asset] ?? []).filter((r) => r.venue === 'x');"));
   });
 
   /**
@@ -457,7 +483,10 @@ describe('no compatibility command-bus writes — the structural fence', () => {
    * through `Reflect.set` and `Object.assign`, and the next reflective spelling would need another
    * enumeration. So the rule is inverted — a use of the ledger this fence cannot READ is a write
    * until proven otherwise. Handing it to a call, or calling a method on it that is neither an
-   * enumerated mutator nor a known non-writing read, is reported.
+   * enumerated mutator nor a known non-writing read, is reported. SPELLING IS NOT A LOOPHOLE:
+   * `ledger['copyWithin'](...)` names its method exactly as `ledger.copyWithin(...)` does and is
+   * classified identically, and `ledger[whichever](...)` — a method name only the running program
+   * knows — is the same failure to read the ledger's use, so it is reported rather than skipped.
    */
   it.each([
     ['a reflective set', 'Reflect.set(world.scheduleOverrides, asset, []);'],
@@ -467,6 +496,10 @@ describe('no compatibility command-bus writes — the structural fence', () => {
       'const bus = world.scheduleOverrides; Reflect.set(bus, asset, []);'],
     ['a hand-off to an unreadable helper', 'installOverride(world.scheduleOverrides, asset);'],
     ['an unenumerated array mutator', 'world.scheduleOverrides[asset]!.copyWithin(0, 1);'],
+    ['a static bracket-spelled unenumerated mutator',
+      "world.scheduleOverrides[asset]!['copyWithin'](0, 1);"],
+    ['a bracket method only the running program can name',
+      'world.scheduleOverrides[asset]![whichever](0, 1);'],
   ])('FIRES on %s injected into a compat apply function', (_label, statement) => {
     expect(injectedWrites(statement).map((site) => site.kind)).toContain('unrecognized');
   });
@@ -475,6 +508,8 @@ describe('no compatibility command-bus writes — the structural fence', () => {
     ['a filtered read', "void (world.scheduleOverrides[asset] ?? []).filter((row) => row.venue === 'x');"],
     ['a searched read', "void (world.scheduleOverrides[asset] ?? []).find((row) => row.source === 'player');"],
     ['a plain index read', 'const venue = world.scheduleOverrides[asset]?.[0]?.venue;'],
+    ['a static bracket-spelled read',
+      "void (world.scheduleOverrides[asset] ?? [])['filter']((row) => row.venue === 'x');"],
   ])('stays SILENT on %s — the fence reports uses it cannot read, not reads', (_label, statement) => {
     expect(injectedWrites(statement)).toEqual([]);
   });
