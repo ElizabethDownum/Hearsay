@@ -416,10 +416,11 @@ describe('headless-sim law — the engine never imports app/UI code', () => {
  * construction, however they are spelled?*
  *
  * It resolves bindings IN-MODULE — `const M = Math`, `const { random } = Math`, `const r = Math.random`,
- * an alias of an alias, `globalThis.` qualification, static bracket keys — and reports a reach
- * wherever it lands, including a bare reference handed off as a callback and a reflective
- * construction. A key only the running program knows resolves to `.*` and is reported rather than
- * skipped; a source the parser only RECOVERED from is refused outright rather than scanned as clean.
+ * an alias of an alias, `globalThis.` qualification, static bracket keys, and the invocation helpers
+ * `.call`/`.apply`/`.bind` read from a guarded callable — and reports a reach wherever it lands,
+ * including a bare reference handed off as a callback and a reflective construction. A key only the
+ * running program knows resolves to `.*` and is reported rather than skipped; a source the parser
+ * only RECOVERED from is refused outright rather than scanned as clean.
  *
  * WHERE THE MANDATE LINE IS. Resolution stops at the module boundary. A deterministic-core file that
  * imports a helper which itself calls the wall clock is not visible here, and enumerating that class
@@ -438,6 +439,27 @@ const DETERMINISTIC_ROOTS = [
 const GUARDED_CALLS = ['Math.random', 'Date.now'];
 const GUARDED_CONSTRUCTOR = 'Date';
 const REFLECTIVE = ['Reflect.construct', 'Reflect.apply'];
+
+/**
+ * `.call`, `.apply` and `.bind` are read FROM the callable they invoke, so a receiver chain resolves
+ * straight through them: `Date.now.call(Date)` reaches `Date.now` and nothing else. Without this the
+ * guarded access is skipped as an intermediate receiver while the outer access resolves to
+ * `Date.now.call`, which is guarded nowhere — so `const D = Date; D.now.call(D)` was a direct clock
+ * call invisible to both the ESLint spelling rules and this layer.
+ */
+const INVOCATION_HELPERS = ['call', 'apply', 'bind'];
+
+/** Strip any chain of invocation helpers read from a guarded callable. */
+function throughInvocationHelpers(reach: string): string {
+  let current = reach;
+  for (;;) {
+    const helper = INVOCATION_HELPERS.find((name) => current.endsWith(`.${name}`));
+    if (helper === undefined) return current;
+    const callable = current.slice(0, -(helper.length + 1));
+    if (!GUARDED_CALLS.includes(callable) && callable !== GUARDED_CONSTRUCTOR) return current;
+    current = callable;
+  }
+}
 
 interface EntropyReach {
   /** The canonical thing reached, e.g. `Math.random`, or `new Date` for a bare construction. */
@@ -543,7 +565,8 @@ function entropyReaches(source: string, fileName: string): EntropyReach[] {
       const parent: ts.Node | undefined = node.parent;
       const isReceiver = parent !== undefined && isAccess(parent) && parent.expression === node;
       if (!isReceiver && !inTypePosition(node)) {
-        const reach = reachOf(node, aliases);
+        const resolved = reachOf(node, aliases);
+        const reach = resolved === null ? null : throughInvocationHelpers(resolved);
         if (reach !== null
           && (GUARDED_CALLS.includes(reach)
             || (reach.endsWith('.*') && (reach === 'Math.*' || reach === 'Date.*')))) {
@@ -610,6 +633,13 @@ describe('determinism law — the AST layer sees qualified, aliased, and reflect
     ['reflective aliased construction', 'const C = Date; const d = Reflect.construct(C, []);',
       'Reflect.construct(Date)'],
     ['reflective apply', 'const t = Reflect.apply(Date.now, Date, []);', 'Reflect.apply(Date.now)'],
+    // Invocation helpers (finding I-4). `.call`/`.apply`/`.bind` are read FROM the callable, so the
+    // receiver chain resolves through them: `D.now.call(D)` is a direct clock call spelled sideways.
+    ['aliased clock through .call', 'const D = Date; const t = D.now.call(D);', 'Date.now'],
+    ['aliased entropy through .call', 'const M = Math; const x = M.random.call(M);', 'Math.random'],
+    ['clock through .bind', 'const D = Date; const f = D.now.bind(D); const t = f();', 'Date.now'],
+    ['entropy through .apply', 'const x = Math.random.apply(Math, []);', 'Math.random'],
+    ['qualified clock through .call', 'const t = globalThis.Date.now.call(Date);', 'Date.now'],
   ])('FIRES on %s', (_form, src, reach) => {
     expect(probe(src).map((found) => found.reach)).toContain(reach);
   });
@@ -623,6 +653,11 @@ describe('determinism law — the AST layer sees qualified, aliased, and reflect
     ['a Date TYPE annotation', 'function at(d: Date): Date { return d; }'],
     ['an unrelated object with its own random', 'const rng = makeRng(); const x = rng.random();'],
     ['an unrelated now', 'const clock = { now: () => 0 }; const t = clock.now();'],
+    // The helper mapping resolves the CALLABLE it is read from, so it fires on a guarded one only.
+    ['a non-guarded callable using .call',
+      'const clock = { now: () => 0 }; const t = clock.now.call(clock);'],
+    ['a lawful Math helper using .call', 'const f = Math.floor.call(Math, 2.5);'],
+    ['a lawful Math helper using .apply', 'const m = Math.max.apply(Math, [1, 2]);'],
   ])('stays SILENT on %s', (_form, src) => {
     expect(probe(src)).toEqual([]);
   });
