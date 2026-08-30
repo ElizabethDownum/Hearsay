@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import {
-  type ModuleGraph, accessedName, assertParsed, chainNames, isAccess, parseModule, reachable,
+  type ModuleGraph, accessedName, assertParsed, isAccess, parseModule, reachable,
 } from '../helpers/callgraph';
 import { at, TICKS_PER_DAY } from '../../src/core/time';
 import { STANDARD_RULES } from '../../src/content/rules';
@@ -297,10 +297,15 @@ describe('legacy courier loop enforcement', () => {
  *
  * The scan is on the AST, over the closure of every exported `apply*` entry point, and it resolves
  * in-module aliases: `const s = world.scheduleOverrides; s[who] = []` is the same write as the
- * direct one. Writes are assignments (plain and compound), `delete`, the array mutators — and,
- * fail-closed, any use of the ledger the fence cannot READ: handed to a call, or reached through a
- * method that is neither an enumerated mutator nor a known non-writing read. That last rule is what
- * makes "no write anywhere" a claim rather than a list; see the doctrine note beside it below.
+ * direct one.
+ *
+ * The scan is REFERENCE-FIRST, and that inversion is the whole of its claim. It does not look for
+ * write shapes and report the ones it recognizes; it finds every mention of the ledger and demands
+ * that each one justify itself — as a write of a known kind (`assign`, `delete`, `mutate`), or as a
+ * lawful read (a known non-writing method, a compared value, a plain binding). Anything else is
+ * reported, whatever node kind it is. An enumeration of write shapes can only ever be as good as
+ * its last counterexample; a demand that every reference account for itself has no per-node-kind
+ * arm to leave out. See the doctrine note beside the firing matrix below.
  */
 describe('no compatibility command-bus writes — the structural fence', () => {
   const MUTATORS = ['push', 'unshift', 'splice', 'pop', 'shift', 'sort', 'reverse', 'fill'];
@@ -322,35 +327,157 @@ describe('no compatibility command-bus writes — the structural fence', () => {
     text: string;
   }
 
-  /** Chain names with in-module aliases resolved: `s[who]` becomes `scheduleOverrides.*`. */
-  const namesOf = (graph: ModuleGraph, node: ts.Node): string[] =>
-    chainNames(node).map((name) => graph.aliases.get(name) ?? name);
+  /** The classified USE of one ledger reference. `null` is the fence's ONLY silence. */
+  type Use = { kind: WriteSite['kind']; node: ts.Node } | null;
 
-  const touchesGuarded = (graph: ModuleGraph, node: ts.Node): boolean =>
-    namesOf(graph, node).includes(GUARDED);
+  const isGuarded = (graph: ModuleGraph, raw: string | null): boolean =>
+    raw !== null && (graph.aliases.get(raw) ?? raw) === GUARDED;
 
   /**
-   * A mutator's receiver is not always a plain chain: `(world.scheduleOverrides[x] ?? []).push(row)`
-   * hides it inside a `??`, and a ternary would hide it inside two branches. Any mention of the
-   * guarded name anywhere in the receiver expression is the receiver, so the whole subtree is read.
-   *
-   * The name itself is read through the SAME `isAccess`/`accessedName` pair the callee resolution
-   * uses, so `world['scheduleOverrides']` names the ledger exactly as `world.scheduleOverrides`
-   * does. Receiver and callee therefore share one spelling rule instead of two that can drift; a key
-   * only the running program knows (`world[whichever]`) still resolves to nothing here, and the
-   * subtree walk continues past it.
+   * A NAME position rather than a value: the `.name` half of the access that already IS the
+   * reference (`world.scheduleOverrides`), a binding name (`const bus = …`), a key (`{ bus: x }`),
+   * a parameter, an import specifier. Counting these would double-report the access they belong to.
+   * A shorthand `{ bus }` is exempt — there the name IS the value being handed over.
    */
-  const receiverTouchesGuarded = (graph: ModuleGraph, node: ts.Node): boolean => {
-    let hit = false;
-    const walk = (current: ts.Node): void => {
-      if (hit) return;
-      const named = ts.isIdentifier(current) ? current.text
-        : isAccess(current) ? accessedName(current) : null;
-      if (named !== null && (graph.aliases.get(named) ?? named) === GUARDED) hit = true;
-      else ts.forEachChild(current, walk);
-    };
-    walk(node);
-    return hit;
+  const isNamePosition = (node: ts.Node): boolean => {
+    const parent = node.parent as (ts.Node & { name?: ts.Node; propertyName?: ts.Node }) | undefined;
+    if (parent === undefined || ts.isShorthandPropertyAssignment(parent)) return false;
+    return parent.name === node || parent.propertyName === node;
+  };
+
+  /** A type annotation names the ledger without ever reaching its value. */
+  const inTypePosition = (node: ts.Node): boolean => {
+    for (let cursor: ts.Node | undefined = node; cursor !== undefined; cursor = cursor.parent) {
+      if (ts.isTypeNode(cursor) || ts.isTypeAliasDeclaration(cursor)
+        || ts.isInterfaceDeclaration(cursor)) return true;
+    }
+    return false;
+  };
+
+  /**
+   * Does this node NAME the ledger? Every spelling the shared `isAccess`/`accessedName` pair
+   * resolves — `world.scheduleOverrides`, `world['scheduleOverrides']`, through casts, parens and
+   * `!` — plus any identifier the module's alias table renames onto it (`const bus = …; bus`).
+   * A key only the running program knows (`world[whichever]`) resolves to nothing HERE, and is
+   * caught instead by the unreadable-name rules below.
+   *
+   * A reference can also be spelled as DATA rather than as an access. `Object.defineProperty(world,
+   * 'scheduleOverrides', …)` replaces the ledger wholesale while never reading it through a member
+   * access at all — the name travels as a string. So a string literal that names the ledger counts
+   * as a reference too, and is then classified by the SAME outward walk as every other reference:
+   * handed to a call it is `unrecognized`, merely compared against (`key === 'scheduleOverrides'`)
+   * it is a read. The literal INSIDE an element access is skipped, because the access surrounding
+   * it is already the reference and counting both would report one use twice.
+   */
+  const namesLedger = (graph: ModuleGraph, node: ts.Node): boolean => {
+    if (inTypePosition(node) || isNamePosition(node)) return false;
+    if (isAccess(node)) return isGuarded(graph, accessedName(node));
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+      const parent = node.parent;
+      if (parent !== undefined && ts.isElementAccessExpression(parent)
+        && parent.argumentExpression === node) return false;
+      return isGuarded(graph, node.text);
+    }
+    return ts.isIdentifier(node) && isGuarded(graph, node.text);
+  };
+
+  const isAssignmentOperator = (kind: ts.SyntaxKind): boolean =>
+    kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment;
+
+  /**
+   * THE INVERTED RULE. Given one reference to the ledger, walk OUTWARD through its parents and ask
+   * what is being done with it. Three outcomes, and only three:
+   *
+   *  - a recognized WRITE keeps its kind — `assign` (an assignment of any operator, a destructuring
+   *    target, a `for…of`/`for…in` target, `++`/`--`), `delete`, or `mutate` (an enumerated array
+   *    mutator called on it);
+   *  - a recognized lawful READ is silent — a known non-writing method from `READS`, a value merely
+   *    compared or combined, an iteration source, a PROJECTION out of the ledger stored somewhere
+   *    (`const kept = ledger[who] ?? []`), or a plain declaration binding (`const bus = ledger`),
+   *    whose rename the module's alias table resolves so that every USE of the rename is itself a
+   *    scanned reference;
+   *  - EVERYTHING ELSE is `unrecognized`. Not "every other shape I thought of" — every other node
+   *    kind that exists, including ones added to the language after this was written. Handing the
+   *    ledger to a call or a `new`, embedding it in a tagged template, a method whose name only the
+   *    running program knows: none of these need their own arm, because the DEFAULT is to report.
+   *
+   * Identity is tracked deliberately, by two flags.
+   *
+   * `boxed` — the reference has passed through an array/object literal. The container may still be
+   * a destructuring TARGET (a write), but it is no longer the ledger, so a method dispatched off it
+   * is a hand-off rather than a mutator.
+   *
+   * `projected` — a member has been taken off the ledger (`ledger[who]`, `ledger.length`), so what
+   * travels onward is a value read OUT of it rather than the ledger object. Only a projection may
+   * be stored freely. The bare ledger escaping into a binding the module's alias table cannot
+   * resolve (`let bus; bus = ledger`, `const held = { bus: ledger }`) is a use this fence cannot
+   * read, and is reported like any other.
+   */
+  const classifyUse = (reference: ts.Node): Use => {
+    let child: ts.Node = reference;
+    let member: string | null = null;
+    let boxed = false;
+    let projected = false;
+    for (let parent = reference.parent; parent !== undefined; child = parent, parent = parent.parent) {
+      if (ts.isParenthesizedExpression(parent) || ts.isNonNullExpression(parent)
+        || ts.isAsExpression(parent) || ts.isSatisfiesExpression(parent)
+        || ts.isTypeAssertionExpression(parent)) continue;
+      if (ts.isDeleteExpression(parent)) return { kind: 'delete', node: parent };
+      // `void x` and `typeof x` evaluate and discard — pure observation, classified as a read.
+      if (ts.isVoidExpression(parent) || ts.isTypeOfExpression(parent)) return null;
+      if (ts.isPostfixUnaryExpression(parent)) return { kind: 'assign', node: parent };
+      if (ts.isPrefixUnaryExpression(parent)) {
+        return parent.operator === ts.SyntaxKind.PlusPlusToken
+          || parent.operator === ts.SyntaxKind.MinusMinusToken
+          ? { kind: 'assign', node: parent } : null;
+      }
+      if (ts.isForOfStatement(parent) || ts.isForInStatement(parent)) {
+        return parent.initializer === child ? { kind: 'assign', node: parent } : null;
+      }
+      if (ts.isBinaryExpression(parent)) {
+        const operator = parent.operatorToken.kind;
+        if (isAssignmentOperator(operator)) {
+          if (parent.left === child) return { kind: 'assign', node: parent };
+          return projected ? null : { kind: 'unrecognized', node: parent };
+        }
+        if (operator === ts.SyntaxKind.QuestionQuestionToken
+          || operator === ts.SyntaxKind.BarBarToken
+          || operator === ts.SyntaxKind.AmpersandAmpersandToken) continue;
+        if (operator === ts.SyntaxKind.CommaToken && parent.right === child) continue;
+        return null; // compared or combined — the value is read, never reached back through.
+      }
+      if (ts.isConditionalExpression(parent)) {
+        if (parent.condition === child) return null;
+        continue;
+      }
+      if ((ts.isCallExpression(parent) || ts.isNewExpression(parent))
+        && (parent.arguments ?? []).some((argument) => argument === child)) {
+        return { kind: 'unrecognized', node: parent };
+      }
+      if (ts.isCallExpression(parent) && parent.expression === child) {
+        if (boxed || member === null) return { kind: 'unrecognized', node: parent };
+        if (MUTATORS.includes(member)) return { kind: 'mutate', node: parent };
+        return READS.includes(member) ? null : { kind: 'unrecognized', node: parent };
+      }
+      if (isAccess(parent) && parent.expression === child) {
+        if (boxed) return { kind: 'unrecognized', node: parent };
+        member = accessedName(parent);
+        projected = true;
+        continue;
+      }
+      if (ts.isArrayLiteralExpression(parent) || ts.isObjectLiteralExpression(parent)
+        || ts.isSpreadElement(parent) || ts.isSpreadAssignment(parent)
+        || ts.isShorthandPropertyAssignment(parent)
+        || (ts.isPropertyAssignment(parent) && parent.initializer === child)) {
+        boxed = true;
+        continue;
+      }
+      if (ts.isVariableDeclaration(parent) && parent.initializer === child) {
+        return projected || !boxed ? null : { kind: 'unrecognized', node: parent };
+      }
+      return { kind: 'unrecognized', node: parent };
+    }
+    return { kind: 'unrecognized', node: reference };
   };
 
   function scheduleWrites(
@@ -365,49 +492,15 @@ describe('no compatibility command-bus writes — the structural fence', () => {
       text: node.getText(graph.file).replace(/\s+/g, ' ').slice(0, 80),
     });
 
+    // EVERY reference, then its use — never the other way round. There is no per-node-kind arm to
+    // omit, so a write in a node kind nobody enumerated cannot fall out of the scan unclassified.
     const visit = (node: ts.Node, owner: string): void => {
       let current = owner;
       if ((ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node))
         && node.name !== undefined && ts.isIdentifier(node.name)) current = node.name.text;
-      const counts = inScope === null || inScope.has(current);
-
-      // A method call's CALLEE, in either spelling. `rows.push(row)` and `rows['push'](row)` name
-      // the same method, so both arms below read the callee through the shared `isAccess` /
-      // `accessedName` pair rather than through `PropertyAccessExpression` alone. `method` is
-      // `null` exactly when only the running program knows the name (`rows[whichever](row)`) —
-      // the fail-closed arm reports that rather than skipping it.
-      const callee = ts.isCallExpression(node) && isAccess(node.expression)
-        ? node.expression : null;
-      const method = callee === null ? null : accessedName(callee);
-
-      if (counts && ts.isBinaryExpression(node)
-        && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
-        && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
-        && touchesGuarded(graph, node.left)) {
-        sites.push({ kind: 'assign', enclosing: current, ...at(node) });
-      }
-      if (counts && ts.isDeleteExpression(node) && touchesGuarded(graph, node.expression)) {
-        sites.push({ kind: 'delete', enclosing: current, ...at(node) });
-      }
-      if (counts && callee !== null && method !== null && MUTATORS.includes(method)
-        && receiverTouchesGuarded(graph, callee.expression)) {
-        sites.push({ kind: 'mutate', enclosing: current, ...at(node) });
-      }
-      // THE FAIL-CLOSED DEFAULT. Enumerating spellings can never make good on "no write anywhere":
-      // `Reflect.set` and `Object.assign` write the ledger without matching any form above, and the
-      // next reflective spelling would need another enumeration. So a use of the ledger this fence
-      // cannot READ counts as a write — handing it to a call, or calling a method on it that is
-      // neither an enumerated mutator (reported above) nor a known non-writing read. A method whose
-      // NAME the fence cannot read either (`ledger[whichever](...)`) is the same failure to read,
-      // so it lands here too rather than falling out of both arms unclassified.
-      if (counts && ts.isCallExpression(node)) {
-        const handedOver = node.arguments.some((argument) => receiverTouchesGuarded(graph, argument));
-        const unknownMethod = callee !== null
-          && (method === null || (!MUTATORS.includes(method) && !READS.includes(method)))
-          && receiverTouchesGuarded(graph, callee.expression);
-        if (handedOver || unknownMethod) {
-          sites.push({ kind: 'unrecognized', enclosing: current, ...at(node) });
-        }
+      if ((inScope === null || inScope.has(current)) && namesLedger(graph, node)) {
+        const use = classifyUse(node);
+        if (use !== null) sites.push({ kind: use.kind, enclosing: current, ...at(use.node) });
       }
       ts.forEachChild(node, (child) => { visit(child, current); });
     };
@@ -507,12 +600,12 @@ describe('no compatibility command-bus writes — the structural fence', () => {
    * THE FAIL-CLOSED DEFAULT (whole-branch M-1). Enumerating write SPELLINGS cannot make good on the
    * claim that no compat verb writes a schedule "anywhere": the reviewer recovered the same write
    * through `Reflect.set` and `Object.assign`, and the next reflective spelling would need another
-   * enumeration. So the rule is inverted — a use of the ledger this fence cannot READ is a write
-   * until proven otherwise. Handing it to a call, or calling a method on it that is neither an
-   * enumerated mutator nor a known non-writing read, is reported. SPELLING IS NOT A LOOPHOLE:
-   * `ledger['copyWithin'](...)` names its method exactly as `ledger.copyWithin(...)` does and is
-   * classified identically, and `ledger[whichever](...)` — a method name only the running program
-   * knows — is the same failure to read the ledger's use, so it is reported rather than skipped.
+   * enumeration. So a use of the ledger this fence cannot READ is a write until proven otherwise.
+   * Handing it to a call, or calling a method on it that is neither an enumerated mutator nor a
+   * known non-writing read, is reported. SPELLING IS NOT A LOOPHOLE: `ledger['copyWithin'](...)`
+   * names its method exactly as `ledger.copyWithin(...)` does and is classified identically, and
+   * `ledger[whichever](...)` — a method name only the running program knows — is the same failure
+   * to read the ledger's use, so it is reported rather than skipped.
    */
   it.each([
     ['a reflective set', 'Reflect.set(world.scheduleOverrides, asset, []);'],
@@ -530,6 +623,40 @@ describe('no compatibility command-bus writes — the structural fence', () => {
     expect(injectedWrites(statement).map((site) => site.kind)).toContain('unrecognized');
   });
 
+  /**
+   * THE INVERSION (fix wave 6). Everything above still described the fence arm-first: each arm
+   * recognized its own shapes, so every node kind WITHOUT an arm was silent by default. Three
+   * review rounds each falsified "no write anywhere" with a new statically readable spelling, and
+   * the fix-5 residual measured thirteen at once across four sub-classes. The rule is therefore
+   * inverted at the REFERENCE level: every mention of the ledger must justify itself as a write of
+   * a known kind or as a lawful read, and anything else — any node kind, named or not — is
+   * reported. This table is that claim's firing matrix; the four sub-classes are labelled.
+   */
+  it.each([
+    // (1) non-chain assignment/delete targets — the target is not a linear access chain.
+    ['a ternary-hidden assignment target', '(cond ? world.scheduleOverrides : other)[asset] = [];', 'assign'],
+    ['a nullish-hidden assignment target', '(world.scheduleOverrides ?? {})[asset] = [];', 'assign'],
+    ['a comma-hidden assignment target', '(0, world.scheduleOverrides)[asset] = [];', 'assign'],
+    ['a ternary-hidden delete', 'delete (cond ? world.scheduleOverrides : other)[asset];', 'delete'],
+    // (2) destructuring assignment targets — the left-hand side is a literal, not a chain.
+    ['an array destructuring assignment', '[world.scheduleOverrides[asset]] = [[]];', 'assign'],
+    ['an object destructuring assignment', '({ ada: world.scheduleOverrides.ada } = src);', 'assign'],
+    ['a rest destructuring assignment', '[...world.scheduleOverrides[asset]] = rows;', 'assign'],
+    // (3) writes that are not BinaryExpressions at all.
+    ['a for-of assignment target', 'for (world.scheduleOverrides[asset] of rows) {}', 'assign'],
+    ['a for-in assignment target', 'for (world.scheduleOverrides[asset] in rows) {}', 'assign'],
+    ['a postfix increment', 'world.scheduleOverrides[asset]!.length++;', 'assign'],
+    ['a prefix decrement', '--world.scheduleOverrides[asset]!.length;', 'assign'],
+    // (4) hand-offs that are not CallExpressions.
+    ['a new-expression hand-off', 'void new Installer(world.scheduleOverrides, asset);', 'unrecognized'],
+    ['a tagged-template hand-off', 'tag`${world.scheduleOverrides}`;', 'unrecognized'],
+  ])('FIRES on %s — an unjustified ledger reference is reported whatever its node kind',
+    (_label, statement, kind) => {
+      const found = injectedWrites(statement);
+      expect(found.map((site) => site.kind)).toContain(kind);
+      expect(found.every((site) => site.enclosing === 'applyMeet')).toBe(true);
+    });
+
   it.each([
     ['a filtered read', "void (world.scheduleOverrides[asset] ?? []).filter((row) => row.venue === 'x');"],
     ['a searched read', "void (world.scheduleOverrides[asset] ?? []).find((row) => row.source === 'player');"],
@@ -537,6 +664,81 @@ describe('no compatibility command-bus writes — the structural fence', () => {
     ['a static bracket-spelled read',
       "void (world.scheduleOverrides[asset] ?? [])['filter']((row) => row.venue === 'x');"],
   ])('stays SILENT on %s — the fence reports uses it cannot read, not reads', (_label, statement) => {
+    expect(injectedWrites(statement)).toEqual([]);
+  });
+
+  /**
+   * WHAT MAKES THIS AN INVERSION RATHER THAN THIRTEEN MORE ARMS. Nothing below was anyone's
+   * counterexample; none has a rule written for it. They are reported because the fence's DEFAULT
+   * is to report, so a node kind nobody thought of — including one the language grows later —
+   * cannot fall out of the scan unclassified the way `for…of`, `++` and `new` all did. If a future
+   * change reintroduces per-kind arms, these are the cases that go quiet first.
+   */
+  it.each([
+    ['a throw', 'throw world.scheduleOverrides;'],
+    ['a return', 'if (asset) { return world.scheduleOverrides; }'],
+    ['an untagged template', 'void `${world.scheduleOverrides}`;'],
+    ['a bare expression statement', 'world.scheduleOverrides;'],
+    ['a class-field capture', 'class Holder { rows = world.scheduleOverrides; }'],
+    ['a switch discriminant', 'switch (world.scheduleOverrides) { default: break; }'],
+    ['an awaited hand-off', 'void (async () => { await world.scheduleOverrides; })();'],
+    ['a method dispatched off a boxing literal',
+      '[world.scheduleOverrides].forEach((b) => b[asset] = []);'],
+  ])('FIRES on %s — no arm recognizes it; the fence reports it because nothing classified it',
+    (_label, statement) => {
+      expect(injectedWrites(statement).map((site) => site.kind)).toContain('unrecognized');
+    });
+
+  /**
+   * THE LEDGER ITSELF MAY NOT LEAVE UNREAD. A PROJECTION out of the ledger (`ledger[who]`, and the
+   * rows spread out of it) is a value, and storing one is a read — production does exactly that
+   * when it rebuilds a row list. The bare ledger OBJECT is different: stored into a binding the
+   * module's alias table resolves (`const bus = ledger`) it stays readable, and every later use of
+   * `bus` is itself a scanned reference — but stored anywhere else it escapes into something this
+   * fence cannot follow, so it is reported. Both forms below were silent until the inversion.
+   */
+  it.each([
+    ['a deferred alias assignment', 'let bus; bus = world.scheduleOverrides; bus[asset] = [];'],
+    ['an object-literal capture', 'const held = { bus: world.scheduleOverrides };'],
+  ])('FIRES on %s — the ledger escaping into a binding the fence cannot resolve',
+    (_label, statement) => {
+      expect(injectedWrites(statement).map((site) => site.kind)).toContain('unrecognized');
+    });
+
+  /**
+   * THE NAME AS DATA. Every form above reaches the ledger through a member ACCESS. These replace or
+   * remove it while never reading it through one: the name travels as a string, to a callee that
+   * redefines the slot on the container. The fence counts a ledger-naming string literal as a
+   * reference and classifies it by the same outward walk, so no new arm was added for this — which
+   * is also why the comparison below stays silent, a string being compared writing nothing.
+   */
+  it.each([
+    ['a defined getter over the ledger slot',
+      "Object.defineProperty(world, 'scheduleOverrides', { get: g });"],
+    ['a reflective delete of the ledger slot', "Reflect.deleteProperty(world, 'scheduleOverrides');"],
+    ['a computed-key object merge', "Object.assign(world, { ['scheduleOverrides']: {} });"],
+  ])('FIRES on %s — the ledger named as data, never read through an access',
+    (_label, statement) => {
+      expect(injectedWrites(statement).map((site) => site.kind)).toContain('unrecognized');
+    });
+
+  it('stays SILENT on a ledger name merely compared as a string', () => {
+    expect(injectedWrites("if (whichever === 'scheduleOverrides') { void 0; }")).toEqual([]);
+  });
+
+  /**
+   * The inversion's read surface, pinned. These are silent because they are CLASSIFIED as reads,
+   * not because no arm happened to match them — which is the distinction the table above turns on.
+   * Iterating the ledger and comparing it cannot write it; a projection stored in a binding is the
+   * shape production itself uses (`const kept = world.scheduleOverrides[who] ?? []`).
+   */
+  it.each([
+    ['an iteration source', 'for (const r of world.scheduleOverrides[asset]!) { void r; }'],
+    ['a comparison', 'if (world.scheduleOverrides[asset] === undefined) { void 0; }'],
+    ['a projection stored in a binding', 'const kept = world.scheduleOverrides[asset] ?? [];'],
+    ['a plain alias declaration the alias table resolves',
+      'const bus = world.scheduleOverrides; void bus.length;'],
+  ])('stays SILENT on %s — a classified read, not an unmatched node kind', (_label, statement) => {
     expect(injectedWrites(statement)).toEqual([]);
   });
 
