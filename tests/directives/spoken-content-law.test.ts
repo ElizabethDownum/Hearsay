@@ -175,14 +175,18 @@ describe('spoken content is the complete carried knowledge', () => {
  *   1. a source the parser only RECOVERED from is refused outright, never scanned as clean;
  *   2. a key only the running program knows (`message.payload[whichever]`) is reported as `.*`,
  *      which no allowlist entry covers;
- *   3. handing the payload OBJECT to a call — or naming it maximally at all — is reported as an
- *      `escape`, because that is where a read would go to hide from an in-module scan.
+ *   3. handing a payload value to a call — or naming it maximally at all — is reported as an
+ *      `escape`, because that is where a read would go to hide from an in-module scan. A tracked
+ *      HOLDER counts: `hidden` and `message.payload` are the same object, so `f(hidden)` is the
+ *      same hand-off as `f(message.payload)`. An escape is unlawful whatever path it carries.
  *
  * A BINDING IS A HOLDER *AND* A READ. `const lineage = message.payload.version` really does
  * dereference `version`, so it is reported — but as its own path, judged on its own role, and it
  * does NOT license what sits inside it. `lineage.brief` is a separate, separately-judged read. The
  * one expression that names no field is `message.payload` itself, so binding THAT is pure aliasing;
  * naming it anywhere else hands the object somewhere this scan cannot follow, and is an `escape`.
+ * That is why a waypoint cannot launder a hand-off either: reaching the lineage envelope is lawful,
+ * handing the envelope — brief and all — to a call is not.
  *
  * Binding resolution is IN-MODULE, over `receiveFinal` and the module-local functions reachable from
  * it. The cross-module data-flow residual (a payload value carried out through an imported helper
@@ -306,6 +310,40 @@ function payloadReads(graph: ModuleGraph, roots: readonly string[]): PayloadRead
       }
     };
 
+    /**
+     * The parent-side mirror of `unwrapNode`: the node this expression really sits inside, with the
+     * casts and parentheses between them stepped over. `(ok as never).kind` reads a field through a
+     * holder exactly as `ok.kind` does, and the identifier must not be mistaken for a hand-off.
+     */
+    const effectiveParent = (node: ts.Node): { parent: ts.Node | undefined; child: ts.Node } => {
+      let child: ts.Node = node;
+      let parent: ts.Node | undefined = child.parent;
+      // `unwrapNode(parent) !== parent` is exactly "parent is one of those wrappers".
+      while (parent !== undefined && unwrapNode(parent) !== parent
+        && (parent as { expression?: ts.Node }).expression === child) {
+        child = parent;
+        parent = child.parent;
+      }
+      return { parent, child };
+    };
+
+    /** The receiver of a further member access — that access is classified on its own line. */
+    const isTrackedReceiver = (node: ts.Identifier): boolean => {
+      const { parent, child } = effectiveParent(node);
+      return parent !== undefined && isAccess(parent) && parent.expression === child;
+    };
+
+    /** A position where an identifier IS a name — a key, a declaration, a parameter — not a value. */
+    const isNamePosition = (node: ts.Identifier): boolean => {
+      const parent: ts.Node | undefined = node.parent;
+      if (parent === undefined) return false;
+      return (ts.isPropertyAccessExpression(parent) && parent.name === node)
+        || (ts.isBindingElement(parent) && (parent.name === node || parent.propertyName === node))
+        || (ts.isVariableDeclaration(parent) && parent.name === node)
+        || (ts.isPropertyAssignment(parent) && parent.name === node)
+        || (ts.isParameter(parent) && parent.name === node);
+    };
+
     const visit = (node: ts.Node): void => {
       if (ts.isVariableDeclaration(node) && node.initializer !== undefined) {
         const base = pathOf(node.initializer);
@@ -332,6 +370,15 @@ function payloadReads(graph: ModuleGraph, roots: readonly string[]): PayloadRead
           record(path, path === PAYLOAD_ROOT ? 'escape' : formOf(node), node);
         }
       }
+      // A tracked holder named as a VALUE hands that value off — returned, passed to a call,
+      // assigned outside the holder relation, used as a key. Reading a field THROUGH it is the one
+      // use that stays inside the scan, and that read is classified by the branch above.
+      if (ts.isIdentifier(node)) {
+        const held = holders.get(node.text);
+        if (held !== undefined && !isNamePosition(node) && !isTrackedReceiver(node)) {
+          record(held, 'escape', node);
+        }
+      }
       ts.forEachChild(node, visit);
     };
     visit(body);
@@ -345,8 +392,12 @@ function scanTransport(sourceOverride?: string): PayloadRead[] {
   return payloadReads(graph, [RECEIPT_ROOT]);
 }
 
+/**
+ * An ESCAPE is never lawful, whatever path it carries: the allowlist justifies READING a handle, and
+ * no entry — waypoint included — justifies handing the value it names somewhere unreadable.
+ */
 const unlawful = (reads: readonly PayloadRead[]): PayloadRead[] =>
-  reads.filter((read) => !isLawful(read.path));
+  reads.filter((read) => read.form === 'escape' || !isLawful(read.path));
 
 const REAL_SOURCE = readFileSync(join(process.cwd(), TRANSPORT), 'utf8');
 
@@ -436,6 +487,43 @@ describe('receipt handlers cannot recover hidden knowledge-bearing payload field
     expect(found).toContainEqual(expect.objectContaining({
       path: 'message.payload', form: 'escape', enclosing: 'receiveFinal',
     }));
+  });
+
+  /**
+   * A HOLDER IS THE OBJECT (re-review finding I-3). The classifier already knew that `hidden` holds
+   * `message.payload`; it simply never inspected what happened to `hidden` itself, so the aliased
+   * spelling of the escape above walked past a fence that reported the direct one. A tracked name
+   * used as a bare NAME — returned, passed to a call, assigned outside the holder relation it was
+   * tracked through — hands the value somewhere this scan cannot follow, whatever the path it holds:
+   * a waypoint licenses reaching the lineage envelope, never handing the envelope over.
+   */
+  it.each([
+    ['an aliased holder handed to a call',
+      'const hidden = message.payload; void cloneSerializable(hidden);', 'message.payload'],
+    ['a returned holder',
+      'const hidden = message.payload; if (t < 0) return hidden as never;', 'message.payload'],
+    ['a holder assigned outside the holder relation',
+      'const hidden = message.payload; state.heldObservations = hidden as never;',
+      'message.payload'],
+    ['a holder used as a computed key',
+      'const hidden = message.payload; void world.npcs[hidden as never];', 'message.payload'],
+    ['a nested holder handed to a call',
+      'const lineage = message.payload.version; void cloneSerializable(lineage);',
+      'message.payload.version'],
+  ])('the scan reports %s as an escape', (_form, statement, path) => {
+    expect(unlawful(inject(statement)))
+      .toContainEqual(expect.objectContaining({ path, form: 'escape', enclosing: 'receiveFinal' }));
+  });
+
+  it.each([
+    ['a payload alias read through to allowlisted handles',
+      'const ok = message.payload; void ok.kind; void ok.asset; void ok.factIndex;'],
+    ['a lineage holder read through to its allowlisted fields',
+      'const lineage = message.payload.version;'
+      + ' void lineage.id; void lineage.parent; void lineage.changedBy;'],
+    ['a holder reached through a cast', 'const ok = message.payload; void (ok as never).kind;'],
+  ])('stays silent on %s', (_form, statement) => {
+    expect(unlawful(inject(statement))).toEqual([]);
   });
 
   it('a lawful handle read stays lawful when it is injected in a new spelling', () => {
