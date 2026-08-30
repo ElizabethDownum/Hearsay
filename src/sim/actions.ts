@@ -47,6 +47,23 @@ function localityFor(world: WorldState, tick: Tick, offered: OfferedCircles): re
   return offered ?? circlesAt(world, tick);
 }
 
+/**
+ * The SECOND locality question, which the circle answer alone does not cover: where the avatar is
+ * standing. A dead-drop handoff must happen at the drop and a debrief at the safehouse, and reading
+ * that from live `world.playerVenue` let an earlier same-tick `goTo` refuse an action the offer had
+ * already composed at that room.
+ *
+ * No new frame field carries it: `prepareTick` groups the frozen circles BY frozen position, so the
+ * frame circle holding the avatar already spells the venue the offer was composed at. Frameless call
+ * sites keep reading live `world.playerVenue` — the same compatibility posture `localityFor` keeps.
+ */
+function offeredVenueFor(world: WorldState, offered: OfferedCircles): VenueId | null {
+  const playerId = world.playerId;
+  if (offered === undefined || playerId === null) return world.playerVenue;
+  return offered.find((candidate) => candidate.members.includes(playerId))?.venue
+    ?? world.playerVenue;
+}
+
 /** Author one player-side outcome brief. Delivery is a separate physical phase. */
 export function applyDirective(
   world: WorldState,
@@ -408,8 +425,9 @@ export function applyCourier(
   }
 
   // The handoff leg. Face: co-locate now (validate-before-mutate — the tell/recruit circle shape).
+  const standingAt = offeredVenueFor(world, offered);
   if (viaDrop === null) {
-    if (world.playerVenue === null) throw new Error('courier: the avatar is nowhere for a face handoff');
+    if (standingAt === null) throw new Error('courier: the avatar is nowhere for a face handoff');
     if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) throw new Error('courier: a face handoff happens on conversation beats');
     const circle = localityFor(world, tick, offered).find((c) => c.members.includes(world.playerId!));
     if (!circle || !circle.members.includes(asset)) {
@@ -419,7 +437,7 @@ export function applyCourier(
     const drop = world.network.drops.find((d) => d.id === viaDrop);
     if (!drop) throw new Error(`courier: unknown dead drop '${viaDrop}'`);
     if (!drop.knownBy.includes(world.playerId)) throw new Error(`courier: you don't know the dead drop '${viaDrop}'`);
-    if (world.playerVenue !== drop.venue) {
+    if (standingAt !== drop.venue) {
       throw new Error(`courier: the avatar must be at dead drop '${viaDrop}' to place the payload`);
     }
     const circle = localityFor(world, tick, offered)
@@ -641,7 +659,9 @@ export function applyDebrief(
   if (world.playerId === null) throw new Error('debrief: no player is enrolled');
   const record = world.network.assets.find((a) => a.id === asset);
   if (!record) throw new Error(`debrief: '${asset}' is not one of your assets`);
-  if (world.playerVenue !== 'safehouse') throw new Error('debrief: the avatar must be at the safehouse');
+  if (offeredVenueFor(world, offered) !== 'safehouse') {
+    throw new Error('debrief: the avatar must be at the safehouse');
+  }
   if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) throw new Error('debrief: debriefing happens on conversation beats');
   const circle = localityFor(world, tick, offered).find((c) => c.members.includes(world.playerId!));
   if (!circle || !circle.members.includes(asset)) {
@@ -743,12 +763,14 @@ export function applyGoTo(world: WorldState, venue: VenueId): void {
  */
 export function applyAssignInformant(
   world: WorldState, informant: EntityId, venue: VenueId | null, tick: Tick,
+  offered?: readonly Circle[],
 ): void {
   const spec = world.intel.informants.find((i) => i.id === informant);
   if (!spec) throw new Error(`assignInformant: '${informant}' is not an informant`);
   if (venue !== null && !world.venues[venue]) throw new Error(`assignInformant: unknown venue '${venue}'`);
   if (world.playerId === null) throw new Error('assignInformant: no player is enrolled');
-  const circle = circlesAt(world, tick).find((candidate) => candidate.members.includes(world.playerId!));
+  const circle = localityFor(world, tick, offered)
+    .find((candidate) => candidate.members.includes(world.playerId!));
   if (!circle || !circle.members.includes(informant)) {
     throw new Error(`assignInformant: '${informant}' is not in the offered circle`);
   }
@@ -766,7 +788,7 @@ export function applyAssignInformant(
   };
   applyDirectiveWithCause(
     world, informant, { outboundVia: [], reportVia: [] }, brief, tick,
-    { kind: 'posting', venue }, 'assignInformant',
+    { kind: 'posting', venue }, 'assignInformant', offered,
   );
   const requested = world.intel.requestedPosts ?? (world.intel.requestedPosts = []);
   requested.push({ informant, venue, authoredAt: tick });

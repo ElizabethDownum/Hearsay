@@ -161,6 +161,27 @@ const CASES: VerbCase[] = [
       recipient: 'ada', principal: 'player',
     }),
   },
+  /**
+   * The NINTH local verb (re-review finding I-5, docket A6 re-adjudicated to BIND). P11-18 enumerated
+   * the eight verbs the prior reviewer had found; it did not license a ninth. `assignInformant` is a
+   * token-gated local action that must begin in a witnessed local handoff
+   * (`plan11-constraints.md`:64-71), so it answers to the offered frame like every other one.
+   */
+  {
+    kind: 'assignInformant',
+    stage: (world) => { world.intel.informants.push({ id: 'ada', assignedVenue: null }); },
+    intent: { tick: 0, kind: 'assignInformant', informant: 'ada', venue: 'market' },
+    applied: (world) => {
+      expect(world.intel.requestedPosts).toEqual([
+        expect.objectContaining({ informant: 'ada', venue: 'market' }),
+      ]);
+      // The nested directive it composes is framed too — a frameless inner call would rebuild
+      // locality live and refuse the handoff the outer validation just accepted.
+      expect(world.network.directiveState!.records.at(-1)).toMatchObject({
+        recipient: 'ada', principal: 'player',
+      });
+    },
+  },
 ];
 
 describe('local verbs execute against the frozen offered state', () => {
@@ -181,10 +202,17 @@ describe('local verbs execute against the frozen offered state', () => {
     });
 
   /**
-   * The mirror image, and the one the offered-state law exists for: `debrief`'s own precondition
-   * (the avatar at the safehouse) is satisfied only by the LIVE walk, while the offered frame never
-   * put `bez` in front of the avatar. A live-reading arm ACCEPTS this — debiting a strike and
-   * writing an intel row for a conversation the offer never contained. The frame-bound arm refuses.
+   * The mirror image, and the one the offered-state law exists for: `debrief`'s own preconditions
+   * (the avatar at the safehouse, the asset in front of them) are satisfied only by the LIVE walk,
+   * while the offered frame put the avatar in the square with nobody to debrief. A live-reading arm
+   * ACCEPTS this — debiting a strike and writing an intel row for a conversation the offer never
+   * contained. The frame-bound arm refuses, with zero residue.
+   *
+   * WHICH refusal fires moved when the venue joined the frame (finding I-2, below): the venue gate is
+   * the earlier of debrief's two locality preconditions, and the frozen frame answers it 'square'.
+   * Before, only the circle was frozen, so the venue gate passed on the live walk and the circle gate
+   * refused. Both spellings are the frame talking; the refusal and the zero-residue pins are the
+   * assertion, and they are unchanged.
    */
   it('debrief refuses an asset the offered frame never stood next to, even after walking to them', () => {
     const world = staged();
@@ -195,7 +223,7 @@ describe('local verbs execute against the frozen offered state', () => {
       apparentSources: ['ada'], discretion: false, counterSpun: false,
     };
     const debrief: Action = { tick: 0, kind: 'debrief', asset: 'bez' };
-    expect(() => framed(world, [WALK_IN, debrief])).toThrow(/with you at the safehouse/);
+    expect(() => framed(world, [WALK_IN, debrief])).toThrow(/must be at the safehouse/);
     expect(world.intel.log).toEqual([]);
     expect(world.network.assets.find((row) => row.id === 'bez')!.strikes).toBe(0);
 
@@ -206,5 +234,74 @@ describe('local verbs execute against the frozen offered state', () => {
     frameless(live, [WALK_IN, debrief]);
     expect(live.intel.log).toHaveLength(1);
     expect(live.network.assets.find((row) => row.id === 'bez')!.strikes).toBe(1);
+  });
+});
+
+/**
+ * THE OTHER HALF OF LOCALITY (re-review finding I-2).
+ *
+ * The frame froze `Circle[]`, and the eight verbs above validate circle membership against it. But
+ * two verb modes ask a second locality question — WHERE the avatar is standing — and both still read
+ * live `world.playerVenue`: the dead-drop courier handoff (the avatar must be at the drop) and the
+ * debrief (the avatar must be at the safehouse). An action offered at that room could therefore be
+ * refused after a same-tick walk OUT of it, which is the exact inverse of the walk-IN case above and
+ * contradicts the seam's own claim that all locality validation answers to the offered state.
+ *
+ * The offered venue needs no new frame field: `prepareTick` groups its circles BY frozen position,
+ * so the frame circle holding the avatar already spells the venue the offer was composed at. Each
+ * pin below is paired with the frameless liveness half, which must still refuse — that is what makes
+ * the framed half non-vacuous.
+ */
+describe('the venue a verb was offered at is frozen with its circle', () => {
+  const DROP = 'drop-square';
+
+  /** The avatar's own room holds the dead drop, so the offer is composed standing at it. */
+  function withDrop(world: WorldState): void {
+    world.network.drops.push({ id: DROP, venue: 'square', knownBy: ['you', 'ada'] });
+  }
+
+  const dropRun: Action = {
+    tick: 0, kind: 'courier', asset: 'ada', spec: { ...SPEC }, target: 'bez', viaDrop: DROP,
+  };
+
+  it('a dead-drop handoff offered at the drop survives a same-tick walk away from it', () => {
+    const world = staged();
+    withDrop(world);
+    framed(world, [WALK_AWAY, dropRun]);
+    expect(world.intel.courierPlans).toEqual([
+      expect.objectContaining({ asset: 'ada', target: 'bez', from: 'square' }),
+    ]);
+
+    const live = staged();
+    withDrop(live);
+    expect(() => frameless(live, [WALK_AWAY, dropRun]))
+      .toThrow(/must be at dead drop/);
+    expect(live.intel.courierPlans ?? []).toEqual([]);
+  });
+
+  it('a debrief offered at the safehouse survives a same-tick walk away from it', () => {
+    const debrief: Action = { tick: 0, kind: 'debrief', asset: 'bez' };
+    /** The avatar is already standing in the safehouse with `bez` when the beat opens. */
+    const atSafehouse = (): WorldState => {
+      const value = staged();
+      value.beliefs['bez']!['f-old'] = {
+        claim: { id: 'c-old', family: 'f-old', parent: null, subject: 'ada', predicate: 'stole',
+          object: null, count: 1, severity: 2, place: null, attribution: SOMEONE },
+        credence: 0.9, heardFrom: 'ada', heardAt: 0, firstHeardAt: 0, timesHeard: 1,
+        apparentSources: ['ada'], discretion: false, counterSpun: false,
+      };
+      frameless(value, [{ tick: 0, kind: 'goTo', venue: 'safehouse' }]);
+      return value;
+    };
+
+    const world = atSafehouse();
+    framed(world, [WALK_AWAY, debrief]);
+    expect(world.intel.log).toHaveLength(1);
+    expect(world.network.assets.find((row) => row.id === 'bez')!.strikes).toBe(1);
+
+    const live = atSafehouse();
+    expect(() => frameless(live, [WALK_AWAY, debrief]))
+      .toThrow(/must be at the safehouse/);
+    expect(live.intel.log).toEqual([]);
   });
 });

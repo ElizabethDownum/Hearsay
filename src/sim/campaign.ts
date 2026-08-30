@@ -173,12 +173,16 @@ export interface Save {
  * live projection an earlier same-tick action may already have moved. All three production paths
  * (session, bot runner, replay) hold the frame and forward it here.
  *
- * P11-18: every LOCAL verb now consumes `frame.circles` — `recruit` (Task 11's correction) plus
- * `tell`, `ask`, `sell`, `debrief`, `courier`, `host`, `meet`, and `directive`. Each still falls
- * back to a live projection when no frame is supplied, which is the pre-existing compatibility
- * posture of the direct `apply*` call sites. `assignInformant` is deliberately NOT bound here: it
- * sits outside the eight the ruling names, and moving it is a semantic change nobody has
- * adjudicated (disclosed in the fix-wave-2 report).
+ * P11-18: every LOCAL verb consumes `frame.circles` — `recruit` (Task 11's correction) plus `tell`,
+ * `ask`, `sell`, `debrief`, `courier`, `host`, `meet`, `directive`, and `assignInformant`. Each
+ * still falls back to a live projection when no frame is supplied, which is the pre-existing
+ * compatibility posture of the direct `apply*` call sites.
+ *
+ * `assignInformant` joined them when docket A6 was re-adjudicated to BIND: the eight-name
+ * enumeration recorded the findings one reviewer had made, and narrowed nothing. The constraints
+ * decide it outright — the offer token freezes the local venue/circle and only an action composed
+ * from that token may execute there (`plan11-constraints.md`:64-67), and `assignInformant` must
+ * begin in a witnessed local handoff (:68-71). It is a ninth local verb, not an exception.
  */
 export function applyAction(
   world: WorldState, action: Action, rules?: Rules, frame?: PreparedTick,
@@ -200,7 +204,7 @@ export function applyAction(
       applyAsk(world, action.to, action.about, action.tick, frame?.circles);
       break;
     case 'assignInformant':
-      applyAssignInformant(world, action.informant, action.venue, action.tick);
+      applyAssignInformant(world, action.informant, action.venue, action.tick, frame?.circles);
       break;
     case 'codex':
       applyCodex(world, action.op, action.npc, action.trait, action.tick);
