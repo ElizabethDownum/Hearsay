@@ -4,8 +4,10 @@ import { STANDARD_RULES } from '../../src/content/rules';
 import { applyAction, runLogOn, type Action, type ActionLog } from '../../src/sim/campaign';
 import { explainBelief } from '../../src/sim/chronicle';
 import { hashWorld, stableStringify } from '../../src/sim/hash';
-import { prepareTick } from '../../src/sim/phases';
-import { HEARSAY_CEILING, ingest } from '../../src/sim/rumors/propagation';
+import { prepareTick, stepTransaction } from '../../src/sim/phases';
+import {
+  CONVERSATION_BEAT, HEARSAY_CEILING, STANCE, chooseTelling, ingest,
+} from '../../src/sim/rumors/propagation';
 import { SOMEONE } from '../../src/sim/rumors/claim';
 import {
   ARTIFACT_CREDENCE, applyForge, artifactById, artifactsOf, isUsable,
@@ -151,26 +153,38 @@ describe('forge through the dispatcher — one typed verb, replay-stable', () =>
  * divergence); `cyn`/`dov` sit at `market` purely as extra corroborating mouths for the hierarchy
  * twin, never in the avatar's circle.
  */
-function artifactTown(): TownFixture {
-  const allDay = (venue: string) => [{ days: 'all' as const, from: 0, to: 1439, venue }];
-  const person = (id: string, venue: string, edges: { to: string; trust: number }[] = []) => ({
-    id, name: id, home: 'home-0', occupation: 'grocer', faction: 'none' as const,
-    traits: ['literalist'], rivals: [], schedule: allDay(venue),
-    edges: edges.map((edge) => ({ ...edge, kind: 'friend' as const })),
-  });
+interface Person {
+  id: string;
+  venue: string;
+  /** Directional trust edges out of this person, by target id. */
+  edges?: Record<string, number>;
+  traits?: string[];
+}
+
+function townOf(people: readonly Person[]): TownFixture {
   return {
     venues: [
       { id: 'square', district: 'd0', access: 'public' as const },
       { id: 'market', district: 'd0', access: 'public' as const },
       { id: 'home-0', district: 'd0', access: 'private' as const },
     ],
-    npcs: [
-      person('ada', 'square', [{ to: 'bez', trust: 0.8 }]),
-      person('bez', 'square', [{ to: 'ada', trust: 0.5 }]),
-      person('cyn', 'market'),
-      person('dov', 'market'),
-    ],
+    npcs: people.map((person) => ({
+      id: person.id, name: person.id, home: 'home-0', occupation: 'grocer',
+      faction: 'none' as const, traits: person.traits ?? ['literalist'], rivals: [],
+      schedule: [{ days: 'all' as const, from: 0, to: 1439, venue: person.venue }],
+      edges: Object.entries(person.edges ?? {})
+        .map(([to, trust]) => ({ to, kind: 'friend' as const, trust })),
+    })),
   };
+}
+
+function artifactTown(): TownFixture {
+  return townOf([
+    { id: 'ada', venue: 'square', edges: { bez: 0.8 } },
+    { id: 'bez', venue: 'square', edges: { ada: 0.5 } },
+    { id: 'cyn', venue: 'market' },
+    { id: 'dov', venue: 'market' },
+  ]);
 }
 
 const DAY1 = at(1, 8);
@@ -391,5 +405,201 @@ describe('the fair-cop law reaches evidence too', () => {
     framed(handed, [{ tick: DAY1, kind: 'plant', artifact: 'a0', venue: null, to: 'ada' }]);
     expect(explainBelief(handed, 'ada', soleBelief(handed, 'ada').claim.family))
       .toMatchObject({ kind: 'artifact', act: 'plant', by: 'you', to: 'ada' });
+  });
+});
+
+// ── THE BEAT TAIL: pickup and conviction circulation ──────────────────────────────────────────────
+
+const artifactActs = (world: WorldState) =>
+  world.chronicle.filter((entry) => entry.kind === 'artifact');
+
+/**
+ * Resolve the current tick plus the next `count` conversation beats, through the real tick
+ * transaction — the only production path (P11-9; `step` is a compatibility wrapper over it).
+ */
+function beats(world: WorldState, count: number): void {
+  for (let i = 0; i <= count * CONVERSATION_BEAT; i += 1) stepTransaction(world, RULES);
+}
+
+/**
+ * The belief this mind got from the PAGE, as opposed to from talk about it. A viewer commonly holds
+ * both: the paper anchored one family at 0.97, and the town's ordinary gossip about the same words
+ * arrives separately, mutating and ceiling-capped. That is the plan's split, not a leak.
+ */
+const paperBelief = (world: WorldState, npcId: string): Belief | undefined =>
+  Object.values(world.beliefs[npcId] ?? {}).find((b) => b.credence === ARTIFACT_CREDENCE);
+
+const hasSeenPaper = (world: WorldState, npcId: string): boolean =>
+  paperBelief(world, npcId) !== undefined;
+
+describe('venue pickup — the first person in the room, chosen the same way every replay', () => {
+  it('the lexicographically first NPC in that circle picks it up at the NEXT beat, never this one', () => {
+    const world = withDocument(SPEC, 'artifact-pickup');
+    framed(world, [{ tick: DAY1, kind: 'plant', artifact: 'a0', venue: 'square', to: null }]);
+    // The planting beat itself resolves with the letter still on the table: "the NEXT beat".
+    expect(artifactById(world, 'a0')!.plantedAt).toBe('square');
+
+    beats(world, 1);
+    expect(artifactById(world, 'a0')).toMatchObject({ heldBy: 'ada', plantedAt: null });
+    expect(artifactActs(world).at(-1)).toMatchObject({ act: 'pickup', by: 'ada', to: null });
+    const found = soleBelief(world, 'ada');
+    expect(found.credence).toBe(ARTIFACT_CREDENCE);
+    expect(found.heardFrom).toBe('ada');       // you found it yourself
+    expect(found.apparentSources).toEqual([]); // and nobody is their own corroborator
+  });
+
+  it('picks the lexicographic first even when the room fills in another order', () => {
+    const world = buildWorld(townOf([
+      { id: 'zed', venue: 'square' }, { id: 'ada', venue: 'square' }, { id: 'mik', venue: 'square' },
+    ]), 'artifact-lex', RULES);
+    enrollPlayer(world, { home: 'square' });
+    applyForge(world, SPEC, at(0, 8), RULES);
+    world.tick = DAY1;
+    framed(world, [{ tick: DAY1, kind: 'plant', artifact: 'a0', venue: 'square', to: null }]);
+    beats(world, 1);
+    expect(artifactById(world, 'a0')!.heldBy).toBe('ada');
+  });
+
+  it('a letter left in an empty room simply waits', () => {
+    // `home-0` is everyone's registered home but nobody's scheduled venue — a genuinely empty room.
+    // The avatar must already be standing there when the beat is prepared: the frame freezes the
+    // offered venue, so a same-tick walk cannot compose a plant somewhere the offer never was.
+    const empty = withDocument(SPEC, 'artifact-empty-room');
+    empty.playerVenue = 'home-0';
+    framed(empty, [{ tick: DAY1, kind: 'plant', artifact: 'a0', venue: 'home-0', to: null }]);
+    beats(empty, 4);
+    expect(artifactById(empty, 'a0')).toMatchObject({ heldBy: null, plantedAt: 'home-0' });
+    expect(artifactActs(empty).filter((entry) => entry.act === 'pickup')).toEqual([]);
+  });
+});
+
+describe('conviction circulation — a believing holder shows the paper on, exactly once', () => {
+  /** The letter handed to `ada`, whose strongest edge (excluding the avatar) is `bez`. */
+  function handedToAda(seed: string): WorldState {
+    const world = withDocument(SPEC, seed);
+    framed(world, [{ tick: DAY1, kind: 'plant', artifact: 'a0', venue: null, to: 'ada' }]);
+    return world;
+  }
+
+  it('re-shows to the highest-trust edge at the NEXT shared beat, re-anchoring them at 0.97', () => {
+    const world = handedToAda('artifact-reshow');
+    expect(artifactActs(world).filter((entry) => entry.act === 'reshow')).toEqual([]);
+
+    beats(world, 1);
+    const reshows = artifactActs(world).filter((entry) => entry.act === 'reshow');
+    expect(reshows).toHaveLength(1);
+    expect(reshows[0]).toMatchObject({ act: 'reshow', by: 'ada', to: 'bez', artifact: 'a0' });
+    const seen = paperBelief(world, 'bez')!;
+    expect(seen.credence).toBe(ARTIFACT_CREDENCE);
+    expect(seen.heardFrom).toBe('ada');
+    expect(seen.claim).toMatchObject(SPEC);
+    // The paper stays in the shower's hand — a re-show is a showing, never a hand-over.
+    expect(artifactById(world, 'a0')!.heldBy).toBe('ada');
+  });
+
+  it('fires ONCE per holder, however many shared beats follow', () => {
+    const world = handedToAda('artifact-reshow-once');
+    beats(world, 8);
+    expect(artifactActs(world).filter((entry) => entry.act === 'reshow')).toHaveLength(1);
+  });
+
+  it('a holder who does not BELIEVE the page keeps it to themselves', () => {
+    // `ada` is a skeptic here, whose retell gate needs two apparent sources — so she never gossips
+    // the page onward and can never be corroborated back up over the BELIEVE line. That isolates
+    // the gate under test: conviction, and nothing else, is what puts paper in front of a second
+    // pair of eyes.
+    const world = buildWorld(townOf([
+      { id: 'ada', venue: 'square', edges: { bez: 0.8 }, traits: ['skeptic'] },
+      { id: 'bez', venue: 'square', edges: { ada: 0.5 } },
+    ]), 'artifact-reshow-doubt', RULES);
+    enrollPlayer(world, { home: 'square' });
+    applyForge(world, SPEC, at(0, 8), RULES);
+    world.tick = DAY1;
+    framed(world, [{ tick: DAY1, kind: 'plant', artifact: 'a0', venue: null, to: 'ada' }]);
+
+    const family = Object.keys(world.beliefs['ada']!)[0]!;
+    world.beliefs['ada']![family]!.credence = STANCE.BELIEVE - 0.01; // 'repeating', not 'believing'
+    beats(world, 4);
+    expect(artifactActs(world).filter((entry) => entry.act === 'reshow')).toEqual([]);
+    expect(hasSeenPaper(world, 'bez')).toBe(false);
+
+    // Positive control on the SAME staging: nudge her over the line and the letter moves.
+    world.beliefs['ada']![family]!.credence = STANCE.BELIEVE;
+    beats(world, 1);
+    expect(artifactActs(world).filter((entry) => entry.act === 'reshow'))
+      .toMatchObject([{ by: 'ada', to: 'bez' }]);
+    expect(hasSeenPaper(world, 'bez')).toBe(true);
+  });
+
+  it('reads the HIGHEST-trust edge, not the first one listed', () => {
+    const world = buildWorld(townOf([
+      { id: 'ada', venue: 'square', edges: { bez: 0.4, cyn: 0.9 } },
+      { id: 'bez', venue: 'square' },
+      { id: 'cyn', venue: 'square' },
+    ]), 'artifact-top-edge', RULES);
+    enrollPlayer(world, { home: 'square' });
+    applyForge(world, SPEC, at(0, 8), RULES);
+    world.tick = DAY1;
+    framed(world, [{ tick: DAY1, kind: 'plant', artifact: 'a0', venue: null, to: 'ada' }]);
+    beats(world, 1);
+    expect(artifactActs(world).filter((entry) => entry.act === 'reshow').at(-1))
+      .toMatchObject({ by: 'ada', to: 'cyn' });
+    expect(hasSeenPaper(world, 'cyn')).toBe(true);
+    expect(hasSeenPaper(world, 'bez')).toBe(false); // the weaker edge only ever gets the talk
+  });
+});
+
+describe('interpretations are not fixed — talk ABOUT the letter is ordinary, ceiling-capped hearsay', () => {
+  it('the twin: the viewer holds the page at 0.97 while their retelling mutates and caps at 0.95', () => {
+    const world = buildWorld(townOf([
+      { id: 'ada', venue: 'square', edges: { bez: 0.8 }, traits: ['exaggerator'] },
+      { id: 'bez', venue: 'square', edges: { ada: 0.9 } },
+    ]), 'artifact-retelling', RULES);
+    enrollPlayer(world, { home: 'square' });
+    applyForge(world, SPEC, at(0, 8), RULES);
+    world.tick = DAY1;
+    framed(world, [{ tick: DAY1, kind: 'show', artifact: 'a0', to: 'ada' }]);
+
+    const onPaper = soleBelief(world, 'ada');
+    expect(onPaper.credence).toBe(ARTIFACT_CREDENCE);
+
+    // ada now TALKS about it — the ordinary telling path, through her own traits.
+    const circle = { venue: 'square', members: ['ada', 'bez', 'you'] };
+    const telling = chooseTelling(world, 'ada', circle, DAY1, RULES)!;
+    expect(telling).not.toBeNull();
+    expect(telling.claim.family).toBe(onPaper.claim.family);
+    // Documents don't mutate; interpretations do — the exaggerator's fingerprint on the retelling.
+    expect(telling.claim.count).toBe(SPEC.count * 2);
+    expect(telling.claim.severity).toBe(5);
+    expect(onPaper.claim.count).toBe(SPEC.count);       // the page itself is untouched
+    expect(onPaper.claim.severity).toBe(SPEC.severity);
+
+    ingest(world, 'bez', { tick: DAY1, speaker: 'ada', claim: telling.claim }, true, RULES);
+    const heard = world.beliefs['bez']![telling.claim.family]!;
+    expect(heard.credence).toBeLessThanOrEqual(HEARSAY_CEILING);
+    expect(heard.credence).toBeLessThan(ARTIFACT_CREDENCE);
+  });
+});
+
+describe('PILLAR: a whole artifact campaign is replay-stable', () => {
+  const LOG: ActionLog = [
+    { tick: at(0, 8), kind: 'forge', spec: SPEC },
+    { tick: at(1, 8), kind: 'plant', artifact: 'a0', venue: 'square', to: null },
+  ];
+
+  const build = (): WorldState => {
+    const world = buildWorld(artifactTown(), 'artifact-campaign', RULES);
+    enrollPlayer(world, { home: 'square' });
+    world.npcs['ada']!.edges.push({ to: 'you', kind: 'friend', trust: 0.6 });
+    return world;
+  };
+
+  it('forge → venue plant → pickup → re-show regrows byte-identically, and every act really fired', () => {
+    const a = runLogOn(build(), RULES, LOG, at(1, 12));
+    const b = runLogOn(build(), RULES, LOG, at(1, 12));
+    expect(hashWorld(a)).toBe(hashWorld(b));
+    expect(artifactActs(a).map((entry) => entry.act))
+      .toEqual(['forge', 'plant', 'pickup', 'reshow']);
+    expect(artifactById(a, 'a0')!.heldBy).toBe('ada');
   });
 });

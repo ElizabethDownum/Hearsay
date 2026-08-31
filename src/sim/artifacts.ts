@@ -4,9 +4,9 @@ import type { Circle } from './agents';
 import { cloneSerializable } from './hash';
 import { canAfford, debitCoin } from './network/roster';
 import type { Rules } from './rules';
-import { mintClaim, type EntityId, type VenueId } from './rumors/claim';
-import { CONVERSATION_BEAT, ingestEvidence } from './rumors/propagation';
-import type { WorldState } from './types';
+import { CLAIM_FIELDS, mintClaim, type Claim, type EntityId, type VenueId } from './rumors/claim';
+import { CONVERSATION_BEAT, ingestEvidence, stanceOf } from './rumors/propagation';
+import type { Belief, WorldState } from './types';
 
 /**
  * THE EVIDENCE HIERARCHY (spec, and this plan's global constraint): artifacts/witnessed >> hearsay.
@@ -246,4 +246,160 @@ export function applyPlant(
   world.chronicle.push({
     kind: 'artifact', tick, act: 'plant', artifact: artifact.id, by: playerId, to: venue,
   });
+}
+
+// ── THE BEAT TAIL: a planted letter is found, and a convinced holder passes the sight of it on ────
+
+/** Whether a mind's version of a story IS the document's text, field for field. */
+function saysTheSame(claim: Claim, spec: InjectSpec): boolean {
+  return CLAIM_FIELDS.every((field) => claim[field] === spec[field]);
+}
+
+/**
+ * The belief this mind holds that is the DOCUMENT'S text — the strongest one where a mind holds
+ * several versions of the same words (their paper copy outranks any rumour copy by construction, so
+ * the strongest is the one the document put there). Ties break to the first family in sorted order.
+ *
+ * Derived rather than stored: the plan pins `Artifact` to six fields and `WorldState` to two, so
+ * "does this holder believe the page?" is answered from the belief store instead of from a
+ * per-artifact family index that would have to be invented outside the pinned interfaces.
+ */
+function documentBelief(world: WorldState, mind: EntityId, artifact: Artifact): Belief | null {
+  const store = world.beliefs[mind];
+  if (store === undefined) return null;
+  let best: Belief | null = null;
+  for (const family of Object.keys(store).sort()) {
+    const belief = store[family]!;
+    if (!saysTheSame(belief.claim, artifact.spec)) continue;
+    if (best === null || belief.credence > best.credence) best = belief;
+  }
+  return best;
+}
+
+/**
+ * The one person a holder would show it to: their highest-trust edge (ties → lexicographic), never
+ * the avatar. The avatar is excluded because the player's knowledge substrate is `intel`, not
+ * `beliefs` — `recordAndIngest` (phases.ts) already refuses to ingest anything into the avatar's
+ * belief store, and a re-show is subject to that same law rather than an exception to it.
+ */
+function topEdge(world: WorldState, holder: EntityId): EntityId | null {
+  const npc = world.npcs[holder];
+  if (npc === undefined) return null;
+  let best: { id: EntityId; trust: number } | null = null;
+  for (const edge of npc.edges) {
+    if (edge.to === world.playerId || edge.to === holder) continue;
+    if (best === null || edge.trust > best.trust
+      || (edge.trust === best.trust && edge.to < best.id)) {
+      best = { id: edge.to, trust: edge.trust };
+    }
+  }
+  return best?.id ?? null;
+}
+
+/** ONCE PER HOLDER, whatever else changes around them — the plan's law, read from its own record. */
+function hasReshown(world: WorldState, artifactId: string, holder: EntityId): boolean {
+  return world.chronicle.some((entry) => entry.kind === 'artifact' && entry.act === 'reshow'
+    && entry.artifact === artifactId && entry.by === holder);
+}
+
+/**
+ * Documents that changed hands EARLIER IN THIS TICK. A short suffix scan (chronicle ticks are
+ * monotone, so this-tick records are the tail), never a whole-chronicle walk.
+ */
+function changedHandsThisTick(world: WorldState, tick: Tick): Set<string> {
+  const settled = new Set<string>();
+  for (let i = world.chronicle.length - 1; i >= 0; i -= 1) {
+    const entry = world.chronicle[i]!;
+    if (entry.tick !== tick) break;
+    if (entry.kind === 'artifact' && entry.act !== 'show' && entry.act !== 'reshow') {
+      settled.add(entry.artifact);
+    }
+  }
+  return settled;
+}
+
+/**
+ * THE BEAT-TAIL ARTIFACT HOOK (Plan 9 Task 1).
+ *
+ * PLACEMENT. The plan asked for a hook in `step()`, which is stale: `step()` is a compatibility
+ * wrapper production never enters (P11-9). This runs inside the tick transaction instead
+ * (`finishTickInternal`, phases.ts), AFTER phase 4's autonomous NPC speech has been recorded and
+ * ingested and BEFORE phase 5's environment pass. Finding a letter and holding one out to a friend
+ * are physical acts on the same simultaneous semantic tier as phase-4 autonomous action, so they
+ * resolve at the TAIL of that tier: no artifact effect can change what was said during the beat, and
+ * the paper lands last — which is the plan's "outranks every mouth" ordering made structural.
+ *
+ * DETERMINISTIC ORDER (the plan requires it documented here):
+ *  1. Nothing happens off a conversation beat, or in a world that has never forged.
+ *  2. Documents are walked in FORGE order — `artifacts` insertion order, i.e. ascending
+ *     `artifactCounter`. Never lexicographic id order, which would put `a10` ahead of `a2`.
+ *  3. Anything that changed hands earlier in THIS tick is skipped: the plan's "the NEXT beat" for a
+ *     pickup, and "their NEXT shared beat" for a re-show.
+ *  4. PICKUPS resolve before RE-SHOWS, and the re-show candidates are snapshotted BEFORE the first
+ *     pickup runs — so a letter found this beat is read this beat, but passed on no earlier than the
+ *     next one.
+ *  5. A pickup's finder is the LEXICOGRAPHICALLY FIRST non-avatar member of the circles standing at
+ *     that venue (the plan's rule, verbatim). An empty room simply leaves the letter waiting.
+ *  6. A re-show fires only on conviction (stance BELIEVE), only to the holder's highest-trust edge,
+ *     and only once per holder. The paper stays with the shower — a re-show is a showing, never a
+ *     hand-over — so circulation costs the letter one more face, not its position.
+ *
+ * The once-per-holder law is checked in two layers: a cheap necessary condition first (the audience
+ * has not already had this exact page in front of them, which is a belief-store read), then the
+ * authoritative chronicle latch. The cheap layer is what keeps a settled letter from re-scanning the
+ * chronicle on every shared beat for the rest of the campaign.
+ */
+export function resolveArtifacts(
+  world: WorldState, tick: Tick, circles: readonly Circle[],
+): void {
+  const artifacts = world.artifacts;
+  if (artifacts === undefined || artifacts.length === 0) return;
+  if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) return;
+  const settled = changedHandsThisTick(world, tick);
+
+  // Order rule 4: the circulation snapshot is taken before any pickup can add to it.
+  const circulating = artifacts
+    .filter((artifact) => artifact.heldBy !== null && artifact.heldBy !== world.playerId
+      && !settled.has(artifact.id))
+    .map((artifact) => artifact.id);
+
+  for (const artifact of artifacts) {
+    const venue = artifact.plantedAt;
+    if (venue === null || settled.has(artifact.id)) continue;
+    const finder = [...new Set(circles
+      .filter((circle) => circle.venue === venue)
+      .flatMap((circle) => circle.members))]
+      .filter((id) => id !== world.playerId)
+      .sort()[0];
+    if (finder === undefined) continue;
+
+    artifact.heldBy = finder;
+    artifact.plantedAt = null;
+    // The finder is their own source: nobody handed it over, and nobody is their own corroborator.
+    deliverDocument(world, artifact, finder, finder, tick);
+    world.chronicle.push({
+      kind: 'artifact', tick, act: 'pickup', artifact: artifact.id, by: finder, to: null,
+    });
+  }
+
+  for (const id of circulating) {
+    const artifact = artifactById(world, id);
+    if (artifact === null) continue;
+    const holder = artifact.heldBy;
+    if (holder === null) continue;
+    const conviction = documentBelief(world, holder, artifact);
+    if (conviction === null || stanceOf(conviction) !== 'believing') continue;
+    const audience = topEdge(world, holder);
+    if (audience === null) continue;
+    const circle = circles.find((candidate) => candidate.members.includes(holder));
+    if (circle === undefined || !circle.members.includes(audience)) continue;
+    const seen = documentBelief(world, audience, artifact);
+    if (seen !== null && seen.credence === ARTIFACT_CREDENCE) continue;
+    if (hasReshown(world, id, holder)) continue;
+
+    deliverDocument(world, artifact, holder, audience, tick);
+    world.chronicle.push({
+      kind: 'artifact', tick, act: 'reshow', artifact: id, by: holder, to: audience,
+    });
+  }
 }

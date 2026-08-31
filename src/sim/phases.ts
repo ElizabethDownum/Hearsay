@@ -2,6 +2,7 @@ import { dayOf, dayOfWeek, minuteOfDay, REST_DAY, type Tick } from '../core/time
 import { fnv1a32, Rng } from '../core/rng';
 import { CIRCLE_SIZE, positionOf, type Circle } from './agents';
 import { captureEvidence, noticedByObserver, runEnemyDay } from './counterintel';
+import { resolveArtifacts } from './artifacts';
 import { captureIntel } from './fieldwork';
 import { cloneSerializable, stableStringify } from './hash';
 import { chooseAnswer, collectOrdinaryAskOffers, expireInquiries, runPlayerAskPhase } from './inquiry';
@@ -633,6 +634,11 @@ function finishTickInternal(
   const events: TickEvents = { tick: frame.tick, positions, utterances, askings };
   if (networkSpeeches.length > 0) events.networkSpeeches = networkSpeeches;
   recordAndIngest(world, rules, events, utterances, askings, networkSpeeches);
+  // THE BEAT TAIL (Plan 9): a planted letter is found and a convinced holder passes the sight of it
+  // on. Physical acts on phase 4's simultaneous tier, resolved at its TAIL — after every word of the
+  // beat is recorded and ingested, before phase 5's environment pass. `resolveArtifacts` documents
+  // the deterministic order it walks. Inert (one array check) in a world that has never forged.
+  resolveArtifacts(world, frame.tick, npcCircles);
   resolveEnvironment(world, rules, frame.tick);
   world.tick = frame.tick + 1;
   return events;
