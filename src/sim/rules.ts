@@ -35,6 +35,8 @@ export interface EconomyDef {
   backRoomEvent: number;
   /** severity × this (Task 10). */
   brokerSaleBase: number;
+  /** One forged document (Plan 9 Task 1). Buys the only credence above the hearsay ceiling. */
+  forgery: number;
 }
 
 /**

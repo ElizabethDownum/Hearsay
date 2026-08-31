@@ -181,9 +181,21 @@ describe('Task 13 registry — exactly eight new nouns, and no copy that promise
     'directive', 'brief', 'priority', 'purpose', 'report-expectation', 'scrutiny',
     'sound-out', 'runaround',
   ];
+  /**
+   * Terms registered by LATER plans, named and subtracted so this assertion keeps proving the thing it
+   * was written to prove — that Plan 11 Task 13 added exactly EIGHT nouns — instead of decaying into a
+   * whole-registry size pin that every subsequent plan must edit blind. Each id here is also asserted
+   * to exist, so the subtraction can never quietly absorb a term that was removed rather than added.
+   * Plan 9 Task 1 (artifacts) registers the forge verb.
+   */
+  const LATER_PLAN_TERM_IDS = ['verb-forge'];
 
-  it('the registry grew by exactly 8 from Task-12 HEAD', () => {
-    expect(Object.keys(TERMS).length).toBe(TASK_12_HEAD_TERM_COUNT + 8);
+  it('the registry grew by exactly 8 from Task-12 HEAD (later-plan registrations named and excluded)', () => {
+    for (const id of LATER_PLAN_TERM_IDS) {
+      expect(TERMS[id], `'${id}' is named as a later-plan term but is not registered`).toBeDefined();
+    }
+    expect(Object.keys(TERMS).length - LATER_PLAN_TERM_IDS.length)
+      .toBe(TASK_12_HEAD_TERM_COUNT + 8);
   });
 
   it.each(NEW_TERM_IDS)('registers "%s" with a label and a <=120 char short line', (id) => {

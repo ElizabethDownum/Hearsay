@@ -1,5 +1,6 @@
 import type { Tick } from '../core/time';
 import type { InjectSpec } from './actions';
+import type { Artifact } from './artifacts';
 import type { Claim, ClaimId, EntityId, RumorId, VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
 import type { EnemyState } from './enemy/state';
@@ -129,8 +130,27 @@ export interface NetworkSpeechRecord {
   cause: NetworkSpeech['cause'];
   heardBy: { id: EntityId; addressed: boolean }[];
 }
+/**
+ * One recorded act on a forged document (Plan 9). Artifacts leave a forensic trail like everything
+ * else in this game: 'forge' authors it, 'plant' places it (at a venue, or into a pair of hands),
+ * 'show' displays it and keeps it, 'pickup' is a planted letter being found, 'reshow' is a convinced
+ * holder passing the sight of it on. `to` is a VenueId only for a venue plant; null where the act has
+ * no counterparty (forge, and a pickup nobody handed over).
+ *
+ * Deliberately carries no `heardBy`: showing paper to one person is not an utterance, so it does not
+ * enter the overhearing/capture physics that `TellingRecord` does. Enemy-side tracing of documents is
+ * this plan's Task 2 (`enemy/digest.ts` heuristic 10), reading these records as evidence.
+ */
+export interface ArtifactRecord {
+  kind: 'artifact';
+  tick: Tick;
+  act: 'forge' | 'plant' | 'show' | 'pickup' | 'reshow';
+  artifact: string;
+  by: EntityId;
+  to: EntityId | VenueId | null;
+}
 export type ChronicleEntry = TellingRecord | InjectRecord | AskingRecord | InstitutionRecord
-  | VignetteRecord | NetworkSpeechRecord;
+  | VignetteRecord | NetworkSpeechRecord | ArtifactRecord;
 
 export interface InquiryTask {
   /** Directive-created story inquiries use their owning directive id as this unique task id. */
@@ -219,6 +239,13 @@ export interface WorldState {
   scheduleOverrides: Record<EntityId, ScheduleOverride[]>;
   /** Prior setup committed by an earlier tick; absent until the first item is scheduled. */
   scheduledSetup?: ScheduledSetup[];
+  /**
+   * Forged documents in play (Plan 9). Optional/lazy per the serialization law: absent until the
+   * first forgery, so a world that never forges keeps its pre-Plan-9 bytes exactly.
+   */
+  artifacts?: Artifact[];
+  /** Next artifact ordinal — ids are `a${artifactCounter}`. Absent until the first forgery. */
+  artifactCounter?: number;
   enemy: EnemyState;
   /** Latch keys of vignettes already fired — `${defId}:${a}:${b ?? '-'}` (pillar 7, replay-stable). */
   vignettesFired: string[];
