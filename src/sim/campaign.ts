@@ -5,7 +5,10 @@ import {
   applyDirective,
   type InjectSpec,
 } from './actions';
-import { applyForge, type ForgeAction } from './artifacts';
+import {
+  applyForge, applyPlant, applyShow,
+  type ForgeAction, type PlantAction, type ShowAction,
+} from './artifacts';
 import type { InquiryKey } from './perception';
 import type { Rules } from './rules';
 import { isTerminal } from './scenario/referee';
@@ -154,7 +157,7 @@ export interface DirectiveAction {
 export type Action =
   | InjectAction | GoToAction | TellAction | AskAction | AssignInformantAction | CodexAction | CardAction
   | TagAction | RecruitAction | SetDropAction | CourierAction | MeetAction | HostAction | DebriefAction
-  | SellAction | DirectiveAction | ForgeAction;
+  | SellAction | DirectiveAction | ForgeAction | PlantAction | ShowAction;
 export type ActionLog = Action[];
 
 /** A complete campaign: the world regrows from these two values alone. */
@@ -256,6 +259,15 @@ export function applyAction(
       // threaded — only the priced, solitary act itself.
       if (!rules) throw new Error('applyAction: forge requires rules (economy prices)');
       applyForge(world, action.spec, action.tick, rules);
+      break;
+    case 'plant':
+      // Beat-circle act on the hand-over branch, frameless-but-present on the venue branch — both
+      // read the frozen frame, so `offered` is threaded either way (artifacts.ts spells which is
+      // which). Not priced: the forgery was the purchase; placing it is the walk.
+      applyPlant(world, action.artifact, action.venue, action.to, action.tick, frame?.circles);
+      break;
+    case 'show':
+      applyShow(world, action.artifact, action.to, action.tick, frame?.circles);
       break;
     case 'directive':
       applyDirective(

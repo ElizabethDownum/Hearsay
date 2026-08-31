@@ -158,6 +158,29 @@ export function apparentSourceOf(hearing: Hearing): EntityId {
   return hearing.claim.attribution !== SOMEONE ? hearing.claim.attribution : hearing.speaker;
 }
 
+/**
+ * The one belief record a FIRST hearing writes. Hearsay and evidence differ ONLY in the credence they
+ * arrive at — never in the record they leave — so both paths compose this same shape and no second
+ * belief-construction site can drift from it. `credence` is a parameter and not a constant here
+ * because the two callers price it differently; the evidence-hierarchy law fences which numbers may
+ * legally reach this parameter (tests/sim/evidence-hierarchy-law.test.ts).
+ */
+function firstHearing(
+  hearing: Hearing, credence: number, apparentSources: EntityId[],
+): Belief {
+  return {
+    claim: hearing.claim,
+    credence,
+    heardFrom: hearing.speaker,
+    heardAt: hearing.tick,
+    firstHeardAt: hearing.tick,
+    timesHeard: 1,
+    apparentSources,
+    discretion: false,
+    counterSpun: false,
+  };
+}
+
 export function ingest(
   world: WorldState, hearerId: EntityId, hearing: Hearing, addressed: boolean, rules: Rules,
 ): void {
@@ -177,15 +200,40 @@ export function ingest(
     return; // first version sticks
   }
   const trust = trustBetween(world, hearerId, hearing.speaker);
-  store[hearing.claim.family] = {
-    claim: hearing.claim,
-    credence: Math.min(HEARSAY_CEILING, clamp01((0.35 + 0.45 * trust * (addressed ? 1 : 0.5)) * plausibility(world.npcs[hearerId]!, hearing.claim, rules))),
-    heardFrom: hearing.speaker,
-    heardAt: hearing.tick,
-    firstHeardAt: hearing.tick,
-    timesHeard: 1,
-    apparentSources: source === hearerId ? [] : [source],
-    discretion: false,
-    counterSpun: false,
-  };
+  store[hearing.claim.family] = firstHearing(
+    hearing,
+    Math.min(HEARSAY_CEILING, clamp01((0.35 + 0.45 * trust * (addressed ? 1 : 0.5)) * plausibility(world.npcs[hearerId]!, hearing.claim, rules))),
+    source === hearerId ? [] : [source],
+  );
+}
+
+/**
+ * EVIDENCE INGESTION — the paper that outranks every mouth (Plan 9). A document held up in front of
+ * someone is not a telling: it lands at `credence` (evidence weight, which the evidence-hierarchy law
+ * pins to `ARTIFACT_CREDENCE` and to nothing else), and its apparent source is the DOCUMENT'S OWN
+ * attribution — paper is its own witness, so a named attribution outranks the hand holding the sheet
+ * exactly as a named attribution already outranks a speaker (`apparentSourceOf`).
+ *
+ * This is deliberately the SAME ingestion path as hearsay rather than a parallel one: it writes the
+ * same `firstHearing` record into the same belief store, so everything downstream — tellability, the
+ * retell gates, corroboration, the debrief substrate, the fair-cop law — sees an ordinary belief that
+ * merely arrived with unusual weight. Retellings ABOUT the document are then ordinary hearsay:
+ * mutating, and capped by the ceiling. Documents don't mutate; interpretations do.
+ *
+ * FRESH-FAMILY CONTRACT (the plan's "as a fresh-family claim"): the caller mints a fresh family for
+ * every viewing, so evidence can never overwrite a belief a mind already holds — `ingest`'s
+ * first-version-sticks law is not weakened here, it simply never applies. A collision means a caller
+ * reused a family, which is a bug and fails loudly instead of silently re-anchoring a mind.
+ */
+export function ingestEvidence(
+  world: WorldState, hearerId: EntityId, hearing: Hearing, credence: number,
+): void {
+  const store = world.beliefs[hearerId];
+  if (store === undefined) throw new Error(`ingestEvidence: unknown hearer '${hearerId}'`);
+  const family = hearing.claim.family;
+  if (store[family] !== undefined) {
+    throw new Error(`ingestEvidence: '${hearerId}' already holds family '${family}' — evidence mints a fresh family`);
+  }
+  const source = apparentSourceOf(hearing);
+  store[family] = firstHearing(hearing, credence, source === hearerId ? [] : [source]);
 }

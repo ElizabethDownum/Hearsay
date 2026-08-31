@@ -28,8 +28,21 @@ export function explainBelief(
       (e) => e.kind === 'inject' && e.target === npcId && e.claimId === belief.claim.id,
     ) ?? null;
   }
-  return world.chronicle.find(
+  const telling = world.chronicle.find(
     (e) => e.kind === 'telling' && e.claimId === belief.claim.id &&
       e.speaker === belief.heardFrom && e.heardBy.some((h) => h.id === npcId),
+  );
+  if (telling) return telling;
+  /**
+   * Plan 9: the fair-cop law reaches EVIDENCE too. A belief a document anchored was delivered by an
+   * artifact act, which is not a telling — showing paper is not speech, so `ArtifactRecord` carries
+   * neither a claim id nor a `heardBy` list. It is matched on what it does carry: the tick the page
+   * was put in front of this mind (`firstHeardAt`, which artifact ingestion sets to the act's tick)
+   * and the viewer — named as `to` for a show/hand-over/re-show, and as `by` for a pickup, where the
+   * finder is their own source.
+   */
+  return world.chronicle.find(
+    (e) => e.kind === 'artifact' && e.tick === belief.firstHeardAt
+      && (e.to === npcId || (e.act === 'pickup' && e.by === npcId)),
   ) ?? null;
 }

@@ -42,8 +42,12 @@ export interface InjectSpec {
  */
 type OfferedCircles = readonly Circle[] | undefined;
 
-/** The one place the offered-or-live choice is spelled. */
-function localityFor(world: WorldState, tick: Tick, offered: OfferedCircles): readonly Circle[] {
+/** The one place the offered-or-live choice is spelled. Exported (Plan 9) so the artifact verbs in
+ *  `artifacts.ts` consume this seam rather than respelling it — a second spelling is how the two
+ *  halves of locality drift apart. */
+export function localityFor(
+  world: WorldState, tick: Tick, offered: OfferedCircles,
+): readonly Circle[] {
   return offered ?? circlesAt(world, tick);
 }
 
@@ -57,7 +61,7 @@ function localityFor(world: WorldState, tick: Tick, offered: OfferedCircles): re
  * frame circle holding the avatar already spells the venue the offer was composed at. Frameless call
  * sites keep reading live `world.playerVenue` — the same compatibility posture `localityFor` keeps.
  */
-function offeredVenueFor(world: WorldState, offered: OfferedCircles): VenueId | null {
+export function offeredVenueFor(world: WorldState, offered: OfferedCircles): VenueId | null {
   const playerId = world.playerId;
   if (offered === undefined || playerId === null) return world.playerVenue;
   return offered.find((candidate) => candidate.members.includes(playerId))?.venue

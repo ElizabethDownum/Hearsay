@@ -16,7 +16,8 @@ export interface SubmitResult { queuedFor: Tick; refused?: boolean; }
 
 type PlannedLocalActionKind =
   | 'tell' | 'ask' | 'sell' | 'recruit' | 'debrief'
-  | 'assignInformant' | 'courier' | 'meet' | 'host' | 'directive';
+  | 'assignInformant' | 'courier' | 'meet' | 'host' | 'directive'
+  | 'show' | 'plant';
 export type LocalActionKind = Extract<Action['kind'], PlannedLocalActionKind>;
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
@@ -56,6 +57,7 @@ export interface Session {
 
 const LOCAL_KINDS = new Set<string>([
   'tell', 'ask', 'sell', 'recruit', 'debrief', 'assignInformant', 'courier', 'meet', 'host', 'directive',
+  'show', 'plant',
 ]);
 const SPEECH_KINDS = new Set<string>(['tell', 'ask', 'sell']);
 
@@ -92,6 +94,10 @@ export function localParticipants(intent: LocalActionIntent): EntityId[] {
     case 'host': return [...intent.invitees];
     case 'assignInformant': return [intent.informant];
     case 'courier': return intent.viaDrop === null ? [intent.asset] : [];
+    case 'show': return [intent.to];
+    // A venue plant names nobody — the letter waits for whoever walks in, exactly as the dead-drop
+    // courier branch above hands off to no one present.
+    case 'plant': return intent.to === null ? [] : [intent.to];
     case 'directive': return [firstHandoffHop(intent.handoff, intent.recipient)];
     default: {
       // Every local kind is handled above; adding one without an arm fails to compile here.

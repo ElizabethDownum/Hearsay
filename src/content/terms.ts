@@ -67,6 +67,8 @@ export const TERMS: Record<string, TermDef> = {
   'verb-sell':       { id: 'verb-sell', label: 'Sell', short: 'Sell a story to a circle-mate for coin. Priced by its severity — and selling it leaks it, same as telling.', entry: null },
   'verb-directive':  { id: 'verb-directive', label: 'Directive', short: 'Hand an outcome brief to a present asset or relay; they decide how to act, and any report must travel back.', entry: null },
   'verb-forge':      { id: 'verb-forge', label: 'Forge', short: 'Commission a forged document carrying a fixed claim. Priced, and the ink needs a day to dry.', entry: null },
+  'verb-plant':      { id: 'verb-plant', label: 'Plant', short: 'Leave a document where it will be found, or hand it to a circle-mate. Never both at once.', entry: null },
+  'verb-show':       { id: 'verb-show', label: 'Show', short: 'Hold a document up to a circle-mate and keep it. Paper is believed further than any mouth.', entry: null },
   // ── the network economy: your standing, your payroll, your reach (Plan 8) ──
   'station':         { id: 'station', label: 'Station', short: 'The seat the seed deals your avatar — noble or lowlife. Fixed for the campaign; it sets your standing in town.', entry: null },
   'standing':        { id: 'standing', label: 'Standing', short: 'What your station lets you do: which venue doors open without suspicion, and the one room you may host in.', entry: null },

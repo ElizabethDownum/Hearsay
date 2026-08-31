@@ -1,9 +1,11 @@
-import { dayOf, type Tick } from '../core/time';
-import type { InjectSpec } from './actions';
+import { dayOf, minuteOfDay, type Tick } from '../core/time';
+import { localityFor, offeredVenueFor, type InjectSpec } from './actions';
+import type { Circle } from './agents';
 import { cloneSerializable } from './hash';
 import { canAfford, debitCoin } from './network/roster';
 import type { Rules } from './rules';
-import type { EntityId, VenueId } from './rumors/claim';
+import { mintClaim, type EntityId, type VenueId } from './rumors/claim';
+import { CONVERSATION_BEAT, ingestEvidence } from './rumors/propagation';
 import type { WorldState } from './types';
 
 /**
@@ -117,4 +119,131 @@ export function applyForge(
     heldBy: playerId, plantedAt: null,
   });
   world.chronicle.push({ kind: 'artifact', tick, act: 'forge', artifact: id, by: playerId, to: null });
+}
+
+/**
+ * ONE VIEWING of a document, shared by show, hand-over, pickup and re-show — every way a pair of eyes
+ * reaches a forged page runs through exactly this.
+ *
+ * The document's FIXED text is minted as a FRESH family (`parent: null` — a root, never a retelling),
+ * so no trait chain ever touches it: documents don't mutate. It then enters the mind through the REAL
+ * ingestion path (`ingestEvidence`, rumors/propagation.ts) at ARTIFACT_CREDENCE, with the document's
+ * own attribution as the apparent source. What the viewer holds afterwards is an ORDINARY belief that
+ * merely arrived at evidence weight — so their later talk about it is ordinary, ceiling-capped
+ * hearsay, which is precisely the plan's split between the paper and its interpretations.
+ */
+function deliverDocument(
+  world: WorldState, artifact: Artifact, shower: EntityId, viewer: EntityId, tick: Tick,
+): void {
+  const family = `f${world.claimCounter}`;
+  const claim = mintClaim(world, { ...artifact.spec, family, parent: null });
+  world.claims[claim.id] = claim;
+  ingestEvidence(world, viewer, { tick, speaker: shower, claim }, ARTIFACT_CREDENCE);
+}
+
+/** The shared preconditions of both paper-in-hand verbs: a real, dry document the avatar holds. */
+function heldDocument(world: WorldState, verb: string, artifactId: string, tick: Tick): Artifact {
+  const playerId = world.playerId;
+  if (playerId === null) throw new Error(`${verb}: no player is enrolled`);
+  if (world.playerVenue === null) throw new Error(`${verb}: the avatar is nowhere`);
+  const artifact = artifactById(world, artifactId);
+  if (artifact === null) throw new Error(`${verb}: unknown artifact '${artifactId}'`);
+  if (artifact.heldBy !== playerId) {
+    throw new Error(`${verb}: you do not hold '${artifactId}' — a document can only be shown from the hand that has it`);
+  }
+  if (!isUsable(artifact, tick)) {
+    throw new Error(`${verb}: '${artifactId}' was forged today — a forgery needs a day before it can be used`);
+  }
+  return artifact;
+}
+
+/** The circle-mate check every beat-circle act makes, read from the OFFERED frame when one exists. */
+function circleMate(
+  world: WorldState, verb: string, to: EntityId, tick: Tick, offered?: readonly Circle[],
+): void {
+  if (!world.npcs[to]) throw new Error(`${verb}: unknown npc '${to}'`);
+  if (to === world.playerId) throw new Error(`${verb}: the avatar is not their own audience`);
+  if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) {
+    throw new Error(`${verb}: paper is shown on conversation beats`);
+  }
+  const circle = localityFor(world, tick, offered)
+    .find((candidate) => candidate.members.includes(world.playerId!));
+  if (!circle || !circle.members.includes(to)) {
+    throw new Error(`${verb}: '${to}' is not in the avatar's circle this beat`);
+  }
+}
+
+/**
+ * SHOW — hold the paper up to one circle-mate and keep it (Plan 9 Task 1).
+ *
+ * A BEAT-CIRCLE ACT under the frame law (P11-18 + docket A6): locality is validated through the
+ * shared `localityFor` seam against the frozen offered circles, exactly as tell/host/meet do, so an
+ * earlier same-tick `goTo` can never move the answer out from under an offer already composed.
+ *
+ * VALIDATE-BEFORE-MUTATE: an unknown/unheld/still-wet document, an off-beat flourish, or an audience
+ * the offer never contained REFUSES before anything is minted or ingested (zero residue).
+ */
+export function applyShow(
+  world: WorldState, artifactId: string, to: EntityId, tick: Tick, offered?: readonly Circle[],
+): void {
+  const artifact = heldDocument(world, 'show', artifactId, tick);
+  circleMate(world, 'show', to, tick, offered);
+
+  // --- Effects (all validation passed) — the paper stays in the shower's hand. ---
+  const shower = world.playerId!;
+  deliverDocument(world, artifact, shower, to, tick);
+  world.chronicle.push({
+    kind: 'artifact', tick, act: 'show', artifact: artifact.id, by: shower, to,
+  });
+}
+
+/**
+ * PLANT — put the document where it will be read: `venue` XOR `to`.
+ *
+ *  - HAND-OVER (`to`): a beat-circle act with the tell-shaped validation `show` uses; the recipient
+ *    becomes the holder AND ingests exactly as a show, so a letter given away is also a letter read.
+ *  - VENUE PLANT (`venue`): frameless in the circle sense — leaving a page on a table needs no
+ *    conversation, so no circle precondition applies (the same posture `setDrop` and `forge` take).
+ *    It still answers the SECOND locality question through the frozen frame (`offeredVenueFor`, the
+ *    dead-drop courier precedent): the avatar must be standing in the room the offer was composed at.
+ *    Nobody reads it yet — the first NPC in that room at the NEXT beat picks it up (see
+ *    `resolveArtifacts`).
+ *
+ * VALIDATE-BEFORE-MUTATE: the XOR, the held/dry document, and both locality questions all throw
+ * before any state change.
+ */
+export function applyPlant(
+  world: WorldState, artifactId: string, venue: VenueId | null, to: EntityId | null,
+  tick: Tick, offered?: readonly Circle[],
+): void {
+  if ((venue === null) === (to === null)) {
+    throw new Error('plant: name exactly one of a venue to leave it at or a pair of hands to give it to');
+  }
+  const artifact = heldDocument(world, 'plant', artifactId, tick);
+  const playerId = world.playerId!;
+
+  if (to !== null) {
+    circleMate(world, 'plant', to, tick, offered);
+
+    // --- Effects (all validation passed) — the paper changes hands AND is read. ---
+    artifact.heldBy = to;
+    artifact.plantedAt = null;
+    deliverDocument(world, artifact, playerId, to, tick);
+    world.chronicle.push({
+      kind: 'artifact', tick, act: 'plant', artifact: artifact.id, by: playerId, to,
+    });
+    return;
+  }
+
+  if (!world.venues[venue!]) throw new Error(`plant: unknown venue '${venue}'`);
+  if (offeredVenueFor(world, offered) !== venue) {
+    throw new Error(`plant: the avatar must be at '${venue}' to leave the document there`);
+  }
+
+  // --- Effects (all validation passed) — it waits for whoever walks in. ---
+  artifact.heldBy = null;
+  artifact.plantedAt = venue;
+  world.chronicle.push({
+    kind: 'artifact', tick, act: 'plant', artifact: artifact.id, by: playerId, to: venue,
+  });
 }
