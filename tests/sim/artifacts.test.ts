@@ -15,6 +15,7 @@ import {
 import { applyInject, type InjectSpec } from '../../src/sim/actions';
 import { buildWorld, enrollPlayer } from '../../src/sim/world';
 import type { Belief, TownFixture, WorldState } from '../../src/sim/types';
+import { localParticipants, type NonLocalActionIntent } from '../../app/src/loop/session';
 import { miniTown } from './helpers/minitown';
 
 /**
@@ -578,6 +579,27 @@ describe('interpretations are not fixed — talk ABOUT the letter is ordinary, c
     const heard = world.beliefs['bez']![telling.claim.family]!;
     expect(heard.credence).toBeLessThanOrEqual(HEARSAY_CEILING);
     expect(heard.credence).toBeLessThan(ARTIFACT_CREDENCE);
+  });
+});
+
+/**
+ * Plan 9 ships these verbs ENGINE-FIRST (docket A7): no composer lands this plan, so the session /
+ * action-log path is the ONLY way they are driven, and the Task-8 e2es will drive them there. This
+ * pins that surface — which of the three are beat-circle acts, and who each one must be standing with
+ * — against the SHIPPED extractor rather than a mirror of it that can drift.
+ */
+describe('the session surface knows the three new verbs', () => {
+  it('show and a hand-over plant name their circle participant; a venue plant names nobody', () => {
+    expect(localParticipants({ kind: 'show', artifact: 'a0', to: 'ada' })).toEqual(['ada']);
+    expect(localParticipants({ kind: 'plant', artifact: 'a0', venue: null, to: 'ada' }))
+      .toEqual(['ada']);
+    expect(localParticipants({ kind: 'plant', artifact: 'a0', venue: 'square', to: null }))
+      .toEqual([]);
+  });
+
+  it('forge is NOT a local action — it has no circle precondition (a compile-time pin)', () => {
+    const solitary: NonLocalActionIntent = { kind: 'forge', spec: SPEC };
+    expect(solitary.kind).toBe('forge');
   });
 });
 

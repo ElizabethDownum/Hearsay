@@ -12,8 +12,8 @@ import type { Belief, WorldState } from './types';
  * THE EVIDENCE HIERARCHY (spec, and this plan's global constraint): artifacts/witnessed >> hearsay.
  * `HEARSAY_CEILING` (0.95, rumors/propagation.ts) caps corroborated hearsay; a document IN HAND
  * anchors at 0.97 — the ONLY credence in the game above that ceiling. No other constant may cross it,
- * and that is not left to a comment: `tests/sim/evidence-hierarchy-law.test.ts` parses every credence
- * write in `src/` and fails if a second number ever climbs above the ceiling.
+ * and that is not left to a comment: `tests/lint/evidence-hierarchy-law.test.ts` parses every
+ * credence write in `src/` and fails if a second number ever climbs above the ceiling.
  */
 export const ARTIFACT_CREDENCE = 0.97;
 
