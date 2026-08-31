@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import {
-  type ModuleGraph, accessedName, assertParsed, isAccess, parseModule, reachable,
+  type ModuleGraph, accessedName, assertParsed, isAccess, parseModule, reachable, staticName,
 } from '../helpers/callgraph';
 import { at, TICKS_PER_DAY } from '../../src/core/time';
 import { STANDARD_RULES } from '../../src/content/rules';
@@ -319,6 +319,13 @@ describe('no compatibility command-bus writes — the structural fence', () => {
     'reduce', 'reduceRight', 'at', 'forEach', 'entries', 'keys', 'values', 'toString',
     'toSorted', 'toReversed', 'toSpliced', 'with'];
   const GUARDED = 'scheduleOverrides';
+  /**
+   * The ledger's container. The fence guards `world.scheduleOverrides`, so an operation can reach
+   * the ledger without naming it as a value at all — by naming it as a PROPERTY of `world`. That is
+   * what makes `Object.assign(world, { scheduleOverrides: {} })` a write, and what makes the same
+   * word in `console.log('scheduleOverrides')` merely a word.
+   */
+  const HOST = 'world';
 
   interface WriteSite {
     kind: 'assign' | 'delete' | 'mutate' | 'unrecognized';
@@ -345,6 +352,51 @@ describe('no compatibility command-bus writes — the structural fence', () => {
     return parent.name === node || parent.propertyName === node;
   };
 
+  /**
+   * The name this node spells as DATA — a bare string handed to a call (`f(world, 'ledger')`) or a
+   * property NAME in an object literal, in all three spellings (`{ ledger: … }`, `{ 'ledger': … }`,
+   * `{ ['ledger']: … }`). These are the positions where a name is written down rather than read
+   * through an access, so they are the ones an access-based resolver cannot see.
+   *
+   * An IDENTIFIER argument is excluded: `f(world, ledger)` passes the ledger's VALUE, which the
+   * ordinary identifier rule already reports. So is a shorthand `{ ledger }`, where the name is
+   * likewise the value. Anything else — a comparison operand, an element-access key — is not a
+   * name-as-data position at all; the element-access key in particular belongs to the access that
+   * already IS the reference, and counting it here would report one use twice.
+   */
+  const dataNameOf = (node: ts.Node): string | null => {
+    const parent = node.parent;
+    if (parent === undefined) return null;
+    const literal = ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node);
+    if (!literal && !ts.isIdentifier(node)) return null;
+    if (literal && (ts.isCallExpression(parent) || ts.isNewExpression(parent))
+      && (parent.arguments ?? []).some((argument) => argument === node)) return node.text;
+    if (ts.isPropertyAssignment(parent) && parent.name === node) return node.text;
+    if (literal && ts.isComputedPropertyName(parent) && parent.expression === node) return node.text;
+    return null;
+  };
+
+  /**
+   * Is the operation this data-name belongs to aimed at the ledger's HOST? A property name only
+   * denotes the ledger when something is being done to `world` — `Object.assign(world, …)`,
+   * `Reflect.set(world, …)`, `Object.defineProperty(world, …)`. No operation is enumerated: the
+   * question asked is only whether the enclosing call RECEIVES the host, so any callee that takes
+   * it qualifies. Without this, every mention of the word anywhere in the closure would report,
+   * which is noise rather than fail-closed — the fence would stop distinguishing a write from a
+   * log line. The search stops at the enclosing statement: a call further out is a different
+   * operation.
+   */
+  const aimedAtHost = (graph: ModuleGraph, node: ts.Node): boolean => {
+    for (let cursor = node.parent; cursor !== undefined; cursor = cursor.parent) {
+      if (ts.isBlock(cursor) || ts.isSourceFile(cursor)) return false;
+      if (ts.isCallExpression(cursor) || ts.isNewExpression(cursor)) {
+        return (cursor.arguments ?? [])
+          .some((argument) => staticName(graph, argument) === HOST);
+      }
+    }
+    return false;
+  };
+
   /** A type annotation names the ledger without ever reaching its value. */
   const inTypePosition = (node: ts.Node): boolean => {
     for (let cursor: ts.Node | undefined = node; cursor !== undefined; cursor = cursor.parent) {
@@ -361,23 +413,15 @@ describe('no compatibility command-bus writes — the structural fence', () => {
    * A key only the running program knows (`world[whichever]`) resolves to nothing HERE, and is
    * caught instead by the unreadable-name rules below.
    *
-   * A reference can also be spelled as DATA rather than as an access. `Object.defineProperty(world,
-   * 'scheduleOverrides', …)` replaces the ledger wholesale while never reading it through a member
-   * access at all — the name travels as a string. So a string literal that names the ledger counts
-   * as a reference too, and is then classified by the SAME outward walk as every other reference:
-   * handed to a call it is `unrecognized`, merely compared against (`key === 'scheduleOverrides'`)
-   * it is a read. The literal INSIDE an element access is skipped, because the access surrounding
-   * it is already the reference and counting both would report one use twice.
+   * A reference can also be spelled as DATA rather than as an access — see `dataNameOf` and
+   * `aimedAtHost` below, which decide that case together.
    */
   const namesLedger = (graph: ModuleGraph, node: ts.Node): boolean => {
-    if (inTypePosition(node) || isNamePosition(node)) return false;
+    if (inTypePosition(node)) return false;
     if (isAccess(node)) return isGuarded(graph, accessedName(node));
-    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-      const parent = node.parent;
-      if (parent !== undefined && ts.isElementAccessExpression(parent)
-        && parent.argumentExpression === node) return false;
-      return isGuarded(graph, node.text);
-    }
+    const asData = dataNameOf(node);
+    if (asData !== null) return isGuarded(graph, asData) && aimedAtHost(graph, node);
+    if (isNamePosition(node)) return false;
     return ts.isIdentifier(node) && isGuarded(graph, node.text);
   };
 
@@ -413,7 +457,7 @@ describe('no compatibility command-bus writes — the structural fence', () => {
    * resolve (`let bus; bus = ledger`, `const held = { bus: ledger }`) is a use this fence cannot
    * read, and is reported like any other.
    */
-  const classifyUse = (reference: ts.Node): Use => {
+  const classifyUse = (graph: ModuleGraph, reference: ts.Node): Use => {
     let child: ts.Node = reference;
     let member: string | null = null;
     let boxed = false;
@@ -473,7 +517,17 @@ describe('no compatibility command-bus writes — the structural fence', () => {
         continue;
       }
       if (ts.isVariableDeclaration(parent) && parent.initializer === child) {
-        return projected || !boxed ? null : { kind: 'unrecognized', node: parent };
+        if (projected) return null;
+        if (boxed) return { kind: 'unrecognized', node: parent };
+        // A destructuring pattern takes MEMBERS off the ledger — a projection by another spelling.
+        if (!ts.isIdentifier(parent.name)) return null;
+        // THE BARE LEDGER MAY ONLY REST WHERE THE ALIAS TABLE CAN FOLLOW IT. `const bus = ledger`
+        // is silent because the table records `bus`, so every later use of it is itself a scanned
+        // reference — that is the entire justification for the silence, so it is checked rather
+        // than assumed. Put any wrapper in between (`?? {}`, `|| {}`, a ternary, a comma) and the
+        // table records nothing, the binding escapes unwatched, and the silence is unearned.
+        return graph.aliases.get(parent.name.text) === GUARDED
+          ? null : { kind: 'unrecognized', node: parent };
       }
       return { kind: 'unrecognized', node: parent };
     }
@@ -499,7 +553,7 @@ describe('no compatibility command-bus writes — the structural fence', () => {
       if ((ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node))
         && node.name !== undefined && ts.isIdentifier(node.name)) current = node.name.text;
       if ((inScope === null || inScope.has(current)) && namesLedger(graph, node)) {
-        const use = classifyUse(node);
+        const use = classifyUse(graph, node);
         if (use !== null) sites.push({ kind: use.kind, enclosing: current, ...at(use.node) });
       }
       ts.forEachChild(node, (child) => { visit(child, current); });
@@ -717,14 +771,49 @@ describe('no compatibility command-bus writes — the structural fence', () => {
       "Object.defineProperty(world, 'scheduleOverrides', { get: g });"],
     ['a reflective delete of the ledger slot', "Reflect.deleteProperty(world, 'scheduleOverrides');"],
     ['a computed-key object merge', "Object.assign(world, { ['scheduleOverrides']: {} });"],
+    ['a plain property-name merge', 'Object.assign(world, { scheduleOverrides: {} });'],
+    ['a string-quoted property-name merge', "Object.assign(world, { 'scheduleOverrides': {} });"],
+    ['a reflective set of the ledger slot', "Reflect.set(world, 'scheduleOverrides', {});"],
   ])('FIRES on %s — the ledger named as data, never read through an access',
     (_label, statement) => {
       expect(injectedWrites(statement).map((site) => site.kind)).toContain('unrecognized');
     });
 
-  it('stays SILENT on a ledger name merely compared as a string', () => {
-    expect(injectedWrites("if (whichever === 'scheduleOverrides') { void 0; }")).toEqual([]);
+  /**
+   * …AND ONLY WHEN THE OPERATION IS AIMED AT THE LEDGER. A property name is only a ledger reference
+   * in an operation that targets the ledger's container; the same word elsewhere is just a word.
+   * Discovery is therefore context-sensitive: without this, every mention of the string anywhere in
+   * the closure would report, which is noise, not fail-closed.
+   */
+  it.each([
+    ['a logged string', "console.log('scheduleOverrides');"],
+    ['an unrelated computed-key object', "const metadata = { ['scheduleOverrides']: {} };"],
+    ['an unrelated property name', 'const metadata = { scheduleOverrides: {} };'],
+    ['a merge into an unrelated target', "Object.assign(other, { scheduleOverrides: {} });"],
+    ['a ledger name merely compared as a string',
+      "if (whichever === 'scheduleOverrides') { void 0; }"],
+  ])('stays SILENT on %s — the word alone is not a reference', (_label, statement) => {
+    expect(injectedWrites(statement)).toEqual([]);
   });
+
+  /**
+   * A BINDING THE ALIAS TABLE CANNOT ACTUALLY RECORD. `const bus = ledger` is silent because the
+   * module's alias table resolves `bus`, so every later use of it is itself a scanned reference —
+   * that is the whole justification for the silence. Put any logical wrapper in between and the
+   * table records nothing (it reads only direct identifier/property/element initializers), so the
+   * binding escapes unwatched. The silence must therefore be conditioned on the table REALLY
+   * holding the rename, not on the shape looking alias-like.
+   */
+  it.each([
+    ['a nullish-wrapped binding', 'const held = world.scheduleOverrides ?? {}; held[asset] = [];'],
+    ['a logical-or-wrapped binding', 'const held = world.scheduleOverrides || {}; held[asset] = [];'],
+    ['a ternary-wrapped binding',
+      'const held = cond ? world.scheduleOverrides : other; held[asset] = [];'],
+    ['a comma-wrapped binding', 'const held = (0, world.scheduleOverrides); held[asset] = [];'],
+  ])('FIRES on %s — the bare ledger entering a binding the alias table cannot resolve',
+    (_label, statement) => {
+      expect(injectedWrites(statement).map((site) => site.kind)).toContain('unrecognized');
+    });
 
   /**
    * The inversion's read surface, pinned. These are silent because they are CLASSIFIED as reads,
