@@ -521,12 +521,19 @@ describe('no compatibility command-bus writes — the structural fence', () => {
         if (boxed) return { kind: 'unrecognized', node: parent };
         // A destructuring pattern takes MEMBERS off the ledger — a projection by another spelling.
         if (!ts.isIdentifier(parent.name)) return null;
-        // THE BARE LEDGER MAY ONLY REST WHERE THE ALIAS TABLE CAN FOLLOW IT. `const bus = ledger`
-        // is silent because the table records `bus`, so every later use of it is itself a scanned
-        // reference — that is the entire justification for the silence, so it is checked rather
-        // than assumed. Put any wrapper in between (`?? {}`, `|| {}`, a ternary, a comma) and the
-        // table records nothing, the binding escapes unwatched, and the silence is unearned.
-        return graph.aliases.get(parent.name.text) === GUARDED
+        // THE BARE LEDGER MAY ONLY REST WHERE THE SCANNER CAN FOLLOW IT. `const bus = ledger` is
+        // silent because the bound name resolves back to the ledger, so every later use of it is
+        // itself a scanned reference — that is the entire justification for the silence, so it is
+        // checked rather than assumed. Put any wrapper in between (`?? {}`, `|| {}`, a ternary, a
+        // comma) and the bound name resolves to nothing, the binding escapes unwatched, and the
+        // silence is unearned.
+        //
+        // The question is whether the SCANNER can follow the binding, which is not the same as
+        // whether the alias table holds an entry for it: the table drops identity edges on purpose,
+        // so `const scheduleOverrides = world.scheduleOverrides` has no entry and yet is followed
+        // perfectly well. Asking the shared guarded-name rule — the one every other reference goes
+        // through — answers the question that actually matters, and answers it for both cases.
+        return isGuarded(graph, parent.name.text)
           ? null : { kind: 'unrecognized', node: parent };
       }
       return { kind: 'unrecognized', node: parent };
@@ -797,12 +804,13 @@ describe('no compatibility command-bus writes — the structural fence', () => {
   });
 
   /**
-   * A BINDING THE ALIAS TABLE CANNOT ACTUALLY RECORD. `const bus = ledger` is silent because the
-   * module's alias table resolves `bus`, so every later use of it is itself a scanned reference —
-   * that is the whole justification for the silence. Put any logical wrapper in between and the
-   * table records nothing (it reads only direct identifier/property/element initializers), so the
-   * binding escapes unwatched. The silence must therefore be conditioned on the table REALLY
-   * holding the rename, not on the shape looking alias-like.
+   * A BINDING THE SCANNER CANNOT ACTUALLY FOLLOW. `const bus = ledger` is silent because `bus`
+   * resolves back to the ledger, so every later use of it is itself a scanned reference — that is
+   * the whole justification for the silence. Put any logical wrapper in between and the alias table
+   * records nothing (it reads only direct identifier/property/element initializers), the bound name
+   * resolves to nothing, and the binding escapes unwatched. The silence must therefore be
+   * conditioned on the bound name REALLY resolving to the ledger, not on the shape looking
+   * alias-like — and, per the pair below, not on the alias table holding a literal entry either.
    */
   it.each([
     ['a nullish-wrapped binding', 'const held = world.scheduleOverrides ?? {}; held[asset] = [];'],
@@ -814,6 +822,29 @@ describe('no compatibility command-bus writes — the structural fence', () => {
     (_label, statement) => {
       expect(injectedWrites(statement).map((site) => site.kind)).toContain('unrecognized');
     });
+
+  /**
+   * …BUT THE TEST IS "CAN THE SCANNER FOLLOW THIS BINDING", NOT "IS THERE A MAP ENTRY". A binding
+   * that REUSES the ledger's own name is the case where those two questions come apart: the alias
+   * table drops identity edges on purpose, so `scheduleOverrides → scheduleOverrides` is absent
+   * from it, yet the scanner follows that binding perfectly well — the raw name resolves through
+   * the very same guarded-name rule every other reference uses. Asking the table for an exact entry
+   * called this lawful binding a write; asking whether the NAME resolves does not.
+   *
+   * The second case is what stops the first from passing vacuously: silence here is earned because
+   * the binding really is followed, and the assignment through it really is still reported.
+   */
+  it('stays SILENT on a same-name direct binding of the ledger', () => {
+    expect(injectedWrites(
+      'const scheduleOverrides = world.scheduleOverrides; void scheduleOverrides.length;',
+    )).toEqual([]);
+  });
+
+  it('still reports a write made through a same-name direct binding', () => {
+    expect(injectedWrites(
+      'const scheduleOverrides = world.scheduleOverrides; scheduleOverrides[asset] = [];',
+    ).map((site) => site.kind)).toEqual(['assign']);
+  });
 
   /**
    * The inversion's read surface, pinned. These are silent because they are CLASSIFIED as reads,
