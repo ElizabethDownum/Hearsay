@@ -316,6 +316,27 @@ function hasReshown(world: WorldState, artifactId: string, holder: EntityId): bo
 }
 
 /**
+ * Has THIS PAGE already been in front of this pair of eyes? IDENTITY, not content: two forged
+ * documents can carry byte-identical text and are still two separate pieces of paper, each owed its
+ * own viewing. Read from the chronicle's own records, which carry the artifact id — the belief store
+ * cannot answer it, because a belief remembers what a page SAID and not which page said it.
+ *
+ * A reader is named `to` on a show, a hand-over and a re-show, and `by` on a pickup (the finder is
+ * their own source). The one shape that is not a reading is a VENUE plant, whose `to` is the room the
+ * page waits in: a room is not a reader, so a `to` that names a venue is excluded. Where an id belongs
+ * to both a venue and an npc — which world-gen's `ids-unique` invariant checks only WITHIN each
+ * namespace — this errs toward granting an extra viewing rather than suppressing a lawful one.
+ */
+function hasSeen(world: WorldState, artifactId: string, viewer: EntityId): boolean {
+  return world.chronicle.some((entry) => {
+    if (entry.kind !== 'artifact' || entry.artifact !== artifactId) return false;
+    if (entry.act === 'pickup') return entry.by === viewer;
+    if (entry.act === 'forge') return false;
+    return entry.to === viewer && world.venues[viewer] === undefined;
+  });
+}
+
+/**
  * Documents that changed hands EARLIER IN THIS TICK. A short suffix scan (chronicle ticks are
  * monotone, so this-tick records are the tail), never a whole-chronicle walk.
  */
@@ -357,10 +378,14 @@ function changedHandsThisTick(world: WorldState, tick: Tick): Set<string> {
  *     and only once per holder. The paper stays with the shower — a re-show is a showing, never a
  *     hand-over — so circulation costs the letter one more face, not its position.
  *
- * The once-per-holder law is checked in two layers: a cheap necessary condition first (the audience
- * has not already had this exact page in front of them, which is a belief-store read), then the
- * authoritative chronicle latch. The cheap layer is what keeps a settled letter from re-scanning the
- * chronicle on every shared beat for the rest of the campaign.
+ * Two latches, both keyed on ARTIFACT IDENTITY and both read from the chronicle (review finding I-1):
+ * has this AUDIENCE already had this page in front of them (`hasSeen`), and has this HOLDER already
+ * had their one turn with it (`hasReshown`). The audience check runs first and deliberately does not
+ * consume the holder's turn — an audience who has already read the page is a non-event, not a spent
+ * chance. Neither question can be answered from the belief store: a belief remembers what a page said,
+ * and two documents may say exactly the same thing while remaining two separate pieces of paper.
+ * `documentBelief` stays content-keyed for the one question that really is about words — whether this
+ * holder believes them (the conviction gate above).
  */
 export function resolveArtifacts(
   world: WorldState, tick: Tick, circles: readonly Circle[],
@@ -406,8 +431,7 @@ export function resolveArtifacts(
     if (audience === null) continue;
     const circle = circles.find((candidate) => candidate.members.includes(holder));
     if (circle === undefined || !circle.members.includes(audience)) continue;
-    const seen = documentBelief(world, audience, artifact);
-    if (seen !== null && seen.credence === ARTIFACT_CREDENCE) continue;
+    if (hasSeen(world, id, audience)) continue;
     if (hasReshown(world, id, holder)) continue;
 
     deliverDocument(world, artifact, holder, audience, tick);

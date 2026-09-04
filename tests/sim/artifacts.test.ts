@@ -8,7 +8,7 @@ import { prepareTick, stepTransaction } from '../../src/sim/phases';
 import {
   CONVERSATION_BEAT, HEARSAY_CEILING, STANCE, chooseTelling, ingest,
 } from '../../src/sim/rumors/propagation';
-import { SOMEONE } from '../../src/sim/rumors/claim';
+import { CLAIM_FIELDS, SOMEONE } from '../../src/sim/rumors/claim';
 import {
   ARTIFACT_CREDENCE, applyForge, artifactById, artifactsOf, isUsable,
 } from '../../src/sim/artifacts';
@@ -729,5 +729,110 @@ describe('P9-3 — hearsay corroboration is monotone: it never lowers a credence
     ingest(world, 'ada', { tick: DAY1, speaker: 'you', claim }, true, RULES);
     expect(belief.credence).toBe(HEARSAY_CEILING);            // and never climbs past it
     expect(belief.apparentSources).toEqual(['bez', 'cyn', 'dov', 'you']);
+  });
+});
+
+// ── I-1 + I-4: a page is identified by WHICH PAGE IT IS, never by what it says ─────────────────────
+
+/**
+ * Two forged documents can carry byte-identical text and still be two separate pieces of paper. Every
+ * question about a VIEWING is therefore a question about artifact IDENTITY, answered from the
+ * chronicle's own records (which carry the id) rather than from claim content:
+ *
+ *  - I-1: the "this audience has already read it" shortcut in the re-show pass. Content-keyed, it let
+ *    an existing anchor from page A suppress a lawful first viewing of page B.
+ *  - I-4: `explainBelief`. Tick + viewer alone cannot tell two pages apart when both reach one mind in
+ *    one beat, so the record must also name a page whose words the belief actually carries.
+ *
+ * `documentBelief` stays content-keyed on purpose, and only where the question genuinely is "does this
+ * mind believe these words" — the conviction gate. Residual, lawful and disclosed: two pages with
+ * IDENTICAL content delivered to one viewer in one beat remain indistinguishable by content, so their
+ * explanations may swap. Distinct pages, or distinct beats, are exact.
+ */
+describe('I-1 — the already-read latch keys on the ARTIFACT, not on the wording', () => {
+  /** Two pages, same words. `ada`'s strongest edge is `bez`; `bez`'s is `ada`. */
+  function twoIdenticalPages(seed: string): WorldState {
+    const world = buildWorld(townOf([
+      { id: 'ada', venue: 'square', edges: { bez: 0.8 } },
+      { id: 'bez', venue: 'square', edges: { ada: 0.9 } },
+    ]), seed, RULES);
+    enrollPlayer(world, { home: 'square' });
+    world.npcs['ada']!.edges.push({ to: 'you', kind: 'friend', trust: 0.6 });
+    applyForge(world, SPEC, at(0, 8), RULES);           // a0
+    applyForge(world, SPEC, at(0, 8), RULES);           // a1 — the same words, a different page
+    world.tick = DAY1;
+    return world;
+  }
+
+  it('an identical-content page still earns its own viewing and its own reshow record', () => {
+    const world = twoIdenticalPages('artifact-i1-identity');
+    framed(world, [
+      { tick: DAY1, kind: 'show', artifact: 'a0', to: 'bez' },          // bez reads page A
+      { tick: DAY1, kind: 'plant', artifact: 'a1', venue: null, to: 'ada' }, // ada is handed page B
+    ]);
+    expect(paperBelief(world, 'bez')!.credence).toBe(ARTIFACT_CREDENCE);
+
+    beats(world, 1);
+    // ada believes page B and hands the sight of it to her strongest edge — who has read page A, and
+    // has never seen page B.
+    expect(artifactActs(world).filter((entry) => entry.act === 'reshow'))
+      .toMatchObject([{ artifact: 'a1', by: 'ada', to: 'bez' }]);
+    const anchors = Object.values(world.beliefs['bez']!)
+      .filter((belief) => belief.credence === ARTIFACT_CREDENCE);
+    expect(anchors, 'one anchor per PAGE, not one per wording').toHaveLength(2);
+  });
+
+  it('but a page the audience really has already read is still skipped, and costs no holder their turn', () => {
+    const world = twoIdenticalPages('artifact-i1-mirror');
+    framed(world, [{ tick: DAY1, kind: 'show', artifact: 'a0', to: 'bez' }]);
+    framed(world, [{ tick: DAY1, kind: 'plant', artifact: 'a0', venue: null, to: 'ada' }]);
+    beats(world, 3);
+    // ada holds the very page bez already read: nothing to show him.
+    expect(artifactActs(world).filter((entry) => entry.act === 'reshow')).toEqual([]);
+    expect(Object.values(world.beliefs['bez']!)
+      .filter((belief) => belief.credence === ARTIFACT_CREDENCE)).toHaveLength(1);
+  });
+});
+
+describe('I-4 — a belief explains itself through its OWN page', () => {
+  it('two different pages reaching one viewer in one beat get one record each', () => {
+    const world = buildWorld(townOf([
+      { id: 'ada', venue: 'square', edges: { bez: 0.8 } },
+      { id: 'bez', venue: 'square', edges: { ada: 0.9 } },
+    ]), 'artifact-i4-explain', RULES);
+    enrollPlayer(world, { home: 'square' });
+    applyForge(world, SPEC, at(0, 8), RULES);                        // a0 — handed to bez
+    applyForge(world, { ...SPEC, severity: 2 }, at(0, 8), RULES);    // a1 — left on the table
+    world.tick = DAY1;
+    framed(world, [
+      { tick: DAY1, kind: 'plant', artifact: 'a0', venue: null, to: 'bez' },
+      { tick: DAY1, kind: 'plant', artifact: 'a1', venue: 'square', to: null },
+    ]);
+
+    // Next beat: ada FINDS a1 (pickup) and, in the same beat's re-show pass, bez holds a0 up to her.
+    beats(world, 1);
+    const sameBeat = artifactActs(world).filter((entry) => entry.tick === DAY1 + CONVERSATION_BEAT);
+    expect(sameBeat.map((entry) => entry.act)).toEqual(['pickup', 'reshow']);
+
+    const anchors = Object.entries(world.beliefs['ada']!)
+      .filter(([, belief]) => belief.credence === ARTIFACT_CREDENCE);
+    expect(anchors).toHaveLength(2);
+    expect(anchors.every(([, belief]) => belief.firstHeardAt === DAY1 + CONVERSATION_BEAT)).toBe(true);
+
+    const explained = anchors.map(([family, belief]) => {
+      const record = explainBelief(world, 'ada', family) as
+        { kind: string; act: string; artifact: string } | null;
+      expect(record).toMatchObject({ kind: 'artifact' });
+      return { belief, record: record! };
+    });
+
+    // Each record names the page whose words that belief actually carries.
+    for (const { belief, record } of explained) {
+      const page = artifactById(world, record.artifact)!;
+      for (const field of CLAIM_FIELDS) expect(belief.claim[field]).toBe(page.spec[field]);
+    }
+    // …so the two beliefs really got DIFFERENT records, not the first one twice.
+    expect(new Set(explained.map(({ record }) => record.artifact)).size).toBe(2);
+    expect(explained.map(({ record }) => record.act).sort()).toEqual(['pickup', 'reshow']);
   });
 });
