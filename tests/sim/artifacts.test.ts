@@ -625,3 +625,109 @@ describe('PILLAR: a whole artifact campaign is replay-stable', () => {
     expect(artifactById(a, 'a0')!.heldBy).toBe('ada');
   });
 });
+
+// ── DOCKET P9-2 + P9-3: what mints an anchor, and what may never take one away ─────────────────────
+
+/**
+ * The plan's global clause reads "an artifact IN HAND anchors at 0.97 … only while the holder
+ * physically holds it", while its own exact SHOW physics anchors a NON-holder at 0.97 "while the
+ * artifact stays with the shower", and its Task-8 victory condition wants a council member left
+ * anchored at ≥ 0.97 by circulation. Controller adjudication **P9-2** resolves that: the clause
+ * constrains WHICH EVENTS may mint an anchor — paper-present viewings, and nothing else — never how
+ * long a minted anchor lives. Adjudication **P9-3** closes the other direction: talk ABOUT the page
+ * can never drag the page's own weight down.
+ *
+ * Both halves are pinned here rather than left to a reading: a positive pin (the page can leave the
+ * room), a negative pin (nothing but a viewing ever mints an above-ceiling belief), and the monotone
+ * corroboration guard with its ordinary-hearsay control.
+ */
+const VIEWING_ACTS = ['show', 'plant', 'pickup', 'reshow'];
+
+describe('P9-2 — viewings mint the anchor; nothing demotes it', () => {
+  it('a shown belief survives the page leaving the room entirely (heldBy === null)', () => {
+    const world = withDocument(SPEC, 'artifact-p9-2-lifetime');
+    framed(world, [{ tick: DAY1, kind: 'show', artifact: 'a0', to: 'ada' }]);
+    expect(soleBelief(world, 'ada').credence).toBe(ARTIFACT_CREDENCE);
+
+    // Venue-plant it: the avatar no longer holds it, and neither does anyone else.
+    framed(world, [{ tick: DAY1, kind: 'plant', artifact: 'a0', venue: 'square', to: null }]);
+    expect(artifactById(world, 'a0')).toMatchObject({ heldBy: null, plantedAt: 'square' });
+    expect(soleBelief(world, 'ada').credence).toBe(ARTIFACT_CREDENCE);
+
+    // …and it survives the page being read by somebody else, days later.
+    beats(world, 4);
+    expect(artifactById(world, 'a0')!.heldBy).not.toBe('you');
+    expect(paperBelief(world, 'ada')!.credence).toBe(ARTIFACT_CREDENCE);
+  });
+
+  it('NOTHING but a paper-present viewing act ever mints a belief above the ceiling', () => {
+    // One campaign, all four viewing acts, ordinary gossip running underneath the whole time.
+    const world = withDocument(SPEC, 'artifact-p9-2-mint');
+    applyForge(world, { ...SPEC, severity: 5 }, at(0, 8), RULES);   // a1 — the venue plant
+    applyForge(world, { ...SPEC, count: 9 }, at(0, 8), RULES);      // a2 — the hand-over
+    world.tick = DAY1;
+    framed(world, [
+      { tick: DAY1, kind: 'show', artifact: 'a0', to: 'ada' },
+      { tick: DAY1, kind: 'plant', artifact: 'a1', venue: 'square', to: null },
+      { tick: DAY1, kind: 'plant', artifact: 'a2', venue: null, to: 'bez' },
+    ]);
+    beats(world, 3);
+
+    const acts = new Set(artifactActs(world).map((entry) => entry.act));
+    for (const act of VIEWING_ACTS) expect(acts, `act '${act}' really fired`).toContain(act);
+
+    let anchors = 0;
+    for (const [npcId, store] of Object.entries(world.beliefs)) {
+      for (const [family, belief] of Object.entries(store)) {
+        if (belief.credence <= HEARSAY_CEILING) continue;
+        anchors += 1;
+        expect(belief.credence, `${npcId}/${family} is above the ceiling`).toBe(ARTIFACT_CREDENCE);
+        const record = explainBelief(world, npcId, family);
+        expect(record, `${npcId}/${family} names the act that minted it`)
+          .toMatchObject({ kind: 'artifact' });
+        expect(VIEWING_ACTS).toContain((record as { act: string }).act);
+      }
+    }
+    expect(anchors, 'the sweep is not vacuous').toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe('P9-3 — hearsay corroboration is monotone: it never lowers a credence', () => {
+  it('a corroborating telling of the page\'s own family leaves a 0.97 anchor at 0.97', () => {
+    const world = withDocument(SPEC, 'artifact-p9-3');
+    framed(world, [{ tick: DAY1, kind: 'show', artifact: 'a0', to: 'ada' }]);
+    const paper = soleBelief(world, 'ada');
+    expect(paper.credence).toBe(ARTIFACT_CREDENCE);
+    const sourcesBefore = paper.apparentSources.length;
+
+    // A third mouth repeats the page's own words back to her — a NEW apparent source for a family
+    // she already holds, which is the ordinary corroboration branch of `ingest`.
+    ingest(world, 'ada', { tick: DAY1, speaker: 'cyn', claim: paper.claim }, true, RULES);
+
+    const after = soleBelief(world, 'ada');
+    expect(after.credence).toBe(ARTIFACT_CREDENCE);           // never dragged down to the ceiling
+    expect(after.timesHeard).toBe(2);
+    expect(after.apparentSources).toHaveLength(sourcesBefore + 1);
+    expect(after.apparentSources).toContain('cyn');           // the bookkeeping still happens
+    expect(after.heardAt).toBe(DAY1);                         // and stale news still revives
+  });
+
+  it('ordinary hearsay is untouched: it still rises by 0.15 per new source and still caps at 0.95', () => {
+    const world = withDocument(SPEC, 'artifact-p9-3-control');
+    const claim = applyInject(world, 'bez', SPEC);
+    ingest(world, 'ada', { tick: DAY1, speaker: 'bez', claim }, true, RULES);
+    const belief = world.beliefs['ada']![claim.family]!;
+    const first = belief.credence;
+    expect(first).toBeLessThan(HEARSAY_CEILING);
+
+    ingest(world, 'ada', { tick: DAY1, speaker: 'cyn', claim }, true, RULES);
+    expect(belief.credence).toBe(Math.min(HEARSAY_CEILING, first + 0.15));
+    expect(belief.credence).toBeGreaterThan(first);
+
+    ingest(world, 'ada', { tick: DAY1, speaker: 'dov', claim }, true, RULES);
+    expect(belief.credence).toBe(HEARSAY_CEILING);            // the cap still binds
+    ingest(world, 'ada', { tick: DAY1, speaker: 'you', claim }, true, RULES);
+    expect(belief.credence).toBe(HEARSAY_CEILING);            // and never climbs past it
+    expect(belief.apparentSources).toEqual(['bez', 'cyn', 'dov', 'you']);
+  });
+});

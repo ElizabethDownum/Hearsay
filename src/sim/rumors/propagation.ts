@@ -192,7 +192,19 @@ export function ingest(
     // Nobody is their own corroborator — a story citing YOU as its origin proves nothing to you.
     if (source !== hearerId && !existing.apparentSources.includes(source)) {
       existing.apparentSources.push(source);
-      existing.credence = Math.min(HEARSAY_CEILING, existing.credence + 0.15);
+      /**
+       * MONOTONE CORROBORATION (docket P9-3): hearing a story again never LOWERS what a mind already
+       * holds. `min(HEARSAY_CEILING, c + 0.15)` was monotone by construction while every credence in
+       * the game was ≤ 0.95; `ARTIFACT_CREDENCE` (0.97) is the first value that breaks that implicit
+       * invariant, and without the outer `max` a single telling ABOUT a document would clamp the
+       * document's own 0.97 anchor down to the hearsay ceiling — gossip diluting proof, which inverts
+       * the evidence hierarchy this file's ceiling exists to express (and would let an echo flip the
+       * plan's "anchored ≥ 0.97" victory condition on the check tick). The ceiling still caps what
+       * hearsay BUILDS TO; it is not a ceiling on beliefs. A no-op for every pre-Plan-9 credence.
+       */
+      existing.credence = Math.max(
+        existing.credence, Math.min(HEARSAY_CEILING, existing.credence + 0.15),
+      );
       // Spec: stale news revives with new corroboration — a fresh APPARENT source
       // resets the freshness clock. A repeat origin refreshes nothing.
       existing.heardAt = hearing.tick;

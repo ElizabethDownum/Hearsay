@@ -14,6 +14,19 @@ import type { Belief, WorldState } from './types';
  * anchors at 0.97 — the ONLY credence in the game above that ceiling. No other constant may cross it,
  * and that is not left to a comment: `tests/lint/evidence-hierarchy-law.test.ts` parses every
  * credence write in `src/` and fails if a second number ever climbs above the ceiling.
+ *
+ * LIFETIME — DOCKET P9-2 (controller adjudication, binding). The plan's global clause says a document
+ * anchors at 0.97 "only while the holder physically holds it", and its own exact SHOW physics
+ * simultaneously anchors a NON-holder at 0.97 while "the artifact stays with the shower". The clause
+ * is read as constraining WHICH EVENTS MAY MINT an anchor — a paper-present viewing, and nothing else
+ * (see `deliverDocument`, the single mint site, and the four acts that call it) — never as demoting an
+ * anchor once minted. A shown belief therefore persists at 0.97 after the page leaves the room. The
+ * demote-on-release reading is not merely unsupported, it is unsatisfiable: the plan's own Task-8
+ * victory condition wants a council member left "anchored ≥ 0.97" by circulation, which no longer puts
+ * paper in that hand. A memory-fades-without-the-proof mechanic needs a decay rule the plan does not
+ * provide, so it is a later design pass rather than a reading. Docket P9-3 closes the same principle
+ * from the other side (rumors/propagation.ts): corroborating talk ABOUT the page never drags the
+ * page's own weight down. Both halves are pinned in `tests/sim/artifacts.test.ts`.
  */
 export const ARTIFACT_CREDENCE = 0.97;
 

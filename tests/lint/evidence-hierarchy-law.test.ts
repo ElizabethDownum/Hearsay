@@ -558,3 +558,77 @@ describe('the evidence-hierarchy law bounds credence writes BY VALUE and fails c
     expect(injected.namesAboveCeiling).toEqual(['ARTIFACT_CREDENCE']);
   });
 });
+
+// ── DOCKET P9-2, the negative half: only a paper-present viewing may MINT an anchor ────────────────
+
+/**
+ * Adjudication P9-2 reads the plan's "only while the holder physically holds it" as a constraint on
+ * MINTING, not on lifetime: the events that may put a 0.97 belief into a mind are the four
+ * paper-present viewing acts and nothing else. The positive half of that ruling (no path demotes a
+ * minted anchor) is behavioural and lives in `tests/sim/artifacts.test.ts`; the negative half is
+ * structural, so it belongs to this scan — the same extractor that already knows which expressions
+ * reach a credence is the thing that can enumerate where the anchor enters one.
+ *
+ * Two questions, both answered from the AST rather than from a reading of the source:
+ *   1. Across all of `src/`, does `ARTIFACT_CREDENCE` reach a credence sink anywhere except the single
+ *      viewing helper? A second ingestion site is how a non-viewing path would mint an anchor.
+ *   2. Is every caller of that helper one of the four viewing acts? A fifth caller is the other way.
+ */
+
+/** Enclosing-function name for a node, or `<top-level>` — how a site is attributed to an act. */
+function enclosingFunction(node: ts.Node): string {
+  for (let current: ts.Node | undefined = node.parent; current; current = current.parent) {
+    if (ts.isFunctionDeclaration(current) || ts.isMethodDeclaration(current)) {
+      return current.name && ts.isIdentifier(current.name) ? current.name.text : '<anonymous>';
+    }
+    if (ts.isArrowFunction(current) || ts.isFunctionExpression(current)) {
+      const parent = current.parent as ts.Node | undefined;
+      if (parent !== undefined && ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
+        return parent.name.text;
+      }
+      return '<anonymous>';
+    }
+  }
+  return '<top-level>';
+}
+
+/** Every `callee(…)` in the file, with the function each call sits inside. */
+function callSites(file: ts.SourceFile, callee: string): { file: string; within: string }[] {
+  const sites: { file: string; within: string }[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && dottedName(node.expression) === callee) {
+      sites.push({ file: file.fileName, within: enclosingFunction(node) });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return sites;
+}
+
+describe('docket P9-2 — the anchor is minted by paper-present viewings and by nothing else', () => {
+  const parsedSources = sources.map(({ file, text }) => ({ file, ast: parse(file, text) }));
+
+  it('ARTIFACT_CREDENCE reaches a credence sink at exactly ONE site in src/', () => {
+    const anchorSites = parsedSources.flatMap(({ file, ast }) =>
+      credenceWrites(ast)
+        .filter(({ expr }) => dottedName(expr) === 'ARTIFACT_CREDENCE')
+        .map(() => ({ file })));
+    expect(anchorSites.map((site) => site.file)).toEqual(['src/sim/artifacts.ts']);
+  });
+
+  it('that one site is the shared viewing helper, whose callers are exactly the four viewing acts', () => {
+    const artifacts = parsedSources.find(({ file }) => file === 'src/sim/artifacts.ts')!;
+    const anchorWrites = credenceWrites(artifacts.ast)
+      .filter(({ expr }) => dottedName(expr) === 'ARTIFACT_CREDENCE');
+    expect(anchorWrites).toHaveLength(1);
+    expect(enclosingFunction(anchorWrites[0]!.expr)).toBe('deliverDocument');
+
+    // SHOW, HAND-OVER (`applyPlant`), PICKUP and RE-SHOW (both inside the beat-tail hook) — the four
+    // acts the plan names, and the only four ways a pair of eyes reaches a page.
+    const callers = parsedSources
+      .flatMap(({ ast }) => callSites(ast, 'deliverDocument'))
+      .map((site) => site.within)
+      .sort();
+    expect(callers).toEqual(['applyPlant', 'applyShow', 'resolveArtifacts', 'resolveArtifacts']);
+  });
+});
