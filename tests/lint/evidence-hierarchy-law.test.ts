@@ -17,9 +17,17 @@ import { ARTIFACT_CREDENCE } from '../../src/sim/artifacts';
  *   2. `something.credence = <expr>` — an existing belief being moved;
  *   3. `sink(…, <expr>, …)`          — an argument in the credence parameter position of a function
  *                                      that takes one (`CREDENCE_SINKS`).
- * Every numeric literal and every named constant inside those expressions is then held to the law:
- * a literal may never exceed the ceiling (evidence arrives by NAME, never as a bare 0.97), and the
- * only NAME allowed above it is `ARTIFACT_CREDENCE`.
+ * Each write is then classified BY VALUE (`classify`), not by its tokens: the scan proves a bound
+ * where one is provable and REPORTS every other shape. Where a write is reported, the numbers and
+ * names it reaches are held to the law as well — a literal may never exceed the ceiling (evidence
+ * arrives by NAME, never as a bare 0.97), and the only NAME allowed above it is `ARTIFACT_CREDENCE`.
+ *
+ * Value-contextual bounds are the review's C-1 closure (fix wave 1). A token-level reading admitted
+ * three writes through this scan's own declared surface: `credence += Math.min(CEILING, 0.99)` (a
+ * bounded right-hand side does not bound a compound assignment), `credence = HEARSAY_CEILING + 0.01`
+ * and `credence = ARTIFACT_CREDENCE + 0.01` (a ceiling constant used as an OPERAND is not a bound).
+ * All three now fire, and so does every arithmetic form nobody has written yet — the default is
+ * "report", and silence has to be earned by a demonstrable bound.
  *
  * Prong 3 is what closes the parameter hole: `ingestEvidence` and `firstHearing` take a credence, so
  * a second number could otherwise sneak above the ceiling at a call site rather than at a write. The
@@ -94,21 +102,33 @@ function collectConstants(file: ts.SourceFile, into: Map<string, number>): void 
   visit(file);
 }
 
+/**
+ * One write of somebody's credence: the expression whose value lands there, plus the OPERATOR that
+ * lands it. `compound` is load-bearing, not decoration — for `+=`/`*=`/`??=` the value written is a
+ * function of the PRIOR credence and the right-hand side, so no property of the right-hand side alone
+ * can bound the result.
+ */
+interface CredenceWrite { expr: ts.Expression; compound: string | null }
+
 /** Every expression whose value becomes somebody's credence. */
-function credenceExpressions(file: ts.SourceFile): ts.Expression[] {
-  const found: ts.Expression[] = [];
+function credenceWrites(file: ts.SourceFile): CredenceWrite[] {
+  const found: CredenceWrite[] = [];
   const visit = (node: ts.Node): void => {
     if (ts.isPropertyAssignment(node) && propertyName(node.name) === 'credence') {
-      found.push(node.initializer);
+      found.push({ expr: node.initializer, compound: null });
     }
     if (ts.isBinaryExpression(node) && ASSIGNMENT_OPERATORS.has(node.operatorToken.kind)
       && ts.isPropertyAccessExpression(node.left) && node.left.name.text === 'credence') {
-      found.push(node.right);
+      const operator = node.operatorToken.kind === ts.SyntaxKind.EqualsToken
+        ? null : ts.tokenToString(node.operatorToken.kind) ?? '<compound>';
+      found.push({ expr: node.right, compound: operator });
     }
     if (ts.isCallExpression(node)) {
       const callee = dottedName(node.expression);
       const index = callee === null ? undefined : CREDENCE_SINKS[callee];
-      if (index !== undefined && node.arguments.length > index) found.push(node.arguments[index]!);
+      if (index !== undefined && node.arguments.length > index) {
+        found.push({ expr: node.arguments[index]!, compound: null });
+      }
     }
     ts.forEachChild(node, visit);
   };
@@ -147,19 +167,99 @@ function numericValueOf(expr: ts.Expression, constants: Map<string, number>): nu
 }
 
 /**
- * `Math.min(X, …)` with an X at or below the ceiling BOUNDS the whole expression: whatever the other
- * operands compute, the result cannot cross. That is exactly how the hearsay path is written, and it
- * is why the arithmetic inside it (a `? 1 : 0.5` addressing multiplier, say) is not a credence and
- * must not be audited as one. Anything NOT provably bounded this way is held to the law in full.
+ * Is this expression the enclosing function's own `credence` parameter, where that function is a
+ * DECLARED sink? Then the value was already held to the law at the call site — prong 3 audits every
+ * one of them, and the completeness prong fails if a credence-taking function goes unnamed. So the
+ * pass-through is bounded by the scan's own coverage, not by an allowlist. A `credence` parameter of
+ * anything NOT declared as a sink is unprovable, which is what keeps that reasoning honest.
  */
-function ceilingBounded(expr: ts.Expression, constants: Map<string, number>): boolean {
+function insideDeclaredSink(node: ts.Node): boolean {
+  for (let current: ts.Node | undefined = node.parent; current; current = current.parent) {
+    const isFn = ts.isFunctionDeclaration(current) || ts.isMethodDeclaration(current)
+      || ts.isArrowFunction(current) || ts.isFunctionExpression(current);
+    if (!isFn) continue;
+    const fn = current as ts.SignatureDeclaration & { name?: ts.Node; parent?: ts.Node };
+    const index = fn.parameters.findIndex(
+      (parameter) => ts.isIdentifier(parameter.name) && parameter.name.text === 'credence');
+    if (index < 0) return false;
+    const declared = fn.name !== undefined && ts.isIdentifier(fn.name)
+      ? fn.name.text
+      : (fn.parent !== undefined && ts.isVariableDeclaration(fn.parent)
+        && ts.isIdentifier(fn.parent.name) ? fn.parent.name.text : null);
+    return declared !== null && CREDENCE_SINKS[declared] === index;
+  }
+  return false;
+}
+
+/**
+ * `bounded`  — the value is PROVEN to sit at or below the hearsay ceiling.
+ * `anchor`   — the value is the one lawful exception, ARTIFACT_CREDENCE, reached by name.
+ * `not-a-number` — the value is provably not numeric, so no numeric ceiling applies to it.
+ * `unprovable` — no bound can be established, so the law reports it.
+ */
+type Verdict = 'bounded' | 'anchor' | 'not-a-number' | 'unprovable';
+
+/**
+ * A value that cannot be a number at all. The scan's write surface keys on the NAME `credence`, and a
+ * name is not always a belief: `src/content/terms.ts` carries a glossary row keyed `'credence'` whose
+ * value is an object literal. A string, an object, an array, `null` or a boolean crosses no numeric
+ * ceiling, and `Belief.credence: number` means anything that reached a real credence this way would
+ * fail the typecheck long before this scan saw it. Deliberately literal FORMS only — no inference.
+ */
+function provablyNotNumeric(target: ts.Expression): boolean {
+  return ts.isStringLiteral(target) || ts.isNoSubstitutionTemplateLiteral(target)
+    || ts.isTemplateExpression(target) || ts.isObjectLiteralExpression(target)
+    || ts.isArrayLiteralExpression(target) || target.kind === ts.SyntaxKind.NullKeyword
+    || target.kind === ts.SyntaxKind.TrueKeyword || target.kind === ts.SyntaxKind.FalseKeyword;
+}
+
+/**
+ * THE ONE SOUNDNESS QUESTION, asked of the VALUE rather than of the tokens: can this expression be
+ * proven to land at or below the ceiling? A ceiling constant is a bound only where it IS the value —
+ * as an operand of arithmetic it is just a number the result is computed from, which is exactly how
+ * `HEARSAY_CEILING + 0.01` slipped past a token-level reading.
+ *
+ * The classification is deliberately a short list of PROVABLE shapes and a fail-closed default. It
+ * does not enumerate forbidden arithmetic: a spelling nobody has thought of arrives reported, and the
+ * only way to make the scan silent is to write a shape whose bound is demonstrable.
+ */
+function classify(expr: ts.Expression, constants: Map<string, number>): Verdict {
   const target = unwrap(expr);
-  if (!ts.isCallExpression(target)) return false;
-  if (dottedName(target.expression) !== 'Math.min') return false;
-  return target.arguments.some((arg) => {
-    const value = numericValueOf(arg, constants);
-    return value !== undefined && value <= HEARSAY_CEILING;
-  });
+
+  if (provablyNotNumeric(target)) return 'not-a-number';
+
+  // A parse-time number, by literal or by name: the value itself answers the question.
+  const value = numericValueOf(target, constants);
+  if (value !== undefined) {
+    if (value <= HEARSAY_CEILING) return 'bounded';
+    return dottedName(target) === 'ARTIFACT_CREDENCE' ? 'anchor' : 'unprovable';
+  }
+
+  // Reading a credence is bounded by closure: whatever it holds, the law governed its own write.
+  if (ts.isPropertyAccessExpression(target) && target.name.text === 'credence') return 'bounded';
+
+  if (ts.isIdentifier(target) && target.text === 'credence' && insideDeclaredSink(target)) {
+    return 'bounded';
+  }
+
+  if (ts.isCallExpression(target) && target.arguments.length > 0) {
+    const callee = dottedName(target.expression);
+    const operands = target.arguments.map((argument) => classify(argument, constants));
+    // The result of a min is at most its smallest operand: ONE bounded operand caps it.
+    if (callee === 'Math.min') {
+      if (operands.includes('bounded')) return 'bounded';
+      return operands.includes('anchor') ? 'anchor' : 'unprovable';
+    }
+    // The result of a max is its LARGEST operand: every operand must be bounded, and one anchor
+    // makes the whole thing an anchor (which is why the P9-3 monotone guard stays lawful).
+    if (callee === 'Math.max') {
+      if (operands.every((operand) => operand === 'bounded')) return 'bounded';
+      return operands.every((operand) => operand !== 'unprovable') ? 'anchor' : 'unprovable';
+    }
+  }
+
+  // Everything else — every arithmetic form, every call the scan cannot reason about — fails closed.
+  return 'unprovable';
 }
 
 interface Reached { literals: number[]; names: string[] }
@@ -195,10 +295,17 @@ function auditCredencePaths(
   let sites = 0;
 
   for (const { file, ast } of parsed) {
-    for (const expr of credenceExpressions(ast)) {
+    for (const { expr, compound } of credenceWrites(ast)) {
       sites += 1;
-      if (ceilingBounded(expr, constants)) continue;
+      // A compound write is unprovable BY SHAPE: the law must hold for the result, and the result
+      // depends on a prior credence no static scan can pin. Its right-hand side is irrelevant.
+      const verdict: Verdict = compound === null ? classify(expr, constants) : 'unprovable';
+      if (verdict === 'bounded' || verdict === 'not-a-number') continue;
       const source = expr.getText(ast).replace(/\s+/g, ' ').trim();
+      const before = violations.length;
+      if (compound !== null) {
+        violations.push({ file, source, detail: `a compound credence write ('${compound}') is never bounded by its right-hand side — the law must hold for the RESULT` });
+      }
       const { literals, names } = reachedBy(expr);
       for (const value of literals) {
         if (value > HEARSAY_CEILING) {
@@ -212,6 +319,13 @@ function auditCredencePaths(
         if (name !== 'ARTIFACT_CREDENCE') {
           violations.push({ file, source, detail: `'${name}' (${value}) is a second constant above the hearsay ceiling` });
         }
+      }
+      // FAIL CLOSED. An unprovable write whose every token is individually lawful is exactly the
+      // review's `HEARSAY_CEILING + 0.01`: no number is out of bounds, the VALUE is unbounded. The
+      // guard keeps the report to one reason per site — where a literal or a name already explains
+      // the failure, that is the diagnostic worth reading.
+      if (verdict === 'unprovable' && violations.length === before) {
+        violations.push({ file, source, detail: 'this write\'s value cannot be proven at or below the hearsay ceiling — a ceiling constant is a bound only where it IS the value, never as an operand' });
       }
     }
   }
@@ -342,5 +456,105 @@ describe('the evidence-hierarchy law FIRES on injected violations (proof, not pr
       { name: 'arrow', index: 2 },
     ]);
     for (const sink of sinks) expect(CREDENCE_SINKS[sink.name]).toBeUndefined();
+  });
+});
+
+// ── C-1: the law closes its own surface — bounds are VALUE-CONTEXTUAL, everything else fails closed ─
+
+/**
+ * The three forms the review pushed through the scanner's own declared surface, plus the general
+ * rule each one exposes. The posture is deliberately NOT an enumeration of forbidden arithmetic: the
+ * scan proves a bound where a bound is provable (a ceiling-or-lower number, a credence read, a
+ * declared-sink pass-through, `Math.min` with a bounded operand, `Math.max` with all operands
+ * bounded) and REPORTS every other shape. A new arithmetic spelling therefore arrives already
+ * reported rather than waiting for the list to learn it.
+ */
+describe('the evidence-hierarchy law bounds credence writes BY VALUE and fails closed on the rest', () => {
+  const anchor = { file: 'anchor.ts', text: 'export const HEARSAY_CEILING = 0.95;\nexport const ARTIFACT_CREDENCE = 0.97;\n' };
+  const audit = (lines: readonly string[]) =>
+    auditCredencePaths([anchor, { file: 'ghost.ts', text: lines.join('\n') }]);
+
+  const COMPOUND = (op: string) =>
+    `a compound credence write ('${op}') is never bounded by its right-hand side — the law must hold for the RESULT`;
+  const UNPROVABLE = 'cannot be proven at or below the hearsay ceiling';
+
+  it('a bounded right-hand side does NOT bound a compound assignment (review form i)', () => {
+    const injected = audit([
+      'export function bad(belief: { credence: number }) {',
+      '  belief.credence += Math.min(HEARSAY_CEILING, 0.99);',
+      '}',
+    ]);
+    expect(injected.sites).toBe(1);
+    expect(injected.violations.map((v) => v.detail).sort()).toEqual([
+      COMPOUND('+='),
+      'bare literal 0.99 exceeds the hearsay ceiling — evidence weight arrives by NAME, never as a literal',
+    ].sort());
+  });
+
+  it('every compound operator is audited as a write, even with a fully lawful right-hand side', () => {
+    const injected = audit([
+      'export const STANCE = { REPEAT: 0.5 };',
+      'export function creep(b: { credence: number }) {',
+      '  b.credence += STANCE.REPEAT;',
+      '  b.credence *= 0.5;',
+      '  b.credence ??= HEARSAY_CEILING;',
+      '}',
+    ]);
+    expect(injected.sites).toBe(3);
+    expect(injected.violations.map((v) => v.detail))
+      .toEqual([COMPOUND('+='), COMPOUND('*='), COMPOUND('??=')]);
+  });
+
+  it('a ceiling constant used as an OPERAND of arithmetic is not a bound (review forms ii and iii)', () => {
+    const injected = audit([
+      'export function over(b: { credence: number }) { b.credence = HEARSAY_CEILING + 0.01; }',
+      'export function past(b: { credence: number }) { b.credence = ARTIFACT_CREDENCE + 0.01; }',
+    ]);
+    expect(injected.sites).toBe(2);
+    expect(injected.violations.map((v) => v.source))
+      .toEqual(['HEARSAY_CEILING + 0.01', 'ARTIFACT_CREDENCE + 0.01']);
+    for (const violation of injected.violations) expect(violation.detail).toContain(UNPROVABLE);
+  });
+
+  it('a bare `credence` pass-through is bounded only inside a DECLARED sink, never anywhere', () => {
+    const injected = audit([
+      'export function smuggle(b: { credence: number }, credence: number) { b.credence = credence; }',
+    ]);
+    expect(injected.sites).toBe(1);
+    expect(injected.violations).toHaveLength(1);
+    expect(injected.violations[0]!.detail).toContain(UNPROVABLE);
+  });
+
+  it('a `credence` key whose value cannot be a number is not a credence write (the glossary row)', () => {
+    const injected = audit([
+      "export const TERMS = { 'credence': { id: 'credence', label: 'Credence', entry: null } };",
+      'export function real(b: { credence: number }) { b.credence = HEARSAY_CEILING; }',
+    ]);
+    expect(injected.sites, 'the glossary row IS still a site — it is classified, not skipped').toBe(2);
+    expect(injected.violations).toEqual([]);
+  });
+
+  it('stays silent on every bounded shape the engine really uses, the P9-3 monotone guard included', () => {
+    const injected = audit([
+      'export const STANCE = { REPEAT: 0.5 };',
+      // The corroboration branch as docket P9-3 leaves it: max-of-min, every operand bounded.
+      'export function hearsay(existing: { credence: number }) {',
+      '  existing.credence = Math.max(existing.credence, Math.min(HEARSAY_CEILING, existing.credence + 0.15));',
+      '}',
+      'export function reaction(belief: { credence: number }) {',
+      '  belief.credence = Math.max(belief.credence, STANCE.REPEAT);',
+      '}',
+      'export function firstHearing(hearing: unknown, credence: number) { void hearing; return credence; }',
+      'export function ingestEvidence(w: unknown, id: string, h: unknown, credence: number) {',
+      '  void w; void id; return firstHearing(h, credence);',
+      '}',
+      'export function anchorIt(w: unknown, id: string, h: unknown) {',
+      '  ingestEvidence(w, id, h, ARTIFACT_CREDENCE);',
+      '}',
+      'export function copy(b: { credence: number }) { return { credence: b.credence }; }',
+    ]);
+    expect(injected.sites).toBe(5);
+    expect(injected.violations).toEqual([]);
+    expect(injected.namesAboveCeiling).toEqual(['ARTIFACT_CREDENCE']);
   });
 });
