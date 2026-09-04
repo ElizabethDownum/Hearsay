@@ -12,42 +12,178 @@ import { ARTIFACT_CREDENCE } from '../../src/sim/artifacts';
  * ceiling"). A comment cannot enforce that. This scan parses every file under `src/` with the repo's
  * own TypeScript and asks a structural question: which numbers can actually REACH a mind's credence?
  *
- * A number reaches a credence three ways, and the scan collects all three:
- *   1. `{ credence: <expr> }`        — a belief record being composed;
- *   2. `something.credence = <expr>` — an existing belief being moved;
- *   3. `sink(…, <expr>, …)`          — an argument in the credence parameter position of a function
- *                                      that takes one (`CREDENCE_SINKS`).
- * Each write is then classified BY VALUE (`classify`), not by its tokens: the scan proves a bound
- * where one is provable and REPORTS every other shape. Where a write is reported, the numbers and
- * names it reaches are held to the law as well — a literal may never exceed the ceiling (evidence
- * arrives by NAME, never as a bare 0.97), and the only NAME allowed above it is `ARTIFACT_CREDENCE`.
+ * THE STRUCTURAL INVERSION (re-review round two, the P11-19 fence precedent). Round one closed the
+ * scan's VALUE recognition; round two showed the WRITE SURFACE was still an enumeration of node kinds
+ * and a hand list of operators — the class of defect that regenerates every time the language grows a
+ * spelling. So the surface is now closed the other way round:
  *
- * Value-contextual bounds are the review's C-1 closure (fix wave 1). A token-level reading admitted
- * three writes through this scan's own declared surface: `credence += Math.min(CEILING, 0.99)` (a
- * bounded right-hand side does not bound a compound assignment), `credence = HEARSAY_CEILING + 0.01`
- * and `credence = ARTIFACT_CREDENCE + 0.01` (a ceiling constant used as an OPERAND is not a bound).
- * All three now fire, and so does every arithmetic form nobody has written yet — the default is
- * "report", and silence has to be earned by a demonstrable bound.
+ *   · a credence write is recognized by the property NAME, in EVERY write position the language
+ *     offers — property assignment, shorthand, computed key, element access, destructuring
+ *     destination, update expression;
+ *   · assignment operators come from the compiler's own `FirstAssignment..LastAssignment` RANGE,
+ *     never from a list this file maintains;
+ *   · targets and callees are resolved by BINDING through the TypeScript checker, so `Object.assign`
+ *     under an alias, a renamed import of the anchor, and a shadowed `Math` all answer correctly;
+ *   · anything the scan cannot PROVE — a computed key it cannot read, an API-mediated patch, an
+ *     unprovable value — is REPORTED. Silence has to be earned.
+ *
+ * A number reaches a credence four ways, and the scan collects all four:
+ *   1. a property position NAMED `credence`   — `{ credence: x }`, `{ credence }`, `{ ['credence']: x }`;
+ *   2. an assignment or update whose TARGET is a credence — `b.credence = x`, `b['credence'] **= x`,
+ *      `b.credence++`, `({ credence: b.credence } = incoming)`;
+ *   3. `sink(…, <expr>, …)` — an argument in the credence parameter position of a function that takes
+ *      one (`CREDENCE_SINKS`);
+ *   4. an API-mediated write onto a target the CHECKER types as carrying a credence —
+ *      `Object.assign` / `Object.defineProperty` / `Object.defineProperties` / `Reflect.set` /
+ *      `Reflect.defineProperty`, and any element-access write whose key only the running program knows.
+ * Positions 2 and 4 include shapes whose written VALUE is never visible to a static scan; those are
+ * sites classified `unprovable` on sight, whatever they carry.
+ *
+ * Each write with a visible value is then classified BY VALUE (`classify`), not by its tokens: the
+ * scan proves a bound where one is provable and REPORTS every other shape. Where a write is reported,
+ * the numbers and names it reaches are held to the law as well — a literal may never exceed the
+ * ceiling (evidence arrives by NAME, never as a bare 0.97), and the only BINDING allowed above it is
+ * the one `ARTIFACT_CREDENCE` declaration.
  *
  * Prong 3 is what closes the parameter hole: `ingestEvidence` and `firstHearing` take a credence, so
  * a second number could otherwise sneak above the ceiling at a call site rather than at a write. The
  * completeness prong below fails if `src/` ever grows a credence-taking function this list does not
  * name — the law extends itself instead of silently narrowing.
  *
- * Same idiom as `determinism-law.test.ts` (AST statement scan) and `jargon.test.ts` (live sweep plus
- * an injected firing proof): the live sweep reads only repository files, so by construction it can
- * never be OBSERVED failing — the firing block pushes real violations through the SAME extractor and
- * asserts each diagnostic appears.
+ * THE DECLARED BOUNDARY (docket P9-4). What this scan does NOT see is one class and one class only:
+ * a value reaching a credence through a holder the checker cannot connect to `Belief` — an
+ * `any`/`unknown`-typed alias, or a structurally unrelated intermediate. Backstops: `noImplicitAny`,
+ * the P9-2 behavioural campaign pin, live ≡ replay, and zero such forms in production today.
+ *
+ * Same idiom as `determinism-law.test.ts` (AST scan) and `jargon.test.ts` (live sweep plus an injected
+ * firing proof): the live sweep reads only repository files, so by construction it can never be
+ * OBSERVED failing — the firing blocks push real violations through the SAME extractor and assert each
+ * diagnostic appears.
  */
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(here, '../..');
 
 /** name → the argument index that carries a credence. */
 const CREDENCE_SINKS: Record<string, number> = { firstHearing: 1, ingestEvidence: 3 };
 
-const ASSIGNMENT_OPERATORS = new Set<ts.SyntaxKind>([
-  ts.SyntaxKind.EqualsToken, ts.SyntaxKind.PlusEqualsToken, ts.SyntaxKind.MinusEqualsToken,
-  ts.SyntaxKind.AsteriskEqualsToken, ts.SyntaxKind.SlashEqualsToken,
-  ts.SyntaxKind.QuestionQuestionEqualsToken,
+/**
+ * Calls that can write a property without ever spelling its name where a scan could read it. Named by
+ * the FULLY QUALIFIED declaration the checker resolves them to (`ObjectConstructor.assign`), which is
+ * a binding question and not a spelling: `const put = Object.assign; put(belief, patch)` lands here.
+ */
+const WRITE_APIS = new Set([
+  'ObjectConstructor.assign',
+  'ObjectConstructor.defineProperty',
+  'ObjectConstructor.defineProperties',
+  'Reflect.set',
+  'Reflect.defineProperty',
 ]);
+
+/**
+ * EVERY assignment operator the compiler knows, taken from its own contiguous SyntaxKind range. A
+ * hand-maintained list is exactly what round two found missing ten operators; a range cannot fall
+ * behind the language, because the language is the thing that defines it.
+ */
+const isAssignmentOperator = (kind: ts.SyntaxKind): boolean =>
+  kind >= ts.SyntaxKind.FirstAssignment && kind <= ts.SyntaxKind.LastAssignment;
+
+const isUpdateOperator = (kind: ts.SyntaxKind): boolean =>
+  kind === ts.SyntaxKind.PlusPlusToken || kind === ts.SyntaxKind.MinusMinusToken;
+
+// ── The one program, and the checker that answers binding questions ───────────────────────────────
+
+interface Source { file: string; text: string }
+
+/**
+ * The repo's OWN compiler options, so the scan reads the same language `npm run typecheck` does.
+ * `types: []` drops the ambient test globals: this scan reads engine source, and loading them into
+ * every injected program would be cost with no answer attached.
+ */
+const COMPILER_OPTIONS: ts.CompilerOptions = (() => {
+  const config = ts.readConfigFile(path.join(repoRoot, 'tsconfig.json'), ts.sys.readFile);
+  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, repoRoot);
+  return { ...parsed.options, noEmit: true, skipLibCheck: true, types: [] };
+})();
+
+/** `lib.*.d.ts`, parsed once and shared — the firing proofs build one small program per case. */
+const libCache = new Map<string, ts.SourceFile | undefined>();
+
+const absolute = (file: string): string => path.resolve(repoRoot, file);
+
+/**
+ * One `ts.Program` over the audited sources, with their text overlaid on the real file system. The
+ * live sweep hands over `src/` exactly as it sits on disk; a firing proof hands over a virtual module
+ * — and both get a REAL checker, which is what makes "is this target a credence carrier?" a question
+ * about types rather than about spelling.
+ */
+function programOf(sources: readonly Source[]): ts.Program {
+  const overlay = new Map(sources.map(({ file, text }) => [absolute(file), text]));
+  const host = ts.createCompilerHost(COMPILER_OPTIONS, true);
+  const innerGet = host.getSourceFile.bind(host);
+  host.getSourceFile = (name, languageVersion, onError, shouldCreate) => {
+    const key = path.resolve(name);
+    const text = overlay.get(key);
+    if (text !== undefined) {
+      return ts.createSourceFile(name, text, languageVersion, true, ts.ScriptKind.TS);
+    }
+    if (libCache.has(key)) return libCache.get(key);
+    const file = innerGet(name, languageVersion, onError, shouldCreate);
+    libCache.set(key, file);
+    return file;
+  };
+  const innerRead = host.readFile.bind(host);
+  host.readFile = (name) => overlay.get(path.resolve(name)) ?? innerRead(name);
+  const innerExists = host.fileExists.bind(host);
+  host.fileExists = (name) => overlay.has(path.resolve(name)) || innerExists(name);
+  return ts.createProgram([...overlay.keys()], COMPILER_OPTIONS, host);
+}
+
+interface Scan {
+  program: ts.Program;
+  checker: ts.TypeChecker;
+  files: { file: string; ast: ts.SourceFile }[];
+  /** Every module constant with a parse-time numeric value, including `OBJ.KEY` members. */
+  constants: Map<string, number>;
+  /** The SYMBOL of the one `ARTIFACT_CREDENCE` binding — identity, not spelling. */
+  anchors: Set<ts.Symbol>;
+}
+
+const scanCache = new Map<readonly Source[], Scan>();
+
+function buildScan(sources: readonly Source[]): Scan {
+  const program = programOf(sources);
+  const checker = program.getTypeChecker();
+  const files = sources.map(({ file }) => {
+    const ast = program.getSourceFile(absolute(file));
+    if (ast === undefined) throw new Error(`the evidence-hierarchy scan could not load '${file}'`);
+    // THE FAIL-CLOSED PARSE (the `assertParsed` precedent in tests/helpers/callgraph.ts): TypeScript
+    // REPAIRS bad syntax rather than rejecting it, and a repaired parse silently reclassifies live
+    // code. Text this scan cannot read is text it must refuse, not text it may guess at.
+    const [firstError] = program.getSyntacticDiagnostics(ast);
+    if (firstError !== undefined) {
+      throw new Error(`the evidence-hierarchy scan could not parse '${file}': `
+        + ts.flattenDiagnosticMessageText(firstError.messageText, ' '));
+    }
+    return { file, ast };
+  });
+  const constants = new Map<string, number>();
+  for (const { ast } of files) collectConstants(ast, constants);
+  const anchors = new Set<ts.Symbol>();
+  for (const { ast } of files) collectAnchorBindings(ast, checker, anchors);
+  return { program, checker, files, constants, anchors };
+}
+
+/** One program per source set, reused: the live sweep is asked several different questions. */
+function scanOf(sources: readonly Source[]): Scan {
+  const cached = scanCache.get(sources);
+  if (cached !== undefined) return cached;
+  const scan = buildScan(sources);
+  scanCache.set(sources, scan);
+  return scan;
+}
+
+// ── Reading the source ────────────────────────────────────────────────────────────────────────────
 
 const parse = (file: string, src: string): ts.SourceFile =>
   ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -57,7 +193,8 @@ function unwrap(node: ts.Expression): ts.Expression {
   let current = node;
   for (;;) {
     if (ts.isParenthesizedExpression(current) || ts.isNonNullExpression(current)
-      || ts.isAsExpression(current) || ts.isSatisfiesExpression(current)) {
+      || ts.isAsExpression(current) || ts.isSatisfiesExpression(current)
+      || ts.isTypeAssertionExpression(current)) {
       current = current.expression;
       continue;
     }
@@ -76,8 +213,33 @@ function dottedName(node: ts.Expression): string | null {
   return null;
 }
 
-const propertyName = (node: ts.PropertyName): string | null =>
-  ts.isIdentifier(node) || ts.isStringLiteral(node) ? node.text : null;
+/**
+ * A key with a parse-time answer: `belief['credence']` yes, `belief[whichever]` no. Position matters —
+ * inside brackets an identifier is a variable READ whose value only the running program knows, so it
+ * must never be mistaken for the property name it happens to be spelled like.
+ */
+function literalKey(node: ts.Expression | undefined): string | null {
+  if (node === undefined) return null;
+  const target = unwrap(node);
+  if (ts.isStringLiteral(target) || ts.isNoSubstitutionTemplateLiteral(target)) return target.text;
+  return null;
+}
+
+/**
+ * The property NAME a write position names. `unprovable` is the fail-closed answer for a computed key
+ * the scan cannot read: it could be `credence`, and nothing in the text says otherwise.
+ */
+function writtenName(name: ts.PropertyName): { name: string | null; unprovable: boolean } {
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)
+    || ts.isNoSubstitutionTemplateLiteral(name)) {
+    return { name: name.text, unprovable: false };
+  }
+  if (ts.isComputedPropertyName(name)) {
+    const key = literalKey(name.expression);
+    return key === null ? { name: null, unprovable: true } : { name: key, unprovable: false };
+  }
+  return { name: null, unprovable: false };  // a private `#name` can never be `credence`
+}
 
 /** Every module constant with a parse-time numeric value, including `OBJ.KEY` members. */
 function collectConstants(file: ts.SourceFile, into: Map<string, number>): void {
@@ -89,7 +251,7 @@ function collectConstants(file: ts.SourceFile, into: Map<string, number>): void 
       else if (ts.isObjectLiteralExpression(init)) {
         for (const prop of init.properties) {
           if (!ts.isPropertyAssignment(prop)) continue;
-          const key = propertyName(prop.name);
+          const key = writtenName(prop.name).name;
           const value = unwrap(prop.initializer);
           if (key !== null && ts.isNumericLiteral(value)) {
             into.set(`${node.name.text}.${key}`, Number(value.text));
@@ -103,31 +265,251 @@ function collectConstants(file: ts.SourceFile, into: Map<string, number>): void 
 }
 
 /**
- * One write of somebody's credence: the expression whose value lands there, plus the OPERATOR that
- * lands it. `compound` is load-bearing, not decoration — for `+=`/`*=`/`??=` the value written is a
- * function of the PRIOR credence and the right-hand side, so no property of the right-hand side alone
- * can bound the result.
+ * THE ANCHOR, as a BINDING. `ARTIFACT_CREDENCE` is not a word this scan looks for — it is a specific
+ * declaration whose parse-time value is the production constant, and a reference is an anchor only
+ * when the checker resolves it to that declaration. A second constant spelled the same way with a
+ * different value is therefore NOT an anchor: it is an unprovable value, and it is reported.
  */
-interface CredenceWrite { expr: ts.Expression; compound: string | null }
+function collectAnchorBindings(
+  file: ts.SourceFile, checker: ts.TypeChecker, into: Set<ts.Symbol>,
+): void {
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)
+      && node.name.text === 'ARTIFACT_CREDENCE' && node.initializer !== undefined) {
+      const init = unwrap(node.initializer);
+      if (ts.isNumericLiteral(init) && Number(init.text) === ARTIFACT_CREDENCE) {
+        const symbol = checker.getSymbolAtLocation(node.name);
+        if (symbol !== undefined) into.add(symbol);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+}
 
-/** Every expression whose value becomes somebody's credence. */
-function credenceWrites(file: ts.SourceFile): CredenceWrite[] {
+/** The symbol an expression is BOUND to, with import aliases resolved to what they stand for. */
+function boundSymbol(node: ts.Expression, scan: Scan): ts.Symbol | undefined {
+  const symbol = scan.checker.getSymbolAtLocation(unwrap(node));
+  if (symbol === undefined) return undefined;
+  if ((symbol.flags & ts.SymbolFlags.Alias) === 0) return symbol;
+  try {
+    return scan.checker.getAliasedSymbol(symbol);
+  } catch {
+    return symbol;
+  }
+}
+
+/**
+ * The fully-qualified name of the STANDARD-LIBRARY function a callee expression is really bound to,
+ * following local renames one declaration at a time (`const put = Object.assign` →
+ * `ObjectConstructor.assign`), and `null` for everything else.
+ *
+ * The library test is not decoration. `getFullyQualifiedName` composes symbol names, so a local
+ * `const Math = { min: … }` also qualifies as `Math.min` — a spelling collision that would let a
+ * shadowed `Math.min` inherit the real one's bounding power. Identity is the declaration's home: only
+ * a symbol every one of whose declarations sits in a default library file is the global one.
+ */
+function standardLibraryCallee(node: ts.Expression, scan: Scan): string | null {
+  let current: ts.Expression = node;
+  for (let hops = 0; hops < 8; hops += 1) {
+    const symbol = boundSymbol(current, scan);
+    if (symbol === undefined) return null;
+    const declarations = symbol.declarations ?? [];
+    if (declarations.length > 0 && declarations.every((declaration) =>
+      scan.program.isSourceFileDefaultLibrary(declaration.getSourceFile()))) {
+      return scan.checker.getFullyQualifiedName(symbol);
+    }
+    const declaration = symbol.valueDeclaration;
+    if (declaration === undefined || !ts.isVariableDeclaration(declaration)
+      || declaration.initializer === undefined) {
+      return null;
+    }
+    current = declaration.initializer;
+  }
+  return null;
+}
+
+/**
+ * Does the CHECKER say this expression's type carries a `credence`? Fail-closed on the types that
+ * mean "the checker does not know" — `any`, `unknown`, an error type — because a Belief is exactly
+ * what one of those could be hiding.
+ */
+function typeCarriesCredence(
+  type: ts.Type, checker: ts.TypeChecker, seen: Set<ts.Type>,
+): boolean {
+  if (seen.has(type)) return false;
+  seen.add(type);
+  if ((type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0) return true;
+  const apparent = checker.getApparentType(type);
+  if (checker.getPropertyOfType(apparent, 'credence') !== undefined) return true;
+  if (apparent.isUnionOrIntersection()) {
+    return apparent.types.some((part) => typeCarriesCredence(part, checker, seen));
+  }
+  return false;
+}
+
+const carriesCredence = (node: ts.Node, scan: Scan): boolean =>
+  typeCarriesCredence(scan.checker.getTypeAtLocation(node), scan.checker, new Set());
+
+/** An object literal in a value position: its declared shape, or the shape the context wants. */
+function objectCarriesCredence(literal: ts.ObjectLiteralExpression, scan: Scan): boolean {
+  const contextual = scan.checker.getContextualType(literal);
+  if (contextual !== undefined
+    && typeCarriesCredence(contextual, scan.checker, new Set())) return true;
+  return carriesCredence(literal, scan);
+}
+
+// ── The write surface ─────────────────────────────────────────────────────────────────────────────
+
+const COMPOUND_WRITE = (operator: string): string =>
+  `a compound credence write ('${operator}') is never bounded by its right-hand side — the law must hold for the RESULT`;
+const UPDATE_WRITE = (operator: string): string =>
+  `an update expression ('${operator}') moves a credence by an amount the law never sees — no lawful increment of a credence exists`;
+const DESTRUCTURED_WRITE =
+  'a destructuring write lands a value the scan never inspects in a credence — the incoming side is not visible here';
+const API_WRITE =
+  'an API-mediated write onto a target the checker types as carrying a credence — the patch is never visible to the scan';
+const COMPUTED_KEY_WRITE =
+  "a computed property key the scan cannot read can name 'credence' on an object the checker types as carrying one";
+const ELEMENT_KEY_WRITE =
+  "an element-access write whose key only the running program knows can name 'credence' on a target the checker types as carrying one";
+
+/**
+ * One write of somebody's credence. `opaque` is load-bearing, not decoration: where it is set, the
+ * write hides its own value from any static reading — a compound assignment whose result depends on
+ * the prior credence, an update expression, a destructuring destination, an API-mediated patch, a key
+ * only the running program knows — and no property of the visible text can bound the result.
+ */
+interface CredenceWrite {
+  /** The expression whose value lands in the credence, or the construct the report quotes. */
+  expr: ts.Expression;
+  /** The reason this write is unprovable whatever it carries, or null when its value is visible. */
+  opaque: string | null;
+}
+
+/** Which credence a target names: one we can see, one we cannot read, or none. */
+type TargetVerdict = 'credence' | 'unreadable' | 'other';
+
+function credenceTarget(target: ts.Expression, scan: Scan): TargetVerdict {
+  if (ts.isPropertyAccessExpression(target)) {
+    return target.name.text === 'credence' ? 'credence' : 'other';
+  }
+  if (ts.isElementAccessExpression(target)) {
+    const key = literalKey(target.argumentExpression);
+    if (key !== null) return key === 'credence' ? 'credence' : 'other';
+    return carriesCredence(target.expression, scan) ? 'unreadable' : 'other';
+  }
+  return 'other';
+}
+
+/** An object/array literal standing where a value is being assigned INTO it — a destructuring target. */
+const isPattern = (node: ts.Expression): boolean =>
+  ts.isObjectLiteralExpression(node) || ts.isArrayLiteralExpression(node);
+
+/**
+ * Is this property position part of a DESTRUCTURING DESTINATION rather than a value being composed?
+ * `({ credence: belief.credence } = incoming)` looks like `{ credence: <expr> }` to a naive walk, and
+ * reading its "value" audits the OLD credence instead of the incoming one — round two's classifier
+ * defect. The whole pattern is handled once, as an opaque write.
+ */
+function insideAssignmentPattern(node: ts.Node): boolean {
+  let current: ts.Node = node;
+  for (let parent = current.parent; parent !== undefined; parent = parent.parent) {
+    if (ts.isBinaryExpression(parent)) {
+      return parent.operatorToken.kind === ts.SyntaxKind.EqualsToken && parent.left === current;
+    }
+    if (ts.isForOfStatement(parent) || ts.isForInStatement(parent)) {
+      return parent.initializer === current;
+    }
+    if (!ts.isObjectLiteralExpression(parent) && !ts.isArrayLiteralExpression(parent)
+      && !ts.isPropertyAssignment(parent) && !ts.isShorthandPropertyAssignment(parent)
+      && !ts.isSpreadAssignment(parent) && !ts.isSpreadElement(parent)
+      && !ts.isParenthesizedExpression(parent)) {
+      return false;
+    }
+    current = parent;
+  }
+  return false;
+}
+
+/** Does a destructuring destination land anything in a credence? */
+function patternWritesCredence(pattern: ts.Expression, scan: Scan): boolean {
+  let found = false;
+  const visit = (node: ts.Node): void => {
+    if (found) return;
+    if (ts.isShorthandPropertyAssignment(node) && node.name.text === 'credence') { found = true; return; }
+    if (ts.isPropertyAssignment(node)) {
+      const key = writtenName(node.name);
+      if (key.name === 'credence' || key.unprovable) { found = true; return; }
+    }
+    if (ts.isExpression(node) && !isPattern(node)
+      && credenceTarget(unwrap(node), scan) !== 'other') { found = true; return; }
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(pattern, visit);
+  return found;
+}
+
+/** Every expression whose value becomes somebody's credence, in every position that can carry one. */
+function credenceWrites(file: ts.SourceFile, scan: Scan): CredenceWrite[] {
   const found: CredenceWrite[] = [];
   const visit = (node: ts.Node): void => {
-    if (ts.isPropertyAssignment(node) && propertyName(node.name) === 'credence') {
-      found.push({ expr: node.initializer, compound: null });
+    // 1. PROPERTY POSITIONS, by NAME — `{ credence: x }`, `{ 'credence': x }`, `{ ['credence']: x }`.
+    if (ts.isPropertyAssignment(node) && !insideAssignmentPattern(node)) {
+      const key = writtenName(node.name);
+      if (key.name === 'credence') found.push({ expr: node.initializer, opaque: null });
+      else if (key.unprovable && objectCarriesCredence(node.parent, scan)) {
+        found.push({ expr: node.parent, opaque: COMPUTED_KEY_WRITE });
+      }
     }
-    if (ts.isBinaryExpression(node) && ASSIGNMENT_OPERATORS.has(node.operatorToken.kind)
-      && ts.isPropertyAccessExpression(node.left) && node.left.name.text === 'credence') {
+    // …including the SHORTHAND, which is a distinct node kind and was the §5.1 hole.
+    if (ts.isShorthandPropertyAssignment(node) && node.name.text === 'credence'
+      && !insideAssignmentPattern(node)) {
+      found.push({ expr: node.name, opaque: null });
+    }
+
+    // 2. ASSIGNMENTS — every operator in the compiler's own range, both member spellings, and the
+    //    destructuring destination whose incoming value is never visible here.
+    if (ts.isBinaryExpression(node) && isAssignmentOperator(node.operatorToken.kind)) {
+      const target = unwrap(node.left);
       const operator = node.operatorToken.kind === ts.SyntaxKind.EqualsToken
         ? null : ts.tokenToString(node.operatorToken.kind) ?? '<compound>';
-      found.push({ expr: node.right, compound: operator });
+      const reach = credenceTarget(target, scan);
+      if (reach === 'credence') {
+        found.push({ expr: node.right, opaque: operator === null ? null : COMPOUND_WRITE(operator) });
+      } else if (reach === 'unreadable') {
+        found.push({ expr: node, opaque: ELEMENT_KEY_WRITE });
+      } else if (isPattern(target) && patternWritesCredence(target, scan)) {
+        found.push({ expr: node, opaque: DESTRUCTURED_WRITE });
+      }
     }
+    // `for ([belief.credence] of rows)` — a destructuring destination with no `=` above it.
+    if ((ts.isForOfStatement(node) || ts.isForInStatement(node))
+      && ts.isExpression(node.initializer) && isPattern(node.initializer)
+      && patternWritesCredence(node.initializer, scan)) {
+      found.push({ expr: node.initializer, opaque: DESTRUCTURED_WRITE });
+    }
+
+    // 3. UPDATE EXPRESSIONS. No lawful increment of a credence exists: every one of them is a move
+    //    by an amount the law cannot see, so the shape itself is the finding.
+    if ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
+      && isUpdateOperator(node.operator)
+      && credenceTarget(unwrap(node.operand), scan) !== 'other') {
+      found.push({ expr: node, opaque: UPDATE_WRITE(ts.tokenToString(node.operator) ?? '<update>') });
+    }
+
     if (ts.isCallExpression(node)) {
+      // 4. SINK ARGUMENTS — the credence parameter position of a function that takes one.
       const callee = dottedName(node.expression);
       const index = callee === null ? undefined : CREDENCE_SINKS[callee];
       if (index !== undefined && node.arguments.length > index) {
-        found.push({ expr: node.arguments[index]!, compound: null });
+        found.push({ expr: node.arguments[index]!, opaque: null });
+      }
+      // 5. API-MEDIATED WRITES, resolved by binding on the callee and by TYPE on the target.
+      const api = standardLibraryCallee(node.expression, scan);
+      if (api !== null && WRITE_APIS.has(api) && node.arguments.length > 0
+        && carriesCredence(node.arguments[0]!, scan)) {
+        found.push({ expr: node, opaque: API_WRITE });
       }
     }
     ts.forEachChild(node, visit);
@@ -157,6 +539,8 @@ function credenceSinks(file: ts.SourceFile): { name: string; index: number }[] {
   visit(file);
   return sinks;
 }
+
+// ── The value question ────────────────────────────────────────────────────────────────────────────
 
 /** A parse-time number: a literal, or a name the constant map resolves. */
 function numericValueOf(expr: ts.Expression, constants: Map<string, number>): number | undefined {
@@ -193,7 +577,7 @@ function insideDeclaredSink(node: ts.Node): boolean {
 
 /**
  * `bounded`  — the value is PROVEN to sit at or below the hearsay ceiling.
- * `anchor`   — the value is the one lawful exception, ARTIFACT_CREDENCE, reached by name.
+ * `anchor`   — the value is PROVEN to be the one lawful exception: the `ARTIFACT_CREDENCE` binding.
  * `not-a-number` — the value is provably not numeric, so no numeric ceiling applies to it.
  * `unprovable` — no bound can be established, so the law reports it.
  */
@@ -213,48 +597,62 @@ function provablyNotNumeric(target: ts.Expression): boolean {
     || target.kind === ts.SyntaxKind.TrueKeyword || target.kind === ts.SyntaxKind.FalseKeyword;
 }
 
+/** A reference the checker resolves to the one anchor declaration — identity, never spelling. */
+function isAnchorReference(expr: ts.Expression, scan: Scan): boolean {
+  const target = unwrap(expr);
+  if (!ts.isIdentifier(target) && !ts.isPropertyAccessExpression(target)) return false;
+  const symbol = boundSymbol(target, scan);
+  return symbol !== undefined && scan.anchors.has(symbol);
+}
+
 /**
  * THE ONE SOUNDNESS QUESTION, asked of the VALUE rather than of the tokens: can this expression be
- * proven to land at or below the ceiling? A ceiling constant is a bound only where it IS the value —
- * as an operand of arithmetic it is just a number the result is computed from, which is exactly how
- * `HEARSAY_CEILING + 0.01` slipped past a token-level reading.
+ * proven to land at or below the ceiling, or proven to BE the anchor? A ceiling constant is a bound
+ * only where it IS the value — as an operand of arithmetic it is just a number the result is computed
+ * from, which is exactly how `HEARSAY_CEILING + 0.01` slipped past a token-level reading.
+ *
+ * `anchor` means PROVABLY EQUALS the anchor binding, which is why the min/max rules are asymmetric:
+ *   · `Math.min` is capped by its SMALLEST operand — one bounded operand bounds the result, and only
+ *     an all-anchor min is still an anchor. `Math.min(ARTIFACT_CREDENCE, candidate)` proves nothing
+ *     (round two's counterexample: with `candidate` at 0.96 it writes 0.96, over the ceiling and not
+ *     the anchor), so it is reported.
+ *   · `Math.max` is its LARGEST operand — all-bounded is bounded, and bounded-or-anchor with at least
+ *     one anchor is exactly the anchor. That is what keeps the docket P9-3 monotone guard lawful and
+ *     what makes `Math.max(HEARSAY_CEILING, ARTIFACT_CREDENCE)` an anchor SITE wherever it is written,
+ *     which the P9-2 pin below then holds to its single sink.
  *
  * The classification is deliberately a short list of PROVABLE shapes and a fail-closed default. It
  * does not enumerate forbidden arithmetic: a spelling nobody has thought of arrives reported, and the
  * only way to make the scan silent is to write a shape whose bound is demonstrable.
  */
-function classify(expr: ts.Expression, constants: Map<string, number>): Verdict {
+function classify(expr: ts.Expression, scan: Scan): Verdict {
   const target = unwrap(expr);
 
   if (provablyNotNumeric(target)) return 'not-a-number';
+  if (isAnchorReference(target, scan)) return 'anchor';
 
   // A parse-time number, by literal or by name: the value itself answers the question.
-  const value = numericValueOf(target, constants);
-  if (value !== undefined) {
-    if (value <= HEARSAY_CEILING) return 'bounded';
-    return dottedName(target) === 'ARTIFACT_CREDENCE' ? 'anchor' : 'unprovable';
-  }
+  const value = numericValueOf(target, scan.constants);
+  if (value !== undefined) return value <= HEARSAY_CEILING ? 'bounded' : 'unprovable';
 
   // Reading a credence is bounded by closure: whatever it holds, the law governed its own write.
-  if (ts.isPropertyAccessExpression(target) && target.name.text === 'credence') return 'bounded';
+  if (credenceTarget(target, scan) === 'credence') return 'bounded';
 
   if (ts.isIdentifier(target) && target.text === 'credence' && insideDeclaredSink(target)) {
     return 'bounded';
   }
 
   if (ts.isCallExpression(target) && target.arguments.length > 0) {
-    const callee = dottedName(target.expression);
-    const operands = target.arguments.map((argument) => classify(argument, constants));
-    // The result of a min is at most its smallest operand: ONE bounded operand caps it.
+    const callee = standardLibraryCallee(target.expression, scan);
+    const operands = target.arguments.map((argument) => classify(argument, scan));
     if (callee === 'Math.min') {
       if (operands.includes('bounded')) return 'bounded';
-      return operands.includes('anchor') ? 'anchor' : 'unprovable';
+      return operands.every((operand) => operand === 'anchor') ? 'anchor' : 'unprovable';
     }
-    // The result of a max is its LARGEST operand: every operand must be bounded, and one anchor
-    // makes the whole thing an anchor (which is why the P9-3 monotone guard stays lawful).
     if (callee === 'Math.max') {
       if (operands.every((operand) => operand === 'bounded')) return 'bounded';
-      return operands.every((operand) => operand !== 'unprovable') ? 'anchor' : 'unprovable';
+      const lawful = operands.every((operand) => operand === 'bounded' || operand === 'anchor');
+      return lawful && operands.includes('anchor') ? 'anchor' : 'unprovable';
     }
   }
 
@@ -262,17 +660,17 @@ function classify(expr: ts.Expression, constants: Map<string, number>): Verdict 
   return 'unprovable';
 }
 
-interface Reached { literals: number[]; names: string[] }
+interface Reached { literals: number[]; names: { name: string; node: ts.Expression }[] }
 
 /** Every number and every static name the expression can reach. */
 function reachedBy(expr: ts.Expression): Reached {
   const literals: number[] = [];
-  const names: string[] = [];
+  const names: { name: string; node: ts.Expression }[] = [];
   const visit = (node: ts.Node): void => {
     if (ts.isNumericLiteral(node)) { literals.push(Number(node.text)); return; }
     if (ts.isPropertyAccessExpression(node) || ts.isIdentifier(node)) {
       const dotted = dottedName(node as ts.Expression);
-      if (dotted !== null) { names.push(dotted); return; }
+      if (dotted !== null) { names.push({ name: dotted, node: node as ts.Expression }); return; }
     }
     ts.forEachChild(node, visit);
   };
@@ -280,43 +678,57 @@ function reachedBy(expr: ts.Expression): Reached {
   return { literals, names };
 }
 
+/** Enclosing-function name for a node, or `<top-level>` — how a site is attributed to an act. */
+function enclosingFunction(node: ts.Node): string {
+  for (let current: ts.Node | undefined = node.parent; current; current = current.parent) {
+    if (ts.isFunctionDeclaration(current) || ts.isMethodDeclaration(current)) {
+      return current.name && ts.isIdentifier(current.name) ? current.name.text : '<anonymous>';
+    }
+    if (ts.isArrowFunction(current) || ts.isFunctionExpression(current)) {
+      const parent = current.parent as ts.Node | undefined;
+      if (parent !== undefined && ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
+        return parent.name.text;
+      }
+      return '<anonymous>';
+    }
+  }
+  return '<top-level>';
+}
+
 interface Violation { file: string; source: string; detail: string }
+/** One credence write, with the verdict the law reached about it — sites are counted by VERDICT. */
+interface SiteRecord { file: string; within: string; verdict: Verdict; source: string }
 
 /** The one diagnostic the law raises, run over whatever files it is handed. */
-function auditCredencePaths(
-  sources: readonly { file: string; text: string }[],
-): { violations: Violation[]; sites: number; namesAboveCeiling: string[] } {
-  const parsed = sources.map(({ file, text }) => ({ file, ast: parse(file, text) }));
-  const constants = new Map<string, number>();
-  for (const { ast } of parsed) collectConstants(ast, constants);
-
+function auditCredencePaths(sources: readonly Source[]): {
+  violations: Violation[]; sites: number; records: SiteRecord[]; namesAboveCeiling: string[];
+} {
+  const scan = scanOf(sources);
   const violations: Violation[] = [];
   const namesAboveCeiling = new Set<string>();
-  let sites = 0;
+  const records: SiteRecord[] = [];
 
-  for (const { file, ast } of parsed) {
-    for (const { expr, compound } of credenceWrites(ast)) {
-      sites += 1;
-      // A compound write is unprovable BY SHAPE: the law must hold for the result, and the result
-      // depends on a prior credence no static scan can pin. Its right-hand side is irrelevant.
-      const verdict: Verdict = compound === null ? classify(expr, constants) : 'unprovable';
-      if (verdict === 'bounded' || verdict === 'not-a-number') continue;
+  for (const { file, ast } of scan.files) {
+    for (const { expr, opaque } of credenceWrites(ast, scan)) {
+      // An opaque write is unprovable BY SHAPE: the law must hold for a result no static scan can
+      // pin, and whatever the visible text carries is beside the point.
+      const verdict: Verdict = opaque === null ? classify(expr, scan) : 'unprovable';
       const source = expr.getText(ast).replace(/\s+/g, ' ').trim();
+      records.push({ file, within: enclosingFunction(expr), verdict, source });
+      if (verdict === 'bounded' || verdict === 'not-a-number') continue;
       const before = violations.length;
-      if (compound !== null) {
-        violations.push({ file, source, detail: `a compound credence write ('${compound}') is never bounded by its right-hand side — the law must hold for the RESULT` });
-      }
+      if (opaque !== null) violations.push({ file, source, detail: opaque });
       const { literals, names } = reachedBy(expr);
       for (const value of literals) {
         if (value > HEARSAY_CEILING) {
           violations.push({ file, source, detail: `bare literal ${value} exceeds the hearsay ceiling — evidence weight arrives by NAME, never as a literal` });
         }
       }
-      for (const name of names) {
-        const value = constants.get(name);
+      for (const { name, node } of names) {
+        const value = scan.constants.get(name);
         if (value === undefined || value <= HEARSAY_CEILING) continue;
         namesAboveCeiling.add(name);
-        if (name !== 'ARTIFACT_CREDENCE') {
+        if (!isAnchorReference(node, scan)) {
           violations.push({ file, source, detail: `'${name}' (${value}) is a second constant above the hearsay ceiling` });
         }
       }
@@ -329,13 +741,10 @@ function auditCredencePaths(
       }
     }
   }
-  return { violations, sites, namesAboveCeiling: [...namesAboveCeiling].sort() };
+  return { violations, sites: records.length, records, namesAboveCeiling: [...namesAboveCeiling].sort() };
 }
 
 // ── The live surface ──────────────────────────────────────────────────────────────────────────────
-
-const here = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(here, '../..');
 
 function engineFiles(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -345,7 +754,7 @@ function engineFiles(dir: string): string[] {
   });
 }
 
-const sources = engineFiles(path.join(repoRoot, 'src')).map((full) => ({
+const sources: readonly Source[] = engineFiles(path.join(repoRoot, 'src')).map((full) => ({
   file: path.relative(repoRoot, full).replace(/\\/g, '/'),
   text: fs.readFileSync(full, 'utf8'),
 }));
@@ -380,28 +789,37 @@ describe('the evidence-hierarchy law — one number, and only one, sits above th
 
 // ── The law's firing proof: real violations through the REAL extractor ────────────────────────────
 
-describe('the evidence-hierarchy law FIRES on injected violations (proof, not presence)', () => {
-  const anchor = { file: 'anchor.ts', text: 'export const HEARSAY_CEILING = 0.95;\nexport const ARTIFACT_CREDENCE = 0.97;\n' };
+/**
+ * Every injected case carries the two governing constants in its own text, so the anchor is a real
+ * BINDING the checker can resolve rather than a word the scan matches — the same question it asks of
+ * `src/sim/artifacts.ts`.
+ */
+const PREAMBLE = [
+  'export const HEARSAY_CEILING = 0.95;',
+  'export const ARTIFACT_CREDENCE = 0.97;',
+];
 
+const audit = (lines: readonly string[]) =>
+  auditCredencePaths([{ file: 'ghost.ts', text: [...PREAMBLE, ...lines].join('\n') }]);
+
+const UNPROVABLE = 'cannot be proven at or below the hearsay ceiling';
+
+describe('the evidence-hierarchy law FIRES on injected violations (proof, not presence)', () => {
   it('catches a bare literal above the ceiling in a composed belief record', () => {
-    const injected = auditCredencePaths([anchor, {
-      file: 'ghost.ts',
-      text: "export function bad(store: Record<string, unknown>) { store['f'] = { credence: 0.99, claim: null }; }",
-    }]);
+    const injected = audit([
+      "export function bad(store: Record<string, unknown>) { store['f'] = { credence: 0.99, claim: null }; }",
+    ]);
     expect(injected.violations).toHaveLength(1);
     expect(injected.violations[0]!.detail).toContain('bare literal 0.99');
   });
 
   it('catches a SECOND named constant above the ceiling, wherever it is spelled', () => {
-    const injected = auditCredencePaths([anchor, {
-      file: 'ghost.ts',
-      text: [
-        'export const CERTAINTY = 0.99;',
-        'export const TIERS = { GOSPEL: 0.98 };',
-        'export function moved(belief: { credence: number }) { belief.credence = CERTAINTY; }',
-        'export function sunk(w: unknown, id: string, h: unknown) { ingestEvidence(w, id, h, TIERS.GOSPEL); }',
-      ].join('\n'),
-    }]);
+    const injected = audit([
+      'export const CERTAINTY = 0.99;',
+      'export const TIERS = { GOSPEL: 0.98 };',
+      'export function moved(belief: { credence: number }) { belief.credence = CERTAINTY; }',
+      'export function sunk(w: unknown, id: string, h: unknown) { ingestEvidence(w, id, h, TIERS.GOSPEL); }',
+    ]);
     expect(injected.violations.map((v) => v.detail).sort()).toEqual([
       "'CERTAINTY' (0.99) is a second constant above the hearsay ceiling",
       "'TIERS.GOSPEL' (0.98) is a second constant above the hearsay ceiling",
@@ -409,35 +827,44 @@ describe('the evidence-hierarchy law FIRES on injected violations (proof, not pr
     expect(injected.namesAboveCeiling).toEqual(['CERTAINTY', 'TIERS.GOSPEL']);
   });
 
-  it('stays silent on the lawful spellings the engine actually uses', () => {
-    const injected = auditCredencePaths([anchor, {
+  it('a constant spelled ARTIFACT_CREDENCE but bound to another value is NOT the anchor', () => {
+    // Identity, not spelling: the scan resolves the reference to a declaration whose parse-time value
+    // is the production anchor. A same-named 0.99 is an unprovable value and is reported as one.
+    const injected = auditCredencePaths([{
       file: 'ghost.ts',
       text: [
-        'export const STANCE = { REPEAT: 0.5 };',
-        'export function ok(b: { credence: number }, t: number) {',
-        '  b.credence = Math.min(HEARSAY_CEILING, b.credence + 0.15);',
-        '  b.credence = Math.max(b.credence, STANCE.REPEAT);',
-        '  return { credence: 0.85, t };',
-        '}',
-        'export function anchorIt(w: unknown, id: string, h: unknown) { ingestEvidence(w, id, h, ARTIFACT_CREDENCE); }',
+        'const ARTIFACT_CREDENCE = 0.99;',
+        'export function bad(b: { credence: number }) { b.credence = ARTIFACT_CREDENCE; }',
       ].join('\n'),
     }]);
+    expect(injected.records.map((record) => record.verdict)).toEqual(['unprovable']);
+    expect(injected.violations.map((v) => v.detail))
+      .toEqual(["'ARTIFACT_CREDENCE' (0.99) is a second constant above the hearsay ceiling"]);
+  });
+
+  it('stays silent on the lawful spellings the engine actually uses', () => {
+    const injected = audit([
+      'export const STANCE = { REPEAT: 0.5 };',
+      'export function ok(b: { credence: number }, t: number) {',
+      '  b.credence = Math.min(HEARSAY_CEILING, b.credence + 0.15);',
+      '  b.credence = Math.max(b.credence, STANCE.REPEAT);',
+      '  return { credence: 0.85, t };',
+      '}',
+      'export function anchorIt(w: unknown, id: string, h: unknown) { ingestEvidence(w, id, h, ARTIFACT_CREDENCE); }',
+    ]);
     expect(injected.violations).toEqual([]);
     expect(injected.namesAboveCeiling).toEqual(['ARTIFACT_CREDENCE']);
     expect(injected.sites).toBe(4);
   });
 
   it('the ceiling clamp is not a blanket escape — an UNBOUNDED Math.min is still audited', () => {
-    const injected = auditCredencePaths([anchor, {
-      file: 'ghost.ts',
-      text: [
-        'export const CERTAINTY = 0.99;',
-        // Bounded: whatever CERTAINTY is, the ceiling operand caps the result.
-        'export function ok(b: { credence: number }) { b.credence = Math.min(HEARSAY_CEILING, CERTAINTY); }',
-        // Unbounded: no operand is at or below the ceiling, so both numbers are audited.
-        'export function bad(b: { credence: number }) { b.credence = Math.min(CERTAINTY, 0.98); }',
-      ].join('\n'),
-    }]);
+    const injected = audit([
+      'export const CERTAINTY = 0.99;',
+      // Bounded: whatever CERTAINTY is, the ceiling operand caps the result.
+      'export function ok(b: { credence: number }) { b.credence = Math.min(HEARSAY_CEILING, CERTAINTY); }',
+      // Unbounded: no operand is at or below the ceiling, so both numbers are audited.
+      'export function bad(b: { credence: number }) { b.credence = Math.min(CERTAINTY, 0.98); }',
+    ]);
     expect(injected.sites).toBe(2);
     expect(injected.violations.map((v) => v.detail).sort()).toEqual([
       "'CERTAINTY' (0.99) is a second constant above the hearsay ceiling",
@@ -462,7 +889,7 @@ describe('the evidence-hierarchy law FIRES on injected violations (proof, not pr
 // ── C-1: the law closes its own surface — bounds are VALUE-CONTEXTUAL, everything else fails closed ─
 
 /**
- * The three forms the review pushed through the scanner's own declared surface, plus the general
+ * The three forms review round one pushed through the scanner's own declared surface, plus the general
  * rule each one exposes. The posture is deliberately NOT an enumeration of forbidden arithmetic: the
  * scan proves a bound where a bound is provable (a ceiling-or-lower number, a credence read, a
  * declared-sink pass-through, `Math.min` with a bounded operand, `Math.max` with all operands
@@ -470,14 +897,6 @@ describe('the evidence-hierarchy law FIRES on injected violations (proof, not pr
  * reported rather than waiting for the list to learn it.
  */
 describe('the evidence-hierarchy law bounds credence writes BY VALUE and fails closed on the rest', () => {
-  const anchor = { file: 'anchor.ts', text: 'export const HEARSAY_CEILING = 0.95;\nexport const ARTIFACT_CREDENCE = 0.97;\n' };
-  const audit = (lines: readonly string[]) =>
-    auditCredencePaths([anchor, { file: 'ghost.ts', text: lines.join('\n') }]);
-
-  const COMPOUND = (op: string) =>
-    `a compound credence write ('${op}') is never bounded by its right-hand side — the law must hold for the RESULT`;
-  const UNPROVABLE = 'cannot be proven at or below the hearsay ceiling';
-
   it('a bounded right-hand side does NOT bound a compound assignment (review form i)', () => {
     const injected = audit([
       'export function bad(belief: { credence: number }) {',
@@ -486,23 +905,9 @@ describe('the evidence-hierarchy law bounds credence writes BY VALUE and fails c
     ]);
     expect(injected.sites).toBe(1);
     expect(injected.violations.map((v) => v.detail).sort()).toEqual([
-      COMPOUND('+='),
+      COMPOUND_WRITE('+='),
       'bare literal 0.99 exceeds the hearsay ceiling — evidence weight arrives by NAME, never as a literal',
     ].sort());
-  });
-
-  it('every compound operator is audited as a write, even with a fully lawful right-hand side', () => {
-    const injected = audit([
-      'export const STANCE = { REPEAT: 0.5 };',
-      'export function creep(b: { credence: number }) {',
-      '  b.credence += STANCE.REPEAT;',
-      '  b.credence *= 0.5;',
-      '  b.credence ??= HEARSAY_CEILING;',
-      '}',
-    ]);
-    expect(injected.sites).toBe(3);
-    expect(injected.violations.map((v) => v.detail))
-      .toEqual([COMPOUND('+='), COMPOUND('*='), COMPOUND('??=')]);
   });
 
   it('a ceiling constant used as an OPERAND of arithmetic is not a bound (review forms ii and iii)', () => {
@@ -544,7 +949,7 @@ describe('the evidence-hierarchy law bounds credence writes BY VALUE and fails c
       'export function reaction(belief: { credence: number }) {',
       '  belief.credence = Math.max(belief.credence, STANCE.REPEAT);',
       '}',
-      'export function firstHearing(hearing: unknown, credence: number) { void hearing; return credence; }',
+      'export function firstHearing(hearing: unknown, credence: number) { void hearing; return { credence, hearing }; }',
       'export function ingestEvidence(w: unknown, id: string, h: unknown, credence: number) {',
       '  void w; void id; return firstHearing(h, credence);',
       '}',
@@ -553,9 +958,292 @@ describe('the evidence-hierarchy law bounds credence writes BY VALUE and fails c
       '}',
       'export function copy(b: { credence: number }) { return { credence: b.credence }; }',
     ]);
-    expect(injected.sites).toBe(5);
+    expect(injected.sites).toBe(6);
     expect(injected.violations).toEqual([]);
     expect(injected.namesAboveCeiling).toEqual(['ARTIFACT_CREDENCE']);
+  });
+});
+
+// ── C-1 round two: an ANCHOR is a value PROVEN to be the anchor, never one spelled like it ─────────
+
+/**
+ * Round two's Critical: `classify` called any `Math.min` with an anchor operand an anchor, so
+ * `Math.min(ARTIFACT_CREDENCE, candidate)` — which writes 0.96 when `candidate` is 0.96, above the
+ * ceiling and not the anchor — passed silently; and `Math.max(HEARSAY_CEILING, ARTIFACT_CREDENCE)`
+ * could mint 0.97 anywhere while the P9-2 site pin, which matched the exact spelling
+ * `ARTIFACT_CREDENCE`, never saw it. Both are answered by making `anchor` mean PROVEN.
+ */
+describe('the anchor verdict is proven compositionally, never read off the spelling', () => {
+  const verdicts = (lines: readonly string[]) => audit(lines).records.map((r) => r.verdict);
+
+  it('Math.min of the anchor and an unprovable co-operand proves nothing and is reported', () => {
+    const injected = audit([
+      'export function bad(belief: { credence: number }, candidate: number) {',
+      '  belief.credence = Math.min(ARTIFACT_CREDENCE, candidate);',
+      '}',
+    ]);
+    expect(injected.sites).toBe(1);
+    expect(injected.records.map((r) => r.verdict)).toEqual(['unprovable']);
+    expect(injected.violations).toHaveLength(1);
+    expect(injected.violations[0]!.detail).toContain(UNPROVABLE);
+    expect(injected.violations[0]!.source).toBe('Math.min(ARTIFACT_CREDENCE, candidate)');
+  });
+
+  it('Math.min of the anchor with a BOUNDED co-operand is bounded — the smallest operand caps it', () => {
+    expect(verdicts([
+      'export function ok(b: { credence: number }) { b.credence = Math.min(ARTIFACT_CREDENCE, HEARSAY_CEILING); }',
+    ])).toEqual(['bounded']);
+  });
+
+  it('Math.min of nothing but anchors is still the anchor', () => {
+    expect(verdicts([
+      'export function ok(b: { credence: number }) { b.credence = Math.min(ARTIFACT_CREDENCE, ARTIFACT_CREDENCE); }',
+    ])).toEqual(['anchor']);
+  });
+
+  it('a NESTED anchor is an anchor SITE wherever it is written — max over bounded-and-anchor', () => {
+    // The spelling is not `ARTIFACT_CREDENCE`, but the VALUE is 0.97 — and the P9-2 pin below counts
+    // sites by verdict, so this shape can no longer mint an anchor outside the one viewing sink.
+    const injected = audit([
+      'export function mint(b: { credence: number }) {',
+      '  b.credence = Math.max(HEARSAY_CEILING, ARTIFACT_CREDENCE);',
+      '}',
+    ]);
+    expect(injected.records.map((r) => ({ within: r.within, verdict: r.verdict })))
+      .toEqual([{ within: 'mint', verdict: 'anchor' }]);
+    expect(injected.violations).toEqual([]);
+  });
+
+  it('Math.max with any unprovable operand proves nothing, anchor operand or not', () => {
+    expect(verdicts([
+      'export function bad(b: { credence: number }, candidate: number) {',
+      '  b.credence = Math.max(ARTIFACT_CREDENCE, candidate);',
+      '}',
+    ])).toEqual(['unprovable']);
+  });
+
+  it('a `Math` that is not the global Math proves nothing — the callee is resolved by binding', () => {
+    expect(verdicts([
+      'const Math = { min: (...xs: number[]) => xs[0]!, max: (...xs: number[]) => xs[0]! };',
+      'export function sneak(b: { credence: number }, candidate: number) {',
+      '  b.credence = Math.min(HEARSAY_CEILING, candidate);',
+      '}',
+    ])).toEqual(['unprovable']);
+  });
+});
+
+// ── C-2 round two: the WRITE SURFACE is closed by NAME, in every position the language offers ──────
+
+/**
+ * Round two's other Critical, and the §5.1 spelling table. Every row below was run through the
+ * delivered scanner and produced zero sites or zero violations; each is now a firing proof. The
+ * closure is structural rather than enumerative — operators come from the compiler's own range, keys
+ * and targets from the checker — so the next spelling arrives already covered.
+ */
+describe('a credence write is recognized by NAME in every write position the language offers', () => {
+  it('every assignment operator the compiler knows is audited — the RANGE, never a hand list', () => {
+    const operators: string[] = [];
+    for (let kind = ts.SyntaxKind.FirstAssignment; kind <= ts.SyntaxKind.LastAssignment; kind += 1) {
+      const spelling = ts.tokenToString(kind);
+      expect(spelling, `SyntaxKind ${kind} sits in the assignment range with no spelling`).toBeTruthy();
+      operators.push(spelling!);
+    }
+    // 2026-09: sixteen of them. The assertion is on the compiler's range, not on that number.
+    expect(operators).toContain('**=');
+    expect(operators).toContain('>>>=');
+    expect(operators.length).toBeGreaterThanOrEqual(16);
+
+    const injected = audit([
+      'export function creep(b: { credence: number }) {',
+      ...operators.map((operator) => `  b.credence ${operator} 0.5;`),
+      '}',
+    ]);
+    expect(injected.sites, 'one site per operator').toBe(operators.length);
+    // Plain `=` of a bounded value is the one lawful member of the range; every compound one fires.
+    expect(injected.violations.map((v) => v.detail))
+      .toEqual(operators.filter((operator) => operator !== '=').map(COMPOUND_WRITE));
+  });
+
+  it('the SHORTHAND property is a write (§5.1), and it is unprovable outside a declared sink', () => {
+    const injected = audit([
+      'export function bad(credence: number) { return { credence, claim: null }; }',
+    ]);
+    expect(injected.sites).toBe(1);
+    expect(injected.violations).toHaveLength(1);
+    expect(injected.violations[0]!.detail).toContain(UNPROVABLE);
+    expect(injected.violations[0]!.source).toBe('credence');
+  });
+
+  it('the shorthand INSIDE a declared sink stays lawful — the real `firstHearing` shape', () => {
+    const injected = audit([
+      'export function firstHearing(hearing: unknown, credence: number, sources: string[]) {',
+      '  return { claim: hearing, credence, apparentSources: sources };',
+      '}',
+    ]);
+    expect(injected.records.map((r) => r.verdict)).toEqual(['bounded']);
+    expect(injected.violations).toEqual([]);
+  });
+
+  it('a computed key spelled as a literal is the same write (§5.1)', () => {
+    const injected = audit([
+      "export function bad(value: number) { return { ['credence']: value, claim: null }; }",
+    ]);
+    expect(injected.sites).toBe(1);
+    expect(injected.violations[0]!.detail).toContain(UNPROVABLE);
+  });
+
+  it('an element-access write with a literal key is the same write (§5.1)', () => {
+    const injected = audit([
+      "export function bad(b: { credence: number }, value: number) { b['credence'] = value; }",
+      "export function creep(b: { credence: number }) { b['credence'] += 0.1; }",
+      // A literal key that is NOT `credence` is not a credence write at all.
+      "export function other(b: { credence: number; note: string }) { b['note'] = 'x'; }",
+    ]);
+    expect(injected.sites).toBe(2);
+    expect(injected.violations.map((v) => v.detail))
+      .toEqual([expect.stringContaining(UNPROVABLE), COMPOUND_WRITE('+=')]);
+  });
+
+  it('an UPDATE expression is a write in both fixities — no lawful increment of a credence exists', () => {
+    const injected = audit([
+      'export function post(b: { credence: number }) { b.credence++; }',
+      'export function pre(b: { credence: number }) { --b.credence; }',
+      "export function elem(b: { credence: number }) { b['credence']++; }",
+    ]);
+    expect(injected.sites).toBe(3);
+    expect(injected.violations.map((v) => v.detail))
+      .toEqual([UPDATE_WRITE('++'), UPDATE_WRITE('--'), UPDATE_WRITE('++')]);
+  });
+
+  it('a DESTRUCTURING destination is a write, and its incoming value is never inspected', () => {
+    // The old walk read the DESTINATION expression (`b.credence`, a bounded credence read) and called
+    // the write lawful. The pattern is now one opaque site: what arrives is not visible here.
+    const injected = audit([
+      'export function bad(b: { credence: number }, incoming: { credence: number }) {',
+      '  ({ credence: b.credence } = incoming);',
+      '}',
+    ]);
+    expect(injected.sites).toBe(1);
+    expect(injected.violations.map((v) => v.detail)).toEqual([DESTRUCTURED_WRITE]);
+  });
+
+  it('every destructuring spelling that can reach a credence is one opaque site', () => {
+    const injected = audit([
+      'export function shorthand(incoming: { credence: number }) {',
+      '  let credence = 0;',
+      '  ({ credence } = incoming);',
+      '  return credence;',
+      '}',
+      'export function nested(b: { credence: number }, rows: { inner: { credence: number } }) {',
+      '  ({ inner: { credence: b.credence } } = rows);',
+      '}',
+      'export function array(b: { credence: number }, xs: number[]) { [b.credence] = xs; }',
+      'export function loop(b: { credence: number }, rows: number[][]) {',
+      '  for ([b.credence] of rows) { void b; }',
+      '}',
+    ]);
+    expect(injected.sites).toBe(4);
+    expect(new Set(injected.violations.map((v) => v.detail))).toEqual(new Set([DESTRUCTURED_WRITE]));
+  });
+
+  it('a destructuring destination that cannot reach a credence stays silent', () => {
+    const injected = audit([
+      'export function fine(b: { note: string }, incoming: { note: string }) {',
+      '  ({ note: b.note } = incoming);',
+      '}',
+      // A DECLARATION binding cannot write an existing object\'s property — it makes a fresh local,
+      // and any later write of that local into a credence is its own site, classified there.
+      'export function read(b: { credence: number }) { const { credence } = b; return credence; }',
+    ]);
+    expect(injected.sites).toBe(0);
+    expect(injected.violations).toEqual([]);
+  });
+});
+
+// ── C-2 round two, prong 5: writes that never spell the name, resolved by the CHECKER ─────────────
+
+describe('API-mediated credence writes are found by TYPE, not by the shape of the patch', () => {
+  const BELIEF = 'export interface Belief { credence: number; note: string }';
+
+  it('Object.assign onto a credence carrier is a site whatever the patch looks like', () => {
+    const injected = audit([
+      BELIEF,
+      'export function literal(b: Belief, credence: number) { Object.assign(b, { credence }); }',
+      'export function opaque(b: Belief, patch: Partial<Belief>) { Object.assign(b, patch); }',
+    ]);
+    // Three sites, not two: the VISIBLE patch is recognized twice over — once as the API-mediated
+    // write and once, independently, as a shorthand property position named `credence`. Two prongs
+    // catching the same danger is what a fail-closed surface looks like; the OPAQUE patch, which no
+    // property walk can see, is the §5.1 (c) row and is caught only by the type-level prong.
+    expect(injected.sites).toBe(3);
+    expect(injected.violations.filter((v) => v.detail === API_WRITE)).toHaveLength(2);
+    expect(injected.violations.filter((v) => v.detail.includes(UNPROVABLE))).toHaveLength(1);
+  });
+
+  it('defineProperty, defineProperties, Reflect.set and Reflect.defineProperty all count', () => {
+    const injected = audit([
+      BELIEF,
+      "export function a(b: Belief, value: number) { Object.defineProperty(b, 'credence', { value }); }",
+      "export function c(b: Belief, props: PropertyDescriptorMap) { Object.defineProperties(b, props); }",
+      "export function d(b: Belief, value: number) { Reflect.set(b, 'credence', value); }",
+      "export function e(b: Belief, spec: PropertyDescriptor) { Reflect.defineProperty(b, 'credence', spec); }",
+    ]);
+    expect(injected.sites).toBe(4);
+    expect(injected.violations.map((v) => v.detail)).toEqual(Array(4).fill(API_WRITE));
+  });
+
+  it('the API is resolved by BINDING — a local rename of Object.assign is the same call', () => {
+    const injected = audit([
+      BELIEF,
+      'const put = Object.assign;',
+      'export function sneak(b: Belief, patch: Partial<Belief>) { put(b, patch); }',
+    ]);
+    expect(injected.sites).toBe(1);
+    expect(injected.violations.map((v) => v.detail)).toEqual([API_WRITE]);
+  });
+
+  it('an element write whose key only the running program knows is a site on a credence carrier', () => {
+    const injected = audit([
+      BELIEF,
+      "export function sneak(b: Belief, key: 'credence' | 'note', value: never) { b[key] = value; }",
+    ]);
+    expect(injected.sites).toBe(1);
+    expect(injected.violations.map((v) => v.detail)).toEqual([ELEMENT_KEY_WRITE]);
+  });
+
+  it('a computed key the scan cannot read is a site on an object typed as carrying a credence', () => {
+    const injected = audit([
+      BELIEF,
+      'export function compose(key: string, value: number): Belief {',
+      "  return { credence: 0.5, note: 'x', [key]: value } as Belief;",
+      '}',
+    ]);
+    expect(injected.violations.map((v) => v.detail)).toContain(COMPUTED_KEY_WRITE);
+  });
+
+  it('the SAME calls on a target that carries no credence stay silent — the three real src/ shapes', () => {
+    // `directives/mutation.ts`, `directives/transport.ts` and `rumors/traits.ts` each `Object.assign`
+    // onto a claim or a payload. The checker types those targets as `InjectSpec`, an invitation
+    // payload and `Partial<Claim>` — none of them carries a credence, so none of them is a site.
+    const injected = audit([
+      'export interface Claim { subject: string; severity: number }',
+      'export function mutate(claim: Claim, field: string, delta: Record<string, unknown>) {',
+      '  Object.assign(claim, { [field]: delta[field] });',
+      '}',
+      'export function merge(merged: Partial<Claim>, delta: Partial<Claim>) { Object.assign(merged, delta); }',
+      "export function payload(p: { kind: string }, more: { venue: string }) { Object.assign(p, more); }",
+      'export function route(map: Record<string, string>, id: string, faction: string) { map[id] = faction; }',
+    ]);
+    expect(injected.sites).toBe(0);
+    expect(injected.violations).toEqual([]);
+  });
+
+  it('fails CLOSED where the checker cannot type the target at all', () => {
+    const injected = audit([
+      'export function murky(target: any, patch: unknown) { Object.assign(target, patch); }',
+    ]);
+    expect(injected.sites).toBe(1);
+    expect(injected.violations.map((v) => v.detail)).toEqual([API_WRITE]);
   });
 });
 
@@ -570,27 +1258,13 @@ describe('the evidence-hierarchy law bounds credence writes BY VALUE and fails c
  * reach a credence is the thing that can enumerate where the anchor enters one.
  *
  * Two questions, both answered from the AST rather than from a reading of the source:
- *   1. Across all of `src/`, does `ARTIFACT_CREDENCE` reach a credence sink anywhere except the single
- *      viewing helper? A second ingestion site is how a non-viewing path would mint an anchor.
- *   2. Is every caller of that helper one of the four viewing acts? A fifth caller is the other way.
+ *   1. Across all of `src/`, does an ANCHOR VALUE reach a credence anywhere except the single viewing
+ *      helper? Counted by `classify` VERDICT, so a nested spelling counts too.
+ *   2. Is every REFERENCE to that helper one of the four viewing acts? A fifth caller is the other way.
  */
 
-/** Enclosing-function name for a node, or `<top-level>` — how a site is attributed to an act. */
-function enclosingFunction(node: ts.Node): string {
-  for (let current: ts.Node | undefined = node.parent; current; current = current.parent) {
-    if (ts.isFunctionDeclaration(current) || ts.isMethodDeclaration(current)) {
-      return current.name && ts.isIdentifier(current.name) ? current.name.text : '<anonymous>';
-    }
-    if (ts.isArrowFunction(current) || ts.isFunctionExpression(current)) {
-      const parent = current.parent as ts.Node | undefined;
-      if (parent !== undefined && ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
-        return parent.name.text;
-      }
-      return '<anonymous>';
-    }
-  }
-  return '<top-level>';
-}
+/** Every credence site in `src/` whose value the law proves to BE the anchor. */
+const anchorSites = live.records.filter((record) => record.verdict === 'anchor');
 
 /** Every `callee(…)` in the file, with the function each call sits inside. */
 function callSites(file: ts.SourceFile, callee: string): { file: string; within: string }[] {
@@ -606,29 +1280,29 @@ function callSites(file: ts.SourceFile, callee: string): { file: string; within:
 }
 
 describe('docket P9-2 — the anchor is minted by paper-present viewings and by nothing else', () => {
-  const parsedSources = sources.map(({ file, text }) => ({ file, ast: parse(file, text) }));
-
-  it('ARTIFACT_CREDENCE reaches a credence sink at exactly ONE site in src/', () => {
-    const anchorSites = parsedSources.flatMap(({ file, ast }) =>
-      credenceWrites(ast)
-        .filter(({ expr }) => dottedName(expr) === 'ARTIFACT_CREDENCE')
-        .map(() => ({ file })));
-    expect(anchorSites.map((site) => site.file)).toEqual(['src/sim/artifacts.ts']);
+  it('an anchor VALUE reaches a credence at exactly ONE site in src/, whatever its spelling', () => {
+    expect(anchorSites.map((site) => ({ file: site.file, within: site.within })))
+      .toEqual([{ file: 'src/sim/artifacts.ts', within: 'deliverDocument' }]);
   });
 
   it('that one site is the shared viewing helper, whose callers are exactly the four viewing acts', () => {
-    const artifacts = parsedSources.find(({ file }) => file === 'src/sim/artifacts.ts')!;
-    const anchorWrites = credenceWrites(artifacts.ast)
-      .filter(({ expr }) => dottedName(expr) === 'ARTIFACT_CREDENCE');
-    expect(anchorWrites).toHaveLength(1);
-    expect(enclosingFunction(anchorWrites[0]!.expr)).toBe('deliverDocument');
-
     // SHOW, HAND-OVER (`applyPlant`), PICKUP and RE-SHOW (both inside the beat-tail hook) — the four
     // acts the plan names, and the only four ways a pair of eyes reaches a page.
-    const callers = parsedSources
-      .flatMap(({ ast }) => callSites(ast, 'deliverDocument'))
+    const callers = scanOf(sources)
+      .files.flatMap(({ ast }) => callSites(ast, 'deliverDocument'))
       .map((site) => site.within)
       .sort();
     expect(callers).toEqual(['applyPlant', 'applyShow', 'resolveArtifacts', 'resolveArtifacts']);
+  });
+
+  it('the site pin counts by verdict, so a nested anchor elsewhere would fail it', () => {
+    // Non-vacuity, without touching production: the same records pass through the same filter.
+    const injected = audit([
+      'export function elsewhere(b: { credence: number }) {',
+      '  b.credence = Math.max(HEARSAY_CEILING, ARTIFACT_CREDENCE);',
+      '}',
+    ]);
+    expect(injected.records.filter((record) => record.verdict === 'anchor')
+      .map((record) => record.within)).toEqual(['elsewhere']);
   });
 });
