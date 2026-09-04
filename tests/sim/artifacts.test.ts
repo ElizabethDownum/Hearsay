@@ -236,10 +236,12 @@ describe('show — the document anchors a fresh family at evidence weight', () =
     framed(named, [{ tick: DAY1, kind: 'show', artifact: 'a0', to: 'ada' }]);
     expect(soleBelief(named, 'ada').apparentSources).toEqual(['bez']);
 
-    // …and a document that names nobody falls back to the person holding it up (the existing rule).
+    // …and a document that names NOBODY says so: the plan's SOMEONE, carried as itself. The page
+    // does not borrow the hand holding it up (review finding I-3) — paper is its own witness, and
+    // what an unsigned page witnesses is "someone".
     const vague = withDocument(SPEC, 'artifact-vague');
     framed(vague, [{ tick: DAY1, kind: 'show', artifact: 'a0', to: 'ada' }]);
-    expect(soleBelief(vague, 'ada').apparentSources).toEqual(['you']);
+    expect(soleBelief(vague, 'ada').apparentSources).toEqual([SOMEONE]);
   });
 
   it('the artifact stays with the shower and the act is chronicled', () => {
@@ -445,8 +447,10 @@ describe('venue pickup — the first person in the room, chosen the same way eve
     expect(artifactActs(world).at(-1)).toMatchObject({ act: 'pickup', by: 'ada', to: null });
     const found = soleBelief(world, 'ada');
     expect(found.credence).toBe(ARTIFACT_CREDENCE);
-    expect(found.heardFrom).toBe('ada');       // you found it yourself
-    expect(found.apparentSources).toEqual([]); // and nobody is their own corroborator
+    expect(found.heardFrom).toBe('ada');             // you found it yourself
+    // …and the page still cites what the page cites: a finder does not become the source, and is not
+    // erased as a self-source either (review finding I-3). The document's attribution, always.
+    expect(found.apparentSources).toEqual([SOMEONE]);
   });
 
   it('picks the lexicographic first even when the room fills in another order', () => {
@@ -834,5 +838,109 @@ describe('I-4 — a belief explains itself through its OWN page', () => {
     // …so the two beliefs really got DIFFERENT records, not the first one twice.
     expect(new Set(explained.map(({ record }) => record.artifact)).size).toBe(2);
     expect(explained.map(({ record }) => record.act).sort()).toEqual(['pickup', 'reshow']);
+  });
+});
+
+// ── I-3 + I-2: the letter's own witness, and the avatar as a real edge ─────────────────────────────
+
+describe('I-3 — the paper is its own witness, whoever happens to be holding it', () => {
+  it('one page carries ONE apparent source through show, pickup and re-show alike', () => {
+    // A NAMED attribution on a page that then passes through all three acts. Under the hearsay rule
+    // the answer used to be the shower, then the finder-erased-as-self-source, then the re-shower —
+    // three different origins for one fixed sheet of paper. It is now the document's, three times.
+    const world = buildWorld(townOf([
+      { id: 'ada', venue: 'square', edges: { bez: 0.8 } },
+      { id: 'bez', venue: 'square' },
+      { id: 'dov', venue: 'market' },
+    ]), 'artifact-i3-one-source', RULES);
+    enrollPlayer(world, { home: 'square' });
+    applyForge(world, { ...SPEC, attribution: 'dov' }, at(0, 8), RULES);
+    world.tick = DAY1;
+
+    framed(world, [
+      { tick: DAY1, kind: 'show', artifact: 'a0', to: 'ada' },              // act 1: shown
+      { tick: DAY1, kind: 'plant', artifact: 'a0', venue: 'square', to: null },
+    ]);
+    beats(world, 2);                                                        // acts 2 and 3
+
+    const acts = artifactActs(world).map((entry) => entry.act);
+    expect(acts).toEqual(['forge', 'show', 'plant', 'pickup', 'reshow']);
+
+    const shown = Object.values(world.beliefs['ada']!)
+      .find((belief) => belief.credence === ARTIFACT_CREDENCE && belief.heardFrom === 'you')!;
+    const found = Object.values(world.beliefs['ada']!)
+      .find((belief) => belief.credence === ARTIFACT_CREDENCE && belief.heardFrom === 'ada')!;
+    const reshown = paperBelief(world, 'bez')!;
+
+    for (const belief of [shown, found, reshown]) {
+      expect(belief.apparentSources).toEqual(['dov']);
+    }
+  });
+});
+
+describe('I-2 — the highest-trust edge is the LITERAL highest-trust edge, avatar included', () => {
+  /** `ada` trusts the avatar 0.75 and `bez` only 0.4 — the plan's edge is the avatar's. */
+  function trustsTheForger(seed: string): WorldState {
+    const world = buildWorld(townOf([
+      { id: 'ada', venue: 'square', edges: { bez: 0.4 } },
+      { id: 'bez', venue: 'square' },
+    ]), seed, RULES);
+    enrollPlayer(world, { home: 'square' });
+    world.npcs['ada']!.edges.push({ to: 'you', kind: 'friend', trust: 0.75 });
+    applyForge(world, SPEC, at(0, 8), RULES);
+    world.tick = DAY1;
+    framed(world, [{ tick: DAY1, kind: 'plant', artifact: 'a0', venue: null, to: 'ada' }]);
+    return world;
+  }
+
+  it('the paper comes back to its forger as INTEL, and the weaker NPC edge gets nothing', () => {
+    const world = trustsTheForger('artifact-i2-avatar');
+    beats(world, 1);
+    const shownAt = DAY1 + CONVERSATION_BEAT;
+
+    expect(artifactActs(world).filter((entry) => entry.act === 'reshow'))
+      .toMatchObject([{ artifact: 'a0', by: 'ada', to: 'you' }]);
+
+    // The player's knowledge substrate is `intel`, never `beliefs` — so the viewing is an observable
+    // intel event and not an ingestion. The player LEARNS their forgery circulated.
+    const rows = world.intel.log.filter((row) => row.kind === 'hint' && row.speaker === 'ada');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      tick: shownAt, venue: 'square', via: 'self', kind: 'hint',
+      overheard: false, speaker: 'ada', addressedTo: 'you',
+    });
+    expect(rows[0]!.reported).toEqual(SPEC);
+    expect(world.beliefs['you']).toEqual({});
+
+    expect(hasSeenPaper(world, 'bez')).toBe(false);      // 0.4 loses to 0.75, as the plan says
+  });
+
+  it('the avatar viewing consumes the holder\'s one turn like any other', () => {
+    const world = trustsTheForger('artifact-i2-latch');
+    beats(world, 8);
+    expect(artifactActs(world).filter((entry) => entry.act === 'reshow')).toHaveLength(1);
+    expect(world.intel.log.filter((row) => row.kind === 'hint' && row.speaker === 'ada'))
+      .toHaveLength(1);
+    expect(hasSeenPaper(world, 'bez')).toBe(false);
+  });
+
+  it('an NPC edge that really is the strongest is still the one that gets the paper', () => {
+    // The same fixture with the trust order inverted: nothing about the NPC path changes.
+    const world = buildWorld(townOf([
+      { id: 'ada', venue: 'square', edges: { bez: 0.8 } },
+      { id: 'bez', venue: 'square' },
+    ]), 'artifact-i2-npc-control', RULES);
+    enrollPlayer(world, { home: 'square' });
+    world.npcs['ada']!.edges.push({ to: 'you', kind: 'friend', trust: 0.4 });
+    applyForge(world, SPEC, at(0, 8), RULES);
+    world.tick = DAY1;
+    framed(world, [{ tick: DAY1, kind: 'plant', artifact: 'a0', venue: null, to: 'ada' }]);
+    beats(world, 1);
+
+    expect(artifactActs(world).filter((entry) => entry.act === 'reshow'))
+      .toMatchObject([{ artifact: 'a0', by: 'ada', to: 'bez' }]);
+    expect(paperBelief(world, 'bez')!.credence).toBe(ARTIFACT_CREDENCE);
+    expect(world.intel.log.filter((row) => row.kind === 'hint' && row.speaker === 'ada'))
+      .toEqual([]);
   });
 });

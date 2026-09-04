@@ -223,8 +223,16 @@ export function ingest(
  * EVIDENCE INGESTION — the paper that outranks every mouth (Plan 9). A document held up in front of
  * someone is not a telling: it lands at `credence` (evidence weight, which the evidence-hierarchy law
  * pins to `ARTIFACT_CREDENCE` and to nothing else), and its apparent source is the DOCUMENT'S OWN
- * attribution — paper is its own witness, so a named attribution outranks the hand holding the sheet
- * exactly as a named attribution already outranks a speaker (`apparentSourceOf`).
+ * attribution, ALWAYS — paper is its own witness.
+ *
+ * "Always" is the plan's word and it is load-bearing (review finding I-3). This deliberately does NOT
+ * route through `apparentSourceOf`, the hearsay rule, which substitutes the SPEAKER for a `SOMEONE`
+ * attribution and drops a self-source as nobody's own corroborator. Both substitutions are right for
+ * a mouth and wrong for a sheet of paper: they made one fixed document appear sourced by the avatar
+ * when shown, by its new holder when re-shown, and by nobody when picked up — so later corroboration
+ * physics turned on which hand held the page rather than on what the page said. An unsigned page cites
+ * `SOMEONE`, which is exactly what it says; a page naming its own reader still cites them, because the
+ * paper does not care who is reading it.
  *
  * This is deliberately the SAME ingestion path as hearsay rather than a parallel one: it writes the
  * same `firstHearing` record into the same belief store, so everything downstream — tellability, the
@@ -246,6 +254,5 @@ export function ingestEvidence(
   if (store[family] !== undefined) {
     throw new Error(`ingestEvidence: '${hearerId}' already holds family '${family}' — evidence mints a fresh family`);
   }
-  const source = apparentSourceOf(hearing);
-  store[family] = firstHearing(hearing, credence, source === hearerId ? [] : [source]);
+  store[family] = firstHearing(hearing, credence, [hearing.claim.attribution]);
 }

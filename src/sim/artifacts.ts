@@ -1,6 +1,7 @@
 import { dayOf, minuteOfDay, type Tick } from '../core/time';
 import { localityFor, offeredVenueFor, type InjectSpec } from './actions';
 import type { Circle } from './agents';
+import { blankIntel } from './fieldwork';
 import { cloneSerializable } from './hash';
 import { canAfford, debitCoin } from './network/roster';
 import type { Rules } from './rules';
@@ -290,23 +291,51 @@ function documentBelief(world: WorldState, mind: EntityId, artifact: Artifact): 
 }
 
 /**
- * The one person a holder would show it to: their highest-trust edge (ties → lexicographic), never
- * the avatar. The avatar is excluded because the player's knowledge substrate is `intel`, not
- * `beliefs` — `recordAndIngest` (phases.ts) already refuses to ingest anything into the avatar's
- * belief store, and a re-show is subject to that same law rather than an exception to it.
+ * The one person a holder would show it to: their LITERAL highest-trust edge (ties → lexicographic),
+ * the avatar included (review finding I-2). Production informants carry ordinary trust edges to the
+ * avatar, so excluding them silently substituted a weaker confidant for the person the plan names —
+ * a holder trusting the avatar 0.75 and a neighbour 0.4 held the paper up to the 0.4 edge.
+ *
+ * The avatar being a lawful answer does not make the avatar a mind: the player's knowledge substrate
+ * is `intel`, not `beliefs` (`recordAndIngest`, phases.ts, refuses to write into the avatar's belief
+ * store). `resolveArtifacts` therefore routes an avatar-targeted viewing through that substrate
+ * instead of through ingestion — the difference is the delivery mechanism, not the edge.
  */
 function topEdge(world: WorldState, holder: EntityId): EntityId | null {
   const npc = world.npcs[holder];
   if (npc === undefined) return null;
   let best: { id: EntityId; trust: number } | null = null;
   for (const edge of npc.edges) {
-    if (edge.to === world.playerId || edge.to === holder) continue;
+    if (edge.to === holder) continue;
     if (best === null || edge.trust > best.trust
       || (edge.trust === best.trust && edge.to < best.id)) {
       best = { id: edge.to, trust: edge.trust };
     }
   }
   return best?.id ?? null;
+}
+
+/**
+ * A holder holds the page up to THE AVATAR — the forgery comes home. The player has no belief store to
+ * anchor, so the viewing lands where the player's knowledge actually lives: one observable `intel` row
+ * saying who showed them what, and where. That is the whole point of the finding — the player learns
+ * their letter circulated, from the person carrying it.
+ *
+ * `kind: 'hint'` is a controller ruling (LOCAL, this wave): `IntelEntry.kind` is a closed union in
+ * `src/intel/entry.ts`, and `'hint'` is the precedented inert kind (dossier hints, sketch tips) that no
+ * existing consumer filters on. Whether "your paper came back to you" earns a kind and a surface of its
+ * own is a later ship-shape decision. `reported` carries the page's own seven fields — the document is
+ * not mutating into a claim, it is being recorded as what the player saw.
+ */
+function showToAvatar(
+  world: WorldState, artifact: Artifact, holder: EntityId, venue: VenueId, tick: Tick,
+): void {
+  const { subject, predicate, object, count, severity, place, attribution } = artifact.spec;
+  world.intel.log.push({
+    ...blankIntel(), tick, venue, via: 'self', kind: 'hint', overheard: false,
+    speaker: holder, addressedTo: world.playerId,
+    reported: { subject, predicate, object, count, severity, place, attribution },
+  });
 }
 
 /** ONCE PER HOLDER, whatever else changes around them — the plan's law, read from its own record. */
@@ -434,7 +463,9 @@ export function resolveArtifacts(
     if (hasSeen(world, id, audience)) continue;
     if (hasReshown(world, id, holder)) continue;
 
-    deliverDocument(world, artifact, holder, audience, tick);
+    // The edge is the edge either way; only the substrate the viewing lands in differs.
+    if (audience === world.playerId) showToAvatar(world, artifact, holder, circle.venue, tick);
+    else deliverDocument(world, artifact, holder, audience, tick);
     world.chronicle.push({
       kind: 'artifact', tick, act: 'reshow', artifact: id, by: holder, to: audience,
     });
