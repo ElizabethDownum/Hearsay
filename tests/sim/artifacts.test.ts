@@ -8,14 +8,16 @@ import { prepareTick, stepTransaction } from '../../src/sim/phases';
 import {
   CONVERSATION_BEAT, HEARSAY_CEILING, STANCE, chooseTelling, ingest,
 } from '../../src/sim/rumors/propagation';
-import { CLAIM_FIELDS, SOMEONE } from '../../src/sim/rumors/claim';
+import { CLAIM_FIELDS, SOMEONE, type EntityId } from '../../src/sim/rumors/claim';
 import {
   ARTIFACT_CREDENCE, applyForge, artifactById, artifactsOf, isUsable,
 } from '../../src/sim/artifacts';
-import { applyInject, type InjectSpec } from '../../src/sim/actions';
+import { applyInject, canEnter, type InjectSpec } from '../../src/sim/actions';
 import { buildWorld, enrollPlayer } from '../../src/sim/world';
 import type { Belief, TownFixture, WorldState } from '../../src/sim/types';
-import { localParticipants, type NonLocalActionIntent } from '../../app/src/loop/session';
+import {
+  loadSession, localParticipants, newSession, type NonLocalActionIntent, type Session,
+} from '../../app/src/loop/session';
 import { miniTown } from './helpers/minitown';
 
 /**
@@ -942,5 +944,115 @@ describe('I-2 — the highest-trust edge is the LITERAL highest-trust edge, avat
     expect(paperBelief(world, 'bez')!.credence).toBe(ARTIFACT_CREDENCE);
     expect(world.intel.log.filter((row) => row.kind === 'hint' && row.speaker === 'ada'))
       .toEqual([]);
+  });
+});
+
+// ── I-5: live ≡ replay, where "live" really is a live session ─────────────────────────────────────
+
+/**
+ * The PILLAR above proves a LOG replays byte-identically — but it enters through `runLogOn` on both
+ * sides, so a defect in `requestLocalInteraction` / `chooseLocal` / action logging / live `show`
+ * execution would sit in both worlds and stay green (review finding I-5). This is the other half, in
+ * the T12 idiom (`tests/app/session.test.ts`): drive a REAL session through the offer path, then
+ * replay THAT SESSION'S OWN saved log against a fresh world and compare end states.
+ *
+ * It also covers the two verbs no determinism test reached: live `show` and a live hand-over `plant`.
+ *
+ * Nothing about the generated town is predicted. Every venue, beat and audience comes from an offer
+ * the session actually returned, which is why the walks below are loops rather than constants — and
+ * why the staging is exclusively logged actions: `loadSession` regrows the seed's town from scratch and
+ * cannot know about anything a test poked into the world directly.
+ */
+const SESSION_SEED = 'cor-1';
+
+/** The first offered circle-mate who is not one of the usurper's watchers. */
+function safeTarget(session: Session, offer: { circleMembers: EntityId[] }): EntityId | undefined {
+  const guards = new Set(session.world.enemy.observers.map((observer) => observer.id));
+  return offer.circleMembers.find((id) => !guards.has(id));
+}
+
+/** Walk real venues from a NON-beat tick until a prepared offer actually contains somebody. */
+function walkToAnOffer(session: Session, venues: readonly string[]) {
+  for (const venue of venues) {
+    session.submit({ kind: 'goTo', venue });
+    if (session.requestLocalInteraction().refused) { session.advance(1); continue; }
+    if (session.advance(CONVERSATION_BEAT + 5).stopped !== 'local-offer') continue;
+    const offer = session.localOffer()!;
+    const target = safeTarget(session, offer);
+    if (target !== undefined) return { offer, target };
+    session.cancelLocalInteraction();
+    session.advance(1);
+  }
+  throw new Error('probe: no prepared offer on this day had a safe audience in it');
+}
+
+/** Stand still and take the next beat that offers somebody. */
+function waitForAnOffer(session: Session, tries = 16) {
+  for (let i = 0; i < tries; i += 1) {
+    if (session.requestLocalInteraction().refused) { session.advance(1); continue; }
+    if (session.advance(CONVERSATION_BEAT + 5).stopped !== 'local-offer') continue;
+    const offer = session.localOffer()!;
+    const target = safeTarget(session, offer);
+    if (target !== undefined) return { offer, target };
+    session.cancelLocalInteraction();
+    session.advance(1);
+  }
+  throw new Error('probe: no later beat offered a safe audience');
+}
+
+describe('PILLAR: a live session replays its own artifact story', () => {
+  it('forge → live show → live hand-over, then the session\'s OWN log regrows the same world', () => {
+    const session = newSession(SESSION_SEED);
+    const spec: InjectSpec = {
+      subject: session.world.scenario!.cast.usurper, predicate: 'poisoned', object: SOMEONE,
+      count: null, severity: 5, place: null, attribution: SOMEONE,
+    };
+    const venues = Object.values(session.world.venues)
+      .filter((venue) => canEnter(session.world, venue.id))
+      .map((venue) => venue.id)
+      .sort();
+
+    // Day 0 — the forgery is a solitary act, so it goes through the non-local submit path.
+    expect(session.submit({ kind: 'forge', spec })).toEqual({ queuedFor: 0 });
+    expect(session.advance(1).stopped).toBe('complete');
+    expect(artifactsOf(session.world).map((artifact) => artifact.id)).toEqual(['a0']);
+    expect(session.world.coin).toBe(RULES.economy.startingCoin - RULES.economy.forgery);
+
+    // Day 1 — the ink is dry. Stop one tick short of the beat so the queued walk is not the offer.
+    session.advance(at(1, 8) - session.world.tick - 1);
+    const shown = walkToAnOffer(session, venues);
+    expect(session.chooseLocal(shown.offer.token, {
+      kind: 'show', artifact: 'a0', to: shown.target,
+    })).toEqual({ queuedFor: shown.offer.tick });
+    expect(session.advance(1).stopped).toBe('complete');
+
+    // The live show really executed: an anchored viewer, a chronicle record, paper still in hand.
+    expect(paperBelief(session.world, shown.target)!.credence).toBe(ARTIFACT_CREDENCE);
+    expect(artifactActs(session.world).at(-1))
+      .toMatchObject({ act: 'show', artifact: 'a0', by: 'you', to: shown.target });
+    expect(artifactById(session.world, 'a0')!.heldBy).toBe('you');
+
+    // A later beat — hand it over for good.
+    const handed = waitForAnOffer(session);
+    expect(session.chooseLocal(handed.offer.token, {
+      kind: 'plant', artifact: 'a0', venue: null, to: handed.target,
+    })).toEqual({ queuedFor: handed.offer.tick });
+    expect(session.advance(1).stopped).toBe('complete');
+    expect(artifactById(session.world, 'a0')!.heldBy).toBe(handed.target);
+    expect(paperBelief(session.world, handed.target)!.credence).toBe(ARTIFACT_CREDENCE);
+
+    // Let the town run on, so the beat-tail hook and ordinary propagation both get a say.
+    const till = at(2, 0);
+    session.advance(till - session.world.tick);
+    expect(session.world.tick).toBe(till);
+    expect(session.world.scenario!.status).toBe('running');
+
+    const log = session.save().log;
+    expect(log[0]!.kind).toBe('forge');
+    expect(log.filter((action) => action.kind === 'show')).toHaveLength(1);
+    expect(log.filter((action) => action.kind === 'plant')).toHaveLength(1);
+
+    // THE PIN: one live world, one replay of that world's own successful log — never two replays.
+    expect(hashWorld(loadSession(session.save(), till).world)).toBe(hashWorld(session.world));
   });
 });
