@@ -111,3 +111,26 @@ every pre-existing field, with 81 new result rows. Common R16/R17 proposals are
 loaded in memory on both sides. The earlier duplicate-work trace and 90-row
 comparison are retained as pre-R17 evidence. All proposals still need independent
 review and actual-base implementation; production remains dc114da1780/114.
+
+## Network-history fragment
+
+Fourteen native cases and both compiler/lint checks pass for this partial model.
+It retains actual transmission times, structured audiences, current carried data
+versus spoken history, unknown legacy links and per-stage known report omissions.
+A real two-hop report validates the association/timing. The initial synthetic
+fixture used the wrong audience shape; final code uses the actual structured shape
+and deeply isolates nested audience objects. Full integration and review remain open.
+Exact code/tests: docs/plans/drafts/2026-09-05-task-5b-fragments.md.
+
+```text
+
+ RUN  v3.2.6 C:/Users/eliza/Desktop/ClaudeFiles/hearsay
+
+ ✓ .superpowers/sdd/task-5b-network-validation/entry.probe.ts (14 tests) 17ms
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  15:13:31
+   Duration  874ms (transform 211ms, setup 0ms, collect 529ms, tests 17ms, environment 0ms, prepare 70ms)
+
+```
