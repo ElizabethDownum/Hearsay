@@ -3,15 +3,20 @@ import { at } from '../../src/core/time';
 import { STANDARD_RULES as RULES } from '../../src/content/rules';
 import { applyInject } from '../../src/sim/actions';
 import { applyForge } from '../../src/sim/artifacts';
-import { applyAction } from '../../src/sim/campaign';
+import { applyAction, runLogOn, type Action } from '../../src/sim/campaign';
 import { applyEnemyDecision, captureEvidence } from '../../src/sim/counterintel';
-import { queueUnqueuedFieldReports } from '../../src/sim/directives/field-reports';
+import { holdFieldObservation, queueUnqueuedFieldReports } from '../../src/sim/directives/field-reports';
 import { realizeNetworkForward } from '../../src/sim/directives/transport';
 import { enemyDigest } from '../../src/sim/enemy/digest';
+import { cloneSerializable, hashWorld } from '../../src/sim/hash';
+import { captureIntel } from '../../src/sim/fieldwork';
+import { setDispositionEdge } from '../../src/sim/network/roster';
+import { runTurncoatPass } from '../../src/sim/network/turncoats';
 import { chooseAnswer } from '../../src/sim/inquiry';
 import { observationsFor, type Asking, type TickEvents } from '../../src/sim/perception';
-import { prepareTick } from '../../src/sim/phases';
+import { finishTick, prepareTick } from '../../src/sim/phases';
 import { SOMEONE } from '../../src/sim/rumors/claim';
+import { HEARSAY_CEILING } from '../../src/sim/rumors/propagation';
 import { runUntil, step } from '../../src/sim/step';
 import { exposureStatus } from '../../src/sim/scenario/exposure';
 import { buildTownMap, buildWorld, enrollPlayer } from '../../src/sim/world';
@@ -62,7 +67,7 @@ function medium(value: object, paper: boolean) {
 }
 
 /** Stage an order, never the yield: real delivery, guard application, answer and report follow. */
-function interrogatedWorld(traits: string[] = []) {
+function interrogationBase(traits: string[] = []) {
   const fixture = miniTown();
   fixture.npcs = fixture.npcs.filter((npc) => npc.id !== 'dov');
   for (const npc of fixture.npcs) {
@@ -79,17 +84,32 @@ function interrogatedWorld(traits: string[] = []) {
   world.enemy.observers = [{ id: 'bez', vigilance: 1 }];
   world.network.spymaster = 'cyn';
   enrollPlayer(world, { home: 'square' });
+  return world;
+}
+
+function interrogatedWorld(traits: string[] = [], pickup = false) {
+  const world = interrogationBase(traits);
   applyForge(world, SPEC, at(0, 8), RULES);
   world.tick = at(1, 8);
-  applyAction(world, { tick: world.tick, kind: 'plant', artifact: 'a0', to: 'ada', venue: null },
+  applyAction(world, { tick: world.tick, kind: 'plant', artifact: 'a0',
+    to: pickup ? null : 'ada', venue: pickup ? 'square' : null },
     RULES, prepareTick(world, RULES));
+  if (pickup) {
+    runUntil(world, at(1, 8, 16), RULES); // pickup requires a later beat than the plant
+    expect(world.artifacts![0]!.heldBy).toBe('ada');
+  }
   const family = Object.keys(world.beliefs['ada']!)[0]!;
+  const issuedAt = world.tick;
   applyEnemyDecision(world, {
     day: 1, features: [], inquiries: [], watches: [],
     interrogations: [{ target: 'ada', guard: 'bez', day: 1, about: { family }, venue: 'backroom' }],
   });
   step(world, RULES);
-  expect(world.network.directiveState!.records[0]!.received?.tick).toBe(at(1, 8));
+  // A pickup consumes the first beat; deliver the order at the next actual contact.
+  while (world.network.directiveState!.records[0]!.received === null && world.tick < at(1, 9)) {
+    step(world, RULES);
+  }
+  expect(world.network.directiveState!.records[0]!.received?.tick).toBeGreaterThanOrEqual(issuedAt);
   runUntil(world, at(2, 0), RULES);
   const asking = world.chronicle.find((row) => row.kind === 'asking'
     && row.speaker === 'bez' && row.addressedTo === 'ada' && row.authority);
@@ -148,6 +168,127 @@ describe('forensics follows the hand named in testimony', () => {
   });
 });
 
+describe('paper traces in the rest of the campaign', () => {
+  it('a planted page remains anonymous when its finder is compelled to answer', () => {
+    const { world, answer } = interrogatedWorld([], true);
+    expect(answer.reported?.attribution).toBe('ada');
+    expect(world.enemy.sketch.filter((feature) => feature.kind === 'forged-document')).toEqual([]);
+    auditSketch(world);
+  });
+
+  function circulatedWorld() {
+    const world = interrogationBase();
+    world.npcs['ada']!.edges.push({ to: 'bez', kind: 'friend', trust: 0.8 });
+    applyForge(world, SPEC, at(0, 8), RULES);
+    world.tick = at(1, 8);
+    const frame = prepareTick(world, RULES);
+    finishTick(world, RULES, frame, () => applyAction(world, {
+      tick: world.tick, kind: 'plant', artifact: 'a0', to: 'ada', venue: null,
+    }, RULES, frame));
+    runUntil(world, at(1, 8, 16), RULES);
+    expect(world.chronicle.some((row) => row.kind === 'artifact'
+      && row.act === 'reshow' && row.by === 'ada' && row.to === 'bez')).toBe(true);
+    return world;
+  }
+
+  it('uninterrogated hand-over and re-show circulation supplies no document feature', () => {
+    const world = circulatedWorld();
+    expect(world.chronicle.filter((row) => row.kind === 'asking')).toEqual([]);
+    expect(enemyDigest(world.enemy, 1, RULES).features
+      .filter((feature) => feature.kind === 'forged-document')).toEqual([]);
+  });
+
+  function disclosedInformant() {
+    const world = circulatedWorld();
+    const family = Object.values(world.beliefs['bez']!)
+      .find((belief) => belief.heardFrom === 'ada' && belief.credence > HEARSAY_CEILING)!.claim.family;
+    const asking: Asking = {
+      tick: world.tick, venue: 'backroom', circleMembers: ['bez', 'cyn'],
+      speaker: 'cyn', addressedTo: 'bez', about: { family }, authority: true,
+    };
+    const answer = chooseAnswer(world, 'bez', asking, world.tick, RULES)!;
+    expect(answer).toMatchObject({ document: true, claim: { attribution: 'ada' } });
+    captureEvidence(world, { tick: world.tick, positions: {}, askings: [asking], utterances: [answer] }, RULES);
+    // Isolate the newly folded kind for the unchanged kind-agnostic consumers.
+    world.enemy.sketch = enemyDigest(world.enemy, 1, RULES).features
+      .filter((feature) => feature.kind === 'forged-document');
+    expect(world.enemy.sketch).toHaveLength(1);
+    expect(world.enemy.sketch[0]!.subject).toBe('ada'); // one hop, never the avatar hop-zero
+    world.intel.informants.push({ id: 'ada', assignedVenue: 'square' });
+    return world;
+  }
+
+  it('a one-hop disclosure adds exactly one informant exposure key, without identifying the avatar', () => {
+    const world = disclosedInformant();
+    expect(exposureStatus(world)).toMatchObject({ score: 1, identified: false });
+    world.enemy.sketch.push(cloneSerializable(world.enemy.sketch[0]!));
+    expect(exposureStatus(world)).toMatchObject({ score: 1, identified: false });
+  });
+
+  it('an eroded player asset flips only once the new feature names them', () => {
+    const world = disclosedInformant();
+    world.network.assets.push({ id: 'ada', mice: null, wagePaidThroughDay: 1, strikes: 0, facts: [] });
+    setDispositionEdge(world, 'ada', 0.3);
+    const unnamed = cloneSerializable(world);
+    unnamed.enemy.sketch = [];
+    runTurncoatPass(unnamed, RULES);
+    expect(unnamed.network.assets[0]!.turned).not.toBe(true);
+    runTurncoatPass(world, RULES);
+    expect(world.network.assets[0]!.turned).toBe(true);
+  });
+
+  it('a walk-in reveals the document accusation only through a physically spoken sketch tip', () => {
+    const world = disclosedInformant();
+    world.network.enemyAssets.push({
+      id: 'bez', mice: null, wagePaidThroughDay: 6, strikes: 0, facts: [], turned: true,
+    });
+    world.tick = at(6, 23, 59);
+    const before = cloneSerializable(world.intel.log);
+    runTurncoatPass(world, RULES);
+    expect(world.intel.log).toEqual(before);
+    const tip = world.network.directiveState!.messages.find((message) => message.payload.kind === 'sketch-tip')!;
+    expect(tip.payload).toMatchObject({ subject: 'ada', detail: world.enemy.sketch[0]!.detail });
+    expect(world.enemy.sketch[0]!.detail).not.toContain('forged-document');
+    const speech = realizeNetworkForward(world, tip.id,
+      { venue: 'square', members: ['bez', 'you'] }, tip.availableAfter, RULES)!;
+    captureIntel(world, {
+      tick: speech.tick, positions: {}, utterances: [], askings: [], networkSpeeches: [speech],
+    }, RULES);
+    expect(world.intel.log.length).toBeGreaterThan(before.length);
+    expect(world.network.enemyAssets[0]!.revealedThrough).toBe(1);
+  });
+
+  it('live tick transactions replay their own forging log through a real staged interrogation', () => {
+    const initial = interrogationBase();
+    applyEnemyDecision(initial, {
+      day: 0, features: [], inquiries: [], watches: [],
+      interrogations: [{ target: 'ada', guard: 'bez', day: 1,
+        about: { subject: 'cyn' }, venue: 'backroom' }],
+    });
+    const live = cloneSerializable(initial);
+    const intended: Action[] = [
+      { tick: 0, kind: 'forge', spec: SPEC },
+      { tick: at(1, 8), kind: 'plant', artifact: 'a0', to: 'ada', venue: null },
+    ];
+    const recorded: Action[] = [];
+    while (live.tick < at(2, 0)) {
+      const frame = prepareTick(live, RULES);
+      finishTick(live, RULES, frame, () => {
+        for (const action of intended.filter((candidate) => candidate.tick === live.tick)) {
+          applyAction(live, action, RULES, frame);
+          recorded.push(cloneSerializable(action));
+        }
+      });
+    }
+    expect(recorded).toEqual(intended);
+    expect(live.enemy.sketch.filter((feature) => feature.kind === 'forged-document'))
+      .toMatchObject([{ subject: 'you' }]);
+    auditSketch(live);
+    const replayed = runLogOn(cloneSerializable(initial), RULES, recorded, live.tick);
+    expect(hashWorld(replayed)).toBe(hashWorld(live));
+  });
+});
+
 describe('a letter is learned only through the words actually heard', () => {
   for (const paper of [true, false]) {
     const label = paper ? 'paper' : 'ordinary hearsay';
@@ -201,6 +342,40 @@ describe('a letter is learned only through the words actually heard', () => {
         reported: { predicate: 'is-having-an-affair-with' },
       });
       expect(held.deliveredAt).toBe(speech.tick);
+    });
+
+    it(label + ': a second relay preserves the medium while changing the first reported copy', () => {
+      const { world, events } = answerWorld(paper);
+      world.network.spymaster = 'cyn';
+      world.enemy.observers = [];
+      world.npcs['ada']!.traits = ['name-dropper'];
+      world.npcs['ada']!.rivals = ['cyn'];
+      const observation = observationsFor('bez', events).observations
+        .find((entry) => entry.kind === 'utterance')!;
+      holdFieldObservation(world, 'enemy', 'bez', { kind: 'raw', observation },
+        null, ['ada', 'cyn'], null, []);
+      queueUnqueuedFieldReports(world);
+      const message = world.network.directiveState!.messages[0]!;
+      const first = realizeNetworkForward(world, message.id,
+        { venue: 'backroom', members: ['bez', 'ada'] }, message.availableAfter, RULES)!;
+      expect(first.spoken).toMatchObject({ kind: 'field-report', items: [{
+        observation: { reported: { predicate: 'is-having-an-affair-with' } },
+      }] });
+      expect(world.enemy.evidence).toEqual([]);
+      const second = realizeNetworkForward(world, message.id,
+        { venue: 'square', members: ['ada', 'cyn'] }, first.tick + 15, RULES)!;
+      if (second.spoken.kind !== 'field-report') throw new Error('missing relay speech');
+      const relayed = second.spoken.items[0]!.observation;
+      medium(relayed, paper);
+      expect(relayed).toMatchObject({ reported: {
+        predicate: 'is-having-an-affair-with', attribution: paper ? 'cyn' : SOMEONE,
+      } });
+      captureEvidence(world, {
+        tick: second.tick, positions: {}, utterances: [], askings: [], networkSpeeches: [second],
+      }, RULES);
+      const entry = world.enemy.evidence.find((item) => item.kind === 'utterance')!;
+      medium(entry, paper);
+      expect(entry.observer).toBe('ada');
     });
   }
 });
