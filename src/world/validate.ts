@@ -79,6 +79,8 @@ export function validateTown(town: GeneratedTown, config: GenConfig, opts: Valid
 
   const venueIds = new Set(fixture.venues.map((v) => v.id));
   const npcIds = new Set(fixture.npcs.map((n) => n.id));
+  const sharedId = fixture.venues.find((v) => npcIds.has(v.id))?.id;
+  if (sharedId) fail('ids-unique', `venue and npc share id '${sharedId}'`);
   for (const n of fixture.npcs) {
     if (!venueIds.has(n.home)) fail('refs-resolve', `npc ${n.id}: unknown home '${n.home}'`);
     for (const s of n.schedule) if (!venueIds.has(s.venue)) fail('refs-resolve', `npc ${n.id}: unknown venue '${s.venue}'`);

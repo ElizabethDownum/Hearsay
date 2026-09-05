@@ -26,6 +26,9 @@ export function buildWorld(fixture: TownFixture, seed: string, rules?: Rules): W
   if (dupVenue) throw new Error(`buildWorld: duplicate venue id '${dupVenue}'`);
   const dupNpc = firstDuplicate(fixture.npcs.map((n) => n.id));
   if (dupNpc) throw new Error(`buildWorld: duplicate npc id '${dupNpc}'`);
+  const npcIds = new Set(fixture.npcs.map((n) => n.id));
+  const sharedId = fixture.venues.find((v) => npcIds.has(v.id))?.id;
+  if (sharedId) throw new Error(`buildWorld: venue and npc share id '${sharedId}'`);
 
   const venues = Object.fromEntries(fixture.venues.map((v) => [v.id, v]));
   // The world OWNS its npcs — clone each (and its edges) so post-build edge writes (Plan 8

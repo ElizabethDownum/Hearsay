@@ -5,6 +5,7 @@ import { STANDARD_GEN_CONFIG, STANDARD_GEN_CONTENT } from '../../src/content/gen
 import { STANDARD_RULES } from '../../src/content/rules';
 import { TESTFORD } from '../../src/content/fixtures/testford';
 import { TRAITS } from '../../src/content/traits';
+import { buildWorld } from '../../src/sim/world';
 import type { Npc, Venue } from '../../src/sim/types';
 import type { GenConfig, GeneratedTown } from '../../src/world/types';
 
@@ -35,6 +36,19 @@ describe('structural invariants (red, one each)', () => {
     const t = town([npc('a'), npc('b')]);
     t.fixture.venues.push(venue('home-a', 'd0', 'private')); // duplicate venue id
     expect(failuresOf(t, cfg())).toContain('ids-unique');
+  });
+
+  it('ids-unique rejects an id shared across the venue and NPC namespaces', () => {
+    const t = town([npc('market'), npc('b')], [venue('market')]);
+    expect(validateTown(t, cfg()).failures).toContainEqual({
+      invariant: 'ids-unique', detail: "venue and npc share id 'market'",
+    });
+  });
+
+  it('buildWorld rejects the same cross-namespace collision before records collapse it', () => {
+    const t = town([npc('market'), npc('b')], [venue('market')]);
+    expect(() => buildWorld(t.fixture, 'cross-namespace-id-collision'))
+      .toThrow("buildWorld: venue and npc share id 'market'");
   });
 
   it('refs-resolve', () => {

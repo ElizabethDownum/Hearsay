@@ -352,9 +352,9 @@ function hasReshown(world: WorldState, artifactId: string, holder: EntityId): bo
  *
  * A reader is named `to` on a show, a hand-over and a re-show, and `by` on a pickup (the finder is
  * their own source). The one shape that is not a reading is a VENUE plant, whose `to` is the room the
- * page waits in: a room is not a reader, so a `to` that names a venue is excluded. Where an id belongs
- * to both a venue and an npc — which world-gen's `ids-unique` invariant checks only WITHIN each
- * namespace — this errs toward granting an extra viewing rather than suppressing a lawful one.
+ * page waits in: a room is not a reader, so a `to` that names a venue is excluded. The `ids-unique`
+ * invariant in `validateTown` and the matching `buildWorld` guard make venue and NPC ids disjoint by
+ * construction, so this exclusion cannot suppress a lawful NPC viewing.
  */
 function hasSeen(world: WorldState, artifactId: string, viewer: EntityId): boolean {
   return world.chronicle.some((entry) => {
