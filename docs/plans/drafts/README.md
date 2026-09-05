@@ -1,4 +1,4 @@
-# Plan 9 author snapshots — 5 September 2026
+# Plan 9 author snapshots â€” 5 September 2026
 
 ## Latest recovered proposals
 
@@ -10,7 +10,7 @@ approved gameplay. The real Task 2/3 predecessor commits must still be reconcile
   authored cases present; root verified the count and complete-block syntax.
   Focused independent re-review remains pending. Draft SHA-256:
   `EBACFF982443BA604006D33CE62F5AD9AA11D95FE08E4C3DA70DB523A91176ED`.
-- [Task 4 completed séance draft](2026-09-05-task-4-seance-complete.md) and
+- [Task 4 completed sÃ©ance draft](2026-09-05-task-4-seance-complete.md) and
   [completed author report](2026-09-05-task-4-author-report-complete.md): review
   stopped at quota before a verdict. Draft SHA-256:
   `14ABA1730FF43696C17D0D81D293C6B96E2065F7B2DE83BD91F1515C4D8EE005`.
@@ -27,10 +27,12 @@ Read each report before using its draft. Resume working copies are under
 - [Task 3 scrying draft](2026-09-05-task-3-scrying.md) and
   [author report](2026-09-05-task-3-author-report.md): fair-cop code/tests,
   app-session replay, coherent chunk/file licenses and self-review remain.
-- [Task 4 séance draft](2026-09-05-task-4-seance.md) and
+- [Task 4 sÃ©ance draft](2026-09-05-task-4-seance.md) and
   [author report](2026-09-05-task-4-author-report.md): exact generation/runtime
   patches, night-visit mechanism, test bodies and self-review remain.
 
 Current decisions are in [the review document](../../review.html), and the
-execution order is in [the current plan](../plan-9-current.md). Task 1 still
-needs the corrections identified by independent review before Task 2 can begin.
+execution order is in [the current plan](../plan-9-current.md). Task 1 corrections
+and Task 2 forensics are now implemented and locally gated at dc114da, with
+independent code approval still pending. Task 3 must reconcile that actual source
+and consolidate the temporary forensics auditor before execution.

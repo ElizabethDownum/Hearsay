@@ -1,161 +1,98 @@
-# Hearsay — restart handoff, 5 September 2026
+# Hearsay continuation — 5 September 2026
 
-Ellie requested a safe stopping point to restart the computer. This is the
-project-local continuation pointer; shared AI memory remains at its older state
-because Ellie asked that all writes stay inside Hearsay.
-
-**Resumed after restart:** Ellie asked to continue. Repository/index were clean
-at 0241fc8b82a633856a47c625d2b807753e9fa138; repeated boot checks passed 1713/113,
-lint, typechecks and build. The bounded R12/R13 correction and completion of the
-scrying author draft resumed. H2 is committed at 2fe440f and H1 at a53551d.
-Full controller gates and simulation comparison pass. Independent review closed
-R13 but found two binding-stability false greens in the scanner (R15). Codex
-workers then hit their usage limit. Byte-preserved plans/reports and raw review
-evidence remain local. Claude completed the scrying draft recovery, then the
-scanner author and séance reviewer hit a new session limit (reset reported as
-15:20 CDT / 20:20 UTC on 5 September). No worker remains active. Root verified
-the recovered draft's 79 authored cases and complete-block syntax; these are
-not executed gameplay tests. Root owns all Git
-index/commits; the implementation worker returns unstaged changes. The detailed
-current ledger is `../.superpowers/sdd/progress.md`. The wind-down section below describes the
-previous checkpoint, not current worker activity.
+**Forensics is implemented and locally gated. Independent review is still open.**
+This project-local handoff supersedes the older shared AI memory. All writes in
+this session stayed inside Hearsay at Ellie's request.
 
 ## Current state
 
-- Repository: `C:/Users/eliza/Desktop/ClaudeFiles/hearsay`, branch `main`.
-- Last implementation commit: `a53551d6e47fc575f7c306f43f9fa0ff836250cc`.
-  H2 `2fe440f` adds the atomic enrollment/empty-id guards; H1 `a53551d` corrects
-  the scanner's bound, retention, forwarding and outcome-recording proofs.
-  G2 recovery `a458cd2`, G3 venue/NPC id collision rejection `55a45ae`, and G4
-  avatar re-show replay `caa5a38` are committed. F1–F5 and G1 were already
-  committed; do not repeat or discard them.
-- Controller gate at that implementation commit: 1,737 tests in 113 files,
-  lint, both typechecks and production build passed. JavaScript bundle
-  `index-lvG-BgOB.js`: 489.96 kB / 145.09 kB gzip.
-- Soak and MC passed. All 10 complete stdout report blocks, 230 deterministic
-  lines, match `bd930cc`. Full raw logs and comparison result are in
-  `../.superpowers/sdd/p9-t1-final-correction-controller/`.
-- The earlier independent review found one Critical and one Important issue.
-  Both corrections are committed and gated, with real RED/GREEN evidence.
-  Independent review over `ae1d5ac..a53551d` delivered Needs-fixes: two further
-  binding-stability false greens, with R13 closed and R14 otherwise conformant.
-  The final reviewer report was lost to quota, so root wrote explicitly labeled
-  [recovery notes](review/2026-09-05-binding-stability-findings.md) from the
-  delivered findings and actual raw logs. Task 1 remains open.
-- Task 2 forensics has an audited brief but has NOT been dispatched. Tasks 3/4
-  have draft authoring artifacts only. No magic implementation has landed.
+- Repository C:/Users/eliza/Desktop/ClaudeFiles/hearsay, main; no push.
+- Current implementation HEAD dc114da3006a75115784e4e894e880dd113226f5.
+- Task 1 R15 scanner correction: 7d5608f, +27 tests. Report:
+  ../.superpowers/sdd/task-1-binding-stability-root-report.md.
+- Task 2: C1 marker projection 8fee456, C2 pure tracing fold 664e0a2,
+  C3 integration/replay dc114da, +16 tests. [Implementation report](review/2026-09-05-forensics-implementation.md).
+- All six local gates at dc114da: **1780/114**, lint, both typechecks, build,
+  soak and MC exit0. JS index-hHcrttYf.js 490.61kB /145.28kB gzip.
+  All10 complete report blocks /230 deterministic lines match bd930cc.
+  Twelve full no-forgery snapshots match pre-Task-2 source byte for byte.
+- Independent approval of R15 and Task 2 is pending. Passing local gates do not
+  certify either task complete. Review delta exists at
+  ../.superpowers/sdd/review-b8ff101..dc114da.diff.
+- Task 3/4 magic: complete author proposals only, no production implementation.
+  Task 3 recovered draft has79 proposed cases, syntax checked; root additionally
+  probed both digest-reference corrections in memory. This is planning evidence.
+  Task 4 plan review ended at quota without a saved verdict.
+- Remaining full Plan9: scrying, séance, prose foundation (7A), debrief data/models,
+  debrief UI/remaining prose (6/7B), integration/closeout (8). Plan10 follows later.
 
-## Persistent instructions
+## Persistent authority
 
-Ellie authorized: audit/read the existing plan, then continue implementation;
-the previous Claude Hearsay session had stopped editing; keep all files/changes
-inside the Hearsay folder in ClaudeFiles; take recommended defaults and put all
-questions/issues in the HTML review document for later reading.
+Ellie authorized audit/planning then continued implementation, confirmed the earlier
+Hearsay editor had stopped, requested all changes in this project folder, and asked
+that recommended defaults proceed with all questions/issues held in
+[the HTML review document](review.html). Shared AI/memory/skills and external plans
+are read-only. Root owns the index and scoped local commits. No push.
 
-No Claude dispatch before **2026-09-05 12:24:11 UTC / 07:24:11 CDT** (conservative
-expiry for the requested 2 hours 15 minutes starting at the later "starting now"
-message). Native Codex workers were used. Implementation and independent review
-were separate threads from the same provider. No push occurred.
+The original no-Claude interval has expired. Ellie explicitly authorized sending
+Hearsay plans/context/source-derived materials to external Claude/Anthropic after
+an automatic review rejection. Subsequent dispatches were approved. Do not ask
+again; unrelated personal/shared memory is excluded.
 
-That pause has elapsed. Ellie then explicitly authorized transmitting these
-Hearsay project plans/context/source to Anthropic after automatic approval review
-initially rejected the dispatch. Subsequent restricted dispatches were approved;
-do not request that authorization again. Unrelated personal/shared memory stays
-excluded. Workers have no shell, agents, hooks, MCP or session persistence and can
-edit only their named plan/report files. Root supplies tests and commits.
+After worker quotas and the controller-only role restriction were explained, Ellie
+renewed the go-ahead. Root implemented directly under that disclosed interpretation.
+PROVISIONAL process amendment: Task2 proceeded on gated R15 while separate review
+remained open. This changed sequencing, not final review requirements or gameplay.
+See HTML R3/R4 and ../.superpowers/sdd/task-2-root-execution-note.md.
 
-## Resume order
+## Next work and capacity
 
-1. Read this handoff, the [session episode](episodes/2026-09-05-recovery-and-plan-audit.md),
-   [current plan](plans/plan-9-current.md), and [review document](review.html).
-   Inspect Git status/log and the latest ignored per-task reports before editing.
-   A documentation commit may follow `a53551d`; that does not mean new game code.
-2. Complete the binding-stability correction before Task 2. Current author brief:
-   `../.superpowers/sdd/task-1-binding-stability-author-brief.md`; outputs are
-   `task-1-binding-stability-plan.md` and `task-1-binding-stability-author-report.md`.
-   Root must inspect/probe the authored correction, then separately implement
-   tests-first, gate and review its actual committed result. Prior review brief:
-   `../.superpowers/sdd/task-1-final-correction-review-brief.md`; implementation
-   report: `task-1-final-correction-implementation-report.md` in that directory.
-   The earlier completed
-   [independent review](review/2026-09-05-artifact-recovery-review.md) is saved
-   in tracked documentation is the reason for the committed correction, not its
-   current verdict. Approved correction plan and controller adjudication are
-   `task-1-final-correction-plan.md` and `task-1-final-correction-controller-adjudication.md`
-   under the same work directory. Preserve their explicit static-analysis boundary;
-   do not restart an unbounded hardening cycle.
-3. After approval, resolve the actual committed HEAD and update
-   `../.superpowers/sdd/task-2-brief.md`'s `<FILL AT DISPATCH>` plus obsolete Opus
-   seat text in a resolved dispatch note. Current floor is 1,737 tests /113
-   files. Use the complete-report comparator and raw baseline named above.
-   Implement marker → perception → direct/delayed report → pure forensics fold,
-   then independent review. The amended perception projection license is required.
-4. Review and complete the corrected Task 3/4 author drafts before dispatching
-   either. Drafts need real Task 2/3 predecessor hashes and source re-verification.
-   Follow the corrected dependency order in the current plan for prose, debrief
-   models/UI and integration tests.
-   Task 3's first plan review found missing nested-reference identity and copy
-   isolation consumers. Both corrections and the marker-collision controls are
-   now fully authored, awaiting focused independent re-review. The initial review is preserved
-   at [scrying plan review](review/2026-09-05-scrying-plan-review.md). Task 7A has a
-   prepared author brief but has not been dispatched.
+1. Read current Git status/log, [current plan](plans/plan-9-current.md), HTML R3/R4/R15,
+   and the latest controller ledger prefix before editing or appending. A later
+   documentation commit does not mean new game code. Preserve all earlier recovery
+   commits and the explicit bounded scanner mandate; no endless hardening cycle.
+2. Obtain independent implemented-code review of the actual combined R15/Task2
+   range. Reviewer must have a real native gate/probe route and state what it reran.
+   File-only authoring review is not implemented-code approval. Fix actual findings
+   within the mandate; never self-approve or invent an exact-HEAD run.
+3. Reconcile/review Task3's frozen recovered plan against the now-real Task2 source,
+   including consolidation of the temporary tests/sim/helpers/forensics-audit.ts
+   caller into Task3's planned shared sketch-audit.ts. Then TDD implementation,
+   full gates/simulation comparison and separate code review. Task4 follows.
+4. Independent prose-foundation authoring (prepared brief
+   ../.superpowers/sdd/task-7a-author-brief-2026-09-05.md) may proceed while capacity
+   is unavailable. It has no production implementation yet. Follow the current
+   plan's prose-before-debrief dependency order afterward.
 
-All three Claude CLI sessions have ended: scrying recovery `43360` completed
-with exit 0; scanner author `92900` and séance reviewer `23943` ended with exit 1,
-API 429, session-limit reset at 15:20 CDT / 20:20 UTC. Do not poll these closed
-sessions or treat their IN PROGRESS reports as deliverables. The scanner plan
-was never written; the séance review has no findings/verdict saved. Native
-collaboration workers also exhausted quota. Preserve the raw logs; retry only
-when capacity is available. Cross-model authorization remains valid.
+All native workers exhausted quota (last reported reset Sep6 22:06).
+Claude sessions43360/92900/23943 are CLOSED. Scrying43360 completed; scanner author
+92900 and séance reviewer23943 failed API429 with reset **Sep5 15:20 CDT /20:20 UTC**.
+Do not poll closed sessions or repeatedly dispatch before capacity returns. Native
+limit and Anthropic authorization are different issues; authorization persists.
 
-The [draft snapshot index](plans/drafts/README.md) identifies the latest completed
-Task 3/4 proposals separately from the historical partial restart snapshots.
-Task 3's corrected draft SHA-256 is
-`EBACFF982443BA604006D33CE62F5AD9AA11D95FE08E4C3DA70DB523A91176ED`.
-Root's count/syntax output and lint result are under
-`../.superpowers/sdd/task-3-validation/`; all four earlier quota snapshots were
-hash-verified unchanged. Focused re-review is prepared but not dispatched.
+## Evidence and reusable checks
 
-## Artifact map
+- ../.superpowers/sdd/progress.md — controller ledger; latest session prefix.
+- ../.superpowers/sdd/task-2-report.md and task-2-progress.md — detailed implementation.
+- ../.superpowers/sdd/task-2-root-gate/ — actual native logs, comparison, manifest.
+- ../.superpowers/sdd/task-2-no-forge/ — full before/after snapshots and proof.
+- ../.superpowers/sdd/task-2-root-logs/ — original/vehicle-corrected REDs and GREENs.
+- [Draft index](plans/drafts/README.md) — byte-preserved Task3/4 proposals and histories.
+- ../.superpowers/sdd/task-3-validation/ — syntax/count and correction-consumer probes.
+- ../.superpowers/sdd/compare-report-blocks-2026-09-05.mjs — complete-report comparator
+  with known-good/changed/extra/missing controls; old selective comparator superseded.
 
-- `../.superpowers/sdd/progress.md` — controller ledger; current session notes at top.
-- `../.superpowers/sdd/task-1-progress.md` — recovery implementation commit units.
-- `../.superpowers/sdd/resume-2026-09-05-g2-snapshot/` — byte copies, hashes and diff
-  of the inherited unfinished G2 edits before this session touched them.
-- `../.superpowers/sdd/p9-resume-premises-2026-09-05-report.md` — recovery audit.
-- `../.superpowers/sdd/p9-plan-audit-2026-09-05-report.md` — remaining-plan audit,
-  including its corrected receipt-history premise.
-- `../.superpowers/sdd/compare-report-blocks-2026-09-05.mjs` — complete-report
-  comparator, with known-good/changed/extra/missing controls. The older worker
-  selection-based comparator can overlook extra output and is superseded.
-- `../.superpowers/sdd/task-3-author-{draft,report}.md` — scrying proposal/status.
-- `../.superpowers/sdd/task-4-author-{draft,report}.md` — séance proposal/status.
-- [Committed partial draft snapshots](plans/drafts/README.md) — both authors'
-  saved code proposals and explicit unfinished-work reports.
-- [Remaining-plan audit](review/2026-09-05-plan-audit.md) and
-  [recovery review](review/2026-09-05-artifact-recovery-review.md) — preserved reports.
-- [HTML review source](review/current.md), [historical docket](review/prior-decisions.md),
-  [builder](review/build_review.py). Rebuild with `python docs/review/build_review.py`.
+The original fair-cop pillar is unchanged; its private function was mechanically
+copied for forensics and exact-function verified. Consolidate at Task3's planned
+extraction, not by weakening assertions. Pickup waits for a later beat; re-shows
+create a new family alongside earlier hearsay. These fixture corrections changed
+no game physics. The name-dropper trait, rather than the vague-only attributor,
+provides the named-source lie. H10 follows H5's first-reference deduplication.
 
-`.superpowers/sdd` is ignored but persists on this machine across a restart.
-Nothing there should be mistaken for committed code merely because a file exists.
-The test/build loader may hit sandbox path access denial in esbuild before tests
-start. Exact test/build escalation succeeded; no tool configuration was changed.
+Build review HTML with python docs/review/build_review.py. Literal npm run lint
+also scans ignored .mjs files. Native esbuild/test/build can require exact sandbox
+escalation for ancestor-path access; prior escalations succeeded without config
+changes. Preserve raw native exits; loader failure is not assertion RED.
 
-## Historical pre-restart wind-down disposition
-
-All session workers have completed their wind-down. The reviewer reports no
-active process/session. Both authors saved PARTIAL, NOT DISPATCH-READY work and
-made no production/test/index edits. No new implementation or review is running.
-
-The independent reviewer repeated focused tests (125/125), the full suite
-(1,713/113), typechecks and build. It found a lint-only unused variable in the
-controller's ignored complete-report comparator. The controller removed it,
-reran literal `npm run lint` successfully (log `handoff-2026-09-05-lint.log`), and
-reran the complete-report comparison with all four controls successfully.
-The two substantive review findings remain intentionally unfixed at this safe
-stopping point; do not mistake passing tests for review approval.
-
-All session-created documentation and the partial plan/report snapshots are
-included in a scoped local checkpoint commit. Implementation HEAD remains
-`caa5a38`; use `git log` to resolve the subsequent documentation commit. No push.
+Historical restart details remain in the Git history of this handoff and the
+[session episode](episodes/2026-09-05-recovery-and-plan-audit.md).

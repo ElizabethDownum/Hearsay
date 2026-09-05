@@ -1,23 +1,27 @@
 # Plan 9 — current execution plan
 
-Updated: 2026-09-05. Controller: Codex. Original authoring base: 2436a36.
-Recovery base: 49cc3e7; measured inherited WIP baseline: 1710 tests / 113 files.
-Recovery now committed through caa5a38: G2 a458cd2, G3 55a45ae, G4 caa5a38.
-Controller gate: 1713 tests / 113 files, lint, both typechecks and production build
-green; 10 complete simulation report blocks / 230 deterministic lines unchanged.
-Independent review at caa5a38 returned Needs-fixes: one Critical and one Important.
-Task 1 is not closed. Ellie resumed after the computer restart. Current base is
-0241fc8; the repeated boot gate passes 1713/113, lint, typechecks and build.
-H2's bounded namespace correction is committed at 2fe440f; H1's scanner correction
-is committed at a53551d. Controller gates at that exact HEAD pass 1737/113, lint,
-typechecks, build, soak and MC; all 10/230 deterministic reports match. Independent
-review of ae1d5ac..a53551d closed R13 but found two binding-stability false greens
-(R15). The native workers then exhausted quota; saved artifacts and raw review
-evidence are preserved. Fable 5.1 completed the scrying draft correction before
-a new quota limit stopped the scanner author and séance reviewer. Neither of
-those two saved a completed deliverable. Reset is reported as 15:20 CDT /
-20:20 UTC on 5 September; no worker is running.
-R14 distinguishes the referee's recorded outcome from a belief write.
+Updated: 2026-09-05. Controller: Codex. Current implementation HEAD:
+**dc114da3006a75115784e4e894e880dd113226f5**.
+
+Task 1's R15 correction is implemented at 7d5608f. Task 2 forensics is implemented
+in 8fee456, 664e0a2 and dc114da. All six local gates pass: **1780 tests /114 files**,
+lint, both typechecks, build, soak and MC. All 10 complete simulation report
+blocks /230 deterministic lines match the baseline. Twelve full no-forgery world
+snapshots also match the pre-Task-2 source byte for byte. Independent approval of
+R15 and Task 2 remains pending; neither is certified complete.
+
+Ellie renewed the go-ahead after worker quotas and the controller-only restriction
+were explained. Under the disclosed PROVISIONAL process amendment, root implemented
+the audited forensics task on the green foundation while independent review remained
+open. This superseded review-before-start sequencing, without waiving final review
+or changing gameplay design/physics. All new production changes stay in the brief's
+eight licensed files; pillar suites and exposure/turncoat mechanics are unchanged.
+
+Task 3 scrying and Task 4 séance remain author proposals, with no magic implementation.
+Root verified the Task 3 recovered count/syntax and the two corrected digest consumers
+in memory; separate plan re-review remains open. Both worker providers exhausted
+capacity. Claude's last reset message was 15:20 CDT /20:20 UTC on 5 September;
+no worker remains active, and closed sessions must not be repeatedly polled.
 
 This document records the current execution order and binding audit amendments.
 It does not certify unimplemented task bodies as dispatch-ready. Exact per-task
@@ -59,7 +63,8 @@ silently rewritten by this Plan 9 recovery.
    static-analysis boundary or start another speculative hardening cycle.
    Corrected code is committed and independently gated. Review found that bound
    parameters and function aliases can be reassigned after the scanner's proof;
-   Task 2 waits for that bounded R15 correction and independent closure.
+   R15 is now corrected at 7d5608f; independent closure remains pending.
+   Task 2 proceeded under the prominently disclosed process amendment above.
    Current author brief: ../../.superpowers/sdd/task-1-binding-stability-author-brief.md.
    Interrupted review evidence: ../review/2026-09-05-binding-stability-findings.md.
    Current review: ../../.superpowers/sdd/task-1-final-correction-review-brief.md.
@@ -77,8 +82,9 @@ silently rewritten by this Plan 9 recovery.
    defaults. Perception license now includes the utterance Observation arm and
    observationsFor's conditional projection, with direct/delayed boundary tests
    required by the amended brief. Replace the obsolete base placeholder
-   only after Task 1 closes at a verified committed HEAD. Exposure/digest pillar
-   suites stay unchanged. See review item R4 and the independent audit.
+   in the resolved root execution note (base 7d5608f). Implementation is now
+   committed at dc114da and locally gated; independent review remains pending.
+   Exposure/digest pillar suites are unchanged. See R4 and the implementation report.
 3. **Task 3 scrying:** exact live sensor/provenance interfaces and persistent
    physical residue discovery/reporting are fully drafted. Independent plan review
    found two missing physical-reference consumer migrations: identity comparison
