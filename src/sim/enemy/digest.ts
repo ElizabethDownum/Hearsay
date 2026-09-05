@@ -165,7 +165,7 @@ export function pressureFor(score: number): 0 | 1 | 2 {
  * zero world access, zero mutation. Attribution corruption by answerer traits is
  * CHASED, not seen through — the enemy trusts testimony the way testimony deserves.
  *
- * The nine digest heuristics appear below as named sections, in the spec's order.
+ * Named heuristics and trace rules mint features before the order-selection sections.
  * `pressure` defaults to 0 (the pre-Task-10 shape) so every existing call site — the
  * no-omniscience pillar test included — stays byte-identical without touching a single
  * call.
@@ -369,6 +369,27 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
     tailDrops.push({
       leadFeatureId: leadId, subject: lead.subject, district: lead.district,
       watchStartDay: startRow.scheduleStartDay, untilDay: day + RUNAROUND_COOLDOWN_DAYS,
+    });
+  }
+
+  // ── Heuristic 10: a spoken document names the hand that passed it ──────────
+  // One hop, as reported: no custody lookup, and no inference from silent circulation.
+  // Like H5, retain the first answer for each subject, then dedupe against the whole sketch.
+  const documentAnswers = new Map<EntityId, EvidenceEntry>();
+  for (const e of state.evidence) {
+    if (e.kind !== 'utterance' || e.mode !== 'answer' || e.document !== true) continue;
+    const hand = e.reported.attribution;
+    if (hand === SOMEONE || hand === e.speaker || documentAnswers.has(hand)) continue;
+    documentAnswers.set(hand, e);
+  }
+  for (const hand of [...documentAnswers.keys()].sort(byId)) {
+    if (has((f) => f.kind === 'forged-document' && f.subject === hand)) continue;
+    const answer = documentAnswers.get(hand)!;
+    addFeature({
+      kind: 'forged-document', day, family: null, subject: hand,
+      district: personOf.get(hand)?.district ?? null,
+      detail: `a letter passed from hand to hand; the one who handed it over was ${hand}`,
+      evidence: [ref(answer)],
     });
   }
 

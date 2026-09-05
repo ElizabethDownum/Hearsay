@@ -93,7 +93,8 @@ export interface SketchEvidenceRef {
 
 export interface SketchFeature {
   id: string;
-  kind: 'district-activity' | 'entry-point' | 'origin-vague' | 'carrier-profile' | 'runaround';
+  kind: 'district-activity' | 'entry-point' | 'origin-vague' | 'carrier-profile' | 'runaround'
+    | 'forged-document';
   day: number;
   family: RumorId | null;
   subject: EntityId | null;

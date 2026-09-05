@@ -139,7 +139,8 @@ export interface NetworkSpeechRecord {
  *
  * Deliberately carries no `heardBy`: showing paper to one person is not an utterance, so it does not
  * enter the overhearing/capture physics that `TellingRecord` does. Enemy-side tracing of documents is
- * this plan's Task 2 (`enemy/digest.ts` heuristic 10), reading these records as evidence.
+ * this plan's Task 2 (`enemy/digest.ts` heuristic 10), reading the holder's compelled answer as
+ * evidence. The digest never reads these artifact records or reconstructs hidden custody.
  */
 export interface ArtifactRecord {
   kind: 'artifact';
