@@ -50,10 +50,11 @@ import { ARTIFACT_CREDENCE } from '../../src/sim/artifacts';
  * completeness prong below fails if `src/` ever grows a credence-taking function this list does not
  * name — the law extends itself instead of silently narrowing.
  *
- * THE DECLARED BOUNDARY (docket P9-4). What this scan does NOT see is one class and one class only:
- * a value reaching a credence through a holder the checker cannot connect to `Belief` — an
- * `any`/`unknown`-typed alias, or a structurally unrelated intermediate. Backstops: `noImplicitAny`,
- * the P9-2 behavioural campaign pin, live ≡ replay, and zero such forms in production today.
+ * THE DECLARED BOUNDARY (docket P9-4). The accepted residual is checker-disconnected holder flow;
+ * this scan does not claim universal alias or runtime accessor analysis. The explicit R14 TurnEvidence
+ * projection is counted as recorded, not treated as a belief write or a proven bound. Backstops:
+ * `noImplicitAny`, the P9-2 behavioural campaign pin, live ≡ replay, and zero such forms in production
+ * today.
  *
  * Same idiom as `determinism-law.test.ts` (AST scan) and `jargon.test.ts` (live sweep plus an injected
  * firing proof): the live sweep reads only repository files, so by construction it can never be
@@ -385,6 +386,7 @@ interface CredenceWrite {
   expr: ts.Expression;
   /** The reason this write is unprovable whatever it carries, or null when its value is visible. */
   opaque: string | null;
+  destination?: ts.Expression;
 }
 
 /** Which credence a target names: one we can see, one we cannot read, or none. */
@@ -476,7 +478,10 @@ function credenceWrites(file: ts.SourceFile, scan: Scan): CredenceWrite[] {
         ? null : ts.tokenToString(node.operatorToken.kind) ?? '<compound>';
       const reach = credenceTarget(target, scan);
       if (reach === 'credence') {
-        found.push({ expr: node.right, opaque: operator === null ? null : COMPOUND_WRITE(operator) });
+        found.push({
+          expr: node.right, opaque: operator === null ? null : COMPOUND_WRITE(operator),
+          ...(operator === null ? { destination: target } : {}),
+        });
       } else if (reach === 'unreadable') {
         found.push({ expr: node, opaque: ELEMENT_KEY_WRITE });
       } else if (isPattern(target) && patternWritesCredence(target, scan)) {
@@ -542,22 +547,40 @@ function credenceSinks(file: ts.SourceFile): { name: string; index: number }[] {
 
 // ── The value question ────────────────────────────────────────────────────────────────────────────
 
-/** A parse-time number: a literal, or a name the constant map resolves. */
-function numericValueOf(expr: ts.Expression, constants: Map<string, number>): number | undefined {
+/** Numeric leaves are resolved by binding; a same-spelled shadow is not a bound. */
+function numericValueOf(expr: ts.Expression, scan: Scan): number | undefined {
   const target = unwrap(expr);
   if (ts.isNumericLiteral(target)) return Number(target.text);
-  const name = dottedName(target);
-  return name === null ? undefined : constants.get(name);
+  const declaration = boundSymbol(target, scan)?.valueDeclaration;
+  if (declaration === undefined) return undefined;
+  if (ts.isVariableDeclaration(declaration) && declaration.initializer !== undefined
+    && ts.isVariableDeclarationList(declaration.parent)
+    && (declaration.parent.flags & ts.NodeFlags.Const) !== 0) {
+    const value = unwrap(declaration.initializer);
+    return ts.isNumericLiteral(value) ? Number(value.text) : undefined;
+  }
+  if (ts.isPropertyAssignment(declaration)) {
+    const value = unwrap(declaration.initializer);
+    let owner: ts.Node = declaration.parent;
+    while (ts.isParenthesizedExpression(owner.parent) || ts.isAsExpression(owner.parent)
+      || ts.isSatisfiesExpression(owner.parent) || ts.isTypeAssertionExpression(owner.parent)) {
+      owner = owner.parent;
+    }
+    const variable = owner.parent;
+    const checked = scan.checker.getTypeAtLocation(target);
+    if (ts.isNumericLiteral(value) && (checked.flags & ts.TypeFlags.NumberLiteral) !== 0
+      && ts.isVariableDeclaration(variable)
+      && ts.isVariableDeclarationList(variable.parent)
+      && (variable.parent.flags & ts.NodeFlags.Const) !== 0) return Number(value.text);
+  }
+  return undefined;
 }
 
 /**
- * Is this expression the enclosing function's own `credence` parameter, where that function is a
- * DECLARED sink? Then the value was already held to the law at the call site — prong 3 audits every
- * one of them, and the completeness prong fails if a credence-taking function goes unnamed. So the
- * pass-through is bounded by the scan's own coverage, not by an allowlist. A `credence` parameter of
- * anything NOT declared as a sink is unprovable, which is what keeps that reasoning honest.
+ * A direct reference to the declared sink's own parameter forwards an already audited input; that
+ * input may be bounded or anchored.
  */
-function insideDeclaredSink(node: ts.Node): boolean {
+function insideDeclaredSink(node: ts.Expression, scan: Scan): boolean {
   for (let current: ts.Node | undefined = node.parent; current; current = current.parent) {
     const isFn = ts.isFunctionDeclaration(current) || ts.isMethodDeclaration(current)
       || ts.isArrowFunction(current) || ts.isFunctionExpression(current);
@@ -570,18 +593,28 @@ function insideDeclaredSink(node: ts.Node): boolean {
       ? fn.name.text
       : (fn.parent !== undefined && ts.isVariableDeclaration(fn.parent)
         && ts.isIdentifier(fn.parent.name) ? fn.parent.name.text : null);
-    return declared !== null && CREDENCE_SINKS[declared] === index;
+    const parameter = fn.parameters[index];
+    const reference = ts.isShorthandPropertyAssignment(node.parent)
+      ? scan.checker.getShorthandAssignmentValueSymbol(node.parent) : boundSymbol(node, scan);
+    return declared !== null && CREDENCE_SINKS[declared] === index
+      && parameter !== undefined && ts.isIdentifier(parameter.name)
+      && reference === scan.checker.getSymbolAtLocation(parameter.name);
   }
   return false;
 }
 
 /**
- * `bounded`  — the value is PROVEN to sit at or below the hearsay ceiling.
- * `anchor`   — the value is PROVEN to be the one lawful exception: the `ARTIFACT_CREDENCE` binding.
- * `not-a-number` — the value is provably not numeric, so no numeric ceiling applies to it.
- * `unprovable` — no bound can be established, so the law reports it.
+ * `bounded` — the value is proven at or below the hearsay ceiling.
+ * `anchor` — the value is proven to be the one lawful new anchor.
+ * `possibly-anchored` — an uncapped credence read/copy that may carry an anchor.
+ * `retained` — a side-effect-free read/update of the same checker binding and static member path.
+ * `forwarded` — a direct declared-sink parameter whose input sites remain audited.
+ * `recorded` — the explicit R14 non-belief projection.
+ * `not-a-number` — the value is provably not numeric.
+ * `unprovable` — no licensed provenance or bound can be established.
  */
-type Verdict = 'bounded' | 'anchor' | 'not-a-number' | 'unprovable';
+type Verdict = 'bounded' | 'anchor' | 'possibly-anchored' | 'retained'
+  | 'forwarded' | 'recorded' | 'not-a-number' | 'unprovable';
 
 /**
  * A value that cannot be a number at all. The scan's write surface keys on the NAME `credence`, and a
@@ -605,59 +638,160 @@ function isAnchorReference(expr: ts.Expression, scan: Scan): boolean {
   return symbol !== undefined && scan.anchors.has(symbol);
 }
 
+interface StableReference { root: ts.Symbol; members: string[] }
+
+/** A bound local and static data-member path; no runtime lookup or accessor proof. */
+function stableReference(expr: ts.Expression, scan: Scan): StableReference | null {
+  const target = unwrap(expr);
+  if (ts.isIdentifier(target)) {
+    const root = boundSymbol(target, scan);
+    const declaration = root?.valueDeclaration;
+    return root !== undefined && declaration !== undefined
+      && (ts.isVariableDeclaration(declaration) || ts.isParameter(declaration)
+        || ts.isBindingElement(declaration)) ? { root, members: [] } : null;
+  }
+  if (!ts.isPropertyAccessExpression(target) && !ts.isElementAccessExpression(target)) return null;
+  if (target.questionDotToken !== undefined) return null;
+  const key = ts.isPropertyAccessExpression(target) ? target.name.text : literalKey(target.argumentExpression);
+  if (key === null) return null;
+  const type = scan.checker.getTypeAtLocation(target.expression);
+  if ((type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) !== 0) return null;
+  const member = scan.checker.getPropertyOfType(scan.checker.getApparentType(type), key);
+  const declarations = member?.declarations ?? [];
+  if (declarations.length === 0 || !declarations.every((declaration) =>
+    ts.isPropertySignature(declaration) || ts.isPropertyDeclaration(declaration)
+    || ts.isPropertyAssignment(declaration) || ts.isShorthandPropertyAssignment(declaration))) return null;
+  const base = stableReference(target.expression, scan);
+  return base === null ? null : { root: base.root, members: [...base.members, key] };
+}
+
+function sameStableReference(a: ts.Expression, b: ts.Expression, scan: Scan): boolean {
+  const left = stableReference(a, scan);
+  const right = stableReference(b, scan);
+  return left !== null && right !== null && left.root === right.root
+    && left.members.length === right.members.length
+    && left.members.every((key, index) => key === right.members[index]);
+}
+
+/** Retention also requires evaluating the other operands without changing the target. */
+function sideEffectFreeNumeric(expr: ts.Expression, scan: Scan): boolean {
+  const target = unwrap(expr);
+  const type = scan.checker.getTypeAtLocation(target);
+  if ((type.flags & ts.TypeFlags.NumberLike) === 0) return false;
+  if (ts.isNumericLiteral(target)) return true;
+  if (ts.isIdentifier(target) || ts.isPropertyAccessExpression(target)
+    || ts.isElementAccessExpression(target)) return stableReference(target, scan) !== null;
+  if (ts.isBinaryExpression(target)) {
+    return !isAssignmentOperator(target.operatorToken.kind)
+      && target.operatorToken.kind !== ts.SyntaxKind.CommaToken
+      && sideEffectFreeNumeric(target.left, scan) && sideEffectFreeNumeric(target.right, scan);
+  }
+  if (ts.isPrefixUnaryExpression(target)) {
+    return (target.operator === ts.SyntaxKind.PlusToken || target.operator === ts.SyntaxKind.MinusToken
+      || target.operator === ts.SyntaxKind.TildeToken) && sideEffectFreeNumeric(target.operand, scan);
+  }
+  if (ts.isCallExpression(target)) {
+    const callee = standardLibraryCallee(target.expression, scan);
+    const fn = unwrap(target.expression);
+    const receiver = ts.isPropertyAccessExpression(fn) ? unwrap(fn.expression) : undefined;
+    const declarations = receiver !== undefined && ts.isIdentifier(receiver)
+      ? boundSymbol(receiver, scan)?.declarations ?? [] : [];
+    if (declarations.length === 0 || !declarations.every((declaration) =>
+      scan.program.isSourceFileDefaultLibrary(declaration.getSourceFile()))) return false;
+    return (callee === 'Math.min' || callee === 'Math.max')
+      && target.arguments.length > 0
+      && target.arguments.every((argument) => sideEffectFreeNumeric(argument, scan));
+  }
+  return false;
+}
+
+/** Canonical interface binding, not a type's printed name or structural resemblance. */
+function interfaceSymbol(scan: Scan, file: string, name: string): ts.Symbol | undefined {
+  const source = scan.program.getSourceFile(absolute(file));
+  const declaration = source?.statements.find((statement) =>
+    ts.isInterfaceDeclaration(statement) && statement.name.text === name);
+  return declaration !== undefined && ts.isInterfaceDeclaration(declaration)
+    ? scan.checker.getSymbolAtLocation(declaration.name) : undefined;
+}
+
+/** R14: only a direct Belief read into the actual TurnEvidence outcome record. */
+function recordsTurnEvidence(expr: ts.Expression, scan: Scan): boolean {
+  if (!ts.isPropertyAccessExpression(expr) && !ts.isElementAccessExpression(expr)) return false;
+  if (credenceTarget(expr, scan) !== 'credence' || stableReference(expr, scan) === null) return false;
+  let asserted = false;
+  const checkAssertion = (node: ts.Node): void => {
+    if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)
+      || ts.isSatisfiesExpression(node)) asserted = true;
+    ts.forEachChild(node, checkAssertion);
+  };
+  checkAssertion(expr);
+  if (asserted) return false;
+  const property = expr.parent;
+  if (!ts.isPropertyAssignment(property) || property.initializer !== expr
+    || writtenName(property.name).name !== 'credence') return false;
+  const literal = property.parent;
+  if (!ts.isObjectLiteralExpression(literal)) return false;
+  let outer: ts.Node = literal.parent;
+  while (ts.isParenthesizedExpression(outer)) outer = outer.parent;
+  if (ts.isAsExpression(outer) || ts.isTypeAssertionExpression(outer)
+    || ts.isSatisfiesExpression(outer)) return false;
+  const context = scan.checker.getContextualType(literal);
+  const report = interfaceSymbol(scan, 'src/sim/scenario/types.ts', 'TurnEvidence');
+  const belief = interfaceSymbol(scan, 'src/sim/types.ts', 'Belief');
+  return context !== undefined && report !== undefined && belief !== undefined
+    && scan.checker.getNonNullableType(context).getSymbol() === report
+    && scan.checker.getNonNullableType(scan.checker.getTypeAtLocation(expr.expression)).getSymbol() === belief;
+}
+
 /**
- * THE ONE SOUNDNESS QUESTION, asked of the VALUE rather than of the tokens: can this expression be
- * proven to land at or below the ceiling, or proven to BE the anchor? A ceiling constant is a bound
- * only where it IS the value — as an operand of arithmetic it is just a number the result is computed
- * from, which is exactly how `HEARSAY_CEILING + 0.01` slipped past a token-level reading.
- *
- * `anchor` means PROVABLY EQUALS the anchor binding, which is why the min/max rules are asymmetric:
- *   · `Math.min` is capped by its SMALLEST operand — one bounded operand bounds the result, and only
- *     an all-anchor min is still an anchor. `Math.min(ARTIFACT_CREDENCE, candidate)` proves nothing
- *     (round two's counterexample: with `candidate` at 0.96 it writes 0.96, over the ceiling and not
- *     the anchor), so it is reported.
- *   · `Math.max` is its LARGEST operand — all-bounded is bounded, and bounded-or-anchor with at least
- *     one anchor is exactly the anchor. That is what keeps the docket P9-3 monotone guard lawful and
- *     what makes `Math.max(HEARSAY_CEILING, ARTIFACT_CREDENCE)` an anchor SITE wherever it is written,
- *     which the P9-2 pin below then holds to its single sink.
- *
- * The classification is deliberately a short list of PROVABLE shapes and a fail-closed default. It
- * does not enumerate forbidden arithmetic: a spelling nobody has thought of arrives reported, and the
- * only way to make the scan silent is to write a shape whose bound is demonstrable.
+ * Composition is deliberately small: min with a genuinely bounded operand is bounded; otherwise
+ * only all-anchor min is anchor. Every other min is unprovable. Max of only bounded operands is
+ * bounded; max of bounded/anchor/retained with any anchor is anchor; max of bounded/retained with any
+ * retained is retained. Other max expressions fail. A real outer cap can bound an otherwise unsafe
+ * inner value. Retention never becomes a cap merely by nesting.
  */
-function classify(expr: ts.Expression, scan: Scan): Verdict {
+function classify(expr: ts.Expression, scan: Scan, destination?: ts.Expression): Verdict {
   const target = unwrap(expr);
 
   if (provablyNotNumeric(target)) return 'not-a-number';
   if (isAnchorReference(target, scan)) return 'anchor';
 
-  // A parse-time number, by literal or by name: the value itself answers the question.
-  const value = numericValueOf(target, scan.constants);
+  // A visible credence can carry 0.97. It cannot prove a ceiling for another value.
+  if (credenceTarget(target, scan) === 'credence') {
+    return destination !== undefined && sameStableReference(destination, target, scan)
+      ? 'retained' : 'possibly-anchored';
+  }
+
+  const value = numericValueOf(target, scan);
   if (value !== undefined) return value <= HEARSAY_CEILING ? 'bounded' : 'unprovable';
-
-  // Reading a credence is bounded by closure: whatever it holds, the law governed its own write.
-  if (credenceTarget(target, scan) === 'credence') return 'bounded';
-
-  if (ts.isIdentifier(target) && target.text === 'credence' && insideDeclaredSink(target)) {
-    return 'bounded';
+  if (ts.isIdentifier(target) && target.text === 'credence' && insideDeclaredSink(target, scan)) {
+    return 'forwarded';
   }
 
   if (ts.isCallExpression(target) && target.arguments.length > 0) {
     const callee = standardLibraryCallee(target.expression, scan);
-    const operands = target.arguments.map((argument) => classify(argument, scan));
+    const operands = target.arguments.map((argument) => classify(argument, scan, destination));
     if (callee === 'Math.min') {
       if (operands.includes('bounded')) return 'bounded';
       return operands.every((operand) => operand === 'anchor') ? 'anchor' : 'unprovable';
     }
     if (callee === 'Math.max') {
       if (operands.every((operand) => operand === 'bounded')) return 'bounded';
-      const lawful = operands.every((operand) => operand === 'bounded' || operand === 'anchor');
-      return lawful && operands.includes('anchor') ? 'anchor' : 'unprovable';
+      if (operands.every((operand) => operand === 'bounded' || operand === 'anchor' || operand === 'retained')
+        && operands.includes('anchor')) return 'anchor';
+      if (operands.every((operand) => operand === 'bounded' || operand === 'retained')
+        && operands.includes('retained')) return 'retained';
     }
   }
-
-  // Everything else — every arithmetic form, every call the scan cannot reason about — fails closed.
   return 'unprovable';
+}
+
+function writeVerdict(write: CredenceWrite, scan: Scan): Verdict {
+  if (write.opaque !== null) return 'unprovable';
+  const verdict = classify(write.expr, scan, write.destination);
+  if (verdict === 'retained' && !sideEffectFreeNumeric(write.expr, scan)) return 'unprovable';
+  if (verdict === 'possibly-anchored' && recordsTurnEvidence(write.expr, scan)) return 'recorded';
+  return verdict;
 }
 
 interface Reached { literals: number[]; names: { name: string; node: ts.Expression }[] }
@@ -709,13 +843,15 @@ function auditCredencePaths(sources: readonly Source[]): {
   const records: SiteRecord[] = [];
 
   for (const { file, ast } of scan.files) {
-    for (const { expr, opaque } of credenceWrites(ast, scan)) {
+    for (const write of credenceWrites(ast, scan)) {
+      const { expr, opaque } = write;
       // An opaque write is unprovable BY SHAPE: the law must hold for a result no static scan can
       // pin, and whatever the visible text carries is beside the point.
-      const verdict: Verdict = opaque === null ? classify(expr, scan) : 'unprovable';
+      const verdict = writeVerdict(write, scan);
       const source = expr.getText(ast).replace(/\s+/g, ' ').trim();
       records.push({ file, within: enclosingFunction(expr), verdict, source });
-      if (verdict === 'bounded' || verdict === 'not-a-number') continue;
+      if (verdict === 'bounded' || verdict === 'not-a-number' || verdict === 'retained'
+        || verdict === 'forwarded' || verdict === 'recorded') continue;
       const before = violations.length;
       if (opaque !== null) violations.push({ file, source, detail: opaque });
       const { literals, names } = reachedBy(expr);
@@ -736,7 +872,7 @@ function auditCredencePaths(sources: readonly Source[]): {
       // review's `HEARSAY_CEILING + 0.01`: no number is out of bounds, the VALUE is unbounded. The
       // guard keeps the report to one reason per site — where a literal or a name already explains
       // the failure, that is the diagnostic worth reading.
-      if (verdict === 'unprovable' && violations.length === before) {
+      if ((verdict === 'unprovable' || verdict === 'possibly-anchored') && violations.length === before) {
         violations.push({ file, source, detail: 'this write\'s value cannot be proven at or below the hearsay ceiling — a ceiling constant is a bound only where it IS the value, never as an operand' });
       }
     }
@@ -844,7 +980,7 @@ describe('the evidence-hierarchy law FIRES on injected violations (proof, not pr
 
   it('stays silent on the lawful spellings the engine actually uses', () => {
     const injected = audit([
-      'export const STANCE = { REPEAT: 0.5 };',
+      'export const STANCE = { REPEAT: 0.5 } as const;',
       'export function ok(b: { credence: number }, t: number) {',
       '  b.credence = Math.min(HEARSAY_CEILING, b.credence + 0.15);',
       '  b.credence = Math.max(b.credence, STANCE.REPEAT);',
@@ -891,10 +1027,10 @@ describe('the evidence-hierarchy law FIRES on injected violations (proof, not pr
 /**
  * The three forms review round one pushed through the scanner's own declared surface, plus the general
  * rule each one exposes. The posture is deliberately NOT an enumeration of forbidden arithmetic: the
- * scan proves a bound where a bound is provable (a ceiling-or-lower number, a credence read, a
- * declared-sink pass-through, `Math.min` with a bounded operand, `Math.max` with all operands
- * bounded) and REPORTS every other shape. A new arithmetic spelling therefore arrives already
- * reported rather than waiting for the list to learn it.
+ * scan proves a bound where a bound is provable (a ceiling-or-lower number, `Math.min` with a bounded
+ * operand, `Math.max` with all operands bounded), distinguishes same-target retention and declared-
+ * sink forwarding, and REPORTS every other shape. A new arithmetic spelling therefore arrives
+ * already reported rather than waiting for the list to learn it.
  */
 describe('the evidence-hierarchy law bounds credence writes BY VALUE and fails closed on the rest', () => {
   it('a bounded right-hand side does NOT bound a compound assignment (review form i)', () => {
@@ -921,7 +1057,7 @@ describe('the evidence-hierarchy law bounds credence writes BY VALUE and fails c
     for (const violation of injected.violations) expect(violation.detail).toContain(UNPROVABLE);
   });
 
-  it('a bare `credence` pass-through is bounded only inside a DECLARED sink, never anywhere', () => {
+  it('a bare `credence` pass-through is forwarded only inside a DECLARED sink, never anywhere', () => {
     const injected = audit([
       'export function smuggle(b: { credence: number }, credence: number) { b.credence = credence; }',
     ]);
@@ -939,10 +1075,10 @@ describe('the evidence-hierarchy law bounds credence writes BY VALUE and fails c
     expect(injected.violations).toEqual([]);
   });
 
-  it('stays silent on every bounded shape the engine really uses, the P9-3 monotone guard included', () => {
+  it('stays silent on the engine\'s bounded, retained and forwarded shapes', () => {
     const injected = audit([
-      'export const STANCE = { REPEAT: 0.5 };',
-      // The corroboration branch as docket P9-3 leaves it: max-of-min, every operand bounded.
+      'export const STANCE = { REPEAT: 0.5 } as const;',
+      // The corroboration branch as docket P9-3 leaves it: max-of-min retains the same target; the inner min alone is bounded.
       'export function hearsay(existing: { credence: number }) {',
       '  existing.credence = Math.max(existing.credence, Math.min(HEARSAY_CEILING, existing.credence + 0.15));',
       '}',
@@ -956,7 +1092,7 @@ describe('the evidence-hierarchy law bounds credence writes BY VALUE and fails c
       'export function anchorIt(w: unknown, id: string, h: unknown) {',
       '  ingestEvidence(w, id, h, ARTIFACT_CREDENCE);',
       '}',
-      'export function copy(b: { credence: number }) { return { credence: b.credence }; }',
+      'export function copy(b: { credence: number }) { return { credence: Math.min(HEARSAY_CEILING, b.credence) }; }',
     ]);
     expect(injected.sites).toBe(6);
     expect(injected.violations).toEqual([]);
@@ -1080,7 +1216,7 @@ describe('a credence write is recognized by NAME in every write position the lan
       '  return { claim: hearing, credence, apparentSources: sources };',
       '}',
     ]);
-    expect(injected.records.map((r) => r.verdict)).toEqual(['bounded']);
+    expect(injected.records.map((r) => r.verdict)).toEqual(['forwarded']);
     expect(injected.violations).toEqual([]);
   });
 
@@ -1244,6 +1380,257 @@ describe('API-mediated credence writes are found by TYPE, not by the shape of th
     ]);
     expect(injected.sites).toBe(1);
     expect(injected.violations.map((v) => v.detail)).toEqual([API_WRITE]);
+  });
+});
+
+describe('R12 — credence provenance and same-target retention', () => {
+  const B = 'interface Belief { credence: number }';
+  const broken = (lines: readonly string[], count: number): void => {
+    const result = audit([B, ...lines]);
+    expect(result.sites).toBe(count);
+    expect(result.violations).toHaveLength(count);
+    for (const row of result.violations) expect(row.detail).toContain(UNPROVABLE);
+  };
+
+  it('rejects typed copied anchors in dot, literal element, object and sink positions', () => {
+    const result = audit([
+      B,
+      'const source: Belief = { credence: ARTIFACT_CREDENCE };',
+      'export function copy(destination: Belief, w: unknown, id: string, h: unknown) {',
+      '  destination.credence = source.credence;',
+      "  destination['credence'] = source['credence'];",
+      '  const composed: Belief = { credence: source.credence };',
+      '  ingestEvidence(w, id, h, source.credence);',
+      '  return composed;',
+      '}',
+    ]);
+    expect(result.sites).toBe(5);
+    expect(result.records.map((row) => row.verdict))
+      .toEqual(['anchor', 'possibly-anchored', 'possibly-anchored', 'possibly-anchored', 'possibly-anchored']);
+    expect(result.violations).toHaveLength(4);
+    for (const row of result.violations) expect(row.detail).toContain(UNPROVABLE);
+  });
+
+  it('retains the same bound target through dot and literal member paths without calling it bounded', () => {
+    const result = audit([
+      B,
+      'export function keep(b: Belief, holder: { belief: Belief }) {',
+      '  b.credence = Math.max(b.credence, Math.min(HEARSAY_CEILING, b.credence + 0.15));',
+      "  b['credence'] = Math.max(b.credence, 0.5);",
+      "  holder.belief.credence = Math.max(holder['belief']['credence'], 0.5);",
+      '}',
+    ]);
+    expect(result.records.map((row) => row.verdict)).toEqual(['retained', 'retained', 'retained']);
+    expect(result.violations).toEqual([]);
+    expect(result.records.filter((row) => row.verdict === 'anchor')).toHaveLength(0);
+  });
+
+  it('allows a true nested ceiling cap on a cross-target read', () => {
+    const result = audit([
+      B,
+      'export function cap(destination: Belief, source: Belief, candidate: number) {',
+      '  destination.credence = Math.min(HEARSAY_CEILING, Math.max(source.credence, candidate));',
+      '  return { credence: Math.min(HEARSAY_CEILING, source.credence) };',
+      '}',
+    ]);
+    expect(result.records.map((row) => row.verdict)).toEqual(['bounded', 'bounded']);
+    expect(result.violations).toEqual([]);
+  });
+
+  it('rejects retained reads used as fake caps and unsafe nested min/max composition', () => {
+    broken([
+      'export function bad(b: Belief, other: Belief, candidate: number) {',
+      '  b.credence = Math.min(b.credence, candidate);',
+      '  b.credence = Math.max(b.credence, Math.min(b.credence, candidate));',
+      '  b.credence = Math.max(b.credence, Math.min(ARTIFACT_CREDENCE, candidate));',
+      '  b.credence = Math.max(b.credence, other.credence);',
+      '  b.credence = Math.max(b.credence, HEARSAY_CEILING + 0.01);',
+      '}',
+    ], 5);
+  });
+
+  it('rejects different members, aliases, dynamic lookups, getters and side effects', () => {
+    broken([
+      'export function bad(left: Belief, right: Belief, box: { a: Belief; b: Belief },',
+      '  list: Belief[], pick: () => Belief, mutate: () => number) {',
+      '  const alias = left;',
+      '  left.credence = Math.max(right.credence, 0.5);',
+      '  left.credence = Math.max(alias.credence, 0.5);',
+      '  box.a.credence = Math.max(box.b.credence, 0.5);',
+      '  list[0].credence = Math.max(list[0].credence, 0.5);',
+      '  pick().credence = Math.max(pick().credence, 0.5);',
+      '  left.credence = Math.max(left.credence, Math.min(HEARSAY_CEILING, mutate()));',
+      '  left.credence = Math.max(left.credence, Math.min(HEARSAY_CEILING, (left = right, left.credence)));',
+      '  let maximum = Math.max; maximum = mutate;',
+      '  left.credence = maximum(left.credence, 0.5);',
+      '}',
+      'export function accessor(box: { get belief(): Belief; set belief(value: Belief) }) {',
+      '  box.belief.credence = Math.max(box.belief.credence, 0.5);',
+      '}',
+    ], 9);
+  });
+
+  it('compares target root bindings, so equal spellings in different scopes differ', () => {
+    const scan = scanOf([{ file: 'ghost.ts', text: [
+      B,
+      'export function outer(b: Belief) { return b.credence; }',
+      'export function inner(b: Belief) { return b.credence; }',
+    ].join('\n') }]);
+    const reads: ts.PropertyAccessExpression[] = [];
+    const visit = (node: ts.Node): void => {
+      if (ts.isPropertyAccessExpression(node) && node.name.text === 'credence') reads.push(node);
+      ts.forEachChild(node, visit);
+    };
+    visit(scan.files[0]!.ast);
+    expect(reads).toHaveLength(2);
+    expect(sameStableReference(reads[0]!, reads[0]!, scan)).toBe(true);
+    expect(sameStableReference(reads[0]!, reads[1]!, scan)).toBe(false);
+  });
+
+  it('does not use a shadowed numeric spelling as a ceiling proof', () => {
+    broken([
+      'const LIMIT = 0.5;',
+      'export function bad(b: Belief, LIMIT: number) {',
+      '  b.credence = Math.max(b.credence, LIMIT);',
+      '  b.credence = Math.min(LIMIT, b.credence);',
+      '}',
+    ], 2);
+  });
+
+  it('mutable numeric locals and object members cannot prove a ceiling', () => {
+    broken([
+      'let limit = 0.5;',
+      'const band = { repeat: 0.5 };',
+      'export function bad(b: Belief, value: number) {',
+      '  limit = value; band.repeat = value;',
+      '  b.credence = Math.max(b.credence, limit);',
+      '  b.credence = Math.max(b.credence, band.repeat);',
+      '}',
+    ], 2);
+  });
+
+  it('forwards the sink parameter directly but cannot use it as a min cap', () => {
+    const result = audit([
+      B,
+      'export function firstHearing(hearing: unknown, credence: number) {',
+      '  void hearing; return { credence };',
+      '}',
+      'export function ingestEvidence(w: unknown, id: string, h: unknown, credence: number) {',
+      '  void w; void id; firstHearing(h, credence);',
+      '  return { credence: Math.min(credence, HEARSAY_CEILING + 0.01) };',
+      '}',
+    ]);
+    expect(result.records.map((row) => row.verdict)).toEqual(['forwarded', 'forwarded', 'unprovable']);
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]!.detail).toContain(UNPROVABLE);
+  });
+
+  it('still counts a new anchor inside a max that also reads the same target', () => {
+    const result = audit([B,
+      'export function mint(b: Belief) { b.credence = Math.max(b.credence, ARTIFACT_CREDENCE); }',
+    ]);
+    expect(result.records.map((row) => row.verdict)).toEqual(['anchor']);
+    expect(result.records.filter((row) => row.verdict === 'anchor').map((row) => row.within))
+      .toEqual(['mint']);
+  });
+
+  it('the production retention and reporting inventories are exact and never bounded', () => {
+    expect(live.records.filter((row) => row.verdict === 'retained')
+      .map((row) => ({ file: row.file, within: row.within })).sort((a, b) => a.file.localeCompare(b.file)))
+      .toEqual([
+        { file: 'src/sim/reactions.ts', within: 'reactToSelfRumor' },
+        { file: 'src/sim/rumors/propagation.ts', within: 'ingest' },
+      ]);
+    expect(live.records.filter((row) => row.verdict === 'recorded')
+      .map((row) => ({ file: row.file, within: row.within })))
+      .toEqual([{ file: 'src/sim/scenario/referee.ts', within: 'councilTurns' }]);
+    expect(live.records.filter((row) => row.verdict === 'possibly-anchored')).toEqual([]);
+  });
+});
+
+describe('R14 — only the declared outcome projection records a credence', () => {
+  const TYPES = [
+    "import type { Belief } from './src/sim/types';",
+    "import type { TurnEvidence } from './src/sim/scenario/types';",
+  ];
+
+  it('records a direct typed Belief read without calling it bounded or newly anchored', () => {
+    const result = audit([...TYPES,
+      'export function report(b: Belief): TurnEvidence {',
+      "  return { npc: 'ada', family: b.claim.family, claimId: b.claim.id, credence: b.credence };",
+      '}',
+    ]);
+    expect(result.records.map((row) => row.verdict)).toEqual(['recorded']);
+    expect(result.violations).toEqual([]);
+  });
+
+  it('the previously lawful anonymous object copy is an explicit rejection', () => {
+    const result = audit([
+      'export function copy(b: { credence: number }) { return { credence: b.credence }; }',
+    ]);
+    expect(result.records.map((row) => row.verdict)).toEqual(['possibly-anchored']);
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]!.detail).toContain(UNPROVABLE);
+  });
+
+  it('a lookalike TurnEvidence name does not acquire the canonical reporting permission', () => {
+    const result = audit([
+      'interface TurnEvidence { npc: string; family: string; claimId: string; credence: number }',
+      'export function report(b: { credence: number }): TurnEvidence {',
+      "  return { npc: 'ada', family: 'f', claimId: 'c', credence: b.credence };",
+      '}',
+    ]);
+    expect(result.records.map((row) => row.verdict)).toEqual(['possibly-anchored']);
+    expect(result.violations).toHaveLength(1);
+  });
+
+  it('casts on the record or on its source cannot grant reporting permission', () => {
+    const result = audit([...TYPES,
+      'export function a(b: Belief) {',
+      "  return ({ npc: 'ada', family: b.claim.family, claimId: b.claim.id, credence: b.credence }) as TurnEvidence;",
+      '}',
+      'export function c(b: Belief): TurnEvidence {',
+      "  return { npc: 'ada', family: b.claim.family, claimId: b.claim.id, credence: (b as Belief).credence };",
+      '}',
+    ]);
+    expect(result.records.map((row) => row.verdict)).toEqual(['possibly-anchored', 'possibly-anchored']);
+    expect(result.violations).toHaveLength(2);
+  });
+
+  it('an ungoverned carrier, arithmetic, calls and new weights are not recorded reads', () => {
+    const result = audit([...TYPES,
+      'export function a(b: { credence: number }): TurnEvidence {',
+      "  return { npc: 'ada', family: 'f', claimId: 'c', credence: b.credence };",
+      '}',
+      'export function c(b: Belief): TurnEvidence {',
+      "  return { npc: 'ada', family: 'f', claimId: 'c', credence: b.credence + 0.01 };",
+      '}',
+      'export function d(read: () => number): TurnEvidence {',
+      "  return { npc: 'ada', family: 'f', claimId: 'c', credence: read() };",
+      '}',
+      'export function e(): TurnEvidence {',
+      "  return { npc: 'ada', family: 'f', claimId: 'c', credence: 0.96 };",
+      '}',
+      'export function f(): TurnEvidence {',
+      "  return { npc: 'ada', family: 'f', claimId: 'c', credence: ARTIFACT_CREDENCE };",
+      '}',
+    ]);
+    expect(result.records.map((row) => row.verdict))
+      .toEqual(['possibly-anchored', 'unprovable', 'unprovable', 'unprovable', 'anchor']);
+    expect(result.records.filter((row) => row.verdict === 'recorded')).toEqual([]);
+    expect(result.violations).toHaveLength(4);
+    expect(result.records.filter((row) => row.verdict === 'anchor').map((row) => row.within)).toEqual(['f']);
+  });
+
+  it('a recorded outcome value copied back into a belief still fires', () => {
+    const result = audit([...TYPES,
+      'export function back(destination: Belief, report: TurnEvidence) {',
+      '  destination.credence = report.credence;',
+      '}',
+    ]);
+    expect(result.records.map((row) => row.verdict)).toEqual(['possibly-anchored']);
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]!.detail).toContain(UNPROVABLE);
   });
 });
 
