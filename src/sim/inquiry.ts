@@ -3,7 +3,7 @@ import { dayOf } from '../core/time';
 import type { Circle } from './agents';
 import type { Asking, InquiryKey, Utterance } from './perception';
 import { mintClaim, SOMEONE, type EntityId } from './rumors/claim';
-import { STANCE } from './rumors/propagation';
+import { HEARSAY_CEILING, STANCE } from './rumors/propagation';
 import type { Rules } from './rules';
 import { applyTraits, traitContextOf } from './rumors/traits';
 import type { Belief, InquiryTask, WorldState } from './types';
@@ -75,6 +75,9 @@ export function chooseAnswer(
   return {
     tick: t, venue: asking.venue, circleMembers: [...asking.circleMembers],
     speaker: answererId, addressedTo: asking.speaker, claim: outgoing, mode: 'answer',
+    // Evidence-hierarchy law: only a paper-present viewing can anchor above hearsay.
+    // The holder says the medium; traits may change the named hand, not unsay the paper.
+    ...(belief.credence > HEARSAY_CEILING ? { document: true as const } : {}),
   };
 }
 

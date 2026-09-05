@@ -65,6 +65,7 @@ export type EvidenceEntry =
   | (EvidenceBase & {
       kind: 'utterance'; mode: 'telling' | 'answer'; claimId: ClaimId; family: RumorId;
       reported: ReportedClaim; about: null; network?: never; leaked?: never;
+      document?: true;
     })
   | (EvidenceBase & {
       kind: 'asking'; mode: null; claimId: null; family: RumorId | null;

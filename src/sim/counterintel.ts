@@ -43,6 +43,7 @@ function ingestEnemyObservation(
       addressedTo: observation.addressedTo, kind: 'utterance', mode: observation.mode,
       claimId: observation.claim.id, family: observation.claim.family,
       reported: reportThrough(world, observer, observation.claim, rules, 'enemy'), about: null,
+      ...(observation.document === true ? { document: true as const } : {}),
     });
   } else if (observation.kind === 'asking') {
     world.enemy.evidence.push({

@@ -11,6 +11,8 @@ export interface Utterance {
   claim: Claim;
   /** 'answer' = a retelling compelled by an asking; its attribution discloses the teller's source. */
   mode: 'telling' | 'answer';
+  /** The speaker explicitly says their answer came from a document. Absent on ordinary speech. */
+  document?: true;
 }
 
 export type InquiryKey = { family: RumorId } | { subject: EntityId };
@@ -38,7 +40,8 @@ export interface TickEvents {
 export type Observation =
   | { kind: 'presence'; tick: Tick; venue: VenueId; actor: EntityId }
   | { kind: 'utterance'; tick: Tick; venue: VenueId; speaker: EntityId;
-      addressedTo: EntityId; claim: Claim; overheard: boolean; mode: 'telling' | 'answer' }
+      addressedTo: EntityId; claim: Claim; overheard: boolean; mode: 'telling' | 'answer';
+      document?: true }
   | { kind: 'asking'; tick: Tick; venue: VenueId; speaker: EntityId;
       addressedTo: EntityId; about: InquiryKey; overheard: boolean; authority: boolean }
   | { kind: 'network-speech'; tick: Tick; venue: VenueId; speaker: EntityId;
@@ -72,6 +75,7 @@ export function observationsFor(observer: EntityId, events: TickEvents): Observa
         kind: 'utterance', tick: u.tick, venue: u.venue,
         speaker: u.speaker, addressedTo: u.addressedTo, claim: u.claim,
         overheard: u.addressedTo !== observer, mode: u.mode,
+        ...(u.document === true ? { document: true as const } : {}),
       });
     }
   }

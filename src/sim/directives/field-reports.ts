@@ -149,6 +149,7 @@ function rawReportedObservation(row: HeldFieldObservation): ReportedFieldObserva
         overheard: observation.overheard, mode: observation.mode,
         claimId: observation.claim.id, family: observation.claim.family,
         reported: { subject, predicate, object, count, severity, place, attribution },
+        ...(observation.document === true ? { document: true as const } : {}),
       };
       }
     case 'asking':
@@ -216,6 +217,7 @@ function projectReportedObservation(
           ...observation.reported,
         }, filteredRules, audience, { traits: 'apply',
           turncoat: candor === 'doctored' ? 'apply' : 'skip' }),
+        ...(observation.document === true ? { document: true as const } : {}),
       };
     case 'asking':
       return {
@@ -380,6 +382,7 @@ function ingestEnemyItem(
       addressedTo: observation.addressedTo, kind: 'utterance', mode: observation.mode,
       claimId: observation.claimId, family: observation.family,
       reported: cloneSerializable(observation.reported), about: null,
+      ...(observation.document === true ? { document: true as const } : {}),
     };
   } else if (observation.kind === 'asking') {
     entry = {

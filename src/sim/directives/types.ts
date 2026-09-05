@@ -206,6 +206,7 @@ export type ReportedFieldObservation =
       kind: 'utterance'; observedAt: Tick; venue: VenueId; speaker: EntityId;
       addressedTo: EntityId; overheard: boolean; mode: 'telling' | 'answer';
       claimId: ClaimId; family: RumorId; reported: ReportedClaim;
+      document?: true;
     }
   | {
       kind: 'asking'; observedAt: Tick; venue: VenueId; speaker: EntityId;
