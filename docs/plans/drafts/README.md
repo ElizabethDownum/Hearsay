@@ -29,6 +29,18 @@ approved gameplay. The real Task 2/3 predecessor commits must still be reconcile
   Draft SHA-256:
   `4E75A99545ACCC5269E5BA9CB23E8C02F0EE8EA48687F2ABE5B8A60C5E6AA0A7`.
 
+## Debrief recording proposal
+
+- [Task 5A exact recording repair](2026-09-05-task-5a-recording.md),
+  [constraints](task-5a-constraints.md) and
+  [author report](2026-09-05-task-5a-author-report.md): six production files,
+  16 new cases, two exact schema expectation updates. The virtual proposal passes
+  99 affected cases, both compiler configurations and lint. Nine full-world pairs
+  preserve all pre-existing state. Independent review, future predecessor
+  reconciliation and implementation remain; Task 5B models are not included.
+  Draft SHA-256:
+  `955DD09A77CB763A76D222E8D66FF99509E58128068A6C1452542FC2674B0A62`.
+
 ## Historical restart snapshots
 
 These are byte-preserved snapshots of the native Codex authors' partial work.

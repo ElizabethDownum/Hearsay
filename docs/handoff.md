@@ -27,6 +27,10 @@ this session stayed inside Hearsay at Ellie's request.
   passing against virtual source; both compiler configurations and lint pass.
   [Draft and report](plans/drafts/README.md) retain exact code and probe limits.
   Independent plan review and future Task 4 base reconciliation remain open.
+- Task 5A debrief recording: complete proposal, 16 new cases/99 affected cases
+  passing in memory; nine full-world pairs preserve all pre-existing state.
+  Six production files, two test files; no actual implementation. Task 5B folds
+  and semantic overlay still need authoring. Draft index links the constraints/report.
 - Remaining full Plan9: scrying, séance, prose foundation (7A), debrief data/models,
   debrief UI/remaining prose (6/7B), integration/closeout (8). Plan10 follows later.
 
@@ -64,8 +68,8 @@ See HTML R3/R4 and ../.superpowers/sdd/task-2-root-execution-note.md.
    caller into Task3's planned shared sketch-audit.ts. Then TDD implementation,
    full gates/simulation comparison and separate code review. Task4 follows.
 4. Review the completed prose-foundation proposal before implementing it on the
-   actual future Task 4 base. Meanwhile, Task 5 debrief authoring may investigate
-   the narrowly identified artifact-claim and per-hop report associations.
+   actual future Task 4 base. Review the completed Task 5A recording proposal too;
+   meanwhile Task 5B may author typed operation folds and semantic calendar matching.
    Follow the current plan's prose-before-debrief dependency order afterward.
 
 All native workers exhausted quota (last reported reset Sep6 22:06).

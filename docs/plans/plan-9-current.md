@@ -110,6 +110,10 @@ silently rewritten by this Plan 9 recovery.
    speech uniquely reconstructs receipt/report chronology, then make only the
    missing correlations explicit. Author typed operation/report threads and semantic
    overlay matching (R8/R9). The original rumor-lineage-only folds are insufficient.
+   Task 5A's narrow recording proposal is complete in drafts: 16 new cases and
+   99 affected cases pass in memory; nine complete world pairs differ only by the
+   proposed metadata. Independent plan review and actual predecessor reconciliation
+   remain open. Task 5B typed folds and calendar/overlay matching remain to be authored.
 7. **Task 6 + Task 7B debrief UI:** terminal-only props-fed panels, existing panel
    import fence firing proof, running-world non-reachability, remaining terms/slots.
 8. **Task 8 integration/closeout:** legal two-council forger route; real interrogation
