@@ -148,6 +148,8 @@ interface Scan {
   constants: Map<string, number>;
   /** The SYMBOL of the one `ARTIFACT_CREDENCE` binding — identity, not spelling. */
   anchors: Set<ts.Symbol>;
+  /** Checker-resolved binding destinations, collected once without control-flow assumptions. */
+  assignedBindings: Set<ts.Symbol>;
 }
 
 const scanCache = new Map<readonly Source[], Scan>();
@@ -172,7 +174,9 @@ function buildScan(sources: readonly Source[]): Scan {
   for (const { ast } of files) collectConstants(ast, constants);
   const anchors = new Set<ts.Symbol>();
   for (const { ast } of files) collectAnchorBindings(ast, checker, anchors);
-  return { program, checker, files, constants, anchors };
+  const assignedBindings = new Set<ts.Symbol>();
+  for (const { ast } of files) collectBindingWrites(ast, checker, assignedBindings);
+  return { program, checker, files, constants, anchors, assignedBindings };
 }
 
 /** One program per source set, reused: the live sweep is asked several different questions. */
@@ -265,6 +269,12 @@ function collectConstants(file: ts.SourceFile, into: Map<string, number>): void 
   visit(file);
 }
 
+/** Only const declarations make their initializer a stable binding-level value. */
+function isConstVariable(declaration: ts.VariableDeclaration): boolean {
+  return ts.isVariableDeclarationList(declaration.parent)
+    && (declaration.parent.flags & ts.NodeFlags.Const) !== 0;
+}
+
 /**
  * THE ANCHOR, as a BINDING. `ARTIFACT_CREDENCE` is not a word this scan looks for — it is a specific
  * declaration whose parse-time value is the production constant, and a reference is an anchor only
@@ -276,7 +286,8 @@ function collectAnchorBindings(
 ): void {
   const visit = (node: ts.Node): void => {
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)
-      && node.name.text === 'ARTIFACT_CREDENCE' && node.initializer !== undefined) {
+      && node.name.text === 'ARTIFACT_CREDENCE' && node.initializer !== undefined
+      && isConstVariable(node)) {
       const init = unwrap(node.initializer);
       if (ts.isNumericLiteral(init) && Number(init.text) === ARTIFACT_CREDENCE) {
         const symbol = checker.getSymbolAtLocation(node.name);
@@ -309,8 +320,12 @@ function boundSymbol(node: ts.Expression, scan: Scan): ts.Symbol | undefined {
  * `const Math = { min: … }` also qualifies as `Math.min` — a spelling collision that would let a
  * shadowed `Math.min` inherit the real one's bounding power. Identity is the declaration's home: only
  * a symbol every one of whose declarations sits in a default library file is the global one.
+ * Value proofs require immutable local aliases at every hop. The write surface also follows mutable
+ * declaration origins conservatively: a possible API write remains a warning, never a safe-value proof.
  */
-function standardLibraryCallee(node: ts.Expression, scan: Scan): string | null {
+function standardLibraryCallee(
+  node: ts.Expression, scan: Scan, purpose: 'value-proof' | 'write-surface' = 'value-proof',
+): string | null {
   let current: ts.Expression = node;
   for (let hops = 0; hops < 8; hops += 1) {
     const symbol = boundSymbol(current, scan);
@@ -325,6 +340,9 @@ function standardLibraryCallee(node: ts.Expression, scan: Scan): string | null {
       || declaration.initializer === undefined) {
       return null;
     }
+    // A possible API-write origin must stay visible even when it cannot prove a safe value.
+    if (purpose === 'value-proof'
+      && (!isConstVariable(declaration) || scan.assignedBindings.has(symbol))) return null;
     current = declaration.initializer;
   }
   return null;
@@ -358,6 +376,66 @@ function objectCarriesCredence(literal: ts.ObjectLiteralExpression, scan: Scan):
   if (contextual !== undefined
     && typeCarriesCredence(contextual, scan.checker, new Set())) return true;
   return carriesCredence(literal, scan);
+}
+
+/**
+ * Visit only destination bindings. Member receivers, computed keys and default RHS expressions
+ * are reads, not assignments to those bindings. Shorthand needs the checker's VALUE symbol.
+ */
+function forEachAssignedBinding(
+  node: ts.Node, checker: ts.TypeChecker, record: (symbol: ts.Symbol) => void,
+): void {
+  const target = ts.isExpression(node) ? unwrap(node) : node;
+  if (ts.isIdentifier(target)) {
+    const symbol = ts.isShorthandPropertyAssignment(target.parent)
+      ? checker.getShorthandAssignmentValueSymbol(target.parent)
+      : checker.getSymbolAtLocation(target);
+    if (symbol !== undefined) record(symbol);
+  } else if (ts.isObjectLiteralExpression(target)) {
+    for (const property of target.properties) {
+      if (ts.isPropertyAssignment(property)) forEachAssignedBinding(property.initializer, checker, record);
+      else if (ts.isShorthandPropertyAssignment(property)) forEachAssignedBinding(property.name, checker, record);
+      else if (ts.isSpreadAssignment(property)) forEachAssignedBinding(property.expression, checker, record);
+    }
+  } else if (ts.isArrayLiteralExpression(target)) {
+    for (const element of target.elements) forEachAssignedBinding(element, checker, record);
+  } else if (ts.isSpreadElement(target)) {
+    forEachAssignedBinding(target.expression, checker, record);
+  } else if (ts.isBinaryExpression(target) && target.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+    forEachAssignedBinding(target.left, checker, record);
+  } else if (ts.isObjectBindingPattern(target) || ts.isArrayBindingPattern(target)) {
+    for (const element of target.elements) {
+      if (ts.isBindingElement(element)) forEachAssignedBinding(element.name, checker, record);
+    }
+  }
+}
+
+/** All visible writes, including a closure's capture; no guess about when or whether it executes. */
+function collectBindingWrites(file: ts.SourceFile, checker: ts.TypeChecker, into: Set<ts.Symbol>): void {
+  const record = (symbol: ts.Symbol): void => { into.add(symbol); };
+  const visit = (node: ts.Node): void => {
+    if (ts.isBinaryExpression(node) && isAssignmentOperator(node.operatorToken.kind)) {
+      forEachAssignedBinding(node.left, checker, record);
+    } else if ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
+      && isUpdateOperator(node.operator)) {
+      forEachAssignedBinding(node.operand, checker, record);
+    } else if (ts.isForInStatement(node) || ts.isForOfStatement(node)) {
+      if (ts.isVariableDeclarationList(node.initializer)) {
+        for (const declaration of node.initializer.declarations) {
+          forEachAssignedBinding(declaration.name, checker, record);
+        }
+      } else {
+        forEachAssignedBinding(node.initializer, checker, record);
+      }
+    } else if (ts.isVariableDeclaration(node) && node.initializer !== undefined) {
+      // A var initializer may reuse the parameter's symbol; a fresh local or bare var does not.
+      forEachAssignedBinding(node.name, checker, (symbol) => {
+        if (symbol.declarations?.some(ts.isParameter)) record(symbol);
+      });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
 }
 
 // ── The write surface ─────────────────────────────────────────────────────────────────────────────
@@ -511,7 +589,7 @@ function credenceWrites(file: ts.SourceFile, scan: Scan): CredenceWrite[] {
         found.push({ expr: node.arguments[index]!, opaque: null });
       }
       // 5. API-MEDIATED WRITES, resolved by binding on the callee and by TYPE on the target.
-      const api = standardLibraryCallee(node.expression, scan);
+      const api = standardLibraryCallee(node.expression, scan, 'write-surface');
       if (api !== null && WRITE_APIS.has(api) && node.arguments.length > 0
         && carriesCredence(node.arguments[0]!, scan)) {
         found.push({ expr: node, opaque: API_WRITE });
@@ -554,8 +632,7 @@ function numericValueOf(expr: ts.Expression, scan: Scan): number | undefined {
   const declaration = boundSymbol(target, scan)?.valueDeclaration;
   if (declaration === undefined) return undefined;
   if (ts.isVariableDeclaration(declaration) && declaration.initializer !== undefined
-    && ts.isVariableDeclarationList(declaration.parent)
-    && (declaration.parent.flags & ts.NodeFlags.Const) !== 0) {
+    && isConstVariable(declaration)) {
     const value = unwrap(declaration.initializer);
     return ts.isNumericLiteral(value) ? Number(value.text) : undefined;
   }
@@ -570,15 +647,15 @@ function numericValueOf(expr: ts.Expression, scan: Scan): number | undefined {
     const checked = scan.checker.getTypeAtLocation(target);
     if (ts.isNumericLiteral(value) && (checked.flags & ts.TypeFlags.NumberLiteral) !== 0
       && ts.isVariableDeclaration(variable)
-      && ts.isVariableDeclarationList(variable.parent)
-      && (variable.parent.flags & ts.NodeFlags.Const) !== 0) return Number(value.text);
+      && isConstVariable(variable)) return Number(value.text);
   }
   return undefined;
 }
 
 /**
  * A direct reference to the declared sink's own parameter forwards an already audited input; that
- * input may be bounded or anchored.
+ * input may be bounded or anchored. A default initializer or a visible write to that same symbol
+ * invalidates forwarding; shadowed locals and read-only uses do not. No execution order is inferred.
  */
 function insideDeclaredSink(node: ts.Expression, scan: Scan): boolean {
   for (let current: ts.Node | undefined = node.parent; current; current = current.parent) {
@@ -598,7 +675,9 @@ function insideDeclaredSink(node: ts.Expression, scan: Scan): boolean {
       ? scan.checker.getShorthandAssignmentValueSymbol(node.parent) : boundSymbol(node, scan);
     return declared !== null && CREDENCE_SINKS[declared] === index
       && parameter !== undefined && ts.isIdentifier(parameter.name)
-      && reference === scan.checker.getSymbolAtLocation(parameter.name);
+      && parameter.initializer === undefined && reference !== undefined
+      && reference === scan.checker.getSymbolAtLocation(parameter.name)
+      && !scan.assignedBindings.has(reference);
   }
   return false;
 }
@@ -1545,6 +1624,164 @@ describe('R12 — credence provenance and same-target retention', () => {
       .map((row) => ({ file: row.file, within: row.within })))
       .toEqual([{ file: 'src/sim/scenario/referee.ts', within: 'councilTurns' }]);
     expect(live.records.filter((row) => row.verdict === 'possibly-anchored')).toEqual([]);
+  });
+});
+
+describe('R15 — value proofs require stable bindings', () => {
+  const expectRejectedForward = (body: string, parameter = 'credence: number'): void => {
+    const result = audit([
+      'export function firstHearing(hearing: unknown, ' + parameter + ') {',
+      '  void hearing; ' + body,
+      '  return { credence };',
+      '}',
+    ]);
+    expect(result.records.at(-1)).toMatchObject({ source: 'credence', verdict: 'unprovable' });
+    expect(result.violations.some((row) => row.source === 'credence' && row.detail.includes(UNPROVABLE)))
+      .toBe(true);
+  };
+
+  it.each([
+    ['direct assignment', 'credence = ARTIFACT_CREDENCE;'],
+    ['compound assignment', 'credence += 0.01;'],
+    ['prefix update', '++credence;'],
+    ['postfix update', 'credence--;'],
+    ['array destination', '[credence] = [ARTIFACT_CREDENCE];'],
+    ['renamed object destination', '({ weight: credence } = { weight: ARTIFACT_CREDENCE });'],
+    ['shorthand destination', '({ credence } = hearing as { credence: number });'],
+    ['nested destination', '([{ weight: credence }] = [{ weight: ARTIFACT_CREDENCE }]);'],
+    ['default destination', '[credence = ARTIFACT_CREDENCE] = [];'],
+    ['for-of destination', 'for (credence of [ARTIFACT_CREDENCE]) { void hearing; }'],
+    ['for-of pattern', 'for ({ weight: credence } of [{ weight: ARTIFACT_CREDENCE }]) { void hearing; }'],
+    ['captured parameter', 'const mutate = () => { credence = ARTIFACT_CREDENCE; }; mutate();'],
+    ['initialized var redeclaration', 'var credence = ARTIFACT_CREDENCE;'],
+    ['initialized var pattern', 'var { weight: credence } = { weight: ARTIFACT_CREDENCE };'],
+  ])('rejects forwarding after %s', (_label, body) => {
+    expectRejectedForward(body);
+  });
+
+  it('invalidates every assignment operator in the compiler range, not only plain assignment', () => {
+    for (let kind = ts.SyntaxKind.FirstAssignment; kind <= ts.SyntaxKind.LastAssignment; kind += 1) {
+      const operator = ts.tokenToString(kind);
+      expect(operator).toBeTruthy();
+      expectRejectedForward('credence ' + operator + ' 0.5;');
+    }
+  });
+
+  it('invalidates a for-in target even when it was explicitly typed to accept keys', () => {
+    expectRejectedForward('for (credence in { item: 0 }) { void hearing; }', 'credence: any');
+  });
+
+  it('does not assume an uncalled closure or later write is unreachable', () => {
+    expectRejectedForward('const later = () => { credence = ARTIFACT_CREDENCE; }; void later;');
+    const result = audit([
+      'export function firstHearing(hearing: unknown, credence: number) {',
+      '  void hearing; return { credence }; credence = ARTIFACT_CREDENCE;',
+      '}',
+    ]);
+    expect(result.records.map((row) => row.verdict)).toEqual(['unprovable']);
+    expect(result.violations).toHaveLength(1);
+  });
+
+  it('does not confuse a parameter default with an audited incoming argument', () => {
+    expectRejectedForward('', 'credence: number = ARTIFACT_CREDENCE');
+  });
+
+  it('preserves forwarding across shadows, property keys, default-value reads and bare var declarations', () => {
+    for (const body of [
+      'var credence;',
+      '{ let credence = 0.5; credence += 0.01; }',
+      'const mutate = (credence: number) => { credence++; }; mutate(0.5);',
+      'for (let credence of [0.5]) { credence++; }',
+      'let other = 0; [other = credence] = []; void other;',
+      'const holder: Record<number, number> = {}; holder[credence] = 0.5;',
+    ]) {
+      const result = audit([
+        'export function firstHearing(hearing: unknown, credence: number) {',
+        '  void hearing; ' + body,
+        '  return { credence };',
+        '}',
+      ]);
+      expect(result.records.at(-1), body).toMatchObject({ source: 'credence', verdict: 'forwarded' });
+      expect(result.violations, body).toEqual([]);
+    }
+    const keyRead = audit([
+      'export function firstHearing(hearing: unknown, credence: number) {',
+      '  void hearing; let other = 0; ({ [credence]: other } = {}); void other;',
+      '  return { credence };',
+      '}',
+    ]);
+    // Preserve the existing opaque-pattern warning while proving that its key only READS the input.
+    expect(keyRead.records.map((row) => row.verdict)).toEqual(['unprovable', 'forwarded']);
+    expect(keyRead.violations.map((row) => row.detail)).toEqual([DESTRUCTURED_WRITE]);
+  });
+
+  it.each([
+    ['reassigned let alias', 'let clamp = Math.min; clamp = Math.max;'],
+    ['reassigned var alias', 'var clamp = Math.min; clamp = Math.max;'],
+    ['mutable link in a const chain', 'let first = Math.min; const clamp = first; first = Math.max;'],
+    ['mutable alias without a visible reassignment', 'let clamp = Math.min;'],
+  ])('does not prove a bound through a %s', (_label, setup) => {
+    const result = audit([
+      'interface Belief { credence: number }',
+      setup,
+      'export function copy(destination: Belief, source: Belief) {',
+      '  destination.credence = clamp(HEARSAY_CEILING, source.credence);',
+      '}',
+    ]);
+    expect(result.records.map((row) => row.verdict)).toEqual(['unprovable']);
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]!.detail).toContain(UNPROVABLE);
+  });
+
+  it('preserves direct const aliases, const chains and unrelated same-spelled mutable aliases', () => {
+    for (const setup of [
+      'const clamp = Math.min;',
+      'const first = Math.min; const second = first; const clamp = second;',
+      'const clamp = Math.min; function unrelated() { let clamp = Math.min; clamp = Math.max; return clamp; }',
+    ]) {
+      const result = audit([
+        'interface Belief { credence: number }',
+        setup,
+        'export function copy(destination: Belief, source: Belief) {',
+        '  destination.credence = clamp(HEARSAY_CEILING, source.credence);',
+        '}',
+      ]);
+      expect(result.records.map((row) => row.verdict)).toEqual(['bounded']);
+      expect(result.violations).toEqual([]);
+    }
+  });
+
+  it.each(['let', 'var'])('does not treat a mutable %s anchor initializer as a constant proof', (kind) => {
+    const result = audit([
+      'export function copy(destination: { credence: number }) {',
+      '  ' + kind + ' ARTIFACT_CREDENCE = 0.97;',
+      '  ARTIFACT_CREDENCE = 0.99;',
+      '  destination.credence = ARTIFACT_CREDENCE;',
+      '}',
+    ]);
+    expect(result.records.map((row) => row.verdict)).toEqual(['unprovable']);
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0]!.detail).toContain('second constant above the hearsay ceiling');
+  });
+
+  it('keeps mutable write-API aliases visible when value-proof aliases become stricter', () => {
+    for (const [callee, args] of [
+      ['Object.assign', 'destination, patch'],
+      ['Object.defineProperty', "destination, 'weight', { value: 0.5 }"],
+      ['Object.defineProperties', 'destination, patch'],
+      ['Reflect.set', "destination, 'weight', 0.5"],
+      ['Reflect.defineProperty', "destination, 'weight', { value: 0.5 }"],
+    ]) {
+      const result = audit([
+        'let put = ' + callee + '; const alias = put;',
+        'export function copy(destination: { credence: number }, patch: object) {',
+        '  alias(' + args + ');',
+        '}',
+      ]);
+      expect(result.sites, callee).toBe(1);
+      expect(result.records[0]!.verdict).toBe('unprovable');
+      expect(result.violations.map((row) => row.detail), callee).toEqual([API_WRITE]);
+    }
   });
 });
 
