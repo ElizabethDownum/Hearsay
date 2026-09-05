@@ -650,20 +650,37 @@ describe('PILLAR: a whole artifact campaign is replay-stable', () => {
 const VIEWING_ACTS = ['show', 'plant', 'pickup', 'reshow'];
 
 describe('P9-2 — viewings mint the anchor; nothing demotes it', () => {
-  it('a shown belief survives the page leaving the room entirely (heldBy === null)', () => {
+  it('a shown belief outlives the page by days, in a room the viewer never enters', () => {
     const world = withDocument(SPEC, 'artifact-p9-2-lifetime');
     framed(world, [{ tick: DAY1, kind: 'show', artifact: 'a0', to: 'ada' }]);
     expect(soleBelief(world, 'ada').credence).toBe(ARTIFACT_CREDENCE);
 
-    // Venue-plant it: the avatar no longer holds it, and neither does anyone else.
-    framed(world, [{ tick: DAY1, kind: 'plant', artifact: 'a0', venue: 'square', to: null }]);
-    expect(artifactById(world, 'a0')).toMatchObject({ heldBy: null, plantedAt: 'square' });
+    // Carry the page to the MARKET and leave it there. `ada` is scheduled at the square from 00:00 to
+    // 23:59 every day of the week, so the paper is not merely out of her hands — it is in a room she
+    // never enters again, and the NPCs who do read it are strangers to her viewing.
+    framed(world, [{ tick: world.tick, kind: 'goTo', venue: 'market' }]);
+    framed(world, [{ tick: world.tick, kind: 'plant', artifact: 'a0', venue: 'market', to: null }]);
+    expect(artifactById(world, 'a0')).toMatchObject({ heldBy: null, plantedAt: 'market' });
     expect(soleBelief(world, 'ada').credence).toBe(ARTIFACT_CREDENCE);
 
-    // …and it survives the page being read by somebody else, days later.
-    beats(world, 4);
-    expect(artifactById(world, 'a0')!.heldBy).not.toBe('you');
-    expect(paperBelief(world, 'ada')!.credence).toBe(ARTIFACT_CREDENCE);
+    // TWO full days, both day-ends crossed, the anchor asserted at every day boundary. A regression
+    // that demoted anchors at day-end, on the page leaving the viewer's venue, or while the viewer is
+    // not the holder, has to fail here — all three conditions hold for the whole run.
+    const holders = new Set<EntityId | null>();
+    for (const boundary of [at(2, 0), at(3, 0)]) {
+      while (world.tick < boundary) {
+        stepTransaction(world, RULES);
+        holders.add(artifactById(world, 'a0')!.heldBy);
+      }
+      expect(world.tick).toBe(boundary);
+      expect(paperBelief(world, 'ada')!.credence, `the anchor at the day-${boundary / 1440} boundary`)
+        .toBe(ARTIFACT_CREDENCE);
+    }
+
+    // Non-vacuity: she was never once the holder, and the page really was read by somebody else —
+    // the anchor is not surviving because nothing happened to it.
+    expect([...holders], 'ada never held the page again').not.toContain('ada');
+    expect(hasSeenPaper(world, 'cyn'), 'the market circle picked the page up').toBe(true);
   });
 
   it('NOTHING but a paper-present viewing act ever mints a belief above the ceiling', () => {

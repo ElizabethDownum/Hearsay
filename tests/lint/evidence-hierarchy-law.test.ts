@@ -1266,33 +1266,123 @@ describe('API-mediated credence writes are found by TYPE, not by the shape of th
 /** Every credence site in `src/` whose value the law proves to BE the anchor. */
 const anchorSites = live.records.filter((record) => record.verdict === 'anchor');
 
-/** Every `callee(…)` in the file, with the function each call sits inside. */
-function callSites(file: ts.SourceFile, callee: string): { file: string; within: string }[] {
-  const sites: { file: string; within: string }[] = [];
-  const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node) && dottedName(node.expression) === callee) {
-      sites.push({ file: file.fileName, within: enclosingFunction(node) });
-    }
-    ts.forEachChild(node, visit);
-  };
-  visit(file);
-  return sites;
+/** The three functions the plan authorizes to put a page in front of a pair of eyes. */
+const VIEWING_FUNCTIONS = ['applyPlant', 'applyShow', 'resolveArtifacts'];
+
+/** How a reference that is NOT a direct call reaches the audited function. */
+function referenceShape(node: ts.Identifier): string {
+  const parent = node.parent;
+  if (ts.isPropertyAccessExpression(parent) && parent.expression === node) {
+    return `through '.${parent.name.text}'`;
+  }
+  if (ts.isElementAccessExpression(parent) && parent.expression === node) {
+    return 'through an element access';
+  }
+  if (ts.isVariableDeclaration(parent) || ts.isBindingElement(parent)) {
+    return 'aliased to a local binding';
+  }
+  if (ts.isExportSpecifier(parent) || ts.isImportSpecifier(parent)
+    || ts.isExportAssignment(parent)) {
+    return 'crossing a module boundary';
+  }
+  if (ts.isCallExpression(parent) || ts.isNewExpression(parent)) {
+    return 'passed as a value to another call';
+  }
+  return `as a ${ts.SyntaxKind[parent.kind]}`;
+}
+
+/**
+ * EVERY REFERENCE to one function, resolved by BINDING (round two's I-1). The delivered pin asked
+ * whether a call expression's callee TEXT read `deliverDocument`, which answers a different question
+ * in three directions at once: `deliverDocument.call(undefined, …)` spells `deliverDocument.call` and
+ * was invisible; `const deliver = deliverDocument; deliver(…)` spells `deliver` and was invisible;
+ * and a same-named function in another module was counted as a caller of this one.
+ *
+ * REFERENCE-FIRST, UNRECOGNIZED-BY-DEFAULT. The scan enumerates every identifier the checker resolves
+ * to the audited symbol and demands that each one be either the declaration itself or the direct
+ * callee of a call inside an authorized function. An alias, a `.call`/`.apply`/`.bind`, a value use,
+ * an export, an import, a fifth caller, an identifier the checker cannot resolve at all — every one of
+ * them is reported. Text is used only to shortlist candidates (a static reference to a binding must
+ * spell its name; an alias spells it at the alias declaration, which is itself a reported reference);
+ * BINDING decides.
+ */
+function referencesTo(
+  sources: readonly Source[], home: string, name: string, authorized: readonly string[],
+): { callers: string[]; violations: Violation[] } {
+  const scan = scanOf(sources);
+  const violations: Violation[] = [];
+  const callers: string[] = [];
+  const quote = (node: ts.Node, ast: ts.SourceFile): string =>
+    node.getText(ast).replace(/\s+/g, ' ').trim().slice(0, 120);
+
+  // 1. THE DECLARATION: exactly one, in the file that owns it. A second function of the same name
+  //    anywhere would leave the audit reading two different things under one word — reported, not
+  //    guessed at.
+  let declared: ts.Identifier | undefined;
+  for (const { file, ast } of scan.files) {
+    const visit = (node: ts.Node): void => {
+      if ((ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node))
+        && node.name !== undefined && node.name.text === name) {
+        if (file === home && declared === undefined) declared = node.name;
+        else {
+          violations.push({
+            file, source: quote(node.name, ast),
+            detail: `a second declaration of '${name}' — the pin would be reading two different functions under one name`,
+          });
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(ast);
+  }
+  if (declared === undefined) {
+    throw new Error(`the P9-2 caller pin found no '${name}' declaration in '${home}'`);
+  }
+  const target = scan.checker.getSymbolAtLocation(declared);
+  if (target === undefined) {
+    throw new Error(`the P9-2 caller pin could not bind '${name}' in '${home}'`);
+  }
+
+  // 2. EVERY reference to that symbol, held to the direct-call-inside-an-authorized-act shape.
+  for (const { file, ast } of scan.files) {
+    const visit = (node: ts.Node): void => {
+      if (ts.isIdentifier(node) && node.text === name && node !== declared) {
+        const symbol = boundSymbol(node, scan);
+        if (symbol === undefined) {
+          violations.push({
+            file, source: quote(node.parent, ast),
+            detail: `a reference to '${name}' the checker cannot resolve — unrecognized by default`,
+          });
+        } else if (symbol === target) {
+          const parent = node.parent;
+          if (ts.isCallExpression(parent) && unwrap(parent.expression) === node) {
+            const within = enclosingFunction(node);
+            callers.push(within);
+            if (!authorized.includes(within)) {
+              violations.push({
+                file, source: quote(parent, ast),
+                detail: `'${name}' is called from '${within}', which is not one of the authorized acts`,
+              });
+            }
+          } else {
+            violations.push({
+              file, source: quote(parent, ast),
+              detail: `'${name}' is reached ${referenceShape(node)}, not as a direct call inside an authorized act`,
+            });
+          }
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(ast);
+  }
+  return { callers: callers.sort(), violations };
 }
 
 describe('docket P9-2 — the anchor is minted by paper-present viewings and by nothing else', () => {
   it('an anchor VALUE reaches a credence at exactly ONE site in src/, whatever its spelling', () => {
     expect(anchorSites.map((site) => ({ file: site.file, within: site.within })))
       .toEqual([{ file: 'src/sim/artifacts.ts', within: 'deliverDocument' }]);
-  });
-
-  it('that one site is the shared viewing helper, whose callers are exactly the four viewing acts', () => {
-    // SHOW, HAND-OVER (`applyPlant`), PICKUP and RE-SHOW (both inside the beat-tail hook) — the four
-    // acts the plan names, and the only four ways a pair of eyes reaches a page.
-    const callers = scanOf(sources)
-      .files.flatMap(({ ast }) => callSites(ast, 'deliverDocument'))
-      .map((site) => site.within)
-      .sort();
-    expect(callers).toEqual(['applyPlant', 'applyShow', 'resolveArtifacts', 'resolveArtifacts']);
   });
 
   it('the site pin counts by verdict, so a nested anchor elsewhere would fail it', () => {
@@ -1304,5 +1394,105 @@ describe('docket P9-2 — the anchor is minted by paper-present viewings and by 
     ]);
     expect(injected.records.filter((record) => record.verdict === 'anchor')
       .map((record) => record.within)).toEqual(['elsewhere']);
+  });
+});
+
+describe('docket P9-2 — the one viewing helper is reached by the four acts and by nothing else', () => {
+  const audited = referencesTo(sources, 'src/sim/artifacts.ts', 'deliverDocument', VIEWING_FUNCTIONS);
+
+  it('every reference to it in src/ is a direct call inside one of the authorized acts', () => {
+    expect(audited.violations).toEqual([]);
+  });
+
+  it('and those calls are exactly show, hand-over, pickup and re-show', () => {
+    // SHOW, HAND-OVER (`applyPlant`), PICKUP and RE-SHOW (both inside the beat-tail hook) — the four
+    // acts the plan names, and the only four ways a pair of eyes reaches a page.
+    expect(audited.callers).toEqual(['applyPlant', 'applyShow', 'resolveArtifacts', 'resolveArtifacts']);
+  });
+});
+
+// ── I-1 round two: the caller pin FIRES on every reference shape that is not a direct lawful call ──
+
+describe('the caller pin is binding-resolved: every other way to reach the helper is reported', () => {
+  const HELPER = 'function deliverDocument(world: unknown, page: unknown) { void world; void page; }';
+  const LAWFUL = 'export function applyShow(w: unknown, p: unknown) { deliverDocument(w, p); }';
+  const walk = (files: readonly Source[]) =>
+    referencesTo(files, 'ghost.ts', 'deliverDocument', VIEWING_FUNCTIONS);
+  const ghost = (lines: readonly string[]): Source =>
+    ({ file: 'ghost.ts', text: [HELPER, LAWFUL, ...lines].join('\n') });
+
+  it('the lawful shape alone is silent — one direct call inside an authorized act', () => {
+    const audited = walk([ghost([])]);
+    expect(audited.violations).toEqual([]);
+    expect(audited.callers).toEqual(['applyShow']);
+  });
+
+  it('an ALIAS is reported at the alias, and its call is never counted as a caller', () => {
+    const audited = walk([ghost([
+      'const deliver = deliverDocument;',
+      'export function smuggle(w: unknown, p: unknown) { deliver(w, p); }',
+    ])]);
+    expect(audited.callers).toEqual(['applyShow']);
+    expect(audited.violations.map((v) => v.detail))
+      .toEqual(["'deliverDocument' is reached aliased to a local binding, not as a direct call inside an authorized act"]);
+  });
+
+  it('a `.call` form is reported — the delivered pin read its callee text as `deliverDocument.call`', () => {
+    const audited = walk([ghost([
+      'export function smuggle(w: unknown, p: unknown) { deliverDocument.call(undefined, w, p); }',
+    ])]);
+    expect(audited.callers).toEqual(['applyShow']);
+    expect(audited.violations.map((v) => v.detail))
+      .toEqual(["'deliverDocument' is reached through '.call', not as a direct call inside an authorized act"]);
+  });
+
+  it('`.apply` and `.bind` are the same finding', () => {
+    const audited = walk([ghost([
+      'export function a(w: unknown, p: unknown) { deliverDocument.apply(undefined, [w, p]); }',
+      'export function b() { return deliverDocument.bind(undefined); }',
+    ])]);
+    expect(audited.violations.map((v) => v.detail)).toEqual([
+      "'deliverDocument' is reached through '.apply', not as a direct call inside an authorized act",
+      "'deliverDocument' is reached through '.bind', not as a direct call inside an authorized act",
+    ]);
+  });
+
+  it('passing it as a VALUE is reported', () => {
+    const audited = walk([ghost([
+      'export function register(fn: unknown) { return fn; }',
+      'export const hook = register(deliverDocument);',
+    ])]);
+    expect(audited.violations.map((v) => v.detail))
+      .toEqual(["'deliverDocument' is reached passed as a value to another call, not as a direct call inside an authorized act"]);
+  });
+
+  it('exporting it is reported — the helper stops being module-private', () => {
+    const audited = walk([ghost(['export { deliverDocument };'])]);
+    expect(audited.violations.map((v) => v.detail))
+      .toEqual(["'deliverDocument' is reached crossing a module boundary, not as a direct call inside an authorized act"]);
+  });
+
+  it('a FIFTH direct call from an unauthorized function is reported AND counted', () => {
+    const audited = walk([ghost([
+      'export function backdoor(w: unknown, p: unknown) { deliverDocument(w, p); }',
+    ])]);
+    expect(audited.callers).toEqual(['applyShow', 'backdoor']);
+    expect(audited.violations.map((v) => v.detail))
+      .toEqual(["'deliverDocument' is called from 'backdoor', which is not one of the authorized acts"]);
+  });
+
+  it('a SAME-NAMED function in another module is never misattributed to this one', () => {
+    const audited = walk([ghost([]), {
+      file: 'other.ts',
+      text: [
+        'function deliverDocument(world: unknown, page: unknown) { void world; void page; }',
+        'export function elsewhere(w: unknown, p: unknown) { deliverDocument(w, p); }',
+      ].join('\n'),
+    }]);
+    // `elsewhere` calls a DIFFERENT symbol, so it is not a caller of the audited one…
+    expect(audited.callers).toEqual(['applyShow']);
+    // …and the duplicate name is itself the finding: one word, two functions.
+    expect(audited.violations.map((v) => v.detail))
+      .toEqual(["a second declaration of 'deliverDocument' — the pin would be reading two different functions under one name"]);
   });
 });
