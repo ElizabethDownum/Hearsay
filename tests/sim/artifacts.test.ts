@@ -964,6 +964,36 @@ describe('I-2 — the highest-trust edge is the LITERAL highest-trust edge, avat
   });
 });
 
+describe('M-1 — an avatar-targeted re-show survives action-log replay', () => {
+  const LOG: ActionLog = [
+    { tick: at(0, 8), kind: 'forge', spec: SPEC },
+    { tick: DAY1, kind: 'plant', artifact: 'a0', venue: null, to: 'ada' },
+  ];
+
+  const build = (): WorldState => {
+    const world = buildWorld(townOf([
+      { id: 'ada', venue: 'square', edges: { bez: 0.4 } },
+      { id: 'bez', venue: 'square' },
+    ]), 'artifact-avatar-reshow-replay', RULES);
+    enrollPlayer(world, { home: 'square' });
+    world.npcs['ada']!.edges.push({ to: 'you', kind: 'friend', trust: 0.75 });
+    return world;
+  };
+
+  it('records the avatar viewing and its hint, then regrows the same world', () => {
+    const until = DAY1 + CONVERSATION_BEAT + 1;
+    const live = runLogOn(build(), RULES, LOG, until);
+
+    expect(artifactActs(live).filter((entry) => entry.act === 'reshow'))
+      .toEqual([expect.objectContaining({ artifact: 'a0', by: 'ada', to: 'you' })]);
+    expect(live.intel.log.filter((row) => row.kind === 'hint' && row.speaker === 'ada'))
+      .toEqual([expect.objectContaining({ addressedTo: 'you', reported: SPEC })]);
+
+    const replay = runLogOn(build(), RULES, LOG, until);
+    expect(hashWorld(replay)).toBe(hashWorld(live));
+  });
+});
+
 // ── I-5: live ≡ replay, where "live" really is a live session ─────────────────────────────────────
 
 /**
