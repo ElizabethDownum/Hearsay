@@ -34,6 +34,25 @@ this session stayed inside Hearsay at Ellie's request.
 - Remaining full Plan9: scrying, séance, prose foundation (7A), debrief data/models,
   debrief UI/remaining prose (6/7B), integration/closeout (8). Plan10 follows later.
 
+## Debrief and watch authoring checkpoint
+
+The Task5B knowledge-calendar fragment passes ten native cases, both compiler
+configurations and lint. It remains a partial model, not an executable full Task5B.
+The probe exposed lost watch history and two existing execution defects. R16's
+self-presence correction has39 affected passing cases; R17's missing attempted-state
+guard has30. Both have genuine assertion REDs, complete proposals and no production fix.
+Task5A2 separately retains private raw local outcomes and actual report packet ids.
+Its19 additions include four firing-proof cases in existing live-view guards;
+affected239/7 and twelve paired full-world comparisons pass (81 new outcome rows,
+every old field equal on common virtual R16/R17). Both typechecks and lint pass.
+Drafts/reports/constraints are indexed in docs/plans/drafts/README.md. Independent
+review, actual predecessor reconciliation and implementation remain mandatory.
+
+The project-local fixed reviewer runner has a root native preflight162/4 at unchanged
+dc114da source. Its independent Claude execution route is still untested; the root
+run is not a reviewer gate. Preserve source/HEAD while an implemented-code review is
+live. Review R15/Task2 first, then the proposed watch corrections and magic plans.
+
 ## Persistent authority
 
 Ellie authorized audit/planning then continued implementation, confirmed the earlier

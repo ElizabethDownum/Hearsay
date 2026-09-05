@@ -41,6 +41,26 @@ approved gameplay. The real Task 2/3 predecessor commits must still be reconcile
   Draft SHA-256:
   `955DD09A77CB763A76D222E8D66FF99509E58128068A6C1452542FC2674B0A62`.
 
+## Watch corrections and execution history proposals
+
+- [R16 self-presence correction](2026-09-05-r16-self-presence.md),
+  [constraints](r16-constraints.md), [author report](2026-09-05-r16-author-report.md):
+  one clause, ten new tests,39 affected passing cases.
+- [R17 watch-stage correction](2026-09-05-r17-watch-stage.md),
+  [constraints](r17-watch-stage-constraints.md), [author report](2026-09-05-r17-watch-stage-author-report.md):
+  one clause, four new tests,30 affected passing cases.
+- [Task5A2 private outcome history](2026-09-05-task-5a2-outcome-history.md),
+  [constraints](task-5a2-outcome-history-constraints.md),
+  [author report](2026-09-05-task-5a2-outcome-history-author-report.md):
+  19 additions,239 affected passing cases, twelve full-world pairs equal after
+  stripping only new outcome history (81 rows). Probes use common virtual R16/R17.
+- [Partial Task5B model evidence](../../review/2026-09-05-debrief-model-preflight.md):
+  ten-case knowledge-calendar fragment; complete models remain to be authored.
+
+All are proposals, not independently approved or implemented. Full production
+gates must assess the behavioral watch repairs; the recording change is separately
+required to preserve every pre-existing field. No source/test path was edited.
+
 ## Historical restart snapshots
 
 These are byte-preserved snapshots of the native Codex authors' partial work.
