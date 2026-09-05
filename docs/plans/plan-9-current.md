@@ -102,6 +102,10 @@ silently rewritten by this Plan 9 recovery.
 5. **Task 7A prose foundation:** implement registry-exhaustive renderClaim and existing
    board reading lines before Task 6 consumes it. Register action vocabulary when
    compile-driven; debrief-specific vocabulary can finish with its UI (R10).
+   Complete proposal saved in drafts/2026-09-05-task-7a-prose.md: 44 exact authored
+   tests pass against virtual source, both compiler configurations and lint pass.
+   No production implementation yet. Independent plan review and reconciliation
+   with the actual future Task 4 base remain required before execution.
 6. **Task 5 debrief substrate and models:** first prove whether retained network
    speech uniquely reconstructs receipt/report chronology, then make only the
    missing correlations explicit. Author typed operation/report threads and semantic

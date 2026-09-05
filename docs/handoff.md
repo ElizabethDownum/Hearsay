@@ -23,6 +23,10 @@ this session stayed inside Hearsay at Ellie's request.
   Task 3 recovered draft has79 proposed cases, syntax checked; root additionally
   probed both digest-reference corrections in memory. This is planning evidence.
   Task 4 plan review ended at quota without a saved verdict.
+- Task 7A prose: complete proposal, 24 templates and 44 isolated authored tests
+  passing against virtual source; both compiler configurations and lint pass.
+  [Draft and report](plans/drafts/README.md) retain exact code and probe limits.
+  Independent plan review and future Task 4 base reconciliation remain open.
 - Remaining full Plan9: scrying, séance, prose foundation (7A), debrief data/models,
   debrief UI/remaining prose (6/7B), integration/closeout (8). Plan10 follows later.
 
@@ -59,10 +63,10 @@ See HTML R3/R4 and ../.superpowers/sdd/task-2-root-execution-note.md.
    including consolidation of the temporary tests/sim/helpers/forensics-audit.ts
    caller into Task3's planned shared sketch-audit.ts. Then TDD implementation,
    full gates/simulation comparison and separate code review. Task4 follows.
-4. Independent prose-foundation authoring (prepared brief
-   ../.superpowers/sdd/task-7a-author-brief-2026-09-05.md) may proceed while capacity
-   is unavailable. It has no production implementation yet. Follow the current
-   plan's prose-before-debrief dependency order afterward.
+4. Review the completed prose-foundation proposal before implementing it on the
+   actual future Task 4 base. Meanwhile, Task 5 debrief authoring may investigate
+   the narrowly identified artifact-claim and per-hop report associations.
+   Follow the current plan's prose-before-debrief dependency order afterward.
 
 All native workers exhausted quota (last reported reset Sep6 22:06).
 Claude sessions43360/92900/23943 are CLOSED. Scrying43360 completed; scanner author

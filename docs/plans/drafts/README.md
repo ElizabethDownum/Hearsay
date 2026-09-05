@@ -17,6 +17,18 @@ approved gameplay. The real Task 2/3 predecessor commits must still be reconcile
 - [Controller verification and interruption record](../../review/2026-09-05-claude-recovery-checkpoint.md)
   distinguishes actual local checks from authored expectations and lost work.
 
+## Prose foundation proposal
+
+- [Task 7A prose and public-label draft](2026-09-05-task-7a-prose.md) and
+  [author report](2026-09-05-task-7a-author-report.md): complete proposal with
+  24 predicate templates and 44 authored tests passing against virtual source.
+  Both compiler configurations and lint pass for all 11 proposed files; a virtual
+  new predicate produces the expected missing-template diagnostic. Production
+  remains at 1780 tests. Independent plan review, reconciliation with the future
+  Task 4 predecessor, implementation and independent code review remain open.
+  Draft SHA-256:
+  `4E75A99545ACCC5269E5BA9CB23E8C02F0EE8EA48687F2ABE5B8A60C5E6AA0A7`.
+
 ## Historical restart snapshots
 
 These are byte-preserved snapshots of the native Codex authors' partial work.
