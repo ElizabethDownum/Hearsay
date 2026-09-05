@@ -28,7 +28,7 @@ export function buildWorld(fixture: TownFixture, seed: string, rules?: Rules): W
   if (dupNpc) throw new Error(`buildWorld: duplicate npc id '${dupNpc}'`);
   const npcIds = new Set(fixture.npcs.map((n) => n.id));
   const sharedId = fixture.venues.find((v) => npcIds.has(v.id))?.id;
-  if (sharedId) throw new Error(`buildWorld: venue and npc share id '${sharedId}'`);
+  if (sharedId !== undefined) throw new Error(`buildWorld: venue and npc share id '${sharedId}'`);
 
   const venues = Object.fromEntries(fixture.venues.map((v) => [v.id, v]));
   // The world OWNS its npcs — clone each (and its edges) so post-build edge writes (Plan 8
@@ -79,7 +79,7 @@ export function buildWorld(fixture: TownFixture, seed: string, rules?: Rules): W
  * Attach the avatar to a built world: a real Npc under physics (observable, circle-joining)
  * that never carries a schedule — its venue is driven by `playerVenue` (rule 2). Seeds an
  * empty belief store and records `playerId`/`playerVenue`. Throws on an unknown home venue,
- * a double enrollment, or an id already taken by an NPC.
+ * a double enrollment, or an id already taken by an NPC or venue.
  */
 export function enrollPlayer(
   world: WorldState, opts: { id?: string; name?: string; home: VenueId },
@@ -88,6 +88,7 @@ export function enrollPlayer(
   if (!world.venues[opts.home]) throw new Error(`enrollPlayer: unknown home venue '${opts.home}'`);
   const id = opts.id ?? 'you';
   if (world.npcs[id]) throw new Error(`enrollPlayer: id '${id}' is already an npc`);
+  if (world.venues[id] !== undefined) throw new Error(`enrollPlayer: id '${id}' is already a venue`);
   const avatar: Npc = {
     id, name: opts.name ?? id, home: opts.home, occupation: 'none', faction: 'none',
     traits: [], rivals: [], schedule: [], edges: [],

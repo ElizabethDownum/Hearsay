@@ -905,6 +905,8 @@ describe('I-2 — the highest-trust edge is the LITERAL highest-trust edge, avat
       { id: 'bez', venue: 'square' },
     ]), seed, RULES);
     enrollPlayer(world, { home: 'square' });
+    expect(world.venues[world.playerId!]).toBeUndefined();
+    expect(Object.keys(world.npcs).filter((id) => world.venues[id] !== undefined)).toEqual([]);
     world.npcs['ada']!.edges.push({ to: 'you', kind: 'friend', trust: 0.75 });
     applyForge(world, SPEC, at(0, 8), RULES);
     world.tick = DAY1;
@@ -976,6 +978,8 @@ describe('M-1 — an avatar-targeted re-show survives action-log replay', () => 
       { id: 'bez', venue: 'square' },
     ]), 'artifact-avatar-reshow-replay', RULES);
     enrollPlayer(world, { home: 'square' });
+    expect(world.venues[world.playerId!]).toBeUndefined();
+    expect(Object.keys(world.npcs).filter((id) => world.venues[id] !== undefined)).toEqual([]);
     world.npcs['ada']!.edges.push({ to: 'you', kind: 'friend', trust: 0.75 });
     return world;
   };

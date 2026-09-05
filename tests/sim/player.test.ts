@@ -41,6 +41,55 @@ describe('player groundwork — the avatar under physics', () => {
     expect(() => enrollPlayer(w2, { home: 'nowhere' })).toThrow();
   });
 
+  it('rejects the default you id when a venue owns it, before any mutation', () => {
+    const fixture = miniTown();
+    fixture.venues.push({ id: 'you', district: 'd0', access: 'public' });
+    const world = buildWorld(fixture, 'avatar-default-venue-collision');
+    const twin = buildWorld(fixture, 'avatar-default-venue-collision');
+    expect(() => enrollPlayer(world, { home: 'square' }))
+      .toThrow("enrollPlayer: id 'you' is already a venue");
+    expect(world).toEqual(twin);
+  });
+
+  it('rejects a custom id owned by the home venue before any mutation', () => {
+    const world = buildWorld(miniTown(), 'avatar-custom-venue-collision');
+    const twin = buildWorld(miniTown(), 'avatar-custom-venue-collision');
+    expect(() => enrollPlayer(world, { id: 'square', home: 'square' }))
+      .toThrow("enrollPlayer: id 'square' is already a venue");
+    expect(world).toEqual(twin);
+  });
+
+  it('rejects an empty id owned by a venue before any mutation', () => {
+    const fixture = miniTown();
+    fixture.venues.push({ id: '', district: 'd0', access: 'public' });
+    const world = buildWorld(fixture, 'avatar-empty-venue-collision');
+    const twin = buildWorld(fixture, 'avatar-empty-venue-collision');
+    expect(() => enrollPlayer(world, { id: '', home: 'square' }))
+      .toThrow("enrollPlayer: id '' is already a venue");
+    expect(world).toEqual(twin);
+  });
+
+  it('the existing NPC id guard also leaves the complete world unchanged', () => {
+    const world = buildWorld(miniTown(), 'avatar-npc-collision');
+    const twin = buildWorld(miniTown(), 'avatar-npc-collision');
+    expect(() => enrollPlayer(world, { id: 'ada', home: 'square' }))
+      .toThrow("enrollPlayer: id 'ada' is already an npc");
+    expect(world).toEqual(twin);
+  });
+
+  it('accepts unused custom and empty avatar ids while keeping namespaces disjoint', () => {
+    for (const id of ['avatar', '']) {
+      const world = buildWorld(miniTown(), 'avatar-unused-id');
+      enrollPlayer(world, { id, name: 'Player', home: 'square' });
+      expect(world.playerId).toBe(id);
+      expect(world.playerVenue).toBe('square');
+      expect(world.npcs[id]).toMatchObject({ id, name: 'Player', schedule: [], edges: [] });
+      expect(world.beliefs[id]).toEqual({});
+      expect(world.venues[id]).toBeUndefined();
+      expect(Object.keys(world.npcs).filter((npcId) => world.venues[npcId] !== undefined)).toEqual([]);
+    }
+  });
+
   // (b)
   it('the avatar joins a circle, never speaks, and never ingests the gossip around it', () => {
     const world = buildWorld(miniTown(), 'abc');

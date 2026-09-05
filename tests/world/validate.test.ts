@@ -51,6 +51,23 @@ describe('structural invariants (red, one each)', () => {
       .toThrow("buildWorld: venue and npc share id 'market'");
   });
 
+  it('ids-unique rejects an empty shared id without mutating the town', () => {
+    const t = town([npc(''), npc('b')], [venue('')]);
+    const before = structuredClone(t);
+    expect(validateTown(t, cfg()).failures).toContainEqual({
+      invariant: 'ids-unique', detail: "venue and npc share id ''",
+    });
+    expect(t).toEqual(before);
+  });
+
+  it('buildWorld rejects an empty shared id without mutating its fixture', () => {
+    const t = town([npc(''), npc('b')], [venue('')]);
+    const before = structuredClone(t.fixture);
+    expect(() => buildWorld(t.fixture, 'empty-cross-namespace-id'))
+      .toThrow("buildWorld: venue and npc share id ''");
+    expect(t.fixture).toEqual(before);
+  });
+
   it('refs-resolve', () => {
     const bad = npc('a', { schedule: [block('nowhere')], edges: [{ to: 'ghost', kind: 'friend', trust: 0.5 }], rivals: ['ghost'] });
     expect(failuresOf(town([bad, npc('b')]), cfg())).toContain('refs-resolve');
