@@ -55,7 +55,7 @@ approved gameplay. The real Task 2/3 predecessor commits must still be reconcile
   19 additions,239 affected passing cases, twelve full-world pairs equal after
   stripping only new outcome history (81 rows). Probes use common virtual R16/R17.
 - [Partial Task5B model evidence](../../review/2026-09-05-debrief-model-preflight.md):
-  ten-case knowledge calendar and fourteen-case network history;
+  six partial modules with62 native cases, both compiler configurations and lint clean;
   [exact partial fragments](2026-09-05-task-5b-fragments.md). Complete models remain unfinished.
 
 All are proposals, not independently approved or implemented. Full production

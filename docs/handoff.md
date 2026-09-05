@@ -30,14 +30,22 @@ this session stayed inside Hearsay at Ellie's request.
 - Task 5A debrief recording: complete proposal, 16 new cases/99 affected cases
   passing in memory; nine full-world pairs preserve all pre-existing state.
   Six production files, two test files; no actual implementation. Task 5B folds
-  and semantic overlay still need authoring. Draft index links the constraints/report.
+  and full feature linkage still need authoring. Draft index links the constraints/report.
 - Remaining full Plan9: scrying, séance, prose foundation (7A), debrief data/models,
   debrief UI/remaining prose (6/7B), integration/closeout (8). Plan10 follows later.
 
 ## Debrief and watch authoring checkpoint
 
-The Task5B knowledge-calendar fragment passes ten native cases, both compiler
-configurations and lint. It remains a partial model, not an executable full Task5B.
+The six partial Task5B modules now pass62 isolated native cases (knowledge10,
+network14, directive/timeline11, ordinary evidence arrival9, semantic attention18),
+both compiler configurations and lint. They include actual report transport and a
+real no-report watch whose work survives expiry. Authored, received, performed and
+reported stages stay separate; calendar dates use actual arrival/digest chronology.
+Compulsion corroboration follows the engine's authority plus invitational-venue rule.
+Exact fragments and proof limits are saved in the draft index. Full story/artifact/
+magic folds, physical receipt branches, feature linkage and terminal integration
+remain unfinished. These models and their virtual predecessors are not implemented.
+
 The probe exposed lost watch history and two existing execution defects. R16's
 self-presence correction has39 affected passing cases; R17's missing attempted-state
 guard has30. Both have genuine assertion REDs, complete proposals and no production fix.
@@ -63,14 +71,25 @@ are read-only. Root owns the index and scoped local commits. No push.
 
 The original no-Claude interval has expired. Ellie explicitly authorized sending
 Hearsay plans/context/source-derived materials to external Claude/Anthropic after
-an automatic review rejection. Subsequent dispatches were approved. Do not ask
-again; unrelated personal/shared memory is excluded.
+an automatic review rejection. Earlier subsequent dispatches were approved. Unrelated personal/shared memory is
+excluded. The later automatic-review block below now prevents new dispatches.
 
 After worker quotas and the controller-only role restriction were explained, Ellie
 renewed the go-ahead. Root implemented directly under that disclosed interpretation.
 PROVISIONAL process amendment: Task2 proceeded on gated R15 while separate review
 remained open. This changed sequencing, not final review requirements or gameplay.
 See HTML R3/R4 and ../.superpowers/sdd/task-2-root-execution-note.md.
+
+## Current external-review blocker
+
+Claude's reported quota reset has passed, but at20:20 UTC automatic approval
+review rejected the implemented-code dispatch twice before any process launched.
+It interpreted the earlier “these plans” wording as excluding source/context and
+the external Claude/Anthropic destination, even after the exact authorization was
+quoted. A narrowly worded source/context/plan transmission confirmation is pending
+and recorded in HTML R3. Do not retry or use another source-transfer route while
+that confirmation is unresolved. Earlier user authorization remains recorded;
+this is an automatic-review block, not a new observed quota failure.
 
 ## Next work and capacity
 

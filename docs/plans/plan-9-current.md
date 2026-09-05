@@ -33,8 +33,16 @@ silently rewritten by this Plan 9 recovery.
 
 ## Debrief and watch authoring checkpoint
 
-The Task5B knowledge-calendar fragment passes ten native cases, both compiler
-configurations and lint. It remains a partial model, not an executable full Task5B.
+The six partial Task5B modules now pass62 isolated native cases (knowledge10,
+network14, directive/timeline11, ordinary evidence arrival9, semantic attention18),
+both compiler configurations and lint. They include actual report transport and a
+real no-report watch whose work survives expiry. Authored, received, performed and
+reported stages stay separate; calendar dates use actual arrival/digest chronology.
+Compulsion corroboration follows the engine's authority plus invitational-venue rule.
+Exact fragments and proof limits are saved in the draft index. Full story/artifact/
+magic folds, physical receipt branches, feature linkage and terminal integration
+remain unfinished. These models and their virtual predecessors are not implemented.
+
 The probe exposed lost watch history and two existing execution defects. R16's
 self-presence correction has39 affected passing cases; R17's missing attempted-state
 guard has30. Both have genuine assertion REDs, complete proposals and no production fix.
@@ -50,6 +58,17 @@ dc114da source. Its independent Claude execution route is still untested; the ro
 run is not a reviewer gate. Preserve source/HEAD while an implemented-code review is
 live. Review R15/Task2 first, then the proposed watch corrections and magic plans.
 
+## Current external-review blocker
+
+Claude's reported quota reset has passed, but at20:20 UTC automatic approval
+review rejected the implemented-code dispatch twice before any process launched.
+It interpreted the earlier “these plans” wording as excluding source/context and
+the external Claude/Anthropic destination, even after the exact authorization was
+quoted. A narrowly worded source/context/plan transmission confirmation is pending
+and recorded in HTML R3. Do not retry or use another source-transfer route while
+that confirmation is unresolved. Earlier user authorization remains recorded;
+this is an automatic-review block, not a new observed quota failure.
+
 ## Authority and boundaries
 
 - Governing design: ../design-spec.md and ../backlog.md. Global constraints:
@@ -63,7 +82,7 @@ live. Review R15/Task2 first, then the proposed watch corrections and magic plan
   Anthropic after an automatic-review rejection. Restricted Claude Fable 5.1
   dispatches were approved; unrelated personal/shared memory is excluded.
   Subsequent API 429 session-limit failures are capacity failures, not a renewed
-  authorization question. Both worker providers currently lack capacity.
+  authorization question. Codex workers remain quota-limited; the later automatic-review block governs Claude dispatches.
   Implementation and review still use independent threads.
 - One code writer and index owner at a time. Scoped local commits; preserve unrelated
   documentation work. No push performed or needed for local verification.
@@ -132,7 +151,7 @@ live. Review R15/Task2 first, then the proposed watch corrections and magic plan
    Task 5A's narrow recording proposal is complete in drafts: 16 new cases and
    99 affected cases pass in memory; nine complete world pairs differ only by the
    proposed metadata. Independent plan review and actual predecessor reconciliation
-   remain open. Task 5B typed folds and calendar/overlay matching remain to be authored.
+   remain open. Task5B has62 passing cases across six partial modules; full models and feature linkage remain unfinished.
 7. **Task 6 + Task 7B debrief UI:** terminal-only props-fed panels, existing panel
    import fence firing proof, running-world non-reachability, remaining terms/slots.
 8. **Task 8 integration/closeout:** legal two-council forger route; real interrogation

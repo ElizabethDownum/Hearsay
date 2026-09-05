@@ -134,3 +134,49 @@ Exact code/tests: docs/plans/drafts/2026-09-05-task-5b-fragments.md.
    Duration  874ms (transform 211ms, setup 0ms, collect 529ms, tests 17ms, environment 0ms, prepare 70ms)
 
 ```
+
+## Six-module continuation
+
+The partial proposal now has62 passing native cases: knowledge10, network14,
+directive/timeline11, ordinary evidence arrival9, semantic attention18. Actual
+report transport and an expired no-report watch are exercised. Both compilers,
+virtual ESLint and literal workspace lint pass. Exact additional code/tests are
+preserved in the fragments document; production remains dc114da1780/114.
+
+The nightly timeline uses actual digest days and avatar carrier-profile identity.
+The evidence calendar follows contiguous report ingestion instead of backdating
+observation ticks. The attention model preserves original log indexes, deduplicates
+real actions, and does not turn an authored order or headquarters' claims into work.
+Actual compulsion additionally requires the engine's invitational-venue condition.
+
+These are author proofs only. No independent approval, full Task5B completion,
+magic physical receipt support, full feature linkage or terminal UI is claimed.
+The initial62-case run had one fixture failure: missing overheard caused undefined
+serialization; the compiler independently caught the same omission. An earlier
+unused destructure also failed lint. Both fixtures were corrected without changing
+any production behavior, and all original logs remain.
+
+Final native output:
+
+```text
+
+ RUN  v3.2.6 C:/Users/eliza/Desktop/ClaudeFiles/hearsay
+
+ ✓ .superpowers/sdd/task-5b-attention-validation/entry.probe.ts (62 tests) 118ms
+
+ Test Files  1 passed (1)
+      Tests  62 passed (62)
+   Start at  15:47:59
+   Duration  1.07s (transform 246ms, setup 0ms, collect 622ms, tests 118ms, environment 0ms, prepare 73ms)
+
+```
+
+```json
+{
+  "scope": "Task5B partial evidence/attention proposal only; no implementation",
+  "newSourceFiles": 6,
+  "tsconfig.json": 0,
+  "tsconfig.app.json": 0,
+  "lintErrors": 0
+}
+```
