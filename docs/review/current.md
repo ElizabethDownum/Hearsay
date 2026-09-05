@@ -6,6 +6,8 @@ Status at session start: Plan 9 Task 1, fix wave two. HEAD 49cc3e7 contains the 
 
 Restart checkpoint: G2–G4 are committed through caa5a38. The controller's full gate passes 1,713 tests in 113 files, lint, both typechecks and the production build (489.86 kB JavaScript, 145.07 kB gzip). All 10 simulation report blocks, comprising 230 deterministic lines, match the prior baseline. Independent review returned Needs-fixes: one Critical and one Important, recorded as R12/R13 below. Task 1 remains open; Task 2 has not started. Corrected scrying and séance drafts are saved for continuation. Work is stopping for Ellie's requested computer restart; see docs/handoff.md.
 
+Resumed after restart: repository/index were clean at 0241fc8. The fresh boot gate again passes 1,713 tests, lint, both typechecks and build. A bounded R12/R13 correction is being authored, while the scrying draft is being completed in a separate Codex thread. Claude's dispatch pause continues until the recorded expiry.
+
 ## Current decisions and issues
 
 ### R1 — Recover the interrupted G2 work in place
@@ -99,6 +101,13 @@ Restart checkpoint: G2–G4 are committed through caa5a38. The controller's full
 - **Recommended action:** check venue ids during enrollment before any mutation, use an explicit undefined comparison for collision detection, and test default/custom avatar collisions plus the empty-id case. Verify repeated avatar viewing remains correctly recognized.
 - **Why:** independent review, Important finding at src/sim/world.ts:84–98 and the two new sharedId guards.
 - **Status:** controller accepts the finding inside the existing invariant; correction resumes after restart.
+
+### R14 — Record an existing conviction without creating a belief
+- **Issue:** correcting the false bounded-read assumption also flags councilTurns, which copies a belief's credence into an outcome record. That record can legitimately contain 0.97 and does not teach anyone a new belief.
+- **Recommended action:** give this copy a separate recorded-value verdict. Accept only a direct governed credence read in an object property context bound by the checker to the existing TurnEvidence declaration. Keep the site visible to the audit; anonymous objects, belief destinations, arithmetic, new literals and casts do not gain this exception. A later copy from outcome data into a belief must still fail.
+- **Why:** src/sim/scenario/referee.ts:52 and scenario/types.ts:23. Renaming the recorded field would unnecessarily change existing saved output. A generic exemption for metadata would weaken the declared guard.
+- **Related proof correction:** direct forwarding of an already-audited credence parameter needs a forwarded verdict, not a bounded one, because it can carry the paper anchor. Neither forwarded nor recorded values may pretend to cap a Math.min. Numeric bound declarations must be resolved by binding so a shadowed name cannot fake a ceiling.
+- **Status:** narrow controller amendment selected for the correction plan; exact code and firing tests are being authored. New metadata sinks require separate review.
 
 ## Verification note
 

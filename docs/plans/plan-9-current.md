@@ -6,8 +6,10 @@ Recovery now committed through caa5a38: G2 a458cd2, G3 55a45ae, G4 caa5a38.
 Controller gate: 1713 tests / 113 files, lint, both typechecks and production build
 green; 10 complete simulation report blocks / 230 deterministic lines unchanged.
 Independent review at caa5a38 returned Needs-fixes: one Critical and one Important.
-Task 1 is not closed. Work is stopped for Ellie's computer restart; resume from
-../handoff.md before any dispatch.
+Task 1 is not closed. Ellie resumed after the computer restart. Current base is
+0241fc8; the repeated boot gate passes 1713/113, lint, typechecks and build.
+A bounded correction for R12/R13 is being authored before implementation;
+R14 distinguishes the referee's recorded outcome from a belief write.
 
 This document records the current execution order and binding audit amendments.
 It does not certify unimplemented task bodies as dispatch-ready. Exact per-task
@@ -44,6 +46,7 @@ silently rewritten by this Plan 9 recovery.
    static-analysis boundary or start another speculative hardening cycle.
    Task 2 waits for corrected code and independent review. Existing brief:
    ../../.superpowers/sdd/task-1-fix2-resume-2026-09-05.md plus original fix2 brief.
+   Current correction authoring brief: ../../.superpowers/sdd/task-1-final-correction-author-brief.md.
 2. **Task 2 forensics:** staged brief task-2-brief.md already carries P9-5's spoken
    document marker, traceable hand, anonymous venue pickup and one-hop disclosure
    defaults. Perception license now includes the utterance Observation arm and

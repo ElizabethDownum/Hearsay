@@ -4,6 +4,12 @@ Ellie requested a safe stopping point to restart the computer. This is the
 project-local continuation pointer; shared AI memory remains at its older state
 because Ellie asked that all writes stay inside Hearsay.
 
+**Resumed after restart:** Ellie asked to continue. Repository/index were clean
+at 0241fc8b82a633856a47c625d2b807753e9fa138; repeated boot checks passed 1713/113,
+lint, typechecks and build. The bounded R12/R13 correction and completion of the
+scrying author draft are active. The wind-down section below describes the
+previous checkpoint, not current worker activity.
+
 ## Current state
 
 - Repository: `C:/Users/eliza/Desktop/ClaudeFiles/hearsay`, branch `main`.
