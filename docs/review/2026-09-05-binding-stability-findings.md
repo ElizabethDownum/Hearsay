@@ -1,0 +1,18 @@
+# Recovery of the interrupted correction review — 2026-09-05
+
+This is a CONTROLLER record of the independent review's delivered findings and surviving raw evidence. The native reviewer hit its Codex usage limit before saving its final report. This document is not a reconstructed reviewer-authored report or an approval.
+
+Actual reviewed source HEAD: a53551d6e47fc575f7c306f43f9fa0ff836250cc. Range ae1d5ac..a53551d;6files+529/-71. Native frontier_reviewer Sol/high independently ran enforcement66 first, H2 focused92, full1737/113, lint, both typechecks and build, all passing. Raw outputs/native exits remain in .superpowers/sdd/task-1-final-correction-review-logs/ (01 through07). Root separately ran full gates+soak/MC and complete comparison10blocks230lines at that exact HEAD. Passing gates do not close the two newly reproduced false greens.
+
+Delivered verdict: Needs-fixes; two class(a) defects inside P9-4. Reviewer explicitly closed R13 enrollment/namespace findings and found the narrow R14 record projection otherwise conformant. The formal final severity table was not saved; root treats both false-green enforcement defects as Important at minimum and blocking, with no severity downgrade implied by the missing report.
+
+1. A bound declared-sink credence parameter is labeled forwarded even after direct reassignment to ARTIFACT_CREDENCE. Probe firstHearing mutates its parameter and returns shorthand credence; audit reports zero violations and runtime writes0.97. This is no longer the audited call input.
+2. standardLibraryCallee follows a mutable variable initializer. `let clamp=Math.min; clamp=Math.max; destination.credence=clamp(HEARSAY_CEILING,source.credence)` audits bounded with zero violations and returns0.97. The genuine const Math.min alias control remains lawful.
+
+Exact probe code: task-1-final-correction-review-logs/probe-scanner.txt. Exact audit outputs and both runtime0.97 values:02-probe-scanner.stdout.log, native exit0. These are actual saved executions, not invented historical output.
+
+Controller B5 adjudication: both are checker-visible binding-stability assumptions in the existing proof mechanism, not accepted opaque-holder/dataflow residuals. Repair once through conservative immutable callee aliases and binding-aware invalidation of written sink parameters, covering the same visible assignment forms already modeled. Do not infer temporal order, solve whole-program heap aliasing, reopen R13/R14, change physics/thresholds, or launch an arbitrary new syntax catalogue. Source remains unchanged pending complete authored correction and separate implementation/review.
+
+Codex workers then exhausted their shared usage allowance, including Task3 author and Task4 author. Four saved magic plan/report files were snapshotted byte-for-byte with SHA256/size manifest in quota-recovery-2026-09-05. Task4 report actually completed before failure; Task3 correction/report remained partial. The temporary no-Claude deadline12:24:11UTC elapsed before root's15:22UTC clock check. An installed restricted Claude availability probe returned READY and actual model claude-fable-5-1.
+
+Automatic approval review first rejected the project-context dispatch because it required explicit authorization for sending project plans/context/source to Anthropic. Ellie explicitly approved that transmission and said it is okay to transmit these plans across models. The subsequent scoped author/review dispatches were approved. Unrelated personal/shared-memory copies are denied and not part of the payload. Authorization persists; do not ask the same question again. No permission bypass or persistent settings edit was used.

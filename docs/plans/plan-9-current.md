@@ -8,7 +8,15 @@ green; 10 complete simulation report blocks / 230 deterministic lines unchanged.
 Independent review at caa5a38 returned Needs-fixes: one Critical and one Important.
 Task 1 is not closed. Ellie resumed after the computer restart. Current base is
 0241fc8; the repeated boot gate passes 1713/113, lint, typechecks and build.
-A bounded correction for R12/R13 is being authored before implementation;
+H2's bounded namespace correction is committed at 2fe440f; H1's scanner correction
+is committed at a53551d. Controller gates at that exact HEAD pass 1737/113, lint,
+typechecks, build, soak and MC; all 10/230 deterministic reports match. Independent
+review of ae1d5ac..a53551d closed R13 but found two binding-stability false greens
+(R15). The native workers then exhausted quota; saved artifacts and raw review
+evidence are preserved. Fable 5.1 completed the scrying draft correction before
+a new quota limit stopped the scanner author and séance reviewer. Neither of
+those two saved a completed deliverable. Reset is reported as 15:20 CDT /
+20:20 UTC on 5 September; no worker is running.
 R14 distinguishes the referee's recorded outcome from a belief write.
 
 This document records the current execution order and binding audit amendments.
@@ -27,8 +35,13 @@ silently rewritten by this Plan 9 recovery.
 - User direction on 2026-09-05: audit then continue implementation; keep all writes
   in this Hearsay checkout; take recommended defaults and retain all questions and
   issues for Ellie in ../review.html. Shared AI memory and external plans are read-only.
-- No Claude dispatch before 2026-09-05 12:24:11 UTC / 07:24:11 CDT. Existing native
-  Codex workers continue. Implementation and review use independent threads.
+- The no-Claude deadline 2026-09-05 12:24:11 UTC / 07:24:11 CDT has expired.
+  Ellie also explicitly approved sending these Hearsay plans/context/source to
+  Anthropic after an automatic-review rejection. Restricted Claude Fable 5.1
+  dispatches were approved; unrelated personal/shared memory is excluded.
+  Subsequent API 429 session-limit failures are capacity failures, not a renewed
+  authorization question. Both worker providers currently lack capacity.
+  Implementation and review still use independent threads.
 - One code writer and index owner at a time. Scoped local commits; preserve unrelated
   documentation work. No push performed or needed for local verification.
 - Gate: npm test, npm run lint, npm run typecheck, npm run app:build. Physics/world
@@ -44,9 +57,21 @@ silently rewritten by this Plan 9 recovery.
    these as defects inside the existing mandate. Author a bounded correction,
    preserving same-belief monotone anchor retention; do not widen the accepted
    static-analysis boundary or start another speculative hardening cycle.
-   Task 2 waits for corrected code and independent review. Existing brief:
+   Corrected code is committed and independently gated. Review found that bound
+   parameters and function aliases can be reassigned after the scanner's proof;
+   Task 2 waits for that bounded R15 correction and independent closure.
+   Current author brief: ../../.superpowers/sdd/task-1-binding-stability-author-brief.md.
+   Interrupted review evidence: ../review/2026-09-05-binding-stability-findings.md.
+   Current review: ../../.superpowers/sdd/task-1-final-correction-review-brief.md.
+   Existing recovery brief:
    ../../.superpowers/sdd/task-1-fix2-resume-2026-09-05.md plus original fix2 brief.
    Current correction authoring brief: ../../.superpowers/sdd/task-1-final-correction-author-brief.md.
+   Execution amendment: H2 may run before H1; no source dependency connects them.
+   Frozen H2 dispatch: ../../.superpowers/sdd/task-1-h2-implementation-brief.md.
+   Approved full correction: 2026-09-05-task-1-correction.md. Resolved H1 continuation:
+   ../../.superpowers/sdd/task-1-h1-continuation-brief.md, base 2fe440f.
+   Expected unit counts are H2 +7 ->1720/113, then H1 +17 ->1737/113, subject to
+   exact final suite arithmetic. Review remains after both committed units.
 2. **Task 2 forensics:** staged brief task-2-brief.md already carries P9-5's spoken
    document marker, traceable hand, anonymous venue pickup and one-hop disclosure
    defaults. Perception license now includes the utterance Observation arm and
@@ -55,11 +80,19 @@ silently rewritten by this Plan 9 recovery.
    only after Task 1 closes at a verified committed HEAD. Exposure/digest pillar
    suites stay unchanged. See review item R4 and the independent audit.
 3. **Task 3 scrying:** exact live sensor/provenance interfaces and persistent
-   physical residue discovery/reporting are being authored before dispatch (R5/R6).
+   physical residue discovery/reporting are fully drafted. Independent plan review
+   found two missing physical-reference consumer migrations: identity comparison
+   and nested-copy isolation. Both are corrected in the recovered author draft
+   (R5/R6), together with the required-marker/colliding-question control.
+   Root counted 79 proposed cases and parsed the complete TypeScript blocks
+   without syntax diagnostics; focused independent re-review remains pending.
+   runtime proof still requires the real Task 2 base to be certified.
    The original direct-evidence insertion and heuristic-3 route are invalid.
    Drafts are proposals until controller review; no magic code yet.
 4. **Task 4 seance:** author separate historical witness metadata retained at runtime,
    living-only witness invariants, grounded clue, and offered local action (R7).
+   The complete draft/report are saved; independent plan review was interrupted
+   by quota before a verdict. Restart that bounded review when capacity returns.
 5. **Task 7A prose foundation:** implement registry-exhaustive renderClaim and existing
    board reading lines before Task 6 consumes it. Register action vocabulary when
    compile-driven; debrief-specific vocabulary can finish with its UI (R10).

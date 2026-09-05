@@ -3,4 +3,5 @@
 # Preserve archived source/draft bytes regardless of the checkout's line-ending setting.
 docs/plans/archive/*.md -text
 docs/plans/drafts/2026-09-05-*.md -text
+docs/plans/2026-09-05-task-1-correction*.md -text
 docs/review/prior-decisions.md -text
