@@ -1,5 +1,19 @@
 # Plan 9 author snapshots â€” 5 September 2026
 
+## Evening native review continuation
+
+Ellie resumed after restart. Native seats are available. The
+[séance plan review](../../review/2026-09-05-native-seance-plan-review.md) is
+Approved-for-base-reconciliation conditional on the now preserved
+[Task4 binding amendment](2026-09-05-task-4-base-reconciliation.md): the copied
+physical-marker guard, three exact unexecuted tests and 4C1/4C2 unit accounting.
+The [prose plan review](../../review/2026-09-05-native-prose-plan-review.md) found
+one Important meaning-preservation defect and one Minor avatar grammar defect;
+a new versioned correction is being authored. Original frozen proposals remain.
+The [forensics code review](../../review/2026-09-05-native-forensics-review.md)
+closed R15 within its boundary and found one relayed-document reference defect;
+its focused production fix and re-review precede Task3 execution.
+
 ## Restart WIP, explicitly untested
 
 [Feature-link author continuation](2026-09-05-task-5b-feature-link-wip.md) was
@@ -25,6 +39,14 @@ approved gameplay. The real Task 2/3 predecessor commits must still be reconcile
   distinguishes actual local checks from authored expectations and lost work.
 
 ## Prose foundation proposal
+
+- [Exact Task7A correction amendment](2026-09-05-task-7a-correction.md),
+  [author report](2026-09-05-task-7a-correction-author-report.md), and
+  [constraints](2026-09-05-task-7a-correction-constraints.md): preserves the original
+  44 cases plus34 new regressions,78 virtual cases passing. Fixed predicates retain
+  their facts when another person is named, and public avatar grammar agrees with
+  `you`. Fresh independent review is running. Apply this exact amendment to the
+  frozen original below; no production implementation is claimed.
 
 - [Task 7A prose and public-label draft](2026-09-05-task-7a-prose.md) and
   [author report](2026-09-05-task-7a-author-report.md): complete proposal with

@@ -1,6 +1,6 @@
 # Hearsay continuation — 5 September 2026
 
-**Forensics is implemented and locally gated. Independent review is still open.**
+**Forensics and R15 have independent approval. Reviewed scrying implementation is next.**
 This project-local handoff supersedes the older shared AI memory. All writes in
 this session stayed inside Hearsay at Ellie's request.
 
@@ -9,6 +9,23 @@ The [session index](episodes/README.md) links both episodes and three transferab
 learning candidates retained locally. This recordkeeping does not resume implementation.
 
 ## Resumed after restart — 5 September, evening Central
+
+Latest checkpoint: R20's received-report correction is committed at09e5458 and
+independently Approved, zero Critical/Important/Minor. The controller and reviewer
+each pass all six gates at that source:1783 tests/114 files, lint, both typechecks,
+build490.90/145.38gzip, soak and MC. All10 report blocks/230 deterministic lines
+match. The controller's Windows PowerShell5 output was BOM-marked UTF16; strict,
+roundtrip-checked UTF8 copies preserve the raw logs and pass the unchanged comparator.
+The reviewer used native PowerShell7 and independently passed comparison.
+The separate historical12-snapshot no-forgery harness was not independently rerun;
+its limitation is preserved in the [focused approval](review/2026-09-05-forensics-relay-approval.md).
+
+Task3's reviewed draft and A1 are ready for actual-base reconciliation at09e5458.
+Its 3C2 migration must preserve all19 forensics cases and eight auditor calls.
+Run3A,3B,3C1,3C2,3D,3E as serial committed units with one production writer.
+The corrected prose proposal retains all44 tests plus34 regressions (78 virtual
+passes) and is under a fresh independent review; no production prose has landed.
+The following paragraphs retain the earlier evening checkpoints.
 
 Ellie resumed with "please continue". Clean documentation HEAD c3e86d5 has the
 same production/test/config files as dc114da. Native frontier review seats are
@@ -24,6 +41,10 @@ brief is staged. Final verdict is Needs-fixes (0 Critical/1 Important/0 Minor);
 R15 passes within its declared boundary. The focused H10 correction is next.
 The [native verdict](review/2026-09-05-native-forensics-review.md) is preserved.
 All writes remain Hearsay-local, with one production writer/index owner and no push.
+The native séance plan review and exact conditional amendment are now preserved;
+its three new auditor cases remain proposed, not executed. The prose plan review
+found three fixed-predicate meaning losses and avatar agreement; a versioned
+correction is being authored. HTML R20–R22 and the draft index track these loops.
 
 ## Earlier stop for Ellie's computer restart (superseded by resume above)
 
@@ -47,7 +68,8 @@ saved. All writes stayed inside Hearsay; no push or production change occurred.
 ## Current state
 
 - Repository C:/Users/eliza/Desktop/ClaudeFiles/hearsay, main; no push.
-- Current implementation HEAD dc114da3006a75115784e4e894e880dd113226f5.
+- Current implementation HEAD09e54582f0a5fc9505e396bd1910c800c7413fff; approved
+  R20 correction follows the historical dc114da forensics endpoint below.
 - Task 1 R15 scanner correction: 7d5608f, +27 tests. Report:
   ../.superpowers/sdd/task-1-binding-stability-root-report.md.
 - Task 2: C1 marker projection 8fee456, C2 pure tracing fold 664e0a2,

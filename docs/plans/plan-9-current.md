@@ -1,14 +1,14 @@
 # Plan 9 — current execution plan
 
 Updated: 2026-09-05. Controller: Codex. Current implementation HEAD:
-**dc114da3006a75115784e4e894e880dd113226f5**.
+**09e54582f0a5fc9505e396bd1910c800c7413fff**.
 
-Task 1's R15 correction is implemented at 7d5608f. Task 2 forensics is implemented
-in 8fee456, 664e0a2 and dc114da. All six local gates pass: **1780 tests /114 files**,
-lint, both typechecks, build, soak and MC. All 10 complete simulation report
-blocks /230 deterministic lines match the baseline. Twelve full no-forgery world
-snapshots also match the pre-Task-2 source byte for byte. Independent approval of
-R15 and Task 2 remains pending; neither is certified complete.
+Task1's R15 correction and Task2 forensics now have independent approval. The
+R20 relay-reference fix at09e5458 closes the sole remaining Important finding.
+Controller and reviewer each pass all six gates: **1783 tests /114 files**, lint,
+both typechecks, build, soak and MC. All10 complete simulation report blocks/
+230 deterministic lines match. The prior12 no-forgery snapshots remain historical
+controller evidence; the independent review discloses that separate harness limit.
 
 Ellie renewed the go-ahead after worker quotas and the controller-only restriction
 were explained. Under the disclosed PROVISIONAL process amendment, root implemented
@@ -17,9 +17,11 @@ open. This superseded review-before-start sequencing, without waiving final revi
 or changing gameplay design/physics. All new production changes stay in the brief's
 eight licensed files; pillar suites and exposure/turncoat mechanics are unchanged.
 
-Task3 and Task4 remain unimplemented. Scrying now has independent plan approval
-for base reconciliation with A1; séance review is still pending. Completed plan
-reviews, partial native code review and the new Claude quota are detailed below.
+Task3 and Task4 remain unimplemented. Scrying has independent plan approval with
+A1; reconcile its actual baseline at09e5458 and preserve19 forensics cases/eight
+auditor calls in3C2. Séance's conditional T4-A1/A2 amendment is saved. The corrected
+78-case prose proposal is under new independent plan review. Historical capacity
+and review checkpoints remain below, superseded by these completed native reviews.
 
 This document records the current execution order and binding audit amendments.
 It does not certify unimplemented task bodies as dispatch-ready. Exact per-task
@@ -30,6 +32,14 @@ Plan 10's original is archived beside it for subsequent audit; it is not being
 silently rewritten by this Plan 9 recovery.
 
 ## Resumed after restart — 5 September, evening Central
+
+Latest: [focused R20 approval](../review/2026-09-05-forensics-relay-approval.md)
+is Approved with zero findings at09e5458. Task3 execution is next in the reviewed
+3A->3B->3C1->3C2->3D->3E order, followed by independent accumulated-code review.
+Each unit has a scoped root commit and actual focused/typecheck evidence; final
+six gates and full comparison use the real certified Task2 report logs. No stale
+whole-file snapshot may overwrite the received-report correction. The paragraphs
+below describe the earlier evening sequence.
 
 Ellie resumed with "please continue". Native frontier seats are running separate
 R15/Task 2 implemented-code and Task 4 plan reviews, with production frozen at
@@ -42,6 +52,13 @@ reference; HTML R20 authorizes the bounded H10 correction to cite actual receive
 network speech. Fix it, run the gates/comparison and focused independent re-review,
 then execute reviewed scrying with binding A1 in committed units and a separate
 code review. No prerequisite approval is assumed.
+
+The native Task4 plan review is now Approved-for-base-reconciliation with
+docs/plans/drafts/2026-09-05-task-4-base-reconciliation.md: exact T4-A1 auditor
+guard/three tests and T4-A2 serial unit accounting. These additions are unexecuted.
+Task7A native review is Needs-fixes (1 Important/1 Minor): named objects delete
+fixed predicate facts and the avatar's grammar is wrong. A versioned corrected
+proposal is being authored. HTML R21/R22 and saved native reports hold the details.
 
 ## Earlier stop for Ellie's computer restart (superseded by resume above)
 

@@ -2,9 +2,14 @@
 
 Ellie's current instructions: audit the existing plan before continuing implementation; keep every change inside the Hearsay project folder; take the recommended behavior and hold questions/issues in this HTML document for later review.
 
-Latest checkpoint: forensics is implemented at dc114da, after the R15 scanner correction at 7d5608f. All 1,780 tests /114 files and all six local gates pass. Simulation reports and complete no-forgery compatibility snapshots are unchanged. Separate independent review remains pending. Scrying and séance are drafted but unimplemented; prose and debrief work remain. Scrying and R16/R17 have completed independent plan reviews; code approval for R15/Task2
-and the séance plan verdict remain pending after Claude hit its next quota. The eight
-partial debrief modules pass96 isolated cases. The following recovery paragraphs are historical checkpoints.
+Latest checkpoint: the received-report correction is committed at09e5458. All1,783
+tests in114 files and all six implementation gates pass; the ten deterministic
+simulation report blocks remain unchanged. Independent focused review Approved
+with zero findings; controller gates also pass at that commit.
+R15 passed within its declared boundary. Scrying and séance remain proposals;
+séance's conditional plan amendment is saved. Prose corrections are being authored.
+The eight partial debrief modules retain96 isolated cases. The following recovery
+paragraphs are historical checkpoints.
 
 Status at session start: Plan 9 Task 1, fix wave two. HEAD 49cc3e7 contains the first five fixes and G1. Two unfinished G2 test edits were preserved in a project-local recovery snapshot. The inherited working tree passes 1,710 tests in 113 files, lint, both typechecks and the production build. The JavaScript bundle remains 489.63 kB (145.02 kB gzip). Remaining fixes and independent review are in progress. This is a recovery baseline, not Task 1 completion.
 
@@ -196,12 +201,51 @@ probe fails. Task 2 closure is withheld while the bounded correction is prepared
   second-relay requirement, and the unchanged heard-event evidence contract.
   P9-5(d)'s all-answer-ref prescription assumed direct observation and needs this
   local correction for delivered reports.
-- **Status:** final independent review is Needs-fixes, 0 Critical/1 Important/0 Minor.
-  R15 passes within its declared boundary; this reference defect is the only
-  blocker. The focused two-file correction is next. No correction is approved yet.
+- **Status:** the focused correction is committed at09e5458, with three new tests,
+  1,783 total passing cases and all six implementation gates green. The original
+  received-interrogation expectation now cites its real network delivery. New
+  fixtures run normal phases and the unchanged auditor. Independent focused
+  re-review is Approved, zero Critical/Important/Minor; its own six gates and full
+  report comparison pass. R15 passed within its declared boundary.
+- **Closure:** [Focused relay-fix approval](2026-09-05-forensics-relay-approval.md).
 - **Saved verdict:** [Native forensics review](2026-09-05-native-forensics-review.md).
 - **Review evidence:** .superpowers/sdd/task-2-native-review-resume-2026-09-05-report.md
   and review-native-utf8/t2/probe.probe.ts with raw native output.
+
+### R21 — Copied physical evidence must retain its observation marker
+
+- **Issue:** the séance proposal checks a night-visit feature's marker, but a later
+  runaround copies that evidence under a different feature kind. Removing the
+  copied marker could let it pass the auditor as an unrelated asking at the same
+  tick. This is a defect in the proposed proof; no séance code is implemented.
+- **Adopted amendment (PROVISIONAL local):** check both physical feature kinds
+  before either physical-value branch, and require a physical marker on a
+  runaround whose two speech IDs are null. Preserve ordinary asking references.
+  Three exact new tests cover the real copied consumer and both crossed markers.
+- **Evidence/status:** [Native séance plan review](2026-09-05-native-seance-plan-review.md)
+  is Approved-for-base-reconciliation conditional on the
+  [binding amendment](../plans/drafts/2026-09-05-task-4-base-reconciliation.md), now
+  preserved. Its three proposed cases remain unexecuted. Actual predecessor,
+  native gates and separate implemented-code review remain required.
+- **Execution clarification:** the existing 4C work is two serial units, 4C1 and
+  4C2. The external Claude quota guard does not gate native implementation.
+
+### R22 — Prose must preserve the predicate when another person is named
+
+- **Issue:** an object-only rumor mutation makes the prose drop facts: “bribed
+  the council” becomes “bribed Benedict.” The drowning-child and alms-to-the-poor
+  templates have the same defect. The predicate itself did not change.
+- **Recommended correction:** retain the predicate's fixed clause and append the
+  neutral statement that the extra person is named in the account. Also correct
+  the real avatar's subject and attribution grammar (“you has” is currently produced).
+- **Evidence:** the [native prose plan review](2026-09-05-native-prose-plan-review.md)
+  reproduced three semantic failures with three passing controls, and one avatar
+  agreement failure. Its original 44-case virtual suite and compiler/lint checks
+  pass, showing why the added regressions are needed.
+- **Status:** the separately versioned correction is complete with78 virtual cases,
+  retaining all44 original cases plus34 additions. It is under a new independent
+  review; original drafts and evidence remain unchanged. No prose production code
+  has been implemented or approved.
 
 ## Verification note
 
