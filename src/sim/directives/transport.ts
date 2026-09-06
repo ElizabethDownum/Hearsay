@@ -23,6 +23,7 @@ import { projectBrief, projectDirectiveReport, type ProjectionSpeaker } from './
 import { evaluateReceivedBrief } from './evaluator';
 import { initializeDirectiveReceipt } from './execution';
 import { settleEnemyOrderReport } from './reports';
+import { reportResidue, sameResidue } from '../residue';
 import { correlationOf } from './types';
 import type {
   DirectiveAuthority, DirectiveDiscretion, MessageId, NetworkMessage, NetworkPayload,
@@ -460,7 +461,13 @@ function receiveFinal(
         if (!held || held.queuedIn !== message.id) {
           throw new Error(`network receipt: malformed field-report source '${id}'`);
         }
-        if (held.deliveredAt === null) held.deliveredAt = t;
+        const residue = held.content.kind === 'raw'
+          ? (held.content.observation.kind === 'arcane-residue'
+              ? reportResidue(held.content.observation) : null)
+          : (held.content.observation.kind === 'arcane-residue' ? held.content.observation : null);
+        const wasSpoken = residue === null || spoken.items.some((item) =>
+          item.observation.kind === 'arcane-residue' && sameResidue(residue, item.observation));
+        if (wasSpoken && held.deliveredAt === null) held.deliveredAt = t;
       }
       return;
     }

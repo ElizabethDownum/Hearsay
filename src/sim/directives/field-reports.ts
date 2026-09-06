@@ -1,7 +1,7 @@
 import type { Tick } from '../../core/time';
 import type { IntelEntry } from '../../intel/entry';
 import { cloneSerializable, stableStringify } from '../hash';
-import type { EvidenceEntry } from '../enemy/state';
+import type { EvidenceEntry, PhysicalReceipt } from '../enemy/state';
 import { reportThrough } from '../reporting';
 import type { Rules } from '../rules';
 import type { EntityId } from '../rumors/claim';
@@ -19,6 +19,9 @@ import type {
   HeldFieldObservation, NetworkMessage, NetworkSpeech, ReportedFieldObservation,
 } from './types';
 import { queueNetworkMessage } from './transport';
+import {
+  ingestEnemyResidue, ingestPlayerResidue, rememberResidueSighting, reportResidue,
+} from '../residue';
 
 const blankIntelFields = (): Omit<IntelEntry, 'tick' | 'venue' | 'via' | 'kind' | 'overheard'> => ({
   speaker: null, addressedTo: null, mode: null, authority: false, claimId: null, family: null,
@@ -45,12 +48,26 @@ export function holdFieldObservation(
   if (content.kind === 'reported' && rootFingerprint === null) {
     throw new Error('field-report: a reported observation must carry its root fingerprint');
   }
+  const encounterAt = content.kind === 'raw' && content.observation.kind === 'arcane-residue'
+    ? content.observation.tick : null;
+  if (content.kind === 'raw' && content.observation.kind === 'arcane-residue') {
+    content = { kind: 'raw', observation: rememberResidueSighting(world, content.observation) };
+  }
   const root = rootFingerprint
     ?? stableStringify(['root', observer, content.kind === 'raw' ? content.observation : content]);
   const fingerprint = stableStringify([principal, observer, root]);
   const state = ensureDirectiveState(world);
   const existing = state.heldObservations.find((row) => row.fingerprint === fingerprint);
-  if (existing) return existing.id;
+  if (existing) {
+    if (encounterAt !== null && encounterAt > existing.observedAt
+      && existing.deliveredAt === null && existing.queuedIn !== null) {
+      const attempt = state.messages.find((message) => message.id === existing.queuedIn);
+      if (attempt && (attempt.failedAt !== null || attempt.deliveredAt !== null)) {
+        existing.queuedIn = null;
+      }
+    }
+    return existing.id;
+  }
   const id = allocateObservationId(state);
   state.heldObservations.push({
     id,
@@ -171,6 +188,8 @@ function rawReportedObservation(row: HeldFieldObservation): ReportedFieldObserva
         overheard: observation.overheard, messageId: observation.messageId,
         spoken: cloneSerializable(observation.spoken),
       };
+    case 'arcane-residue':
+      return reportResidue(observation);
   }
 }
 
@@ -188,6 +207,7 @@ function projectReportedObservation(
   const scrutiny = perceivedScrutiny(world, reporter, principal, atTick);
   const turned = isTurnedAgainst(world, audience, reporter);
   const candor = candorFor(turned, scrutiny, npc.traits);
+  if (observation.kind === 'arcane-residue' && candor !== 'ordinary') return null;
   if (candor === 'guarded' && (observation.kind === 'presence'
     || ('overheard' in observation && observation.overheard))) return null;
   if ((candor === 'omissive' || candor === 'doctored') && (observation.kind === 'presence'
@@ -206,6 +226,8 @@ function projectReportedObservation(
   const speaker: ProjectionSpeaker = { id: reporter, faction: npc.faction,
     rivals: [...npc.rivals], knownFactions, traits: [...npc.traits] };
   switch (observation.kind) {
+    case 'arcane-residue':
+      return { ...observation };
     case 'utterance':
       return {
         kind: 'utterance', observedAt: observation.observedAt, venue: observation.venue,
@@ -356,7 +378,9 @@ function ingestPlayerItem(
       ...blankIntelFields(), tick: observation.observedAt, venue: observation.venue, via,
       kind: 'presence', overheard: true, actor: observation.actor,
     });
-  } else {
+  } else if (observation.kind === 'arcane-residue') {
+    ingestPlayerResidue(world, observation, via);
+  } else if (observation.kind === 'network-speech') {
     const rows = world.intel.network ?? (world.intel.network = []);
     rows.push({
       tick: observation.observedAt, venue: observation.venue, via,
@@ -372,8 +396,13 @@ function ingestEnemyItem(
   world: WorldState,
   observer: EntityId,
   item: { observation: ReportedFieldObservation },
+  physicalReceipt: PhysicalReceipt,
 ): void {
   const observation = item.observation;
+  if (observation.kind === 'arcane-residue') {
+    ingestEnemyResidue(world, observation, physicalReceipt);
+    return;
+  }
   let entry: EvidenceEntry | null = null;
   if (observation.kind === 'utterance') {
     entry = {
@@ -417,6 +446,10 @@ export function ingestObservedFieldReport(
   if (principal === 'player') {
     for (const item of speech.spoken.items) ingestPlayerItem(world, speech.speaker, item, speech.tick);
   } else {
-    for (const item of speech.spoken.items) ingestEnemyItem(world, speech.speaker, item);
+    const receiver = world.network.spymaster;
+    if (receiver === null) return;
+    for (const item of speech.spoken.items) ingestEnemyItem(world, speech.speaker, item, {
+      tick: speech.tick, observer: receiver, messageId: speech.messageId,
+    });
   }
 }

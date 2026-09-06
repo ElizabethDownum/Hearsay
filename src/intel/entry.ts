@@ -44,7 +44,8 @@ export interface IntelEntry {
   tick: Tick; venue: VenueId;
   via: 'self' | 'dossier' | EntityId;   // EntityId = the reporting informant
   provenance?: MagicProvenance;
-  kind: 'utterance' | 'asking' | 'presence' | 'scene-presence' | 'trait-read' | 'edge-read' | 'hint';
+  kind: 'utterance' | 'asking' | 'presence' | 'scene-presence' | 'trait-read' | 'edge-read' | 'hint'
+    | 'arcane-residue';
   overheard: boolean;
   speaker: EntityId | null; addressedTo: EntityId | null;
   mode: 'telling' | 'answer' | null; authority: boolean;
@@ -55,6 +56,7 @@ export interface IntelEntry {
   npc: EntityId | null; trait: TraitId | null;              // trait-read
   edgeFrom: EntityId | null; edgeTo: EntityId | null; edgeKind: string | null; // edge-read
   hintAbout: EntityId | null; hintWitness: EntityId | null; // hint
+  residueId?: string;
 }
 
 /**

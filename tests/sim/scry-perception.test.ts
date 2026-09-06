@@ -41,4 +41,16 @@ describe('live venue sensor', () => {
     const heard = observationsAtVenue(sensor, bundle).find((row) => row.kind === 'utterance')!;
     expect(Object.hasOwn(heard, 'document')).toBe(false);
   });
+  it('residue is visible only to real local observers; report bookkeeping is not an event', () => {
+    const bundle = events(1440);
+    bundle.residues = [{ id: 's0', venue: 'hall', createdAt: 1440 }];
+    expect(observationsFor('b', bundle).observations).toContainEqual({
+      kind: 'arcane-residue', tick: 1440, venue: 'hall', residueId: 's0', witness: 'b',
+    });
+    expect(observationsFor('outsider', bundle).observations).toEqual([]);
+    expect(observationsFor('absent', bundle).observations).toEqual([]);
+    expect(observationsAtVenue(sensor, bundle).map((row) => row.kind)).toEqual(['presence', 'presence', 'utterance', 'asking']);
+    bundle.residues[0]!.createdAt = 1441;
+    expect(observationsFor('b', bundle).observations.some((row) => row.kind === 'arcane-residue')).toBe(false);
+  });
 });

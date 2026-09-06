@@ -15,6 +15,7 @@ import {
 } from './directives/field-reports';
 import type { NetworkSpeech } from './directives/types';
 import type { CourierPlanningMark } from '../intel/entry';
+import { ingestPlayerResidue, rememberResidueSighting, reportResidue } from './residue';
 
 /** The nulled-out fields of one intel row — the parts that identify a row (tick/venue/via/
  *  kind/overheard) are always supplied by the caller. A FACTORY (fresh object per call) so no
@@ -60,7 +61,9 @@ function appendOwnNetwork(world: WorldState, speech: NetworkSpeech): void {
 }
 
 function appendOwnObservation(world: WorldState, observation: Observation, rules: Rules): void {
-  if (observation.kind === 'utterance') {
+  if (observation.kind === 'arcane-residue') {
+    ingestPlayerResidue(world, reportResidue(rememberResidueSighting(world, observation)), 'self');
+  } else if (observation.kind === 'utterance') {
     world.intel.log.push({
       ...blankIntel(), tick: observation.tick, venue: observation.venue, via: 'self',
       kind: 'utterance', overheard: observation.overheard,
@@ -86,7 +89,7 @@ function appendOwnObservation(world: WorldState, observation: Observation, rules
       ...blankIntel(), tick: observation.tick, venue: observation.venue, via: 'self',
       kind: 'presence', overheard: true, actor: observation.actor,
     });
-  } else {
+  } else if (observation.kind === 'network-speech') {
     appendOwnNetwork(world, {
       tick: observation.tick, venue: observation.venue, circleMembers: [],
       speaker: observation.speaker, addressedTo: observation.addressedTo,

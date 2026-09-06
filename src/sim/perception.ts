@@ -30,6 +30,10 @@ export interface Asking {
 
 export interface ResidueEvent { id: string; venue: VenueId; createdAt: Tick }
 
+export interface ResidueObservation {
+  kind: 'arcane-residue'; tick: Tick; venue: VenueId; residueId: string; witness: EntityId;
+}
+
 /** Everything that happened in one tick — the ONLY raw material observation is built from. */
 export interface TickEvents {
   tick: Tick;
@@ -48,7 +52,8 @@ export type Observation =
   | { kind: 'asking'; tick: Tick; venue: VenueId; speaker: EntityId;
       addressedTo: EntityId; about: InquiryKey; overheard: boolean; authority: boolean }
   | { kind: 'network-speech'; tick: Tick; venue: VenueId; speaker: EntityId;
-      addressedTo: EntityId; messageId: string; spoken: SpokenNetworkPayload; overheard: boolean };
+      addressedTo: EntityId; messageId: string; spoken: SpokenNetworkPayload; overheard: boolean }
+  | ResidueObservation;
 
 export interface ObservationFeed {
   observer: EntityId;
@@ -110,6 +115,14 @@ export function observationsFor(observer: EntityId, events: TickEvents): Observa
         messageId: speech.messageId, spoken: speech.spoken,
         overheard: speech.addressedTo !== observer,
       });
+    }
+  }
+
+  if (myVenue !== undefined) {
+    for (const residue of events.residues ?? []) {
+      if (residue.venue !== myVenue || residue.createdAt > events.tick) continue;
+      observations.push({ kind: 'arcane-residue', tick: events.tick, venue: myVenue,
+        residueId: residue.id, witness: observer });
     }
   }
 

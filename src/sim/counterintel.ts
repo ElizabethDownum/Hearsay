@@ -16,12 +16,14 @@ import type { ObserverSpec } from './enemy/state';
 import { issueDirectiveRecord, strictNextBeat } from './directives/state';
 import type { DirectiveBrief, DirectiveCorrelation } from './directives/types';
 import type { EntityId } from './rumors/claim';
+import { ingestEnemyResidue, rememberResidueSighting, reportResidue } from './residue';
 
 export function noticedByObserver(spec: ObserverSpec, observation: Observation, rules: Rules): boolean {
   if (observation.kind === 'utterance') {
     return !observation.overheard || juiciness(observation.claim, rules) >= 1 - spec.vigilance;
   }
-  return observation.kind === 'asking' || observation.kind === 'network-speech';
+  return observation.kind === 'asking' || observation.kind === 'network-speech'
+    || observation.kind === 'arcane-residue';
 }
 
 function sourceDirectiveId(world: WorldState, messageId: string): string | null {
@@ -36,6 +38,10 @@ function sourceDirectiveId(world: WorldState, messageId: string): string | null 
 function ingestEnemyObservation(
   world: WorldState, observer: string, observation: Observation, rules: Rules,
 ): void {
+  if (observation.kind === 'arcane-residue') {
+    ingestEnemyResidue(world, reportResidue(rememberResidueSighting(world, observation)));
+    return;
+  }
   if (observation.kind === 'utterance') {
     world.enemy.evidence.push({
       tick: observation.tick, venue: observation.venue, observer,

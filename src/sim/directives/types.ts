@@ -217,7 +217,8 @@ export type ReportedFieldObservation =
       kind: 'network-speech'; observedAt: Tick; venue: VenueId; speaker: EntityId;
       addressedTo: EntityId; overheard: boolean; messageId: MessageId;
       spoken: SpokenNetworkPayload;
-    };
+    }
+  | { kind: 'arcane-residue'; observedAt: Tick; venue: VenueId; residueId: string; witness: EntityId };
 
 export type NetworkPayload =
   | { kind: 'directive'; version: BriefVersion }

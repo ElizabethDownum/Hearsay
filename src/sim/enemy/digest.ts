@@ -217,7 +217,9 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
   for (const family of suspiciousFamilies) {
     const familyEntries = state.evidence.filter((e) => e.family === family);
     // Story-bearing entries (an asking carries no claim, so it is not a "voicing").
-    const voicings = familyEntries.filter((e) => e.reported !== null);
+    const voicings = familyEntries.filter(
+      (e): e is Extract<EvidenceEntry, { kind: 'utterance' | 'network' }> => e.reported !== null,
+    );
 
     // ── Heuristic 2: entry-point (once per family) ──────────────────────────
     // The family's FIRST evidence entry — where the ENEMY first sampled it (honest

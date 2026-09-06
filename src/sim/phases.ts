@@ -519,7 +519,8 @@ function recordAndIngest(
     });
   }
 
-  if (utterances.length > 0 || askings.length > 0 || networkSpeeches.length > 0) {
+  if (utterances.length > 0 || askings.length > 0 || networkSpeeches.length > 0
+    || (events.residues?.length ?? 0) > 0) {
     captureEvidence(world, events, rules);
   }
   if (world.scenario?.status === 'running' && world.playerId !== null) {
