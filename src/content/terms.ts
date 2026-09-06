@@ -69,6 +69,9 @@ export const TERMS: Record<string, TermDef> = {
   'verb-forge':      { id: 'verb-forge', label: 'Forge', short: 'Commission a forged document carrying a fixed claim. Priced, and the ink needs a day to dry.', entry: null },
   'verb-plant':      { id: 'verb-plant', label: 'Plant', short: 'Leave a document where it will be found, or hand it to a circle-mate. Never both at once.', entry: null },
   'verb-show':       { id: 'verb-show', label: 'Show', short: 'Hold a document up to a circle-mate and keep it. Paper is believed further than any mouth.', entry: null },
+  'verb-scry': { id: 'verb-scry', label: 'Scry', short: 'Buy a remote scene tomorrow: up to an hour, in 15-minute steps. Costs 15 coin and leaves physical residue.', entry: null },
+  'scrying': { id: 'scrying', label: 'Scrying', short: 'A view of one venue as events happen. It shows words faithfully; the words themselves may be false.', entry: null },
+  'magic': { id: 'magic', label: 'Magic', short: 'Observation through a ritual. It supplies no independent informant channel.', entry: null },
   // ── the network economy: your standing, your payroll, your reach (Plan 8) ──
   'station':         { id: 'station', label: 'Station', short: 'The seat the seed deals your avatar — noble or lowlife. Fixed for the campaign; it sets your standing in town.', entry: null },
   'standing':        { id: 'standing', label: 'Standing', short: 'What your station lets you do: which venue doors open without suspicion, and the one room you may host in.', entry: null },

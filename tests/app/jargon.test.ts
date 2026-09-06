@@ -188,7 +188,9 @@ describe('Task 13 registry — exactly eight new nouns, and no copy that promise
    * to exist, so the subtraction can never quietly absorb a term that was removed rather than added.
    * Plan 9 Task 1 (artifacts) registers the three artifact verbs.
    */
-  const LATER_PLAN_TERM_IDS = ['verb-forge', 'verb-plant', 'verb-show'];
+  const LATER_PLAN_TERM_IDS = [
+    'verb-forge', 'verb-plant', 'verb-show', 'verb-scry', 'scrying', 'magic',
+  ];
 
   it('the registry grew by exactly 8 from Task-12 HEAD (later-plan registrations named and excluded)', () => {
     for (const id of LATER_PLAN_TERM_IDS) {

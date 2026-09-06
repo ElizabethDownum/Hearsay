@@ -10,6 +10,7 @@ import type { ScenarioState } from './scenario/types';
 import type { NetworkState } from './network/types';
 import type { ScheduledSetup } from './phases';
 import type { NetworkSpeech } from './directives/types';
+import type { MagicState } from './magic';
 
 export type { IntelEntry, IntelState, InformantSpec, HypothesisCard, CodexHypothesis, TagNote } from '../intel/entry';
 export type { ScenarioState, ScenarioStatus, ScenarioDef, ScenarioCast, WinCondition, Resolution } from './scenario/types';
@@ -150,8 +151,16 @@ export interface ArtifactRecord {
   by: EntityId;
   to: EntityId | VenueId | null;
 }
+export interface ScryRecord {
+  kind: 'scry'; tick: Tick; operation: string; venue: VenueId;
+  day: number; from: number; to: number;
+}
+export interface ResidueRecord {
+  kind: 'residue'; act: 'created' | 'observed'; tick: Tick;
+  residueId: string; venue: VenueId; observer: EntityId | null;
+}
 export type ChronicleEntry = TellingRecord | InjectRecord | AskingRecord | InstitutionRecord
-  | VignetteRecord | NetworkSpeechRecord | ArtifactRecord;
+  | VignetteRecord | NetworkSpeechRecord | ArtifactRecord | ScryRecord | ResidueRecord;
 
 export interface InquiryTask {
   /** Directive-created story inquiries use their owning directive id as this unique task id. */
@@ -247,6 +256,7 @@ export interface WorldState {
   artifacts?: Artifact[];
   /** Next artifact ordinal — ids are `a${artifactCounter}`. Absent until the first forgery. */
   artifactCounter?: number;
+  magic?: MagicState;
   enemy: EnemyState;
   /** Latch keys of vignettes already fired — `${defId}:${a}:${b ?? '-'}` (pillar 7, replay-stable). */
   vignettesFired: string[];

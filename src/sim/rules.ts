@@ -37,6 +37,7 @@ export interface EconomyDef {
   brokerSaleBase: number;
   /** One forged document (Plan 9 Task 1). Buys the only credence above the hearsay ceiling. */
   forgery: number;
+  scrying: number;
 }
 
 /**

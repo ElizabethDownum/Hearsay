@@ -18,4 +18,5 @@ export const STANDARD_ECONOMY: EconomyDef = {
   backRoomEvent: 4,
   brokerSaleBase: 2,
   forgery: 6,
+  scrying: 15,
 };

@@ -76,4 +76,5 @@ export const VERB_TERM: Record<Action['kind'], string> = {
   forge: 'verb-forge',
   plant: 'verb-plant',
   show: 'verb-show',
+  scry: 'verb-scry',
 };

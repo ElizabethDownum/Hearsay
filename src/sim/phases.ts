@@ -28,6 +28,7 @@ import {
 import { queueUnqueuedFieldReports } from './directives/field-reports';
 import { pruneScrutiny } from './directives/scrutiny';
 import type { NetworkSpeech } from './directives/types';
+import { beginScryWindows, residueEvents, captureScryIntel } from './magic';
 import {
   attemptDirective, collectDirectiveActIntents, expireDirectiveExecutions,
   expireDirectiveActsBeforeCollection, markDirectiveDue,
@@ -549,6 +550,7 @@ function recordAndIngest(
   }
 
   captureIntel(world, events, rules);
+  captureScryIntel(world, events);
   queueUnqueuedFieldReports(world);
   if (utterances.length === 0 && askings.length === 0) return;
   for (const hearerId of Object.keys(world.npcs).sort()) {
@@ -612,6 +614,7 @@ function finishTickInternal(
   }
 
   consumePrior(world, frame.prior);
+  beginScryWindows(world, frame.tick);
   playerPhase?.();
 
   const utterances: Utterance[] = [];
@@ -633,6 +636,7 @@ function finishTickInternal(
 
   const events: TickEvents = { tick: frame.tick, positions, utterances, askings };
   if (networkSpeeches.length > 0) events.networkSpeeches = networkSpeeches;
+  if (world.magic !== undefined && world.magic.traces.length > 0) events.residues = residueEvents(world);
   recordAndIngest(world, rules, events, utterances, askings, networkSpeeches);
   // THE BEAT TAIL (Plan 9): a planted letter is found and a convinced holder passes the sight of it
   // on. Physical acts on phase 4's simultaneous tier, resolved at its TAIL — after every word of the

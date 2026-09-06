@@ -19,6 +19,7 @@ import type { TraitId } from './rumors/traits';
 import type { Mice } from './network/types';
 import type { DirectiveBrief, DirectiveHandoff, PlayerDirectiveApplication } from './directives/types';
 import { buildWorld } from './world';
+import { applyScry, type ScryAction } from './magic';
 
 export interface InjectAction {
   tick: Tick;
@@ -157,7 +158,7 @@ export interface DirectiveAction {
 export type Action =
   | InjectAction | GoToAction | TellAction | AskAction | AssignInformantAction | CodexAction | CardAction
   | TagAction | RecruitAction | SetDropAction | CourierAction | MeetAction | HostAction | DebriefAction
-  | SellAction | DirectiveAction | ForgeAction | PlantAction | ShowAction;
+  | SellAction | DirectiveAction | ForgeAction | PlantAction | ShowAction | ScryAction;
 export type ActionLog = Action[];
 
 /** A complete campaign: the world regrows from these two values alone. */
@@ -274,6 +275,10 @@ export function applyAction(
         world, action.recipient, action.handoff, action.brief, action.tick, action.application,
         frame?.circles,
       );
+      break;
+    case 'scry':
+      if (!rules) throw new Error('applyAction: scry requires rules (economy prices)');
+      applyScry(world, action, rules);
       break;
     default: {
       // Saves are untrusted JSON — an unknown kind must fail loudly, never silently no-op.

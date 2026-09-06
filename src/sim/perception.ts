@@ -28,6 +28,8 @@ export interface Asking {
   authority: boolean;
 }
 
+export interface ResidueEvent { id: string; venue: VenueId; createdAt: Tick }
+
 /** Everything that happened in one tick — the ONLY raw material observation is built from. */
 export interface TickEvents {
   tick: Tick;
@@ -35,6 +37,7 @@ export interface TickEvents {
   utterances: Utterance[];
   askings: Asking[];
   networkSpeeches?: NetworkSpeech[];
+  residues?: ResidueEvent[];
 }
 
 export type Observation =
