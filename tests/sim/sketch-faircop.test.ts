@@ -1,64 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { runUntil } from '../../src/sim/step';
+import { runUntil, step } from '../../src/sim/step';
 import { applyInject } from '../../src/sim/actions';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { SOMEONE } from '../../src/sim/rumors/claim';
 import { at } from '../../src/core/time';
-import { runLogOn, type Action } from '../../src/sim/campaign';
+import { applyAction, runLogOn, type Action } from '../../src/sim/campaign';
 import { buildTownMap, buildWorld, enrollPlayer } from '../../src/sim/world';
 import type { DirectiveBrief } from '../../src/sim/directives/types';
 import type { Npc, TownFixture, WorldState } from '../../src/sim/types';
+import { enemyDigest } from '../../src/sim/enemy/digest';
+import { cloneSerializable } from '../../src/sim/hash';
+import type { SketchEvidenceRef, SketchFeature } from '../../src/sim/enemy/state';
 import { watchfordWorld } from './helpers/watchford-world';
-
-/**
- * The sketch fair-cop audit — a permanent property test in the spirit of the Plan-2
- * provenance audit. Every accusation the enemy will ever put on the Counter-Sketch
- * board must be EXPLAINABLE from the chronicle: each feature carries ≥1 evidence ref,
- * and every ref resolves both to a captured EvidenceEntry AND to the chronicle record
- * the named observer actually heard. This is the debrief substrate guarantee — no
- * feature may float free of a witnessed event.
- *
- * Task 12 widens the audit to the SECOND channel a ref can name: a network ref resolves by
- * `(tick, observer, messageId)` against a `network-speech` chronicle row the observer heard.
- */
-function auditSketch(world: WorldState): void {
-  for (const feature of world.enemy.sketch) {
-    // Fair-cop law: never empty.
-    expect(feature.evidence.length, `feature ${feature.id} (${feature.kind}) has no evidence`).toBeGreaterThanOrEqual(1);
-
-    for (const ref of feature.evidence) {
-      // Exactly one id field identifies a ref — a claim ref or a network ref, never both.
-      expect(ref.claimId === null || ref.messageId === null,
-        `feature ${feature.id} ref ${JSON.stringify(ref)} names two channels at once`).toBe(true);
-
-      // (1) the ref resolves to a captured EvidenceEntry (same tick/observer/claimId/messageId).
-      const entry = world.enemy.evidence.find(
-        (e) => e.tick === ref.tick && e.observer === ref.observer && e.claimId === ref.claimId
-          && (e.network?.messageId ?? null) === ref.messageId);
-      expect(entry, `feature ${feature.id} ref ${JSON.stringify(ref)} matches no EvidenceEntry`).toBeDefined();
-
-      // (2) the ref resolves to a chronicle record the observer HEARD at that tick.
-      if (ref.messageId !== null) {
-        // a network ref → a network-speech row with that id/tick whose heardBy names the observer.
-        const speech = world.chronicle.find(
-          (c) => c.kind === 'network-speech' && c.tick === ref.tick && c.messageId === ref.messageId
-            && c.heardBy.some((h) => h.id === ref.observer));
-        expect(speech, `feature ${feature.id} network-ref ${JSON.stringify(ref)} matches no speech heard by ${ref.observer}`).toBeDefined();
-      } else if (ref.claimId !== null) {
-        // an utterance/answer ref → a telling of that claim whose heardBy names the observer.
-        const telling = world.chronicle.find(
-          (c) => c.kind === 'telling' && c.tick === ref.tick && c.claimId === ref.claimId &&
-            c.heardBy.some((h) => h.id === ref.observer));
-        expect(telling, `feature ${feature.id} ref ${JSON.stringify(ref)} matches no telling heard by ${ref.observer}`).toBeDefined();
-      } else {
-        // an asking ref → an asking at that tick whose heardBy names the observer.
-        const asking = world.chronicle.find(
-          (c) => c.kind === 'asking' && c.tick === ref.tick && c.heardBy.some((h) => h.id === ref.observer));
-        expect(asking, `feature ${feature.id} asking-ref ${JSON.stringify(ref)} matches no asking heard by ${ref.observer}`).toBeDefined();
-      }
-    }
-  }
-}
+import { scryWorld } from './helpers/scry-world';
+import { auditSketch } from './helpers/sketch-audit';
 
 describe('sketch fair-cop — every feature traces to a chronicle record the observer heard', () => {
   it('holds over an emergent multi-day Watchford world', () => {
@@ -117,5 +72,117 @@ describe('sketch fair-cop — every feature traces to a chronicle record the obs
     expect(networkRefs.length).toBeGreaterThan(0);
     expect(world.enemy.sketch.some((f) => f.subject === 'mira')).toBe(true);
     auditSketch(world);
+  });
+});
+
+function residueAuditWorld(remote: boolean): WorldState {
+  const world = scryWorld();
+  applyAction(world, { tick: 0, kind: 'scry', venue: 'hall', day: 1, from: 0, to: 60 }, STANDARD_RULES);
+  if (!remote) world.npcs.boss!.schedule = [{ days: 'all', from: 0, to: 1440, venue: 'hall' }];
+  world.tick = 1440;
+  if (remote) runUntil(world, 1486, STANDARD_RULES);
+  else step(world, STANDARD_RULES);
+  const decision = enemyDigest(world.enemy, 1, STANDARD_RULES);
+  world.enemy.sketch.push(...decision.features);
+  expect(world.enemy.sketch.some((feature) => feature.kind === 'arcane-residue')).toBe(true);
+  return world;
+}
+
+describe('physical residue fair-cop chain', () => {
+  it.each([false, true])('accepts a real direct or physically reported sighting (remote=%s)', (remote) => {
+    const world = residueAuditWorld(remote);
+    const entry = world.enemy.evidence.find((row) => row.kind === 'arcane-residue')!;
+    expect(entry.receipt !== undefined).toBe(remote);
+    auditSketch(world);
+  });
+
+  it.each([
+    'no-evidence', 'no-creation', 'no-sighting', 'wrong-witness', 'no-receipt',
+    'wrong-message', 'no-envelope', 'not-heard', 'omitted-atom', 'wrong-spoken-witness',
+    'wrong-spoken-venue', 'wrong-spoken-time', 'wrong-ref-channel', 'missing-ref-discriminant',
+  ] as const)('rejects a broken remote chain: %s', (fault) => {
+    const world = cloneSerializable(residueAuditWorld(true));
+    const entry = world.enemy.evidence.find((row) => row.kind === 'arcane-residue');
+    if (entry?.kind !== 'arcane-residue' || entry.receipt === undefined) throw new Error('test needs received residue');
+    const feature = world.enemy.sketch.find((row) => row.kind === 'arcane-residue')!;
+    const ref = feature.evidence[0]!;
+    const receipt = { ...entry.receipt };
+    const speech = world.chronicle.find((row) => row.kind === 'network-speech'
+      && row.tick === receipt.tick && row.messageId === receipt.messageId);
+    if (speech?.kind !== 'network-speech' || speech.spoken.kind !== 'field-report') throw new Error('test needs actual report');
+    const atom = speech.spoken.items.find((item) => item.observation.kind === 'arcane-residue')?.observation;
+    if (atom?.kind !== 'arcane-residue') throw new Error('test needs spoken residue');
+    if (fault === 'no-evidence') world.enemy.evidence = world.enemy.evidence.filter((row) => row !== entry);
+    if (fault === 'no-creation' || fault === 'no-sighting') world.chronicle = world.chronicle.filter((row) =>
+      !(row.kind === 'residue' && row.residueId === entry.residue.id
+        && row.act === (fault === 'no-creation' ? 'created' : 'observed')));
+    if (fault === 'wrong-witness') {
+      entry.observer = 'citizen'; entry.residue.witness = 'citizen';
+      ref.observer = 'citizen'; ref.residue!.witness = 'citizen';
+    }
+    if (fault === 'no-receipt') delete entry.receipt;
+    if (fault === 'wrong-message') entry.receipt!.messageId = 'missing-message';
+    if (fault === 'no-envelope') world.chronicle = world.chronicle.filter((row) => row !== speech);
+    if (fault === 'not-heard') speech.heardBy = speech.heardBy.filter((row) => row.id !== receipt.observer);
+    if (fault === 'omitted-atom') speech.spoken.items = speech.spoken.items.filter((item) => item.observation !== atom);
+    if (fault === 'wrong-spoken-witness') atom.witness = 'citizen';
+    if (fault === 'wrong-spoken-venue') atom.venue = 'away';
+    if (fault === 'wrong-spoken-time') atom.observedAt += 1;
+    if (fault === 'wrong-ref-channel') ref.claimId = 'invented-claim';
+    if (fault === 'missing-ref-discriminant') delete ref.residue;
+    expect(() => auditSketch(world)).toThrow();
+  });
+});
+
+/** The same witness heard an ordinary asking at the exact tick and venue of the physical sighting. */
+function stageAskingTwin(world: WorldState, ref: SketchEvidenceRef): void {
+  world.enemy.evidence.push({
+    tick: ref.tick, venue: 'hall', observer: ref.observer, overheard: false,
+    speaker: 'citizen', addressedTo: ref.observer, kind: 'asking', mode: null,
+    claimId: null, family: 'f-twin', reported: null, about: { family: 'f-twin' },
+  });
+  world.chronicle.push({
+    kind: 'asking', tick: ref.tick, venue: 'hall', speaker: 'citizen', addressedTo: ref.observer,
+    about: { family: 'f-twin' }, authority: false,
+    heardBy: [{ id: ref.observer, addressed: true }],
+  });
+}
+
+/** A lawful legacy asking ref: both speech ids null and no physical discriminant. */
+const legacyAskingFeature = (ref: SketchEvidenceRef): SketchFeature => ({
+  id: 'legacy-asking-twin', kind: 'entry-point', day: 1, family: 'f-twin', subject: null, district: 'd0',
+  detail: 'staged legacy asking ref beside a physical sighting',
+  evidence: [{ tick: ref.tick, observer: ref.observer, claimId: null, messageId: null }],
+});
+
+describe('a physical ref cannot borrow an ordinary asking heard at the same tick', () => {
+  function twinWorld(): { world: WorldState; feature: SketchFeature; ref: SketchEvidenceRef } {
+    const world = cloneSerializable(residueAuditWorld(true));
+    const feature = world.enemy.sketch.find((row) => row.kind === 'arcane-residue')!;
+    const ref = feature.evidence[0]!;
+    expect(ref).toMatchObject({ tick: 1440, observer: 'guard', claimId: null, messageId: null });
+    expect(ref.residue).toBeDefined();
+    stageAskingTwin(world, ref);
+    world.enemy.sketch.push(legacyAskingFeature(ref));
+    return { world, feature, ref };
+  }
+
+  it('positive legacy path: an intact residue ref and a lawful asking ref coexist on one tick/observer', () => {
+    const { world, ref } = twinWorld();
+    // Non-vacuous: two evidence rows now share the ref's tick, observer and null speech ids.
+    expect(world.enemy.evidence.filter((row) => row.tick === ref.tick && row.observer === ref.observer
+      && row.claimId === null && (row.network?.messageId ?? null) === null).map((row) => row.kind))
+      .toEqual(['arcane-residue', 'asking']);
+    auditSketch(world);
+  });
+
+  it('corrupted copy: a stripped residue discriminant is rejected although the asking twin would resolve', () => {
+    const { world, feature, ref } = twinWorld();
+    auditSketch(world); // the identical world passes before corruption
+    delete ref.residue;
+    expect(feature.evidence[0]).toEqual({ tick: 1440, observer: 'guard', claimId: null, messageId: null });
+    expect(world.chronicle.some((row) => row.kind === 'asking' && row.tick === ref.tick
+      && row.heardBy.some((hearer) => hearer.id === ref.observer))).toBe(true);
+    expect(() => auditSketch(world)).toThrow();
   });
 });

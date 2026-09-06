@@ -96,25 +96,29 @@ export type EvidenceEntry =
     });
 
 /**
- * One fair-cop pointer at something an observer actually heard. A CLAIM ref resolves by
- * `(tick, observer, claimId)`; a NETWORK ref resolves by `(tick, observer, messageId)` against a
- * `network-speech` chronicle row with that id/tick whose `heardBy` names the observer. Exactly one
- * of the two id fields is non-null for any ref the digest mints.
+ * One fair-cop pointer at something an observer actually heard or physically saw. A CLAIM ref
+ * resolves by `(tick, observer, claimId)`; a NETWORK ref resolves by
+ * `(tick, observer, messageId)` against a `network-speech` chronicle row with that id/tick whose
+ * `heardBy` names the observer. Old claim/network/asking refs retain their existing resolution. A
+ * residue ref requires both ids null and resolves to its physical sighting plus any actual report
+ * receipt.
  */
 export interface SketchEvidenceRef {
   tick: Tick;
   observer: EntityId;
   claimId: ClaimId | null;
   messageId: MessageId | null;
+  residue?: ResidueEvidenceData;
 }
 
 export interface SketchFeature {
   id: string;
   kind: 'district-activity' | 'entry-point' | 'origin-vague' | 'carrier-profile' | 'runaround'
-    | 'forged-document';
+    | 'forged-document' | 'arcane-residue';
   day: number;
   family: RumorId | null;
   subject: EntityId | null;
+  venue?: VenueId;
   district: string | null;
   detail: string;
   /** Fair-cop law: never empty; each ref resolves to a chronicle entry the observer heard. */

@@ -132,7 +132,10 @@ const byStart = (a: EnemyActionLedgerEntry, b: EnemyActionLedgerEntry): number =
 const sameRefs = (a: readonly SketchEvidenceRef[], b: readonly SketchEvidenceRef[]): boolean =>
   a.length === b.length && a.every((ref, i) => ref.tick === b[i]!.tick
     && ref.observer === b[i]!.observer && ref.claimId === b[i]!.claimId
-    && ref.messageId === b[i]!.messageId);
+    && ref.messageId === b[i]!.messageId
+    && ref.residue?.id === b[i]!.residue?.id
+    && ref.residue?.witness === b[i]!.residue?.witness
+    && ref.residue?.observedAt === b[i]!.residue?.observedAt);
 
 /**
  * Plan 8 Task 10 — exposure escalation tiers (P6 deferral #2). How hard the PLAYER'S OWN
@@ -188,6 +191,7 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
   const ref = (e: EvidenceEntry): EvidenceRef => ({
     tick: e.tick, observer: e.observer, claimId: e.claimId,
     messageId: e.network?.messageId ?? null,
+    ...(e.kind === 'arcane-residue' ? { residue: { ...e.residue } } : {}),
   });
 
   // ── Heuristic 9: feature ids `sf${counter + i}` in emission order — reads the counter, never writes it.
@@ -364,7 +368,10 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
     addFeature({
       kind: 'runaround', day, family: lead.family, subject: lead.subject, district: lead.district,
       detail: `runaround: ${streak} worked night(s) on ${lead.subject} in ${lead.district} produced nothing (lead ${lead.id})`,
-      evidence: lead.evidence.map((row) => ({ ...row })),
+      evidence: lead.evidence.map((row) => ({
+        ...row,
+        ...(row.residue === undefined ? {} : { residue: { ...row.residue } }),
+      })),
     });
     const watchRows = rows.filter((row) => row.kind === 'watch').sort(byStart);
     const startRow = watchRows[0] ?? [...rows].sort(byStart)[0]!;
@@ -405,6 +412,17 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
       district: personOf.get(hand)?.district ?? null,
       detail: `a letter passed from hand to hand; the one who handed it over was ${hand}`,
       evidence: [ref(answer)],
+    });
+  }
+
+  for (const e of state.evidence) {
+    if (e.kind !== 'arcane-residue') continue;
+    if (has((f) => f.kind === 'arcane-residue' && f.venue === e.venue)) continue;
+    addFeature({
+      kind: 'arcane-residue', day, family: null, subject: null,
+      venue: e.venue, district: districtOf.get(e.venue) ?? null,
+      detail: `arcane residue observed at ${e.venue} (day ${dayOf(e.residue.observedAt)})`,
+      evidence: [ref(e)],
     });
   }
 

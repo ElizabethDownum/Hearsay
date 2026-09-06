@@ -20,7 +20,7 @@ import { HEARSAY_CEILING } from '../../src/sim/rumors/propagation';
 import { runUntil, step } from '../../src/sim/step';
 import { exposureStatus } from '../../src/sim/scenario/exposure';
 import { buildTownMap, buildWorld, enrollPlayer } from '../../src/sim/world';
-import { auditSketch } from './helpers/forensics-audit';
+import { auditSketch } from './helpers/sketch-audit';
 import { miniTown } from './helpers/minitown';
 
 const SPEC = {

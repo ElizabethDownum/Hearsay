@@ -5,6 +5,7 @@ import { beginScryWindows, residueEvents } from '../../src/sim/magic';
 import { captureEvidence } from '../../src/sim/counterintel';
 import { captureIntel, playerView, networkView, courierRouteView } from '../../src/sim/fieldwork';
 import { enemyDigest } from '../../src/sim/enemy/digest';
+import { exposureStatus } from '../../src/sim/scenario/exposure';
 import { runUntil, step } from '../../src/sim/step';
 import { stableStringify, cloneSerializable } from '../../src/sim/hash';
 import { ingestObservedFieldReport, queueUnqueuedFieldReports } from '../../src/sim/directives/field-reports';
@@ -44,6 +45,12 @@ describe('physical residue waits for lawful discovery and report', () => {
       receipt: { observer: 'boss', tick: 1485 } });
     expect(held[0]!.deliveredAt).toBe(1485);
     expect(world.magic!.traces).toHaveLength(1);
+    const features = enemyDigest(world.enemy, 1, R).features.filter((row) => row.kind === 'arcane-residue');
+    expect(features).toHaveLength(1);
+    expect(features[0]).toMatchObject({ subject: null, family: null, venue: 'hall', district: 'd0' });
+    world.enemy.sketch.push(...features);
+    expect(exposureStatus(world)).toMatchObject({ score: 0, identified: false });
+    expect(enemyDigest(world.enemy, 2, R).features.filter((row) => row.kind === 'arcane-residue')).toEqual([]);
     expect(world.chronicle.filter((row) => row.kind === 'residue' && row.act === 'observed' && row.observer === 'guard')).toHaveLength(1);
   });
   it('spymaster own sighting is immediate without a made-up speaker or report envelope', () => {
@@ -53,6 +60,7 @@ describe('physical residue waits for lawful discovery and report', () => {
     const entry = world.enemy.evidence.find((row) => row.kind === 'arcane-residue')!;
     expect(entry).toMatchObject({ observer: 'boss', speaker: null, addressedTo: null, venue: 'hall' });
     expect(entry).not.toHaveProperty('receipt');
+    expect(enemyDigest(world.enemy, 1, R).features.some((row) => row.kind === 'arcane-residue')).toBe(true);
   });
   it('omitted residue stays reportable; a later real encounter retries one held root', () => {
     const world = paid();
@@ -128,5 +136,18 @@ describe('physical residue waits for lawful discovery and report', () => {
     ingestObservedFieldReport(world, 'enemy', { ...speech, addressedTo: 'boss',
       spoken: { kind: 'field-report', items: [], onwardTo: null } });
     expect(stableStringify(world.enemy)).toBe(enemyBefore);
+  });
+  it('two paid traces at one venue retain two observations but produce one location feature', () => {
+    const world = scryWorld();
+    world.coin = 30;
+    for (let i = 0; i < 2; i += 1) applyAction(world,
+      { tick: 0, kind: 'scry', venue: 'hall', day: 1, from: 0, to: 15 }, R);
+    world.tick = 1440;
+    world.npcs.boss!.schedule = [{ days: 'all', from: 0, to: 1440, venue: 'hall' }];
+    step(world, R);
+    expect(world.coin).toBe(0);
+    expect(world.magic!.traces).toHaveLength(2);
+    expect(world.enemy.evidence.filter((entry) => entry.kind === 'arcane-residue')).toHaveLength(2);
+    expect(enemyDigest(world.enemy, 1, R).features.filter((entry) => entry.kind === 'arcane-residue')).toHaveLength(1);
   });
 });
