@@ -28,6 +28,12 @@ export interface HypothesisCard {
 /** A player guess that an NPC carries a trait — the Codex's working notes. */
 export interface CodexHypothesis { npc: EntityId; trait: TraitId; proposedAt: Tick }
 
+export interface MagicProvenance {
+  kind: 'magic';
+  spell: 'scrying' | 'seance';
+  operation: string;
+}
+
 /**
  * One captured observation, wide-and-flat with nulls for absence — the single row shape
  * the whole board stack shares. `reported` reuses the enemy's ReportedClaim (7 content
@@ -37,7 +43,8 @@ export interface CodexHypothesis { npc: EntityId; trait: TraitId; proposedAt: Ti
 export interface IntelEntry {
   tick: Tick; venue: VenueId;
   via: 'self' | 'dossier' | EntityId;   // EntityId = the reporting informant
-  kind: 'utterance' | 'asking' | 'presence' | 'trait-read' | 'edge-read' | 'hint';
+  provenance?: MagicProvenance;
+  kind: 'utterance' | 'asking' | 'presence' | 'scene-presence' | 'trait-read' | 'edge-read' | 'hint';
   overheard: boolean;
   speaker: EntityId | null; addressedTo: EntityId | null;
   mode: 'telling' | 'answer' | null; authority: boolean;

@@ -53,6 +53,20 @@ export interface ObservationFeed {
   observations: Observation[];
 }
 
+export interface VenueSensor {
+  kind: 'venue-sensor'; venue: VenueId; from: Tick; to: Tick;
+}
+export type SceneObservation = Extract<Observation, { kind: 'presence' | 'utterance' | 'asking' }>;
+
+function utteranceObservation(u: Utterance, overheard: boolean): Extract<Observation, { kind: 'utterance' }> {
+  return {
+    kind: 'utterance', tick: u.tick, venue: u.venue,
+    speaker: u.speaker, addressedTo: u.addressedTo, claim: u.claim,
+    overheard, mode: u.mode,
+    ...(u.document === true ? { document: true as const } : {}),
+  };
+}
+
 /**
  * Structural law: any actor observes the world through this function and
  * nothing else. Same venue = see presence; same circle = hear the words.
@@ -71,12 +85,7 @@ export function observationsFor(observer: EntityId, events: TickEvents): Observa
 
   for (const u of events.utterances) {
     if (u.speaker !== observer && u.circleMembers.includes(observer)) {
-      observations.push({
-        kind: 'utterance', tick: u.tick, venue: u.venue,
-        speaker: u.speaker, addressedTo: u.addressedTo, claim: u.claim,
-        overheard: u.addressedTo !== observer, mode: u.mode,
-        ...(u.document === true ? { document: true as const } : {}),
-      });
+      observations.push(utteranceObservation(u, u.addressedTo !== observer));
     }
   }
 
@@ -102,4 +111,25 @@ export function observationsFor(observer: EntityId, events: TickEvents): Observa
   }
 
   return { observer, tick: events.tick, observations };
+}
+
+export function observationsAtVenue(sensor: VenueSensor, events: TickEvents): SceneObservation[] {
+  if (events.tick < sensor.from || events.tick >= sensor.to) return [];
+  const observations: SceneObservation[] = [];
+  for (const [actor, venue] of Object.entries(events.positions).sort(([a], [b]) => a.localeCompare(b))) {
+    if (venue === sensor.venue) observations.push({ kind: 'presence', tick: events.tick, venue, actor });
+  }
+  for (const u of events.utterances) {
+    if (u.tick === events.tick && u.venue === sensor.venue) {
+      observations.push(utteranceObservation(u, true));
+    }
+  }
+  for (const a of events.askings) {
+    if (a.tick === events.tick && a.venue === sensor.venue) observations.push({
+      kind: 'asking', tick: a.tick, venue: a.venue,
+      speaker: a.speaker, addressedTo: a.addressedTo, about: a.about,
+      overheard: true, authority: a.authority,
+    });
+  }
+  return observations;
 }
