@@ -8,7 +8,24 @@ The explicit `$handoff` is recorded in the [immutable continuation episode](epis
 The [session index](episodes/README.md) links both episodes and three transferable
 learning candidates retained locally. This recordkeeping does not resume implementation.
 
-## Stopped for Ellie's computer restart
+## Resumed after restart — 5 September, evening Central
+
+Ellie resumed with "please continue". Clean documentation HEAD c3e86d5 has the
+same production/test/config files as dc114da. Native frontier review seats are
+available again: independent R15/Task 2 code review and Task 4 plan review are
+running in separate threads. These replace the immediate capacity wait, while
+the saved external Claude launchers retain their own midnight reset guard.
+Source stays frozen for the code verdict. The controller's fresh suite passes
+1780/114; lint, both typechecks and build pass (bundle unchanged). Independent
+review reproduced an Important two-hop document-report reference defect: the
+final relay is wrongly cited as witness to the original answer. HTML R20 records
+the local amendment to cite the actual received network speech. A bounded fix
+brief is staged. Final verdict is Needs-fixes (0 Critical/1 Important/0 Minor);
+R15 passes within its declared boundary. The focused H10 correction is next.
+The [native verdict](review/2026-09-05-native-forensics-review.md) is preserved.
+All writes remain Hearsay-local, with one production writer/index owner and no push.
+
+## Earlier stop for Ellie's computer restart (superseded by resume above)
 
 Ellie requested: “get to a stopping point then actually stop, need to restart my
 computer soon.” Work is stopped. No worker or review process remains active, and

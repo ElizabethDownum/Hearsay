@@ -29,7 +29,21 @@ dispatch. Original plan bytes are preserved in archive/2026-07-05-plan-9.md
 Plan 10's original is archived beside it for subsequent audit; it is not being
 silently rewritten by this Plan 9 recovery.
 
-## Stopped for Ellie's computer restart
+## Resumed after restart — 5 September, evening Central
+
+Ellie resumed with "please continue". Native frontier seats are running separate
+R15/Task 2 implemented-code and Task 4 plan reviews, with production frozen at
+dc114da (documentation HEAD c3e86d5). Fresh controller tests pass 1780/114; lint
+and both typechecks pass. The earlier native quota record is superseded by these
+successful dispatches; external Claude launchers keep their own reset guard.
+Final native code verdict is Needs-fixes (0 Critical/1 Important/0 Minor). R15
+passes within its declared boundary. The sole blocker is a two-hop document-report
+reference; HTML R20 authorizes the bounded H10 correction to cite actual received
+network speech. Fix it, run the gates/comparison and focused independent re-review,
+then execute reviewed scrying with binding A1 in committed units and a separate
+code review. No prerequisite approval is assumed.
+
+## Earlier stop for Ellie's computer restart (superseded by resume above)
 
 Ellie requested: “get to a stopping point then actually stop, need to restart my
 computer soon.” Work is stopped. No worker or review process remains active, and

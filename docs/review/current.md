@@ -12,11 +12,21 @@ Restart checkpoint: G2–G4 are committed through caa5a38. The controller's full
 
 Resumed after restart: H2's namespace fix is committed at 2fe440f and H1's scanner correction at a53551d. The controller's gate at that exact commit passes 1,737 tests in 113 files, lint, both typechecks, build, soak and MC. All 10 simulation blocks / 230 deterministic lines remain equal. Independent review closed the namespace issue but found two binding-stability gaps in the scanner. After Codex workers exhausted quota, Claude completed the scrying correction draft before hitting a new session limit. The scanner author and séance reviewer stopped without completed deliverables. No worker is running; the reported Claude reset is 15:20 CDT / 20:20 UTC on 5 September. Task 1 remains open.
 
-Restart stop: Ellie requested a complete stop for a computer restart. No workers
+Earlier restart stop (superseded below): Ellie requested a complete stop for a computer restart. No workers
 remain active. The96-case checkpoint is saved; the newly started feature-link
 proposal is separately marked UNTESTED, with no authored tests or native checks.
 Its evidence extension cannot replace the verified shared proposal accidentally.
 No gameplay source changed, and no background continuation is scheduled.
+
+Evening continuation: Ellie resumed with "please continue". Native frontier seats
+are available and independently reviewing R15/Task 2 code and the Task 4 plan.
+The source at documentation HEAD c3e86d5 still equals dc114da. Fresh controller
+tests pass 1780/114, lint and both typechecks pass; approval remains pending.
+The saved external Claude launchers retain their midnight quota guard. The build
+also passed with unchanged index-hHcrttYf.js (490.61 kB /145.28 kB gzip).
+Independent review has reproduced one Important forensics reference defect in
+a two-hop report, recorded as R20. The registered suite passes; the new reviewer
+probe fails. Task 2 closure is withheld while the bounded correction is prepared.
 
 ## Current decisions and issues
 
@@ -169,6 +179,29 @@ No gameplay source changed, and no background continuation is scheduled.
 - **Scope:** the handoff skill normally promotes lessons into shared memory and asks for classifications interactively. Ellie's standing project-only write instruction and HTML question queue take precedence. The three lessons and an immutable session episode are saved under Hearsay, indexed in docs/episodes/README.md; no shared wiki, memory or skill was changed.
 - **Proposed skill improvements:** future orchestration review briefs should require substantive progress after each charge and gate; authoring briefs should distinguish validated snapshots from newer WIP. These proposals are recorded in the local lesson pages and are not silently applied to shared skills.
 - **Status:** handoff complete locally. Work remains stopped for the requested computer restart; this recordkeeping does not authorize an implementation or worker restart.
+
+### R20 — A relayed document report must cite the speech that arrived
+
+- **Issue:** after bez reports an answer through ada to cyn, the received inner
+  row names ada as observer but retains the answer's original tick and claim.
+  Ada did not hear that original answer. H10 creates a feature whose reference
+  fails the unchanged fair-cop auditor. The real two-hop reviewer probe has
+  nine passing controls and this one failure; the existing 1,780 tests still pass.
+- **Recommended correction (PROVISIONAL local plan amendment):** fold the actual
+  received network field-report row in evidence order. Read its post-trait spoken
+  document-answer items and cite the network speech that reached the listener.
+  Later inner copies deduplicate; directly observed answers keep their claim refs.
+  This uses existing evidence and adds no hidden witness lookup or state field.
+- **Why:** the Plan 11 speech-only and physical-delivery laws, Task 2's explicit
+  second-relay requirement, and the unchanged heard-event evidence contract.
+  P9-5(d)'s all-answer-ref prescription assumed direct observation and needs this
+  local correction for delivered reports.
+- **Status:** final independent review is Needs-fixes, 0 Critical/1 Important/0 Minor.
+  R15 passes within its declared boundary; this reference defect is the only
+  blocker. The focused two-file correction is next. No correction is approved yet.
+- **Saved verdict:** [Native forensics review](2026-09-05-native-forensics-review.md).
+- **Review evidence:** .superpowers/sdd/task-2-native-review-resume-2026-09-05-report.md
+  and review-native-utf8/t2/probe.probe.ts with raw native output.
 
 ## Verification note
 
