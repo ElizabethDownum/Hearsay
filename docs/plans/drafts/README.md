@@ -9,16 +9,20 @@ Approved-for-base-reconciliation conditional on the now preserved
 physical-marker guard, three exact unexecuted tests and 4C1/4C2 unit accounting.
 The [prose plan review](../../review/2026-09-05-native-prose-plan-review.md) found
 one Important meaning-preservation defect and one Minor avatar grammar defect;
-a new versioned correction is being authored. Original frozen proposals remain.
+the exact 78-case correction now has fresh independent approval below. Original frozen proposals remain.
 The [forensics code review](../../review/2026-09-05-native-forensics-review.md)
 closed R15 within its boundary and found one relayed-document reference defect;
-its focused production fix and re-review precede Task3 execution.
+its focused production fix at 09e5458 is independently Approved, zero findings.
+Scrying is committed through 3C1 at d07f01b, with 3C2 next and accumulated
+code review after 3E. These execution results do not imply later proposals landed.
 
 ## Restart WIP, explicitly untested
 
 [Feature-link author continuation](2026-09-05-task-5b-feature-link-wip.md) was
 saved when Ellie requested a stop. It has no tests or compiler/runtime evidence.
-The validated debrief checkpoint remains eight modules/96 isolated cases.
+The validated debrief checkpoint remains eight modules/96 isolated cases. A new
+versioned completion proposal is being validated against pinned 09e source with
+the original 96 cases retained. This WIP and the older shared proposal stay frozen.
 
 ## Latest recovered proposals
 
@@ -33,7 +37,7 @@ approved gameplay. The real Task 2/3 predecessor commits must still be reconcile
   `EBACFF982443BA604006D33CE62F5AD9AA11D95FE08E4C3DA70DB523A91176ED`.
 - [Task 4 completed sÃ©ance draft](2026-09-05-task-4-seance-complete.md) and
   [completed author report](2026-09-05-task-4-author-report-complete.md): review
-  stopped at quota before a verdict. Draft SHA-256:
+  now has conditional independent approval with T4-A1/A2 above. Draft SHA-256:
   `14ABA1730FF43696C17D0D81D293C6B96E2065F7B2DE83BD91F1515C4D8EE005`.
 - [Controller verification and interruption record](../../review/2026-09-05-claude-recovery-checkpoint.md)
   distinguishes actual local checks from authored expectations and lost work.
@@ -45,28 +49,38 @@ approved gameplay. The real Task 2/3 predecessor commits must still be reconcile
   [constraints](2026-09-05-task-7a-correction-constraints.md): preserves the original
   44 cases plus34 new regressions,78 virtual cases passing. Fixed predicates retain
   their facts when another person is named, and public avatar grammar agrees with
-  `you`. Fresh independent review is running. Apply this exact amendment to the
-  frozen original below; no production implementation is claimed.
+  `you`. [Fresh independent approval](../../review/2026-09-05-prose-correction-approval.md)
+  has zero findings and requires actual Task4-base reconciliation. Apply this exact
+  amendment to the frozen original below; no production implementation is claimed.
 
 - [Task 7A prose and public-label draft](2026-09-05-task-7a-prose.md) and
   [author report](2026-09-05-task-7a-author-report.md): complete proposal with
   24 predicate templates and 44 authored tests passing against virtual source.
   Both compiler configurations and lint pass for all 11 proposed files; a virtual
   new predicate produces the expected missing-template diagnostic. Production
-  remains at 1780 tests. Independent plan review, reconciliation with the future
-  Task 4 predecessor, implementation and independent code review remain open.
+  has not received this proposal. The corrected proposal above has independent
+  approval; actual Task 4 reconciliation, implementation and code review remain.
   Draft SHA-256:
   `4E75A99545ACCC5269E5BA9CB23E8C02F0EE8EA48687F2ABE5B8A60C5E6AA0A7`.
 
 ## Debrief recording proposal
+
+- [Independent recording review](../../review/2026-09-05-recording-plan-review.md)
+  found one future séance-family regression. Root adopted the
+  [exact T5A-A1 amendment](2026-09-05-task-5a-base-reconciliation.md), preserving
+  the original16 cases and adding one actual-ritual regression. The unchanged
+  proposal's102 affected cases and nine complete-world pairs pass independently;
+  the new17th case awaits the actual magic predecessor. No production recording
+  repair has landed.
 
 - [Task 5A exact recording repair](2026-09-05-task-5a-recording.md),
   [constraints](task-5a-constraints.md) and
   [author report](2026-09-05-task-5a-author-report.md): six production files,
   16 new cases, two exact schema expectation updates. The virtual proposal passes
   99 affected cases, both compiler configurations and lint. Nine full-world pairs
-  preserve all pre-existing state. Independent review, future predecessor
-  reconciliation and implementation remain; Task 5B models are not included.
+  preserve all pre-existing state. The native review and adopted T5A-A1 above
+  supersede this author's historical count; actual predecessor reconciliation and
+  implementation remain. Task 5B models are not included.
   Draft SHA-256:
   `955DD09A77CB763A76D222E8D66FF99509E58128068A6C1452542FC2674B0A62`.
 
@@ -93,7 +107,7 @@ separate implemented-code approvals and full gates remain required. Full product
 gates must assess the behavioral watch repairs; the recording change is separately
 required to preserve every pre-existing field. No source/test path was edited.
 
-## Latest independent review results
+## Historical external review interruption
 
 [Recovery record](../../review/2026-09-05-independent-review-recovery.md):
 scrying and watch plan reviews completed; R15/forensics and séance reviews
@@ -117,5 +131,6 @@ Read each report before using its draft. Resume working copies are under
 Current decisions are in [the review document](../../review.html), and the
 execution order is in [the current plan](../plan-9-current.md). Task 1 corrections
 and Task 2 forensics are now implemented and locally gated at dc114da, with
-independent code approval still pending. Task 3 must reconcile that actual source
-and consolidate the temporary forensics auditor before execution.
+independent approval now completed at corrected 09e5458. Task 3 is being executed
+on that certified predecessor; 3C2 must consolidate the temporary forensics auditor
+while preserving all 19 current cases and eight auditor calls.

@@ -6,9 +6,15 @@ Latest checkpoint: the received-report correction is committed at09e5458. All1,7
 tests in114 files and all six implementation gates pass; the ten deterministic
 simulation report blocks remain unchanged. Independent focused review Approved
 with zero findings; controller gates also pass at that commit.
-R15 passed within its declared boundary. Scrying and séance remain proposals;
-séance's conditional plan amendment is saved. Prose corrections are being authored.
-The eight partial debrief modules retain96 isolated cases. The following recovery
+R15 passed within its declared boundary. Scrying is committed through 3C1 at
+d07f01b; worker and controller passed its 49 focused cases and both typechecks.
+Two mistakenly deferred pre-delivery assertions were restored before this commit.
+Physical sketch refs and the shared-auditor migration (3C2) are next. The last full suite above belongs to
+09e5458; full scrying gates and independent code review follow 3E.
+Séance's conditional plan amendment is saved. The corrected 78-case prose proposal
+has fresh independent approval. Recording review's séance-family correction is
+adopted under R23. The eight partial debrief modules retain 96 isolated cases;
+a separate feature-link proposal is being validated. The following recovery
 paragraphs are historical checkpoints.
 
 Status at session start: Plan 9 Task 1, fix wave two. HEAD 49cc3e7 contains the first five fixes and G1. Two unfinished G2 test edits were preserved in a project-local recovery snapshot. The inherited working tree passes 1,710 tests in 113 files, lint, both typechecks and the production build. The JavaScript bundle remains 489.63 kB (145.02 kB gzip). Remaining fixes and independent review are in progress. This is a recovery baseline, not Task 1 completion.
@@ -243,9 +249,30 @@ probe fails. Task 2 closure is withheld while the bounded correction is prepared
   agreement failure. Its original 44-case virtual suite and compiler/lint checks
   pass, showing why the added regressions are needed.
 - **Status:** the separately versioned correction is complete with78 virtual cases,
-  retaining all44 original cases plus34 additions. It is under a new independent
-  review; original drafts and evidence remain unchanged. No prose production code
-  has been implemented or approved.
+  retaining all44 original cases plus34 additions. A new independent review is
+  Approved-for-base-reconciliation, zero Critical/Important/Minor. Its own78-case
+  GREEN,27-failure RED, five original-regression controls, compilers, registry
+  firing and40 extra grammar/relational controls pass as expected. Original
+  artifacts remain unchanged. No prose production code has been implemented.
+- **Closure:** [Independent prose correction approval](2026-09-05-prose-correction-approval.md).
+  Actual Task4-base reconciliation and later implemented-code review remain required.
+
+### R23 — Recording repairs must preserve séance family membership
+
+- **Issue:** Task4 deliberately includes a real séance in its story family while
+  keeping living reach metrics restricted to injections/tellings. Task5A's proposed
+  two-kind guard would silently remove that séance when recording links are added.
+- **Adopted amendment (PROVISIONAL local):** retain injection, telling and séance
+  family members; optional document claim links remain separate. Preserve Task4's
+  metrics narrowing and add one real-ritual regression to the original16 cases.
+- **Evidence:** the [independent recording review](2026-09-05-recording-plan-review.md)
+  reproduced one failure with17 controls, then18 passing cases with the exact guard
+  correction. Its unchanged102-case proposal suite, both compilers, lint and nine
+  complete-world comparisons passed. The future ritual regression is proposed,
+  with no implemented-magic result claimed.
+- **Status:** root adopted the [exact binding amendment](../plans/drafts/2026-09-05-task-5a-base-reconciliation.md).
+  Proposal approval is conditional on that amendment and actual Task4/7A-base
+  reconciliation; implementation and independent code review remain required.
 
 ## Verification note
 
@@ -254,3 +281,10 @@ The reviewer also found one unused variable in the controller's ignored report-c
 The recovered Task 3 draft's exact counting script reports 79 cases and no syntax diagnostics for complete TypeScript blocks. Its first root extraction stopped at backticks inside a JavaScript regular expression and failed before execution; root corrected only the fence extraction, retained that failed log, and reran the unchanged authored script successfully. Scoped ESLint also passes. All four earlier quota snapshots remain byte-identical. The completed Task 3/4 drafts and reports are preserved under docs/plans/drafts; no new gameplay gate is claimed for this documentation checkpoint.
 
 The orchestration skill's role contract says, "You do not implement, deep-review, or research — workers do" (C:/Users/eliza/Desktop/ClaudeFiles/ai/skills/orchestrate/SKILL.md). After this limit was explained, Ellie replied, "understood, you are clear to continue work then." Root treats that go-ahead as authorization to perform the bounded R15 planning and implementation directly while workers remain unavailable. This is a disclosed interpretation of the user's instruction, not a claim that the skill normally allows it. Independent review remains required before Task 1 closure; root will not approve its own implementation. Cross-model transmission authorization also remains valid.
+
+### R24 — Keep incomplete report arrivals unknown
+- **Status:** PROVISIONAL local proposal correction; no production change or independent approval.
+- **Finding:** a real one-hop report with one retained child missing caused the surviving child to be dated as direct evidence at tick1980 because the relay heard the original. Original observation does not prove headquarters arrival.
+- **Adopted correction:** in a corroborated but incomplete report batch, keep matching possible child rows unrecorded within the exact maximum append span. Distinguishable direct observations remain direct; an identical direct/report candidate remains unknown. Complete batches keep their exact receipt links.
+- **Basis:** Task5B completion brief38–54; committed09e counterintel66–82 and field-reports371–420; raw author-pass1 failure. The [local adjudication](plans/drafts/2026-09-05-task-5b-incomplete-batch-amendment.md) records the bounded algorithm and required controls.
+- **Remaining:** author correction gates and independent proposal review, then future implementation review; all original96 cases stay intact.

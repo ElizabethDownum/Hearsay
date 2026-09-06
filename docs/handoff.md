@@ -1,6 +1,6 @@
 # Hearsay continuation — 5 September 2026
 
-**Forensics and R15 have independent approval. Reviewed scrying implementation is next.**
+**Forensics and R15 have independent approval. Scrying is committed through 3C1; 3C2 is next.**
 This project-local handoff supersedes the older shared AI memory. All writes in
 this session stayed inside Hearsay at Ellie's request.
 
@@ -24,7 +24,34 @@ Task3's reviewed draft and A1 are ready for actual-base reconciliation at09e5458
 Its 3C2 migration must preserve all19 forensics cases and eight auditor calls.
 Run3A,3B,3C1,3C2,3D,3E as serial committed units with one production writer.
 The corrected prose proposal retains all44 tests plus34 regressions (78 virtual
-passes) and is under a fresh independent review; no production prose has landed.
+passes) has fresh independent approval for actual Task4-base reconciliation;
+no production prose has landed.
+Scrying3A is now committed32491f9: ten new cases/two files, focused34/4 and both
+compiler configurations green from worker/controller; worker scoped lint passes.
+The whole-suite gate remains deferred to3E. The two agents briefly hit quota;
+Ellie confirmed a reset and said to retry. Root found no3B production WIP and
+resumed its existing13-path brief from32491f9. Task5A's saved review was recovered
+without repeating completed gates; its séance-family correction is adopted in
+the binding amendment/HTML R23. One production writer and root index ownership persist.
+Task 3B is committed at b723dda8c1c6690506e3696ae734ef413d11f4d0: 13 paths,
+29 authored cases plus three registry-derived cases. Worker and controller each
+passed the focused 297 cases in seven files and both typechecks; scoped lint passed.
+Meaningful RED was eight failures with 289 controls passing. The last actual full
+suite remains 1783/114 at approved 09e5458; full scrying gates and code review await 3E.
+Task 3C1 is now committed at d07f01b10835fe43658dc71e33768d3ab7f4678d, 13 paths,
+seven new cases. Worker/controller each pass focused 49/5 and both typechecks;
+scoped lint passes. Root caught and restored two pre-delivery no-leak assertions
+that were incorrectly included in the deferred feature block. The corrected six
+residue tests exactly match the frozen body after only the four licensed omissions.
+Next is atomic 3C2: physical sketch refs, feature generation and the shared auditor
+migration. Preserve all 19 forensics cases/eight calls and both original pillars.
+Root retains index ownership and serial production writers; full gates/review after 3E.
+
+The feature-link author independently validates a new proposal against isolated
+09e source, preserving the older 96 cases and frozen fragments. Physical magic
+links, calendar/terminal composition and the full Task 5B model remain outside
+this fragment. No feature-link production implementation or approval is claimed.
+
 The following paragraphs retain the earlier evening checkpoints.
 
 Ellie resumed with "please continue". Clean documentation HEAD c3e86d5 has the
@@ -65,7 +92,7 @@ The user's source/context/plan transmission confirmation persists. R15/Task2 cod
 approval and Task4 plan approval remain pending; the scrying/watch plan reviews are
 saved. All writes stayed inside Hearsay; no push or production change occurred.
 
-## Current state
+## Historical implementation checkpoint (superseded by the resume above)
 
 - Repository C:/Users/eliza/Desktop/ClaudeFiles/hearsay, main; no push.
 - Current implementation HEAD09e54582f0a5fc9505e396bd1910c800c7413fff; approved
@@ -134,7 +161,7 @@ PROVISIONAL process amendment: Task2 proceeded on gated R15 while separate revie
 remained open. This changed sequencing, not final review requirements or gameplay.
 See HTML R3/R4 and ../.superpowers/sdd/task-2-root-execution-note.md.
 
-## Independent review results and current capacity
+## Historical review and quota checkpoint
 
 Ellie's exact source/context/plan-to-Claude confirmation was accepted; all four
 bounded reviews launched. Scrying and watch plan reviews completed. Scrying's A1
@@ -158,7 +185,7 @@ reported Sep6 22:06 reset. This is capacity, not a new permission question.
 Read docs/review/2026-09-05-independent-review-recovery.md for exact results,
 original report links, gate reconstruction and retained artifact paths.
 
-## Next work and capacity
+## Earlier recovery sequence (completed prerequisites noted above)
 
 1. Read current Git status/log, [current plan](plans/plan-9-current.md), HTML R3/R4/R15,
    and the latest controller ledger prefix before editing or appending. A later
