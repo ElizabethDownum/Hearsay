@@ -13,8 +13,38 @@ the exact 78-case correction now has fresh independent approval below. Original 
 The [forensics code review](../../review/2026-09-05-native-forensics-review.md)
 closed R15 within its boundary and found one relayed-document reference defect;
 its focused production fix at 09e5458 is independently Approved, zero findings.
-Scrying is committed through 3C1 at d07f01b, with 3C2 next and accumulated
-code review after 3E. These execution results do not imply later proposals landed.
+Scrying is committed through3D at60506d9. [Final validation](../../review/2026-09-05-scrying-implementation-validation.md)
+and root checkpoint pass allsixgates,1868/121 and10blocks/230lines. Independent
+accumulated [code review](../../review/2026-09-05-scrying-code-approval.md) is
+Approved with zero findings, allsixindependent gates and full comparison passed.
+Task3 is closed; Task4A implementation is next. These execution results do not imply later proposals landed.
+
+## Ordinary feature links, approved receipt correction
+
+- [R25 complete correction](2026-09-05-task-5b-feature-links-receipt-corrected.md),
+  [author report](2026-09-05-task-5b-feature-links-receipt-correction-report.md),
+  [constraints](task-5b-feature-links-receipt-correction-constraints.md):147 cases,
+  preserving all144 plus the three exact reviewer controls. NativeRED146/1 then
+  GREEN147, bothcompilers/lint/firing pass; only evidence.ts changes. Root verified
+  all375 owned file hashes and three exact code fences. [Focused independent
+  approval](../../review/2026-09-05-feature-links-receipt-correction-approval.md)
+  has zerofindings, native147/147, bothcompilers/lint/firing and a separate exact-key
+  constructor diagnostic. All1389protected/302snapshotfiles remain unchanged;
+  root verified the395-file reviewer inventory. Original proposal/review remain frozen.
+
+- [Complete three-file proposal](2026-09-05-task-5b-feature-links-complete.md),
+  [author report](2026-09-05-task-5b-feature-links-author-report.md), and
+  [constraints](task-5b-feature-links-constraints.md): 144 isolated cases, preserving
+  all 96 earlier cases and adding 48. Both compilers/virtual lint and firing checks
+  pass. Root verified all three exact source/test fences against the manifest.
+  R20 receipt references, actual watch beats and the provisional R24 incomplete-batch
+  correction are included. [Independent review](../../review/2026-09-05-feature-links-plan-review.md)
+  found one Important receipt-timing error, reproduced at146pass/1fail after three
+  added controls. Root adopted the bounded [R25 amendment](2026-09-05-task-5b-missing-receipt-amendment.md)
+  PROVISIONALLY. A versioned correction retains all147 acceptance cases; the old
+  proposal and native review remain frozen.
+  Physical magic, story/séance integration, calendar and full composition remain
+  unfinished. This is the ninth partial source module, not full Task5B completion.
 
 ## Restart WIP, explicitly untested
 
@@ -85,6 +115,12 @@ approved gameplay. The real Task 2/3 predecessor commits must still be reconcile
   `955DD09A77CB763A76D222E8D66FF99509E58128068A6C1452542FC2674B0A62`.
 
 ## Watch corrections and execution history proposals
+
+- [Independent Task5A2 approval](../../review/2026-09-05-outcome-history-plan-approval.md):
+  zero findings, exact 239 affected cases and both compilers/lint pass; twelve
+  complete-world pairs preserve every old field with 81 private outcomes, and all
+  54 packet links resolve. Enforcement ran first (151 cases). Actual predecessor
+  reconciliation, implementation gates and separate code review remain required.
 
 - [R16 self-presence correction](2026-09-05-r16-self-presence.md),
   [constraints](r16-constraints.md), [author report](2026-09-05-r16-author-report.md):

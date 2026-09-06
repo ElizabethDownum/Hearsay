@@ -1,6 +1,6 @@
 # Hearsay continuation — 5 September 2026
 
-**Forensics and R15 have independent approval. Scrying is committed through 3C1; 3C2 is next.**
+**Scrying is independently approved at60506d9, zero findings. Séance implementation is next.**
 This project-local handoff supersedes the older shared AI memory. All writes in
 this session stayed inside Hearsay at Ellie's request.
 
@@ -34,7 +34,7 @@ resumed its existing13-path brief from32491f9. Task5A's saved review was recover
 without repeating completed gates; its séance-family correction is adopted in
 the binding amendment/HTML R23. One production writer and root index ownership persist.
 Task 3B is committed at b723dda8c1c6690506e3696ae734ef413d11f4d0: 13 paths,
-29 authored cases plus three registry-derived cases. Worker and controller each
+29 authored cases plus one registry-derived case (corrected by3E native accounting). Worker and controller each
 passed the focused 297 cases in seven files and both typechecks; scoped lint passed.
 Meaningful RED was eight failures with 289 controls passing. The last actual full
 suite remains 1783/114 at approved 09e5458; full scrying gates and code review await 3E.
@@ -43,14 +43,52 @@ seven new cases. Worker/controller each pass focused 49/5 and both typechecks;
 scoped lint passes. Root caught and restored two pre-delivery no-leak assertions
 that were incorrectly included in the deferred feature block. The corrected six
 residue tests exactly match the frozen body after only the four licensed omissions.
-Next is atomic 3C2: physical sketch refs, feature generation and the shared auditor
-migration. Preserve all 19 forensics cases/eight calls and both original pillars.
-Root retains index ownership and serial production writers; full gates/review after 3E.
+Task 3C2 is committed at db6ffae3826f34974b3c5acef113031eecc2ea38: physical sketch
+refs/features and one shared auditor. Worker and controller each pass focused
+91/6 and both typechecks; scoped lint passes. All 19 forensics cases/eight calls,
+both original pillars and legacy audit assertions are preserved. The temporary
+helper is removed. Staged REDs isolate reference equality, nested-copy isolation
+and the missing physical marker. Task 3D is committed at
+60506d9a582db60c60c627d6b42ec83f62ed709e, 19 paths: honest magic source labels,
+separate report/web buckets, no synthetic informant channel, and a primitive icon
+fallback. Worker/controller each pass321/10 and both compilers; scoped lint passes.
+Root verified19 hashes, both complete test bodies and original literal-NPC cases.
+Task3E and root each pass all six native gates at60506d9:1868 tests/121 files,
+lint, both compilers, build500.56kB/148.06gzip, soak and MC. All10 report blocks/
+230 deterministic lines remain equal, with all four comparator controls. The
+1870 estimate overcounted3B generated jargon cases by two; exact native per-file
+accounting gives79 authored plus6 registry additions and no missing tests.
+Vite's over500kB size warning is retained. See the [validation report](review/2026-09-05-scrying-implementation-validation.md).
+Independent accumulated code review is Approved, zero Critical/Important/Minor.
+The reviewer independently passes allsixgates1868/121 and10blocks/230lines. Its
+initial enforcement-focused probe is transcript-only; the full suite subsequently
+captures those cases in raw native output. No missing buffers were reconstructed.
+The [code approval](review/2026-09-05-scrying-code-approval.md) records limits:
+no manual browser/layout audit, no many-seed magic balance claim, and no current
+scry purchase composer (the approved engine/session stage). Task3 is closed.
+Task4A is next with the frozen séance draft and bindingT4-A1/A2; root retains
+index ownership and serial writers.
 
-The feature-link author independently validates a new proposal against isolated
-09e source, preserving the older 96 cases and frozen fragments. Physical magic
-links, calendar/terminal composition and the full Task 5B model remain outside
-this fragment. No feature-link production implementation or approval is claimed.
+The completed ordinary feature-link proposal now has 144 isolated cases (all 96
+earlier cases plus 48), both compilers/virtual lint and exact fence integrity. A
+fresh independent review found one Important missing-receipt timing defect:
+all144 cases pass, but a new acceptance case falsely backdates a report child.
+Root adopted the bounded uncertainty correction PROVISIONALLY under R25. The
+versioned147-case proposal now has independent approval, zero findings; native
+RED146/1 becomesGREEN147, bothcompilers/lint/firing pass, and a separate exact-key
+constructor diagnostic proves unknown rows gain no receipt/root/attention fields.
+All1389 protected inputs/302snapshot files remain unchanged. See the
+[focused approval](review/2026-09-05-feature-links-receipt-correction-approval.md). The [review](review/2026-09-05-feature-links-plan-review.md)
+and [amendment](plans/drafts/2026-09-05-task-5b-missing-receipt-amendment.md) preserve
+the native146pass/1fail evidence; all147 acceptance cases must be retained.
+See the [draft index](plans/drafts/README.md). Physical magic, story/séance links,
+calendar/terminal composition and the full Task5B model remain unfinished. No
+feature-link production implementation or approval is claimed.
+Task 5A2 outcome recording now has independent plan approval, zero findings:
+239 affected cases, both compilers/lint and twelve full-world pairs pass, with 81
+outcomes and all 54 packet associations verified. See the
+[native approval](review/2026-09-05-outcome-history-plan-approval.md). Actual
+R16/R17/magic/prose/5A1 reconciliation and production code review remain required.
 
 The following paragraphs retain the earlier evening checkpoints.
 

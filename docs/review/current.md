@@ -6,15 +6,25 @@ Latest checkpoint: the received-report correction is committed at09e5458. All1,7
 tests in114 files and all six implementation gates pass; the ten deterministic
 simulation report blocks remain unchanged. Independent focused review Approved
 with zero findings; controller gates also pass at that commit.
-R15 passed within its declared boundary. Scrying is committed through 3C1 at
-d07f01b; worker and controller passed its 49 focused cases and both typechecks.
-Two mistakenly deferred pre-delivery assertions were restored before this commit.
-Physical sketch refs and the shared-auditor migration (3C2) are next. The last full suite above belongs to
-09e5458; full scrying gates and independent code review follow 3E.
+R15 passed within its declared boundary. Scrying is committed through 3D at
+60506d9. Worker and controller now pass allsixfullgates:1868 tests/121files,
+lint, both typechecks, build500.56kB/148.06gzip, soak and MC. All10blocks/230lines
+match with four comparator controls. The earlier1870 estimate overcounted3B's
+generated cases; no test disappeared. The build's over500kB warning is retained.
+The shared auditor preserves the original assertions; existing panels distinguish
+magic from human channels. [Validation report](review/2026-09-05-scrying-implementation-validation.md).
+Independent accumulated [code review](review/2026-09-05-scrying-code-approval.md)
+is Approved with zero findings, allsixgates/comparison independently passed.
+Task3 is closed; Task4A is next. The approval covers engine/session and rendered
+panel behavior; a purchase composer, manual layout audit and many-seed magic balance
+remain outside this stage.
 Séance's conditional plan amendment is saved. The corrected 78-case prose proposal
 has fresh independent approval. Recording review's séance-family correction is
-adopted under R23. The eight partial debrief modules retain 96 isolated cases;
-a separate feature-link proposal is being validated. The following recovery
+adopted under R23. Task5A2 private outcome recording has independent proposal
+approval with zero findings: 239 affected cases and twelve complete-world pairs
+pass ([review](review/2026-09-05-outcome-history-plan-approval.md)). It remains
+unimplemented. The ninth partial debrief module, ordinary feature linkage, now
+now has an independently approved147-case correction (96 earlier,48 feature and3 receipt-boundary cases), zerofindings. R25 retains the provisional local decision and native approval evidence. The following recovery
 paragraphs are historical checkpoints.
 
 Status at session start: Plan 9 Task 1, fix wave two. HEAD 49cc3e7 contains the first five fixes and G1. Two unfinished G2 test edits were preserved in a project-local recovery snapshot. The inherited working tree passes 1,710 tests in 113 files, lint, both typechecks and the production build. The JavaScript bundle remains 489.63 kB (145.02 kB gzip). Remaining fixes and independent review are in progress. This is a recovery baseline, not Task 1 completion.
@@ -83,7 +93,7 @@ probe fails. Task 2 closure is withheld while the bounded correction is prepared
 - **Recommended action:** a valid paid scry leaves a persistent physical trace at the target venue when the window begins. An actual observer must encounter it; a remote observer must then report it through the physical network. The enemy learns only the observed venue and trace, never the player's identity. Use a dedicated evidence rule with resolvable provenance.
 - **Why:** the Plan 11 remote-observation and spoken-content laws; enemy/digest.ts's existing district rule requires story families and speakers.
 - **To reverse:** change the trace's expiry/discovery rules in a later tuning pass, with measured tests. Invalid actions remain mutation-free; valid but uninformative scrying still leaves residue.
-- **Status:** both Important omissions from the first Task 3 plan review are now corrected in the completed draft: the shared comparator includes physical trace identity, and runaround copies detach nested residue data while preserving absent keys and legacy ordering. Independent plan re-review approved base reconciliation; A1 now explicitly migrates forensics into the shared auditor in3C2. Root verified79 authored cases and syntax, including the three remaining fragments. Actual runtime gates and separate code approval remain. No magic code shipped yet.
+- **Status:** implemented through60506d9, including physical trace identity, nested reference copies and the completed A1 shared-auditor migration. Worker and controller each pass all six gates,1868 tests/121 files, and the complete10-block/230-line simulation comparison. Independent accumulated code review Approved with zero findings; Task3 is closed.
 - **Authored defaults adopted:** keep each physical trace for the campaign; track discovery/reporting separately. A failed or omitted report can retry only after that observer encounters the trace again. One residue feature per venue prevents repeated casts from multiplying the same location lead. Any locally present actor can see the trace; existing principal/observer rosters determine who records or reports it.
 
 ### R6 — Give magic an explicit observation source
@@ -91,7 +101,7 @@ probe fails. Task 2 closure is withheld while the bounded correction is prepared
 - **Recommended action:** add an explicit live venue sensor over the same tick events used by ordinary perception. Model magic provenance distinctly from informant identities, and update grouping, badges and corroboration consumers together. Magic does not count as a separate informant for channel corroboration.
 - **Why:** perception.ts's observer/circle checks, intel/entry.ts's string source, and intel/web.ts's carrier grouping are different responsibilities and must stay coherent.
 - **To reverse:** change spell presentation or the explicit corroboration rule without changing ordinary NPC observation.
-- **Status:** exact interfaces, consumers and tests are drafted. The recovered draft includes both a valid colliding ordinary-question control and a rejecting stripped-residue-marker control. Root verified the full authored count of 79; this is syntax/count evidence, not gameplay execution. Runtime verification follows the certified Task 2 implementation.
+- **Status:** implemented and natively validated at60506d9. All79 authored cases and six generated jargon cases are present, including the colliding-question and stripped-marker controls. Existing panels distinguish magic from human channels. Independent accumulated code review Approved with zero findings; Task3 is closed.
 - **Held seam for Task 4 review:** Task 3 emits null-subject residue features. A later subjectful derived feature carrying a physical ref needs its own audit provenance checked; removing its nested marker must not turn it into an ordinary question. The saved Task 4 draft already has a direct night-visit feature marker precondition, so do not report that guard as missing without checking the actual code. This is a focused reviewer question, not permission to broaden the scanner or invent a new mechanic.
 - **Authored defaults adopted:** retain the original three sensor channels (speech, questions, presence). Use an optional typed magic provenance field, so an NPC named 'scrying' remains an NPC. Ordinary scene presence gets a separate intel kind because existing presence rows mean watch activity. A spell and a human seeing the same telling count once for deductions; magic adds no independent informant corroboration.
 
@@ -100,7 +110,7 @@ probe fails. Task 2 closure is withheld while the bounded correction is prepared
 - **Recommended action:** generate a separate historical witness record, copy it into optional runtime state, and retain the living-only secret witness invariant. Select one real subject relationship as the grounded clue at generation time. Do not remove anyone from the generated living cast. A séance validates its offered local venue and night window.
 - **Why:** world/validate.ts's secret-witness checks and world/attach.ts's belief seeding both require actual living NPCs.
 - **To reverse:** change how historical witnesses are selected without deleting live graph nodes or altering existing secret attachment.
-- **Status:** the complete draft and report were saved before the author hit its usage limit. Independent Claude plan review subsequently hit a new session limit before saving findings or a verdict. The review must restart from the frozen bytes; its IN PROGRESS header is not approval. No implementation is certified.
+- **Status:** the complete draft has conditional native plan approval with the adopted T4-A1/A2 amendment under R21. That amendment adds three auditor controls and separate4C1/4C2 accounting. Actual60506d9 predecessor seams have been checked; implementation waits for Task3 code approval.
 - **Further source finding:** the original claim that guards already report a nighttime avatar sighting is false. Enemy capture excludes presence, and received presence has no dedicated enemy evidence arm. The draft will define a narrow chapel-night observation and carry the actual sighting in a physically spoken report. Eligibility must depend on visible location/time, not hidden spell state. The direct spymaster case and the sighting's actual gameplay consequence still need a concrete design; no implementation is certified by this note.
 - **Selected consequence for the draft:** direct local sighting or actual received speech supplies a fair-cop evidence reference. A dedicated night-visit feature, deduped by kind/subject, adds one ordinary exposure point without automatic carrier-profile identification. Keep this in the existing evidence substrate rather than a redundant nightVisits ledger. Exact code and tests still require authoring/review.
 - **Consumer correction found during author review:** keep the séance record in its truthful claim-family history, while campaign metrics count ordinary heardBy lists only on telling records. The new ritual record must not be mistaken for speech. Exact code and a metrics-preservation assertion are in the draft; production remains untouched.
@@ -283,8 +293,18 @@ The recovered Task 3 draft's exact counting script reports 79 cases and no synta
 The orchestration skill's role contract says, "You do not implement, deep-review, or research — workers do" (C:/Users/eliza/Desktop/ClaudeFiles/ai/skills/orchestrate/SKILL.md). After this limit was explained, Ellie replied, "understood, you are clear to continue work then." Root treats that go-ahead as authorization to perform the bounded R15 planning and implementation directly while workers remain unavailable. This is a disclosed interpretation of the user's instruction, not a claim that the skill normally allows it. Independent review remains required before Task 1 closure; root will not approve its own implementation. Cross-model transmission authorization also remains valid.
 
 ### R24 — Keep incomplete report arrivals unknown
-- **Status:** PROVISIONAL local proposal correction; no production change or independent approval.
+- **Status:** PROVISIONAL local rule; the147-case corrected proposal has independent approval under R25. Production implementation remains pending.
 - **Finding:** a real one-hop report with one retained child missing caused the surviving child to be dated as direct evidence at tick1980 because the relay heard the original. Original observation does not prove headquarters arrival.
 - **Adopted correction:** in a corroborated but incomplete report batch, keep matching possible child rows unrecorded within the exact maximum append span. Distinguishable direct observations remain direct; an identical direct/report candidate remains unknown. Complete batches keep their exact receipt links.
 - **Basis:** Task5B completion brief38–54; committed09e counterintel66–82 and field-reports371–420; raw author-pass1 failure. The [local adjudication](plans/drafts/2026-09-05-task-5b-incomplete-batch-amendment.md) records the bounded algorithm and required controls.
-- **Remaining:** author correction gates and independent proposal review, then future implementation review; all original96 cases stay intact.
+- **Author proof:** final WIP122 pass/22 fail → corrected144/144, both compilers/lint clean. Distinguishable direct observations remain direct, indistinguishable candidates remain unknown, and reservation stops at the bounded span.
+- **Independent result:** R24 controls pass. R25 closes the adjacent missing-receipt defect with147-case proposal approval; all original96 and later144 cases stay intact.
+
+### R25 — A missing receipt cannot become an earlier direct arrival
+
+- **Status:** PROVISIONAL local rule; the corrected proposal is independently Approved-for-base-reconciliation, zerofindings. No production change.
+- **Finding:** deleting only the real1995 report receipt record leaves its child falsely dated direct at1980, when the relay heard the original. Headquarters did not hear that original answer.
+- **Adopted correction:** extend R24's bounded possible-child reservation to uncorroborated wrappers. Matching candidates remain unrecorded/null; distinct direct observations, complete receipts and span bounds retain their behavior.
+- **Evidence:** [independent review](review/2026-09-05-feature-links-plan-review.md), 144 authored cases pass; reviewer acceptance146pass/1fail. The [binding amendment](plans/drafts/2026-09-05-task-5b-missing-receipt-amendment.md) cites the acquisition contract and preserves all147 acceptance cases.
+- **Author correction:** [complete version](plans/drafts/2026-09-05-task-5b-feature-links-receipt-corrected.md) preserves all144 cases plus three reviewer controls. NativeRED146/1 becomesGREEN147/147; both compilers/lint and actual rule-firing pass. Only the supporting evidence fold changes.
+- **Independent approval:** [focused native review](review/2026-09-05-feature-links-receipt-correction-approval.md), zerofindings. RED146/1 → GREEN147, bothcompilers/lint/firing and a separate exact-key diagnostic pass. Actual-predecessor reconciliation, fullmagic/calendar composition and eventual production code review remain.

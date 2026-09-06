@@ -1,7 +1,7 @@
 # Plan 9 — current execution plan
 
 Updated: 2026-09-05. Controller: Codex. Current implementation HEAD:
-**d07f01b10835fe43658dc71e33768d3ab7f4678d** (scrying 3C1).
+**60506d9a582db60c60c627d6b42ec83f62ed709e** (scrying 3D).
 
 Task1's R15 correction and Task2 forensics now have independent approval. The
 R20 relay-reference fix at09e5458 closes the sole remaining Important finding.
@@ -16,9 +16,15 @@ the audited forensics task on the green foundation while independent review rema
 open. This superseded review-before-start sequencing, without waiving final review
 or changing gameplay design/physics. Those forensics changes stayed in their scoped brief; pillar suites and exposure/turncoat mechanics are unchanged.
 
-Task 3A, 3B and 3C1 are committed. The controller independently verified focused
-34/4, 297/7 and 49/5 respectively, plus both typechecks at each boundary. Task 3C2 is next;
-full scrying gates and accumulated code review follow 3E. Task 4 remains unimplemented. Scrying has independent plan approval
+Task 3A, 3B, 3C1, 3C2 and 3D are committed. The controller independently verified
+focused 34/4, 297/7, 49/5, 91/6 and321/10 respectively, plus both typechecks at each
+boundary. Task3E and root each pass all six full gates:1868/121, lint, both
+compilers, build500.56/148.06gzip, soak and MC. All10blocks/230lines and four
+comparator controls match. Exact count growth is79 authored plus6 registry cases;
+the earlier1870 estimate overcounted3B by two. No tests disappeared. Independent
+accumulated code review is Approved with zero findings; the reviewer independently
+passed the same fullgates/comparison. [Task3 approval](../review/2026-09-05-scrying-code-approval.md).
+Task3 is closed. Task4A historical witness implementation is next. Scrying has independent plan approval
 with A1; its certified baseline is09e5458 and preserve19 forensics cases/eight
 auditor calls in3C2. Séance's conditional T4-A1/A2 amendment is saved. The corrected
 78-case prose proposal has independent approval for future-base reconciliation.
@@ -98,7 +104,9 @@ separate code review. The execution amendment strengthens one R16 assertion and
 preserves the existing watch pin. Production implementation remains queued while
 review capacity is unavailable. Task5A2's19 additions/239 affected cases and twelve
 world pairs (81 private outcomes, every old field equal on common virtual R16/R17)
-remain author evidence only; that recording proposal is not approved or implemented.
+now have independent proposal approval with zero findings. Actual predecessor
+reconciliation, implementation gates and code review remain; no recording change
+has been implemented.
 
 ## Historical review and quota checkpoint
 
@@ -186,8 +194,8 @@ original report links, gate reconstruction and retained artifact paths.
    Independent plan re-review approved base reconciliation with mandatory A1
    in drafts/2026-09-05-task-3-base-reconciliation.md. All79 authored cases
    and syntax probes are retained. The actual Task 2 base is certified at 09e5458;
-   3A/3B/3C1 are committed and proportionally gated. Execute 3C2 with A1, 3D and 3E
-   serially, followed by the full gates/comparison and independent code review.
+   3A/3B/3C1/3C2/3D are committed; A1 and3E are complete. Worker/controller full
+   gates1868/121 and10blocks/230lines pass. Independent code review Approved0C/0I/0M; Task3 closed.
    The original direct-evidence insertion and heuristic-3 route are invalid.
 4. **Task 4 seance:** author separate historical witness metadata retained at runtime,
    living-only witness invariants, grounded clue, and offered local action (R7).
@@ -212,7 +220,11 @@ original report links, gate reconstruction and retained artifact paths.
    Apply the adopted T5A-A1 amendment to preserve Task 4 séance family membership;
    its 17th actual-ritual regression awaits that predecessor. Actual reconciliation,
    implementation and code review remain. Task 5B has 96 passing cases across eight
-   partial modules; a new feature-link proposal is being validated independently.
+   partial modules; the completed ninth ordinary feature-link proposal has 144
+   author cases (96+48). Independent review found one missing-receipt chronology
+   defect; the R25 correction preserves all144 plus three reviewer cases and now
+   has independent proposal approval, zerofindings. Native147/147 and bothcompilers/
+   lint/firing pass; production implementation and fullmagic integration remain.
    Full magic links, calendar and terminal composition remain unfinished.
 7. **Task 6 + Task 7B debrief UI:** terminal-only props-fed panels, existing panel
    import fence firing proof, running-world non-reachability, remaining terms/slots.
