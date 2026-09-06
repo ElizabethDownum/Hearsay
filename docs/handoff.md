@@ -4,6 +4,10 @@
 This project-local handoff supersedes the older shared AI memory. All writes in
 this session stayed inside Hearsay at Ellie's request.
 
+The explicit `$handoff` is recorded in the [immutable continuation episode](episodes/2026-09-05-independent-review-and-debrief.md).
+The [session index](episodes/README.md) links both episodes and three transferable
+learning candidates retained locally. This recordkeeping does not resume implementation.
+
 ## Stopped for Ellie's computer restart
 
 Ellie requested: “get to a stopping point then actually stop, need to restart my

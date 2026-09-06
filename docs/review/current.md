@@ -163,6 +163,13 @@ No gameplay source changed, and no background continuation is scheduled.
 - **Evidence and limits:** watch-plan-review observations d1–d3 trace the current source; expiry after actual work is also in the retained native history probe. Cancellation and venue-mutation consequences are source-derived hypotheses until a bounded native reproduction is saved. Do not call them new passing tests or silently repair them under R17.
 - **Status:** held for later bounded work; no new gameplay rule or threshold selected. [Independent source review](2026-09-05-watch-plan-review.md).
 
+### R19 — Handoff learning candidates stay project-local
+
+- **Recommended classification:** durable procedures for preserving UTF-8 across PowerShell script boundaries, saving each review charge/gate incrementally, and binding proposal verification to exact frozen source maps.
+- **Scope:** the handoff skill normally promotes lessons into shared memory and asks for classifications interactively. Ellie's standing project-only write instruction and HTML question queue take precedence. The three lessons and an immutable session episode are saved under Hearsay, indexed in docs/episodes/README.md; no shared wiki, memory or skill was changed.
+- **Proposed skill improvements:** future orchestration review briefs should require substantive progress after each charge and gate; authoring briefs should distinguish validated snapshots from newer WIP. These proposals are recorded in the local lesson pages and are not silently applied to shared skills.
+- **Status:** handoff complete locally. Work remains stopped for the requested computer restart; this recordkeeping does not authorize an implementation or worker restart.
+
 ## Verification note
 
 The reviewer also found one unused variable in the controller's ignored report-comparison script. It was removed and the literal npm run lint command passed again before handoff. The comparator checks complete report blocks and has changed, added and missing-output controls. Some historical worker RED stdout buffers were unavailable; the report discloses this, while current controller/reviewer full-suite output is retained. No missing evidence was reconstructed or invented.
