@@ -17,11 +17,9 @@ open. This superseded review-before-start sequencing, without waiving final revi
 or changing gameplay design/physics. All new production changes stay in the brief's
 eight licensed files; pillar suites and exposure/turncoat mechanics are unchanged.
 
-Task 3 scrying and Task 4 séance remain author proposals, with no magic implementation.
-Root verified the Task 3 recovered count/syntax and the two corrected digest consumers
-in memory; separate plan re-review remains open. Both worker providers exhausted
-capacity. Claude's last reset message was 15:20 CDT /20:20 UTC on 5 September;
-no worker remains active, and closed sessions must not be repeatedly polled.
+Task3 and Task4 remain unimplemented. Scrying now has independent plan approval
+for base reconciliation with A1; séance review is still pending. Completed plan
+reviews, partial native code review and the new Claude quota are detailed below.
 
 This document records the current execution order and binding audit amendments.
 It does not certify unimplemented task bodies as dispatch-ready. Exact per-task
@@ -33,41 +31,46 @@ silently rewritten by this Plan 9 recovery.
 
 ## Debrief and watch authoring checkpoint
 
-The six partial Task5B modules now pass62 isolated native cases (knowledge10,
-network14, directive/timeline11, ordinary evidence arrival9, semantic attention18),
-both compiler configurations and lint. They include actual report transport and a
-real no-report watch whose work survives expiry. Authored, received, performed and
-reported stages stay separate; calendar dates use actual arrival/digest chronology.
-Compulsion corroboration follows the engine's authority plus invitational-venue rule.
-Exact fragments and proof limits are saved in the draft index. Full story/artifact/
-magic folds, physical receipt branches, feature linkage and terminal integration
-remain unfinished. These models and their virtual predecessors are not implemented.
+Eight partial Task5B modules pass96 isolated native cases: knowledge10, network14,
+directive/timeline11, ordinary evidence arrival9, semantic attention18,
+story/artifact17 and report items17. Both compiler configurations and virtual lint
+pass. Exact current fragments and failed/final proof limits are in the draft index.
+Real report transport, paper actions and no-report watch history are exercised.
+Missing or omitted copies stay distinct from known content; envelope closure is
+not item receipt. Magic operations, physical receipt branches, feature linkage,
+calendar/terminal composition and the complete model plan remain unfinished.
 
-The probe exposed lost watch history and two existing execution defects. R16's
-self-presence correction has39 affected passing cases; R17's missing attempted-state
-guard has30. Both have genuine assertion REDs, complete proposals and no production fix.
-Task5A2 separately retains private raw local outcomes and actual report packet ids.
-Its19 additions include four firing-proof cases in existing live-view guards;
-affected239/7 and twelve paired full-world comparisons pass (81 new outcome rows,
-every old field equal on common virtual R16/R17). Both typechecks and lint pass.
-Drafts/reports/constraints are indexed in docs/plans/drafts/README.md. Independent
-review, actual predecessor reconciliation and implementation remain mandatory.
+R16/R17 proposals now have independent plan approval, zero Critical/Important,
+with required order R16 → six gates → separate code review → R17 → six gates →
+separate code review. The execution amendment strengthens one R16 assertion and
+preserves the existing watch pin. Production implementation remains queued while
+review capacity is unavailable. Task5A2's19 additions/239 affected cases and twelve
+world pairs (81 private outcomes, every old field equal on common virtual R16/R17)
+remain author evidence only; that recording proposal is not approved or implemented.
 
-The project-local fixed reviewer runner has a root native preflight162/4 at unchanged
-dc114da source. Its independent Claude execution route is still untested; the root
-run is not a reviewer gate. Preserve source/HEAD while an implemented-code review is
-live. Review R15/Task2 first, then the proposed watch corrections and magic plans.
+## Independent review results and current capacity
 
-## Current external-review blocker
+Ellie's exact source/context/plan-to-Claude confirmation was accepted; all four
+bounded reviews launched. Scrying and watch plan reviews completed. Scrying's A1
+base amendment is saved in the draft index and must accompany 3C2. No magic code
+has been implemented. Root ran the reviewer-supplied three-fragment syntax probe,
+diagnostics[], exit0; this is not a typecheck or runtime proof of the79-case draft.
 
-Claude's reported quota reset has passed, but at20:20 UTC automatic approval
-review rejected the implemented-code dispatch twice before any process launched.
-It interpreted the earlier “these plans” wording as excluding source/context and
-the external Claude/Anthropic destination, even after the exact authorization was
-quoted. A narrowly worded source/context/plan transmission confirmation is pending
-and recorded in HTML R3. Do not retry or use another source-transfer route while
-that confirmation is unresolved. Earlier user authorization remains recorded;
-this is an automatic-review block, not a new observed quota failure.
+R15/Task2 reviewer ran Focused162/4, Tests1780/114, lint, both typechecks, build,
+soak, MC and a9-case probe successfully, then quota stopped the final verdict.
+Its complete-report comparison initially rejected Unicode-corrupted capture.
+Root proved lossless recovery, then separately reran soak/MC with a corrected UTF-8
+runner. The unchanged comparator passes all10 blocks/230 lines on both recovered
+and fresh logs. The final reviewer probe has an unexecuted comparison addition;
+do not claim that final file passed. R15/Task2 code approval is still pending.
+
+Séance's second plan review also stopped at quota without a verdict. All worker
+processes are CLOSED (97184/70746 exit1;18660/67543 exit0). The latest Claude reset
+is **6 September00:00 CDT /05:00 UTC**. Do not poll closed sessions or repeatedly
+dispatch before it. Native Codex workers remain limited until their previously
+reported Sep6 22:06 reset. This is capacity, not a new permission question.
+Read docs/review/2026-09-05-independent-review-recovery.md for exact results,
+original report links, gate reconstruction and retained artifact paths.
 
 ## Authority and boundaries
 
@@ -82,7 +85,7 @@ this is an automatic-review block, not a new observed quota failure.
   Anthropic after an automatic-review rejection. Restricted Claude Fable 5.1
   dispatches were approved; unrelated personal/shared memory is excluded.
   Subsequent API 429 session-limit failures are capacity failures, not a renewed
-  authorization question. Codex workers remain quota-limited; the later automatic-review block governs Claude dispatches.
+  authorization question. Codex workers remain quota-limited; the later explicit confirmation enabled Claude reviews.
   Implementation and review still use independent threads.
 - One code writer and index owner at a time. Scoped local commits; preserve unrelated
   documentation work. No push performed or needed for local verification.
@@ -128,8 +131,9 @@ this is an automatic-review block, not a new observed quota failure.
    found two missing physical-reference consumer migrations: identity comparison
    and nested-copy isolation. Both are corrected in the recovered author draft
    (R5/R6), together with the required-marker/colliding-question control.
-   Root counted 79 proposed cases and parsed the complete TypeScript blocks
-   without syntax diagnostics; focused independent re-review remains pending.
+   Independent plan re-review approved base reconciliation with mandatory A1
+   in drafts/2026-09-05-task-3-base-reconciliation.md. All79 authored cases
+   and syntax probes are retained; actual runtime gates remain.
    runtime proof still requires the real Task 2 base to be certified.
    The original direct-evidence insertion and heuristic-3 route are invalid.
    Drafts are proposals until controller review; no magic code yet.
@@ -151,7 +155,7 @@ this is an automatic-review block, not a new observed quota failure.
    Task 5A's narrow recording proposal is complete in drafts: 16 new cases and
    99 affected cases pass in memory; nine complete world pairs differ only by the
    proposed metadata. Independent plan review and actual predecessor reconciliation
-   remain open. Task5B has62 passing cases across six partial modules; full models and feature linkage remain unfinished.
+   remain open. Task5B has96 passing cases across eight partial modules; full models and feature linkage remain unfinished.
 7. **Task 6 + Task 7B debrief UI:** terminal-only props-fed panels, existing panel
    import fence firing proof, running-world non-reachability, remaining terms/slots.
 8. **Task 8 integration/closeout:** legal two-council forger route; real interrogation

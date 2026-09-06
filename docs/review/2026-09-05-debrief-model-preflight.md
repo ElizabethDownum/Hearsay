@@ -180,3 +180,35 @@ Final native output:
   "lintErrors": 0
 }
 ```
+
+## Latest eight-module continuation
+
+Story/artifact17 and report-item17 additions bring the partial models to96 cases.
+Both compiler configurations and virtual lint pass. Exact code and interpretation
+limits are in the updated fragments document. Real paper mint/show paths, physical
+two-hop reporting and a turned courier's empty final delivery are exercised.
+The report fixture corrections and original94/95 failure are retained; current
+production remains dc114da1780/114. This does not complete Task5B or independent review.
+
+```text
+
+ RUN  v3.2.6 C:/Users/eliza/Desktop/ClaudeFiles/hearsay
+
+ ✓ .superpowers/sdd/task-5b-reports-validation/entry.probe.ts (96 tests) 196ms
+
+ Test Files  1 passed (1)
+      Tests  96 passed (96)
+   Start at  19:39:58
+   Duration  1.72s (transform 397ms, setup 0ms, collect 1.02s, tests 196ms, environment 0ms, prepare 119ms)
+
+```
+
+```json
+{
+  "scope": "Task5B partial report-item proposal only; no implementation",
+  "newSourceFiles": 8,
+  "tsconfig.json": 0,
+  "tsconfig.app.json": 0,
+  "lintErrors": 0
+}
+```

@@ -1,5 +1,12 @@
 # Partial Task5B model fragments — not an executable full plan
 
+Latest continuation: eight partial modules, **96 native cases**, both compiler
+configurations and virtual lint clean. This document contains the current network
+value-diff wrapper plus all earlier modules and the new story/artifact/report-item
+modules below. Earlier checkpoint counts describe their historical validation.
+Physical magic receipt support, magic operations, evidence-to-feature linkage,
+calendar/terminal composition and independent review remain unfinished.
+
 Authored-by: root Codex GPT-6, 2026-09-05. Actual production remains dc114da.
 These fragments do not implement the full debrief. All operation families, semantic
 overlay, terminal composition and independent review remain open. Preserve actual
@@ -309,6 +316,11 @@ const object = (value: unknown): value is Record<string, unknown> =>
 
 /** Stable value diff. Presence is explicit so null and an absent field remain different. */
 export function spokenCopyChanges(before: SpokenNetworkPayload, after: SpokenNetworkPayload): SpokenCopyChange[] {
+  return reportValueChanges(before, after);
+}
+
+/** The same value diff also compares individual root-associated report items. */
+export function reportValueChanges(before: unknown, after: unknown): SpokenCopyChange[] {
   const changes: SpokenCopyChange[] = [];
   const visit = (a: unknown, b: unknown, path: string, aPresent: boolean, bPresent: boolean): void => {
     if (aPresent && bPresent && stableStringify(a) === stableStringify(b)) return;
@@ -1351,6 +1363,630 @@ describe('semantic counter-attention without feature-id guessing', () => {
     expect(attentionAt(world, 1439)).toEqual(first);
     first.actual[0]!.directiveIds.push('changed'); first.signals[0]!.entryIndexes.push(99);
     expect(hashWorld(world)).toBe(before);
+  });
+});
+```
+
+## Eight-module continuation: stories, papers and individual report items
+
+Story/artifact threads add17 cases; report-item threads add17. Total10+14+11+9+18+17+17=96.
+The story fold retains exact parent-version diffs, actual audiences and raw events,
+missing parent/claim history, per-viewing paper families, present custody and ended
+circulation under the actual two-day/REPEAT rule. It never matches artifacts by
+identical text. Unknown ancestry/events stay explicit, and returned objects are detached.
+
+Report items use recorded roots across shifted arrays, separate original observers
+from relayed holdings, preserve multiple packets, and break comparison at missing,
+malformed, omitted or non-report copies. A real turned courier's empty delivered
+envelope closes its holdings while its information is still omitted. Another full
+phase-loop case records both real transport hops and audiences. No deliveredAt field
+is reinterpreted as proof the contents became known.
+
+The first report fixture incorrectly assumed identical observations by two original
+witnesses share a root. The actual root includes the original observer; a relayed
+holding preserves that root explicitly. The fixture now models that relay and adds
+the distinct-original-witness control. A factRefs fixture also needed its actual
+{asset,factIndex} shape. Original94/95 runtime and compiler diagnostic are preserved.
+No gameplay mechanism was altered to satisfy those assumptions.
+
+The network diff implementation is unchanged internally; its new reportValueChanges
+entry point lets the report model compare one associated item without flattening
+the entire array. All previous79 cases passed with that refactor and the17 additions.
+
+## Story and artifact threads module (src/sim/debrief/stories.ts)
+
+```ts
+import { TICKS_PER_DAY } from '../../core/time';
+import type { Artifact } from '../artifacts';
+import { cloneSerializable } from '../hash';
+import { diffClaims, type Claim, type FieldChange } from '../rumors/claim';
+import { STANCE } from '../rumors/propagation';
+import type { ArtifactRecord, Belief, InjectRecord, TellingRecord, WorldState } from '../types';
+
+export interface StoryVersion {
+  claim: Claim;
+  parentState: 'root' | 'recorded' | 'missing' | 'other-family';
+  changes: FieldChange[] | null;
+}
+export interface StoryEvent {
+  chronicleIndex: number;
+  record: InjectRecord | TellingRecord | ArtifactRecord;
+  claimId: string;
+  /** Null means the parent was not retained; [] means no content changed. */
+  changes: FieldChange[] | null;
+  changedBy: string | null;
+}
+export interface StoryThread {
+  kind: 'story';
+  id: string;
+  family: string;
+  versions: StoryVersion[];
+  events: StoryEvent[];
+  originEventIndexes: number[];
+  artifactIds: string[];
+  beliefs: { npc: string; belief: Belief }[];
+  lastActivityAt: number | null;
+  /** No recorded activity leaves this unknown, rather than inventing a death date. */
+  died: boolean | null;
+  becameEvidence: number[];
+}
+
+/** Current family lineage plus every retained injection, speech and linked paper viewing. */
+export function storyThreads(world: WorldState): StoryThread[] {
+  const families = new Map<string, StoryThread>();
+  const versions = new Map<string, StoryVersion>();
+  for (const claim of Object.values(world.claims).sort((a, b) => a.id.localeCompare(b.id))) {
+    const parent = claim.parent === null ? null : world.claims[claim.parent];
+    const parentState = claim.parent === null ? 'root' : !parent ? 'missing'
+      : parent.family === claim.family ? 'recorded' : 'other-family';
+    const version: StoryVersion = { claim: cloneSerializable(claim), parentState,
+      changes: parentState === 'root' ? [] : parentState === 'recorded' ? diffClaims(parent!, claim) : null };
+    versions.set(claim.id, version);
+    const thread: StoryThread = families.get(claim.family) ?? { kind: 'story', id: 'story:' + claim.family,
+      family: claim.family, versions: [], events: [], originEventIndexes: [], artifactIds: [],
+      beliefs: [], lastActivityAt: null, died: null, becameEvidence: [] };
+    thread.versions.push(version); families.set(claim.family, thread);
+  }
+  world.chronicle.forEach((row, chronicleIndex) => {
+    if (row.tick > world.tick || (row.kind !== 'inject' && row.kind !== 'telling' && row.kind !== 'artifact')) return;
+    if (row.claimId === undefined) return;
+    const version = versions.get(row.claimId);
+    if (!version) return;
+    const thread = families.get(version.claim.family)!;
+    const changes = cloneSerializable(version.changes);
+    thread.events.push({ chronicleIndex, record: cloneSerializable(row), claimId: row.claimId, changes,
+      changedBy: changes !== null && changes.length > 0 ? (row.kind === 'telling' ? row.speaker : row.by) : null });
+    if ((row.kind === 'inject' || row.kind === 'artifact') && version.parentState === 'root') {
+      thread.originEventIndexes.push(chronicleIndex);
+    }
+    if (row.kind === 'artifact' && !thread.artifactIds.includes(row.artifact)) thread.artifactIds.push(row.artifact);
+    thread.lastActivityAt = Math.max(thread.lastActivityAt ?? row.tick, row.tick);
+  });
+  for (const [npc, store] of Object.entries(world.beliefs).sort(([a], [b]) => a.localeCompare(b))) {
+    if (!world.npcs[npc]) continue;
+    for (const [family, belief] of Object.entries(store)) {
+      families.get(family)?.beliefs.push({ npc, belief: cloneSerializable(belief) });
+    }
+  }
+  world.enemy.evidence.forEach((entry, index) => {
+    // Family is immutable lineage metadata, not the reported subject or a content guess.
+    if (entry.family !== null) families.get(entry.family)?.becameEvidence.push(index);
+  });
+  for (const thread of families.values()) {
+    thread.events.sort((a, b) => a.record.tick - b.record.tick || a.chronicleIndex - b.chronicleIndex);
+    thread.artifactIds.sort();
+    thread.died = thread.lastActivityAt === null ? null
+      : world.tick - thread.lastActivityAt >= 2 * TICKS_PER_DAY
+        && !thread.beliefs.some((row) => row.belief.credence >= STANCE.REPEAT);
+  }
+  return [...families.values()].sort((a, b) => a.family.localeCompare(b.family));
+}
+
+/** Older incomplete saves can retain speech whose claim is absent; never silently discard it. */
+export function unresolvedStoryEvents(world: WorldState): { chronicleIndex: number; record: InjectRecord | TellingRecord }[] {
+  return world.chronicle.flatMap((row, chronicleIndex) =>
+    row.tick <= world.tick && (row.kind === 'inject' || row.kind === 'telling') && !world.claims[row.claimId]
+      ? [{ chronicleIndex, record: cloneSerializable(row) }] : []);
+}
+
+export interface ArtifactEvent {
+  chronicleIndex: number;
+  record: ArtifactRecord;
+  claim: Claim | null;
+  family: string | null;
+  claimLink: 'linked' | 'missing-claim' | 'unrecorded' | 'not-a-viewing';
+}
+export interface ArtifactThread {
+  kind: 'artifact';
+  id: string;
+  artifactId: string;
+  /** Current custody and immutable paper text, distinct from each interpretation. */
+  artifact: Artifact | null;
+  events: ArtifactEvent[];
+  storyFamilies: string[];
+}
+
+function isNpcViewing(world: WorldState, row: ArtifactRecord): boolean {
+  if (row.act === 'pickup') return row.by !== world.playerId;
+  if (row.act === 'show' || row.act === 'reshow') return row.to !== null && row.to !== world.playerId;
+  return row.act === 'plant' && row.to !== null && row.to !== world.playerId && Object.hasOwn(world.npcs, row.to);
+}
+
+/** Exact Task5A1 claim ids connect fresh viewing families; identical text is never an identity join. */
+export function artifactThreads(world: WorldState): ArtifactThread[] {
+  const threads = new Map<string, ArtifactThread>();
+  const get = (id: string): ArtifactThread => {
+    const row: ArtifactThread = threads.get(id) ?? { kind: 'artifact', id: 'artifact:' + id, artifactId: id,
+      artifact: null, events: [], storyFamilies: [] };
+    threads.set(id, row); return row;
+  };
+  for (const artifact of world.artifacts ?? []) get(artifact.id).artifact = cloneSerializable(artifact);
+  world.chronicle.forEach((row, chronicleIndex) => {
+    if (row.kind !== 'artifact' || row.tick > world.tick) return;
+    const thread = get(row.artifact);
+    const claim = row.claimId === undefined ? null : world.claims[row.claimId] ?? null;
+    const claimLink = row.claimId === undefined ? isNpcViewing(world, row) ? 'unrecorded' : 'not-a-viewing'
+      : claim === null ? 'missing-claim' : 'linked';
+    thread.events.push({ chronicleIndex, record: cloneSerializable(row), claim: cloneSerializable(claim),
+      family: claim?.family ?? null, claimLink });
+    if (claim && !thread.storyFamilies.includes(claim.family)) thread.storyFamilies.push(claim.family);
+  });
+  for (const thread of threads.values()) {
+    thread.events.sort((a, b) => a.record.tick - b.record.tick || a.chronicleIndex - b.chronicleIndex);
+    thread.storyFamilies.sort();
+  }
+  return [...threads.values()].sort((a, b) => a.artifactId.localeCompare(b.artifactId));
+}
+```
+
+## Story and artifact tests
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { STANDARD_RULES as RULES } from '../../src/content/rules';
+import { TICKS_PER_DAY } from '../../src/core/time';
+import { storyThreads, artifactThreads, unresolvedStoryEvents } from '../../src/sim/debrief/stories';
+import { applyForge, applyShow } from '../../src/sim/artifacts';
+import { hashWorld } from '../../src/sim/hash';
+import { diffClaims, mintClaim, type Claim } from '../../src/sim/rumors/claim';
+import { STANCE } from '../../src/sim/rumors/propagation';
+import type { TellingRecord, WorldState } from '../../src/sim/types';
+import { buildWorld, enrollPlayer } from '../../src/sim/world';
+import { miniTown } from '../sim/helpers/minitown';
+
+const spec = { subject: 'cyn', predicate: 'stole', object: null, count: 2,
+  severity: 4 as const, place: 'square', attribution: 'someone' };
+function fixture() {
+  const world = buildWorld(miniTown(), 'story-history', RULES);
+  enrollPlayer(world, { home: 'square' }); return world;
+}
+function claim(world: WorldState, over: Partial<Omit<Claim, 'id'>> = {}) {
+  const value = mintClaim(world, { ...spec, family: 'f0', parent: null, ...over });
+  world.claims[value.id] = value; return value;
+}
+function speech(value: Claim, over: Partial<TellingRecord> = {}): TellingRecord {
+  return { kind: 'telling', tick: 15, venue: 'square', speaker: 'ada', addressedTo: 'bez',
+    mode: 'telling', claimId: value.id, heardBy: [{ id: 'bez', addressed: true }, { id: 'cyn', addressed: false }], ...over };
+}
+function belief(world: WorldState, value: Claim, credence: number) {
+  world.beliefs.ada![value.family] = { claim: value, credence, heardFrom: 'injected', heardAt: 0,
+    firstHeardAt: 0, timesHeard: 1, apparentSources: [], discretion: false, counterSpun: false };
+}
+function shownWorld() {
+  const world = fixture(); applyForge(world, spec, 0, RULES);
+  world.tick = TICKS_PER_DAY;
+  applyShow(world, 'a0', 'ada', world.tick, [{ venue: 'square', members: ['you', 'ada', 'bez'] }]);
+  return world;
+}
+
+describe('complete story lineage and actual event copies', () => {
+  it('does not invent stories in an untouched world', () => {
+    expect(storyThreads(fixture())).toEqual([]);
+    expect(unresolvedStoryEvents(fixture())).toEqual([]);
+  });
+  it('retains origin, every actual audience, and the exact seven-field parent diff', () => {
+    const world = fixture(); const root = claim(world); const changed = claim(world, { parent: root.id, count: 7 });
+    world.tick = 30;
+    world.chronicle.push({ kind: 'inject', tick: 0, target: 'ada', by: 'player', claimId: root.id }, speech(changed));
+    const thread = storyThreads(world)[0]!;
+    expect(thread.originEventIndexes).toEqual([0]);
+    expect(thread.events.map((event) => event.chronicleIndex)).toEqual([0, 1]);
+    expect(thread.events[1]).toMatchObject({ changes: diffClaims(root, changed), changedBy: 'ada',
+      record: { heardBy: [{ id: 'bez', addressed: true }, { id: 'cyn', addressed: false }] } });
+  });
+  it('an unchanged retelling has an empty diff and names no mind as changing it', () => {
+    const world = fixture(); const root = claim(world); const repeated = claim(world, { parent: root.id });
+    world.tick = 15; world.chronicle.push(speech(repeated));
+    expect(storyThreads(world)[0]!.events[0]).toMatchObject({ changes: [], changedBy: null });
+  });
+  it('branches compare with their actual parent rather than the preceding chronicle event', () => {
+    const world = fixture(); const root = claim(world);
+    const branchA = claim(world, { parent: root.id, count: 7 });
+    const branchB = claim(world, { parent: root.id, severity: 5 });
+    world.tick = 30; world.chronicle.push(speech(branchA), speech(branchB, { tick: 30, speaker: 'bez' }));
+    expect(storyThreads(world)[0]!.events[1]!.changes).toEqual([{ field: 'severity', from: 4, to: 5 }]);
+  });
+  it('preserves repeated events and original ordering when two records share a tick', () => {
+    const world = fixture(); const value = claim(world); world.tick = 15;
+    world.chronicle.push(speech(value), speech(value));
+    expect(storyThreads(world)[0]!.events.map((event) => event.chronicleIndex)).toEqual([0, 1]);
+  });
+  it('keeps missing parent and missing event claims explicit without inventing a mutation', () => {
+    const world = fixture(); const value = claim(world, { parent: 'missing' }); world.tick = 15;
+    world.chronicle.push(speech(value), speech(value, { claimId: 'absent' }));
+    expect(storyThreads(world)[0]!.versions[0]).toMatchObject({ parentState: 'missing', changes: null });
+    expect(storyThreads(world)[0]!.events[0]!.changedBy).toBeNull();
+    expect(unresolvedStoryEvents(world)).toEqual([{ chronicleIndex: 1, record: world.chronicle[1] }]);
+  });
+  it('does not treat a different family as a valid lineage parent', () => {
+    const world = fixture(); const other = claim(world, { family: 'f-other' });
+    claim(world, { parent: other.id });
+    expect(storyThreads(world).find((row) => row.family === 'f0')!.versions[0]).toMatchObject({ parentState: 'other-family', changes: null });
+  });
+  it('uses the two-day inactivity condition together with the live REPEAT belief threshold', () => {
+    const world = fixture(); const value = claim(world); world.chronicle.push(speech(value, { tick: 0 }));
+    world.tick = 2 * TICKS_PER_DAY - 1; expect(storyThreads(world)[0]!.died).toBe(false);
+    world.tick += 1; expect(storyThreads(world)[0]!.died).toBe(true);
+    belief(world, value, STANCE.REPEAT); expect(storyThreads(world)[0]!.died).toBe(false);
+    world.beliefs.ada![value.family]!.credence = STANCE.REPEAT - 0.01;
+    expect(storyThreads(world)[0]!.died).toBe(true);
+  });
+  it('retains unknown activity for an orphan family and excludes unprocessed future events', () => {
+    const world = fixture(); const value = claim(world); world.chronicle.push(speech(value));
+    expect(storyThreads(world)[0]).toMatchObject({ lastActivityAt: null, died: null, events: [] });
+  });
+  it('links terminal enemy evidence by immutable family, preserving actual evidence indexes', () => {
+    const world = fixture(); const value = claim(world);
+    world.enemy.evidence.push({ kind: 'utterance', tick: 0, venue: 'square', observer: 'bez', overheard: false,
+      speaker: 'ada', addressedTo: 'bez', mode: 'answer', claimId: value.id, family: value.family,
+      reported: { ...spec, subject: 'dov' }, about: null });
+    expect(storyThreads(world)[0]!.becameEvidence).toEqual([0]);
+  });
+  it('a real paper viewing appears in its fresh story family and preserves evidence-weight belief', () => {
+    const world = shownWorld(); const thread = storyThreads(world)[0]!;
+    expect(thread.artifactIds).toEqual(['a0']);
+    expect(thread.events).toHaveLength(1); expect(thread.events[0]!.record.kind).toBe('artifact');
+    expect(thread.beliefs[0]).toMatchObject({ npc: 'ada', belief: { credence: 0.97 } });
+    expect(thread.originEventIndexes).toEqual([1]);
+  });
+});
+
+describe('paper operations preserve exact viewing identity', () => {
+  it('retains the actual forge and show, separating current custody from the reader', () => {
+    const world = shownWorld(); const thread = artifactThreads(world)[0]!;
+    expect(thread.artifact!.heldBy).toBe('you');
+    expect(thread.events.map((event) => event.claimLink)).toEqual(['not-a-viewing', 'linked']);
+    expect(thread.events[1]!.record.to).toBe('ada');
+    expect(thread.storyFamilies).toEqual([thread.events[1]!.claim!.family]);
+  });
+  it('identical papers shown in the same beat still link to their own minted claims', () => {
+    const world = fixture(); applyForge(world, spec, 0, RULES); applyForge(world, spec, 0, RULES);
+    world.tick = TICKS_PER_DAY;
+    const offered = [{ venue: 'square', members: ['you', 'ada'] }];
+    applyShow(world, 'a0', 'ada', world.tick, offered); applyShow(world, 'a1', 'ada', world.tick, offered);
+    const papers = artifactThreads(world);
+    expect(papers.map((row) => row.events[1]!.claimLink)).toEqual(['linked', 'linked']);
+    expect(papers[0]!.events[1]!.claim!.id).not.toBe(papers[1]!.events[1]!.claim!.id);
+    expect(papers[0]!.storyFamilies).not.toEqual(papers[1]!.storyFamilies);
+  });
+  it('a legacy viewing without a claim id never guesses from matching text and tick', () => {
+    const world = shownWorld(); const row = world.chronicle[1]!;
+    if (row.kind !== 'artifact') throw new Error('missing viewing');
+    delete row.claimId;
+    expect(artifactThreads(world)[0]!.events[1]).toMatchObject({ claimLink: 'unrecorded', claim: null, family: null });
+  });
+  it('distinguishes an explicit missing claim from a missing link', () => {
+    const world = shownWorld(); const row = world.chronicle[1]!;
+    if (row.kind !== 'artifact') throw new Error('missing viewing');
+    row.claimId = 'missing';
+    expect(artifactThreads(world)[0]!.events[1]).toMatchObject({ claimLink: 'missing-claim', claim: null });
+  });
+  it('preserves an orphaned paper event when the artifact object is absent', () => {
+    const world = fixture(); world.chronicle.push({ kind: 'artifact', tick: 0, act: 'forge', artifact: 'old', by: 'you', to: null });
+    expect(artifactThreads(world)[0]).toMatchObject({ artifactId: 'old', artifact: null, storyFamilies: [] });
+    expect(artifactThreads(world)[0]!.events).toHaveLength(1);
+  });
+  it('returns independent nested copies without mutating the world or another output view', () => {
+    const world = shownWorld(); const before = hashWorld(world);
+    const stories = storyThreads(world); const papers = artifactThreads(world);
+    papers[0]!.artifact!.spec.count = 99; papers[0]!.events[1]!.record.to = 'changed';
+    stories[0]!.beliefs[0]!.belief.credence = 0;
+    expect(hashWorld(world)).toBe(before);
+    expect(stories[0]!.events[0]!.record).toMatchObject({ to: 'ada' });
+    expect(storyThreads(world)[0]!.beliefs[0]!.belief.credence).toBe(0.97);
+  });
+});
+```
+
+## Field report item module (src/sim/debrief/reports.ts)
+
+```ts
+import type { HeldFieldObservation, SpokenNetworkPayload } from '../directives/types';
+import { cloneSerializable } from '../hash';
+import type { WorldState } from '../types';
+import { networkThreads, reportValueChanges, type NetworkThread, type SpokenCopyChange } from './network';
+
+type ReportItem = Extract<SpokenNetworkPayload, { kind: 'field-report' }>['items'][number];
+export interface ReportItemStage {
+  chronicleIndex: number;
+  tick: number;
+  speaker: string;
+  addressedTo: string;
+  heardBy: NetworkThread['stages'][number]['heardBy'];
+  status: 'spoken' | 'omitted' | 'unknown';
+  item: ReportItem | null;
+  /** Unknown previous copy or a missing link breaks comparison, never guesses a reindex. */
+  changes: SpokenCopyChange[] | null;
+}
+export interface FieldReportThread {
+  kind: 'field-report-item';
+  id: string;
+  rootFingerprint: string;
+  /** Retained raw/reported holdings, not retroactively inferred from a later speech. */
+  held: HeldFieldObservation[];
+  packets: {
+    messageId: string;
+    transport: NetworkThread['transport'];
+    transportAt: number | null;
+    plannedRoute: string[] | null;
+    stages: ReportItemStage[];
+  }[];
+}
+
+/**
+ * One original observation can travel in several reports and change at each hop.
+ * Packet/held deliveredAt is transport bookkeeping; only actual spoken copies and
+ * audiences show whether an item was said or heard. A delivered empty envelope
+ * does not turn its omitted contents into knowledge.
+ */
+export function fieldReportThreads(world: WorldState, messages = networkThreads(world)): FieldReportThread[] {
+  const threads = new Map<string, FieldReportThread>();
+  const rootsByMessage = new Map<string, Set<string>>();
+  const get = (root: string): FieldReportThread => {
+    const row: FieldReportThread = threads.get(root) ?? { kind: 'field-report-item', id: 'report:' + root,
+      rootFingerprint: root, held: [], packets: [] };
+    threads.set(root, row); return row;
+  };
+  const link = (root: string, messageId: string): void => {
+    get(root);
+    const roots = rootsByMessage.get(messageId) ?? new Set<string>();
+    roots.add(root); rootsByMessage.set(messageId, roots);
+  };
+  const held = world.network.directiveState?.heldObservations ?? [];
+  for (const row of held) {
+    get(row.rootFingerprint).held.push(cloneSerializable(row));
+    if (row.queuedIn !== null) link(row.rootFingerprint, row.queuedIn);
+  }
+  for (const packet of world.network.directiveState?.messages ?? []) {
+    if (packet.payload.kind !== 'field-report') continue;
+    for (const id of packet.payload.sourceObservationIds) {
+      const row = held.find((candidate) => candidate.id === id);
+      if (row) link(row.rootFingerprint, packet.id);
+    }
+    for (const item of packet.payload.renderedItems ?? []) link(item.rootFingerprint, packet.id);
+  }
+  for (const message of messages) for (const stage of message.stages) {
+    for (const root of stage.reportRoots ?? []) link(root, message.messageId);
+  }
+  for (const message of messages) for (const root of rootsByMessage.get(message.messageId) ?? []) {
+    const stages: ReportItemStage[] = [];
+    let previous: ReportItem | null = null;
+    for (const stage of message.stages) {
+      if (stage.copy.kind !== 'field-report') { previous = null; continue; }
+      const position = stage.reportRoots?.indexOf(root) ?? -1;
+      const status = stage.reportRoots === null ? 'unknown' : position < 0 ? 'omitted' : 'spoken';
+      const item = status === 'spoken' ? cloneSerializable(stage.copy.items[position]!) : null;
+      stages.push({ chronicleIndex: stage.chronicleIndex, tick: stage.tick, speaker: stage.speaker,
+        addressedTo: stage.addressedTo, heardBy: cloneSerializable(stage.heardBy), status, item,
+        changes: previous !== null && item !== null ? reportValueChanges(previous, item) : null });
+      previous = item;
+    }
+    get(root).packets.push({ messageId: message.messageId, transport: message.transport,
+      transportAt: message.transportAt, plannedRoute: cloneSerializable(message.plannedRoute), stages });
+  }
+  // Retain a known association whose legacy packet and speech history are both missing.
+  const retainedMessages = new Set(messages.map((message) => message.messageId));
+  for (const [messageId, roots] of rootsByMessage) {
+    if (retainedMessages.has(messageId)) continue;
+    for (const root of roots) get(root).packets.push({ messageId, transport: 'unrecorded',
+      transportAt: null, plannedRoute: null, stages: [] });
+  }
+  for (const row of threads.values()) {
+    row.held.sort((a, b) => a.observedAt - b.observedAt || a.id.localeCompare(b.id));
+    row.packets.sort((a, b) => a.messageId.localeCompare(b.messageId));
+  }
+  return [...threads.values()].sort((a, b) => a.rootFingerprint.localeCompare(b.rootFingerprint));
+}
+```
+
+## Field report item tests
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { STANDARD_RULES as RULES } from '../../src/content/rules';
+import { fieldReportThreads } from '../../src/sim/debrief/reports';
+import { holdFieldObservation, ingestObservedFieldReport, queueUnqueuedFieldReports } from '../../src/sim/directives/field-reports';
+import { realizeNetworkForward } from '../../src/sim/directives/transport';
+import { hashWorld } from '../../src/sim/hash';
+import type { NetworkSpeechRecord, WorldState } from '../../src/sim/types';
+import { runUntil } from '../../src/sim/step';
+import { buildWorld, enrollPlayer } from '../../src/sim/world';
+import { miniTown } from '../sim/helpers/minitown';
+
+function fixture() {
+  const town = miniTown();
+  town.npcs = town.npcs.filter((npc) => ['ada', 'bez'].includes(npc.id));
+  for (const npc of town.npcs) { npc.traits = ['literalist']; npc.edges = []; }
+  const world = buildWorld(town, 'report-item-debrief', RULES);
+  enrollPlayer(world, { home: 'square' }); world.playerVenue = 'backroom';
+  world.enemy.observers = [];
+  return world;
+}
+function hold(world: WorldState, observer = 'ada', actor = 'bez', tick = 0) {
+  const id = holdFieldObservation(world, 'player', observer, { kind: 'raw', observation: {
+    kind: 'presence', tick, venue: 'square', actor,
+  } }, null, ['you'], null, []);
+  return world.network.directiveState!.heldObservations.find((row) => row.id === id)!;
+}
+function speech(messageId: string, tick: number, roots: string[] | null, actors?: string[]): NetworkSpeechRecord {
+  return { kind: 'network-speech', tick, venue: 'square', speaker: 'ada', addressedTo: 'bez',
+    heardBy: [{ id: 'bez', addressed: true }, { id: 'you', addressed: false }],
+    messageId, spoken: { kind: 'field-report', onwardTo: null,
+      items: (actors ?? roots ?? ['unknown']).map((actor) => ({ observation: {
+        kind: 'presence', observedAt: 3, venue: 'square', actor,
+      }, factRefs: [] })) }, cause: null, ...(roots === null ? {} : { reportRoots: [...roots] }) };
+}
+
+describe('terminal field report items retain source, copies and omissions separately', () => {
+  it('returns no invented observations and preserves an untouched world', () => {
+    const world = fixture(); const before = hashWorld(world);
+    expect(fieldReportThreads(world)).toEqual([]);
+    expect(hashWorld(world)).toBe(before);
+    expect(world.network.directiveState).toBeUndefined();
+  });
+
+  it('retains an unqueued raw observation without inventing a spoken copy or receipt', () => {
+    const world = fixture(); const held = hold(world);
+    expect(fieldReportThreads(world)).toEqual([{ kind: 'field-report-item',
+      id: 'report:' + held.rootFingerprint, rootFingerprint: held.rootFingerprint,
+      held: [held], packets: [] }]);
+  });
+
+  it('retains a queued packet without inventing its planned transmission', () => {
+    const world = fixture(); const held = hold(world); queueUnqueuedFieldReports(world);
+    const thread = fieldReportThreads(world)[0]!;
+    expect(thread.packets).toEqual([{ messageId: held.queuedIn, transport: 'in-transit',
+      transportAt: null, plannedRoute: ['you'], stages: [] }]);
+  });
+
+  it('the first recorded empty copy omits its known queued source', () => {
+    const world = fixture(); const held = hold(world); queueUnqueuedFieldReports(world);
+    world.chronicle.push(speech(held.queuedIn!, 15, []));
+    expect(fieldReportThreads(world)[0]!.packets[0]!.stages).toMatchObject([
+      { status: 'omitted', item: null, changes: null, tick: 15 },
+    ]);
+  });
+
+  it('compares by root through reindexing without attributing another item to this observation', () => {
+    const world = fixture();
+    world.chronicle.push(speech('m0', 15, ['r0', 'r1'], ['ada', 'bez']),
+      speech('m0', 30, ['r1'], ['cyn']));
+    const threads = fieldReportThreads(world);
+    expect(threads[0]!.packets[0]!.stages[1]).toMatchObject({ status: 'omitted', item: null, changes: null });
+    expect(threads[1]!.packets[0]!.stages[1]).toMatchObject({ status: 'spoken',
+      item: { observation: { actor: 'cyn' } }, changes: [
+        { path: '/observation/actor', beforePresent: true, afterPresent: true, before: 'bez', after: 'cyn' },
+      ] });
+  });
+
+  it.each(['legacy', 'omitted', 'wrong-count', 'duplicate', 'other-kind'] as const)(
+    'a %s middle copy breaks same-root comparison', (kind) => {
+      const world = fixture();
+      const middle = speech('m0', 30, kind === 'legacy' ? null : kind === 'omitted' ? [] : ['r0']);
+      if (kind === 'wrong-count') middle.reportRoots = ['r0', 'r1'];
+      if (kind === 'duplicate') {
+        middle.spoken = speech('m0', 30, ['r0', 'r0']).spoken;
+        middle.reportRoots = ['r0', 'r0'];
+      }
+      if (kind === 'other-kind') middle.spoken = {
+        kind: 'invitation-response', invitationId: 'i0', response: 'accept', onwardTo: null,
+      };
+      world.chronicle.push(speech('m0', 15, ['r0'], ['ada']), middle, speech('m0', 45, ['r0'], ['bez']));
+      const stages = fieldReportThreads(world).find((row) => row.rootFingerprint === 'r0')!.packets[0]!.stages;
+      expect(stages.at(-1)).toMatchObject({ tick: 45, status: 'spoken', changes: null });
+      if (kind !== 'other-kind') expect(stages[1]!.status).toBe(kind === 'omitted' ? 'omitted' : 'unknown');
+    });
+
+  it('keeps a spoken root without a retained held observation or packet', () => {
+    const world = fixture(); world.chronicle.push(speech('missing-packet', 15, ['orphan']));
+    expect(fieldReportThreads(world)[0]).toMatchObject({ rootFingerprint: 'orphan', held: [],
+      packets: [{ messageId: 'missing-packet', transport: 'unrecorded', plannedRoute: null,
+        stages: [{ chronicleIndex: 0, status: 'spoken', heardBy: [
+          { id: 'bez', addressed: true }, { id: 'you', addressed: false },
+        ] }] }] });
+  });
+
+  it('one root keeps distinct observers and separate report routes without merging equal copies', () => {
+    const world = fixture(); const first = hold(world);
+    const id = holdFieldObservation(world, 'player', 'bez', { kind: 'reported', observation: {
+      kind: 'presence', observedAt: 0, venue: 'square', actor: 'bez',
+    } }, first.rootFingerprint, ['you'], null, []);
+    const second = world.network.directiveState!.heldObservations.find((row) => row.id === id)!;
+    expect(first.rootFingerprint).toBe(second.rootFingerprint);
+    queueUnqueuedFieldReports(world);
+    expect(first.queuedIn).not.toBe(second.queuedIn);
+    world.chronicle.push(speech(first.queuedIn!, 15, [first.rootFingerprint]),
+      speech(second.queuedIn!, 30, [second.rootFingerprint]));
+    const rows = fieldReportThreads(world);
+    expect(rows).toHaveLength(1); expect(rows[0]!.held).toHaveLength(2);
+    expect(rows[0]!.packets).toHaveLength(2);
+    expect(rows[0]!.packets.map((row) => row.stages[0]!.changes)).toEqual([null, null]);
+  });
+
+  it('identical raw facts from different original observers remain different roots', () => {
+    const world = fixture(); const first = hold(world); const second = hold(world, 'bez');
+    expect(first.rootFingerprint).not.toBe(second.rootFingerprint);
+    expect(fieldReportThreads(world)).toHaveLength(2);
+  });
+
+  it('preserves a missing queued packet association as unknown history', () => {
+    const world = fixture(); const held = hold(world); held.queuedIn = 'missing';
+    expect(fieldReportThreads(world)[0]!.packets).toEqual([{ messageId: 'missing',
+      transport: 'unrecorded', transportAt: null, plannedRoute: null, stages: [] }]);
+  });
+
+  it('returns independent nested holdings, report items, audience and change values', () => {
+    const world = fixture(); const held = hold(world); queueUnqueuedFieldReports(world);
+    const root = held.rootFingerprint;
+    const first = speech(held.queuedIn!, 15, [root]);
+    const second = speech(held.queuedIn!, 30, [root]);
+    if (second.spoken.kind === 'field-report') second.spoken.items[0]!.factRefs.push({ asset: 'ada', factIndex: 0 });
+    world.chronicle.push(first, second); const before = hashWorld(world);
+    const thread = fieldReportThreads(world)[0]!;
+    thread.held[0]!.route.push('elsewhere');
+    const stages = thread.packets[0]!.stages;
+    stages[0]!.heardBy[0]!.id = 'changed';
+    stages[0]!.item!.observation.venue = 'elsewhere';
+    (stages[1]!.changes![0]!.after as { asset: string; factIndex: number }[])[0]!.asset = 'changed';
+    expect(stages[1]!.item!.factRefs).toEqual([{ asset: 'ada', factIndex: 0 }]);
+    expect(hashWorld(world)).toBe(before);
+  });
+
+  it('a real turned courier delivers an empty envelope and closes holdings without delivering their information', () => {
+    const world = fixture();
+    world.network.assets.push({ id: 'ada', mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [], turned: true });
+    const held = hold(world); queueUnqueuedFieldReports(world);
+    const packet = world.network.directiveState!.messages[0]!;
+    const heard = realizeNetworkForward(world, packet.id,
+      { venue: 'backroom', members: ['ada', 'you'] }, 15, RULES)!;
+    expect(heard.spoken).toMatchObject({ kind: 'field-report', items: [] });
+    ingestObservedFieldReport(world, 'player', heard);
+    expect(world.intel.log).toEqual([]);
+    expect(held.deliveredAt).toBe(15);
+    // Direct transport invocation bypasses the phase's chronicle append; preserve its actual returned speech.
+    world.chronicle.push({ kind: 'network-speech', tick: heard.tick, venue: heard.venue,
+      speaker: heard.speaker, addressedTo: heard.addressedTo,
+      heardBy: [{ id: 'you', addressed: true }], messageId: heard.messageId,
+      spoken: heard.spoken, cause: null, reportRoots: [] });
+    expect(fieldReportThreads(world)[0]).toMatchObject({ held: [{ deliveredAt: 15 }], packets: [
+      { transport: 'delivered', transportAt: 15, stages: [{ status: 'omitted', item: null }] },
+    ] });
+  });
+
+  it('reads both actual transport hops and the unchanged item after real phase recording', () => {
+    const world = fixture();
+    world.npcs.bez!.schedule = [
+      { days: 'all', from: 0, to: 30, venue: 'square' },
+      { days: 'all', from: 30, to: 1439, venue: 'backroom' },
+    ];
+    const held = hold(world); held.route = ['bez', 'you']; queueUnqueuedFieldReports(world);
+    world.tick = 15; runUntil(world, 31, RULES);
+    const packet = fieldReportThreads(world).find((row) => row.rootFingerprint === held.rootFingerprint)!.packets[0]!;
+    expect(packet.transport).toBe('delivered');
+    expect(packet.stages.map((row) => [row.tick, row.status, row.changes])).toEqual([
+      [15, 'spoken', null], [30, 'spoken', []],
+    ]);
+    expect(packet.stages[1]!.heardBy).toContainEqual({ id: 'you', addressed: true });
   });
 });
 ```

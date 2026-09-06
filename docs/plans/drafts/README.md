@@ -8,7 +8,8 @@ approved gameplay. The real Task 2/3 predecessor commits must still be reconcile
 - [Task 3 corrected scrying draft](2026-09-05-task-3-scrying-recovered.md) and
   [completed author report](2026-09-05-task-3-author-report-recovered.md): all 79
   authored cases present; root verified the count and complete-block syntax.
-  Focused independent re-review remains pending. Draft SHA-256:
+  Independent re-review approved base reconciliation; apply the
+  [required 3C2 amendment](2026-09-05-task-3-base-reconciliation.md). Draft SHA-256:
   `EBACFF982443BA604006D33CE62F5AD9AA11D95FE08E4C3DA70DB523A91176ED`.
 - [Task 4 completed sÃ©ance draft](2026-09-05-task-4-seance-complete.md) and
   [completed author report](2026-09-05-task-4-author-report-complete.md): review
@@ -55,12 +56,21 @@ approved gameplay. The real Task 2/3 predecessor commits must still be reconcile
   19 additions,239 affected passing cases, twelve full-world pairs equal after
   stripping only new outcome history (81 rows). Probes use common virtual R16/R17.
 - [Partial Task5B model evidence](../../review/2026-09-05-debrief-model-preflight.md):
-  six partial modules with62 native cases, both compiler configurations and lint clean;
+  eight partial modules with96 native cases, both compiler configurations and lint clean;
   [exact partial fragments](2026-09-05-task-5b-fragments.md). Complete models remain unfinished.
 
-All are proposals, not independently approved or implemented. Full production
+All remain unimplemented proposals. R16/R17 now have independent plan approval
+and [binding execution notes](2026-09-05-watch-execution-amendment.md); their
+separate implemented-code approvals and full gates remain required. Full production
 gates must assess the behavioral watch repairs; the recording change is separately
 required to preserve every pre-existing field. No source/test path was edited.
+
+## Latest independent review results
+
+[Recovery record](../../review/2026-09-05-independent-review-recovery.md):
+scrying and watch plan reviews completed; R15/forensics and séance reviews
+stopped at the next Claude quota without verdicts. Explicit transmission
+authorization persists. Next reported reset:6 September00:00 CDT /05:00 UTC.
 
 ## Historical restart snapshots
 
