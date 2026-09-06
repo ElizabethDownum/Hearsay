@@ -1,4 +1,8 @@
-# Current review — 5 September 2026
+# Current review — 6 September 2026
+
+**Hearsay is stopped at Ellie's explicit handoff request.** Task4A is committed;
+Task4B is paused after preflight with no source/test changes. No worker or
+automatic continuation is active. [Current handoff](handoff.md).
 
 Ellie's current instructions: audit the existing plan before continuing implementation; keep every change inside the Hearsay project folder; take the recommended behavior and hold questions/issues in this HTML document for later review.
 
@@ -15,7 +19,7 @@ The shared auditor preserves the original assertions; existing panels distinguis
 magic from human channels. [Validation report](review/2026-09-05-scrying-implementation-validation.md).
 Independent accumulated [code review](review/2026-09-05-scrying-code-approval.md)
 is Approved with zero findings, allsixgates/comparison independently passed.
-Task3 is closed; Task4A is next. The approval covers engine/session and rendered
+Task 3 is closed. Task 4A is committed at 336b51b (59 focused tests and both typechecks pass independently); the priced local ritual in Task 4B is paused before implementation. Full Task 4 verification and code review remain at 4D. The approval covers engine/session and rendered
 panel behavior; a purchase composer, manual layout audit and many-seed magic balance
 remain outside this stage.
 Séance's conditional plan amendment is saved. The corrected 78-case prose proposal
@@ -23,8 +27,7 @@ has fresh independent approval. Recording review's séance-family correction is
 adopted under R23. Task5A2 private outcome recording has independent proposal
 approval with zero findings: 239 affected cases and twelve complete-world pairs
 pass ([review](review/2026-09-05-outcome-history-plan-approval.md)). It remains
-unimplemented. The ninth partial debrief module, ordinary feature linkage, now
-now has an independently approved147-case correction (96 earlier,48 feature and3 receipt-boundary cases), zerofindings. R25 retains the provisional local decision and native approval evidence. The following recovery
+unimplemented. The ninth partial debrief module, ordinary feature linkage, now has an independently approved147-case correction (96 earlier,48 feature and3 receipt-boundary cases), zerofindings. R25 retains the provisional local decision and native approval evidence. The following recovery
 paragraphs are historical checkpoints.
 
 Status at session start: Plan 9 Task 1, fix wave two. HEAD 49cc3e7 contains the first five fixes and G1. Two unfinished G2 test edits were preserved in a project-local recovery snapshot. The inherited working tree passes 1,710 tests in 113 files, lint, both typechecks and the production build. The JavaScript bundle remains 489.63 kB (145.02 kB gzip). Remaining fixes and independent review are in progress. This is a recovery baseline, not Task 1 completion.
@@ -199,7 +202,9 @@ probe fails. Task 2 closure is withheld while the bounded correction is prepared
 - **Recommended classification:** durable procedures for preserving UTF-8 across PowerShell script boundaries, saving each review charge/gate incrementally, and binding proposal verification to exact frozen source maps.
 - **Scope:** the handoff skill normally promotes lessons into shared memory and asks for classifications interactively. Ellie's standing project-only write instruction and HTML question queue take precedence. The three lessons and an immutable session episode are saved under Hearsay, indexed in docs/episodes/README.md; no shared wiki, memory or skill was changed.
 - **Proposed skill improvements:** future orchestration review briefs should require substantive progress after each charge and gate; authoring briefs should distinguish validated snapshots from newer WIP. These proposals are recorded in the local lesson pages and are not silently applied to shared skills.
-- **Status:** handoff complete locally. Work remains stopped for the requested computer restart; this recordkeeping does not authorize an implementation or worker restart.
+- **Latest handoff:** 6 September, stopped at Ellie's explicit request. The latest immutable episode preserves the full checkpoint and former rolling record. No worker restart or shared-memory promotion is authorized by this recordkeeping.
+- **Three current candidates for later classification:** native per-file test-count reconciliation; raw output/exit capture before formatting; exact proposal inputs and actual-predecessor union reconciliation. Recommended classification is durable for all three; the earlier incremental-review lesson remains indexed.
+- **Additional proposed skill improvements:** count generated tests from executed results, prepare native capture before the first gate, and identify every virtual prerequisite separately from implemented source. [Local lesson index](episodes/README.md).
 
 ### R20 — A relayed document report must cite the speech that arrived
 

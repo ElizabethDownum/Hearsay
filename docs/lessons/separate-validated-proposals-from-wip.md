@@ -4,8 +4,8 @@ description: Bind authoring evidence to exact virtual sources and keep subsequen
 type: procedure
 confidence: confirmed-once
 first-recorded: 2026-09-05
-last-confirmed: 2026-09-05
-sources: [session-2026-09-05-hearsay-debrief-authoring]
+last-confirmed: 2026-09-06
+sources: [session-2026-09-05-hearsay-debrief-authoring, session-2026-09-06-hearsay-close]
 ---
 
 # Keep validated proposals separate from later drafts
@@ -28,3 +28,22 @@ missing tests and checks. Production remains unchanged.
 Recommended scope: durable authoring/verification procedure. Any future author-skill
 update should require evidence to name the exact loaded proposal version. No shared
 skill or memory edit is made under the current project-only scope.
+
+## Later proposal and predecessor evidence
+
+The ordinary feature-link proposal now preserves all 96 earlier cases, 48 feature
+cases and three independent receipt-boundary cases, for 147. Its independent
+approval binds the corrected exact source map. The old 144-case version and its
+failing missing-receipt counterexample remain immutable evidence. See the
+[focused approval](../review/2026-09-05-feature-links-receipt-correction-approval.md).
+
+That host uses explicitly listed future recording/watch overlays over committed
+source. It does not prove integration with the actual Task 3/4 physical evidence
+unions or the complete debrief model. Before implementation, reconcile every
+overlapping field against the actual predecessor; an old speech-only whole-file
+overlay must not erase new physical branches. A source inventory is discovery
+evidence, and a complete code proposal still requires independent review and
+actual-base verification.
+
+Proposed authoring improvement: list each virtual prerequisite and its consumer
+migrations, with exact hashes, separately from implemented predecessor facts.

@@ -1,7 +1,9 @@
 # Plan 9 — current execution plan
 
-Updated: 2026-09-05. Controller: Codex. Current implementation HEAD:
-**60506d9a582db60c60c627d6b42ec83f62ed709e** (scrying 3D).
+Updated: 2026-09-06. Controller: Codex. **Stopped at Ellie's explicit handoff request.**
+No worker/background continuation is active; resume only on a new go-ahead.
+See [the current handoff](../handoff.md). Current implementation HEAD:
+**336b51b1fc77669084cead621d87ef8fd8736f09** (séance 4A).
 
 Task1's R15 correction and Task2 forensics now have independent approval. The
 R20 relay-reference fix at09e5458 closes the sole remaining Important finding.
@@ -24,7 +26,11 @@ comparator controls match. Exact count growth is79 authored plus6 registry cases
 the earlier1870 estimate overcounted3B by two. No tests disappeared. Independent
 accumulated code review is Approved with zero findings; the reviewer independently
 passed the same fullgates/comparison. [Task3 approval](../review/2026-09-05-scrying-code-approval.md).
-Task3 is closed. Task4A historical witness implementation is next. Scrying has independent plan approval
+Task 3 is closed. Task 4A historical witness metadata is committed at 336b51b:
+worker/controller focused 59/4 and both typechecks pass, with four exact new bodies
+and eleven scoped paths verified. Task 4B's priced local ritual is paused after
+preflight: no source/test changes or gates remain. Its brief is saved for actual-HEAD
+reconciliation on resume. Full Task 4 gates and independent review remain at 4D. Scrying has independent plan approval
 with A1; its certified baseline is09e5458 and preserve19 forensics cases/eight
 auditor calls in3C2. Séance's conditional T4-A1/A2 amendment is saved. The corrected
 78-case prose proposal has independent approval for future-base reconciliation.
