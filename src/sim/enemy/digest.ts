@@ -374,13 +374,26 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
 
   // ── Heuristic 10: a spoken document names the hand that passed it ──────────
   // One hop, as reported: no custody lookup, and no inference from silent circulation.
+  // A received field report cites the report speech the enemy actually heard; its inner
+  // utterance copy retains the original answer's tick/claim and cannot lawfully stand in for it.
   // Like H5, retain the first answer for each subject, then dedupe against the whole sketch.
   const documentAnswers = new Map<EntityId, EvidenceEntry>();
   for (const e of state.evidence) {
-    if (e.kind !== 'utterance' || e.mode !== 'answer' || e.document !== true) continue;
-    const hand = e.reported.attribution;
-    if (hand === SOMEONE || hand === e.speaker || documentAnswers.has(hand)) continue;
-    documentAnswers.set(hand, e);
+    if (e.kind === 'network' && e.network.spoken.kind === 'field-report') {
+      for (const item of e.network.spoken.items) {
+        const spoken = item.observation;
+        if (spoken.kind !== 'utterance' || spoken.mode !== 'answer' || spoken.document !== true) continue;
+        const hand = spoken.reported.attribution;
+        if (hand === SOMEONE || hand === spoken.speaker || documentAnswers.has(hand)) continue;
+        documentAnswers.set(hand, e);
+      }
+      continue;
+    }
+    if (e.kind === 'utterance' && e.mode === 'answer' && e.document === true) {
+      const hand = e.reported.attribution;
+      if (hand === SOMEONE || hand === e.speaker || documentAnswers.has(hand)) continue;
+      documentAnswers.set(hand, e);
+    }
   }
   for (const hand of [...documentAnswers.keys()].sort(byId)) {
     if (has((f) => f.kind === 'forged-document' && f.subject === hand)) continue;

@@ -124,9 +124,15 @@ describe('forensics follows the hand named in testimony', () => {
   it('a real interrogation traces a direct hand-over to the avatar with a fair-cop reference', () => {
     const { world, answer } = interrogatedWorld();
     const features = world.enemy.sketch.filter((feature) => feature.kind === 'forged-document');
+    const delivery = world.enemy.evidence.find((entry) => entry.kind === 'network'
+      && entry.network.spoken.kind === 'field-report'
+      && entry.network.spoken.items.some((item) => item.observation.kind === 'utterance'
+        && item.observation.claimId === answer.claimId));
+    if (delivery?.kind !== 'network') throw new Error('missing received document report evidence');
     expect(features).toHaveLength(1);
     expect(features[0]).toMatchObject({ subject: 'you', evidence: [{
-      tick: answer.tick, observer: 'bez', claimId: answer.claimId, messageId: null,
+      tick: delivery.tick, observer: delivery.observer, claimId: null,
+      messageId: delivery.network.messageId,
     }] });
     auditSketch(world);
     const withPaper = exposureStatus(world);
@@ -378,4 +384,133 @@ describe('a letter is learned only through the words actually heard', () => {
       expect(entry.observer).toBe('ada');
     });
   }
+});
+
+function stagedPaperAnswer(spymaster: 'bez' | 'cyn', cynArrivesAt: number | null = null) {
+  const { world } = answerWorld(true);
+  const family = Object.keys(world.beliefs['ada']!)[0]!;
+  world.network.spymaster = spymaster;
+  world.enemy.observers = [];
+  if (cynArrivesAt !== null) {
+    world.npcs['cyn']!.schedule = [
+      { days: 'all', from: 0, to: cynArrivesAt, venue: 'backroom' },
+      { days: 'all', from: cynArrivesAt, to: 1439, venue: 'square' },
+    ];
+  }
+  world.inquiries['bez'] = [{
+    about: { family }, from: 'enemy', expiresDay: 3, asked: [], answersHeard: 0,
+    addressee: 'ada',
+  }];
+  const events = step(world, RULES);
+  const answer = events.utterances.find((entry) => entry.mode === 'answer'
+    && entry.speaker === 'ada' && entry.claim.family === family)!;
+  expect(answer).toMatchObject({ document: true, addressedTo: 'bez' });
+  const telling = world.chronicle.find((entry) => entry.kind === 'telling'
+    && entry.tick === answer.tick && entry.claimId === answer.claim.id);
+  if (telling?.kind !== 'telling') throw new Error('missing normal-phase answer chronicle');
+  expect(telling.heardBy).toContainEqual({ id: 'bez', addressed: true });
+  return { world, events, answer };
+}
+
+function captureRelayedPaper(hops: 1 | 2) {
+  const { world, events } = stagedPaperAnswer('cyn', hops === 1 ? 555 : 570);
+  if (hops === 2) {
+    world.npcs['ada']!.traits = ['name-dropper'];
+    world.npcs['ada']!.rivals = ['cyn'];
+  }
+  const observation = observationsFor('bez', events).observations
+    .find((entry) => entry.kind === 'utterance')!;
+  holdFieldObservation(world, 'enemy', 'bez', { kind: 'raw', observation },
+    null, hops === 1 ? ['cyn'] : ['ada', 'cyn'], null, []);
+  queueUnqueuedFieldReports(world);
+  const message = world.network.directiveState!.messages[0]!;
+  const before = world.enemy.evidence.length;
+  runUntil(world, message.availableAfter, RULES);
+  const firstEvents = step(world, RULES);
+  const first = firstEvents.networkSpeeches?.find((speech) => speech.messageId === message.id);
+  if (!first) throw new Error('missing normal-phase first report hop');
+  let delivered = first;
+  if (hops === 2) {
+    runUntil(world, message.availableAfter, RULES);
+    const secondEvents = step(world, RULES);
+    const second = secondEvents.networkSpeeches?.find((speech) => speech.messageId === message.id);
+    if (!second) throw new Error('missing normal-phase second report hop');
+    delivered = second;
+  }
+  const added = world.enemy.evidence.slice(before);
+  const network = added.find((entry) => entry.kind === 'network'
+    && entry.network.messageId === message.id);
+  if (network?.kind !== 'network') throw new Error('missing captured report evidence');
+  const answer = added.find((entry) => entry.kind === 'utterance'
+    && entry.mode === 'answer' && entry.document === true);
+  if (answer?.kind !== 'utterance') throw new Error('missing received document answer');
+  expect(added.indexOf(network)).toBeLessThan(added.indexOf(answer));
+  const heard = world.chronicle.find((entry) => entry.kind === 'network-speech'
+    && entry.tick === network.tick && entry.messageId === network.network.messageId);
+  if (heard?.kind !== 'network-speech') throw new Error('missing normal-phase report chronicle');
+  expect(heard.heardBy).toContainEqual({ id: network.observer, addressed: true });
+  return { world, delivered, network, answer };
+}
+
+describe('received document forensics cite the report actually heard', () => {
+  it('a one-hop report mints a network ref that resolves to the field-report speech', () => {
+    const { world, network, answer } = captureRelayedPaper(1);
+    expect(answer).toMatchObject({ observer: 'bez', reported: { attribution: 'you' } });
+    const papers = enemyDigest(world.enemy, 1, RULES).features
+      .filter((feature) => feature.kind === 'forged-document');
+    expect(papers).toMatchObject([{ subject: 'you', evidence: [{
+      tick: network.tick, observer: network.observer, claimId: null,
+      messageId: network.network.messageId,
+    }] }]);
+    world.enemy.sketch = papers;
+    auditSketch(world);
+  });
+
+  it('a two-hop report retains its spoken attribution and cites the final report speech', () => {
+    const { world, delivered, network, answer } = captureRelayedPaper(2);
+    expect(delivered).toMatchObject({ speaker: 'ada', addressedTo: 'cyn', spoken: {
+      kind: 'field-report', items: [{ observation: { kind: 'utterance', mode: 'answer',
+        document: true, reported: { attribution: 'cyn' } } }],
+    } });
+    expect(answer.reported.attribution).toBe('cyn');
+    const papers = enemyDigest(world.enemy, 1, RULES).features
+      .filter((feature) => feature.kind === 'forged-document');
+    expect(papers).toMatchObject([{ subject: 'cyn', evidence: [{
+      tick: network.tick, observer: network.observer, claimId: null,
+      messageId: network.network.messageId,
+    }] }]);
+    world.enemy.sketch = papers;
+    auditSketch(world);
+  });
+
+  it('the first direct or received observation keeps its own causal ref', () => {
+    const direct = stagedPaperAnswer('bez');
+    const directEntry = direct.world.enemy.evidence.find((entry) => entry.kind === 'utterance'
+      && entry.claimId === direct.answer.claim.id)!;
+    const directPaper = enemyDigest(direct.world.enemy, 1, RULES).features
+      .find((feature) => feature.kind === 'forged-document' && feature.subject === 'you')!;
+    expect(directPaper.evidence).toEqual([{
+      tick: directEntry.tick, observer: directEntry.observer,
+      claimId: directEntry.claimId, messageId: null,
+    }]);
+    direct.world.enemy.sketch = [directPaper];
+    auditSketch(direct.world);
+
+    for (const directFirst of [true, false]) {
+      const received = captureRelayedPaper(1);
+      const state = cloneSerializable(received.world.enemy);
+      const receivedRows = [received.network, received.answer].map(cloneSerializable);
+      state.evidence = directFirst
+        ? [cloneSerializable(directEntry), ...receivedRows]
+        : [...receivedRows, cloneSerializable(directEntry)];
+      const paper = enemyDigest(state, 1, RULES).features
+        .find((feature) => feature.kind === 'forged-document' && feature.subject === 'you')!;
+      const source = directFirst ? directEntry : received.network;
+      expect(paper.evidence).toEqual([{
+        tick: source.tick, observer: source.observer,
+        claimId: source.kind === 'network' ? null : source.claimId,
+        messageId: source.kind === 'network' ? source.network.messageId : null,
+      }]);
+    }
+  });
 });
