@@ -64,6 +64,7 @@ export const UI_GLYPHS: Record<string, string> = {
   'dead-drop': '⚑',
   salon: '❧',
   'walk-in': '⇥',
+  scrying: '◉',
 };
 
 /** Unicode-glyph fallback for the town-view map tokens (asset-slots.md, map.token.* rows). */

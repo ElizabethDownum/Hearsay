@@ -67,6 +67,9 @@ are player-invisible by pillar law (`networkView` never exposes the flip), so a 
 only ever bait a future epistemic violation. The player-facing walk-in (an enemy asset who flipped to
 you, whose tip is a lawful intel row) is the honest slot. Controller adjudication, Task 11.
 
+Plan 9 Task 3 registers `icon.ui.scrying` as null; primitive fallback `◉`.
+No media is wired. The planned séance and debrief slots remain their own tasks.
+
 ## Rules for future plans & AI sessions
 
 1. **Plan 7 authoring** consumes this doc: it must include (a) the `assets.ts` loader + manifest task

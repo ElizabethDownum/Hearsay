@@ -1,5 +1,6 @@
 import type { BoardView, Cluster, TagNote } from '../../../src/intel/types';
 import { useState } from 'react';
+import { sourceKey, sourceLabel } from '../../../src/intel/provenance';
 import { Term } from './Term';
 import { TagChip } from './TagChip';
 
@@ -21,7 +22,11 @@ export function EvidenceBoard({
   const [selected, setSelected] = useState<string | null>(null);
   const clusters = view.clusters ?? [];
   const cluster = clusters.find((c) => c.family === selected) ?? null;
-  const viasOf = (entryIndexes: number[]) => [...new Set(entryIndexes.map((i) => view.entries[i]!.via))].sort();
+  const viasOf = (entryIndexes: number[]) => [...new Map(entryIndexes.map((i) => {
+    const row = view.entries[i]!;
+    return [sourceKey(row), { key: sourceKey(row), label: sourceLabel(row) }] as const;
+  })).values()].sort((a, b) => a.label < b.label ? -1 : a.label > b.label ? 1
+    : a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
   return (
     <section className="panel">
       <h2><Term id="evidence-board" /> <span className="desk-note">(<Term id="assist-level" /> {view.level}; {view.entries.length} entries)</span></h2>
@@ -33,7 +38,7 @@ export function EvidenceBoard({
                 <button className="desk-btn" onClick={() => setSelected(c.family)}>
                   {c.family} — {c.versions.length} <Term id="version" />(s)
                 </button>
-                {' '}{viasOf(c.entryIndexes).map((v) => <span key={v} className="badge badge-via">{v}</span>)}
+                {' '}{viasOf(c.entryIndexes).map((v) => <span key={v.key} className="badge badge-via">{v.label}</span>)}
                 {view.suggestions?.[c.family]?.length ? <span className="desk-note"> · candidates: {view.suggestions[c.family]!.join(', ')}</span> : ''}
                 <TagChip tags={tags} target={`cluster:${c.family}`} onAdd={(t) => onAddTag(`cluster:${c.family}`, t)} onRemove={onRemoveTag} />
               </li>
@@ -49,7 +54,7 @@ export function EvidenceBoard({
 function RawNotes({ view }: { view: BoardView }) {
   return <ol>{view.entries.map((e, i) => (
     <li key={i}>
-      t{e.tick} {e.kind} @{e.venue} <span className="badge badge-via"><Term id="via" /> {e.via}</span>
+      t{e.tick} {e.kind === 'scene-presence' ? <><Term id="scene-presence" /> {e.actor}</> : e.kind === 'arcane-residue' ? <Term id="arcane-residue" /> : e.kind} @{e.venue} <span className="badge badge-via"><Term id="via" /> {sourceLabel(e)}</span>
       {e.reported ? ` — "${e.reported.subject} ${e.reported.predicate}"` : ''}
     </li>
   ))}</ol>;
@@ -72,7 +77,7 @@ function ClusterDetail({ cluster, view }: { cluster: Cluster; view: BoardView })
         </tbody></table>
       {view.routes?.[cluster.family] && (
         <ol>{view.routes[cluster.family]!.map((h, i) => (
-          <li key={i}>t{h.tick}: {h.speaker} → {h.addressedTo} @{h.venue} <span className="badge badge-via"><Term id="via" /> {h.via}</span></li>))}
+          <li key={i}>t{h.tick}: {h.speaker} → {h.addressedTo} @{h.venue} <span className="badge badge-via"><Term id="via" /> {sourceLabel(h)}</span></li>))}
         </ol>)}
     </div>
   );

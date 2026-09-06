@@ -4,6 +4,7 @@ import type { Rules } from '../sim/rules';
 import type { ReportedClaim } from '../sim/enemy/state';
 import type { CodexHypothesis, IntelEntry } from './entry';
 import { diffReported } from './board';
+import { isMagic } from './provenance';
 
 /** One observed corroboration: the npc was addressed a version, then emitted a differing one. */
 export interface CorroborationHit {
@@ -28,6 +29,10 @@ interface ObservedPair {
   changes: FieldChange[];
 }
 
+function physicalTellingKey(e: IntelEntry): string {
+  return JSON.stringify([e.tick, e.venue, e.speaker, e.addressedTo, e.family, e.claimId, e.mode]);
+}
+
 /**
  * The Obra Dinn trick, mechanically: fold over claimful utterances, and for every telling BY an
  * npc pair it with the LATEST telling ADDRESSED TO that same npc before it in the same family
@@ -41,7 +46,7 @@ function observedPairs(
 ): ObservedPair[] {
   const pairs: ObservedPair[] = [];
   log.forEach((tell, toldIndex) => {
-    if (!isClaimful(tell) || tell.speaker === null) return;
+    if (!isClaimful(tell) || tell.speaker === null || (isMagic(tell) && tell.addressedTo === null)) return;
     const npc = tell.speaker;
     if (npcFilter !== null && npc !== npcFilter) return;
     if (familyFilter !== null && tell.family !== familyFilter) return;
@@ -51,7 +56,8 @@ function observedPairs(
     let before: ReportedClaim | null = null;
     for (let j = toldIndex - 1; j >= 0; j--) {
       const rec = log[j]!;
-      if (isClaimful(rec) && rec.family === tell.family && rec.addressedTo === npc) {
+      if (isClaimful(rec) && rec.family === tell.family && rec.addressedTo === npc
+        && (!isMagic(rec) || rec.speaker !== null)) {
         receivedIndex = j;
         before = rec.reported;
         break;
@@ -63,7 +69,16 @@ function observedPairs(
     if (changes.length === 0) return;   // an empty-diff pair corroborates nothing
     pairs.push({ family: tell.family, npc, receivedIndex, toldIndex, before, changes });
   });
-  return pairs;
+  const magicTellings = new Set(log.filter((e) => isClaimful(e) && isMagic(e)).map(physicalTellingKey));
+  if (magicTellings.size === 0) return pairs;
+  const counted = new Set<string>();
+  return pairs.filter((pair) => {
+    const key = physicalTellingKey(log[pair.toldIndex]!);
+    if (!magicTellings.has(key)) return true;
+    if (counted.has(key)) return false;
+    counted.add(key);
+    return true;
+  });
 }
 
 /**

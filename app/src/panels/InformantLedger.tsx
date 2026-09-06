@@ -18,7 +18,7 @@ export function InformantLedger({ ledger, onSelectFamily }: { ledger: LedgerView
           <tbody>
             {ledger.rows.map((r) => (
               <tr key={r.entryIndex}>
-                <td>{r.tick}</td><td>{r.kind}</td>
+                <td>{r.tick}</td><td>{r.kind === 'arcane-residue' ? <Term id="arcane-residue" /> : r.kind}</td>
                 <td>{r.family ? <button className="desk-btn" onClick={() => onSelectFamily(r.family!)}>{r.family}</button> : '—'}</td>
                 <td>{r.summary}</td>
               </tr>

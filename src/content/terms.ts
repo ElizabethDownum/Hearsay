@@ -72,6 +72,8 @@ export const TERMS: Record<string, TermDef> = {
   'verb-scry': { id: 'verb-scry', label: 'Scry', short: 'Buy a remote scene tomorrow: up to an hour, in 15-minute steps. Costs 15 coin and leaves physical residue.', entry: null },
   'scrying': { id: 'scrying', label: 'Scrying', short: 'A view of one venue as events happen. It shows words faithfully; the words themselves may be false.', entry: null },
   'magic': { id: 'magic', label: 'Magic', short: 'Observation through a ritual. It supplies no independent informant channel.', entry: null },
+  'scene-presence': { id: 'scene-presence', label: 'Seen in the scene', short: 'A person visible at a known venue and time. Presence alone does not say they serve the watch.', entry: null },
+  'arcane-residue': { id: 'arcane-residue', label: 'Arcane residue', short: 'A physical trace where scrying begins. Local witnesses may report it; it does not name the caster.', entry: null },
   // ── the network economy: your standing, your payroll, your reach (Plan 8) ──
   'station':         { id: 'station', label: 'Station', short: 'The seat the seed deals your avatar — noble or lowlife. Fixed for the campaign; it sets your standing in town.', entry: null },
   'standing':        { id: 'standing', label: 'Standing', short: 'What your station lets you do: which venue doors open without suspicion, and the one room you may host in.', entry: null },

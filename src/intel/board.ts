@@ -70,9 +70,10 @@ export function versionDiffs(cluster: Cluster): VersionDiff[] {
 export function routeOf(log: readonly IntelEntry[], family: RumorId): RouteHop[] {
   const hops: RouteHop[] = [];
   log.forEach((e) => {
-    if (!isClaimful(e) || e.family !== family) return;
+    if (!isClaimful(e) || e.family !== family || e.speaker === null || e.addressedTo === null) return;
     hops.push({
-      tick: e.tick, venue: e.venue, speaker: e.speaker!, addressedTo: e.addressedTo!, via: e.via,
+      tick: e.tick, venue: e.venue, speaker: e.speaker, addressedTo: e.addressedTo, via: e.via,
+      ...(e.provenance === undefined ? {} : { provenance: { ...e.provenance } }),
     });
   });
   // Stable tick sort: equal-tick hops keep log order (self is captured before informants).

@@ -29,6 +29,7 @@ export function WebViewPanel({ web, onSelectNpc }: { web: WebView; onSelectNpc(i
         )
         : <p><Term id="subject" />: <b>{s.id}</b></p>}
       <Hub web={web} onSelectNpc={onSelectNpc} />
+      {web.magicEntryIndexes && <p className="desk-note"><Term id="magic" />: {web.magicEntryIndexes.length} observation(s)</p>}
       <p className="desk-note">
         {web.families.length} <Term id="family" />(s) · {web.spokes.length} carrier(s)
         {s.kind === 'objective' ? ` · ${web.principalsTouched.length}/${principals.length} principals touched` : ''}

@@ -2,6 +2,7 @@ import type { EntityId, RumorId } from '../sim/rumors/claim';
 import type { ReportedClaim } from '../sim/enemy/state';
 import { stableStringify } from '../sim/hash';
 import type { IntelEntry } from './entry';
+import { isMagic } from './provenance';
 
 /** The subject a web is drawn around: one npc's profile, or the succession objective's principals. */
 export type WebSubject =
@@ -21,6 +22,7 @@ export interface WebView {
   /** Families whose reported.subject is the subject (or any principal, for objectives). */
   families: { family: RumorId; versions: number; entryIndexes: number[] }[];
   spokes: WebSpoke[];               // sorted by carrier id — zero entropy
+  magicEntryIndexes?: number[];
   /** For objectives: how close you are — principals with ANY damaging family known to you. */
   principalsTouched: EntityId[];
 }
@@ -74,7 +76,7 @@ export function webView(
   interface SpokeBucket { via: IntelEntry['via']; families: Set<RumorId>; entryIndexes: number[] }
   const byCarrier = new Map<EntityId, SpokeBucket>();
   log.forEach((e, i) => {
-    if (!isClaimful(e) || !matchedFamilies.has(e.family)) return;
+    if (!isClaimful(e) || !matchedFamilies.has(e.family) || isMagic(e)) return;
     const carrier = e.via === 'self' ? (e.speaker ?? 'self') : e.via;
     let sb = byCarrier.get(carrier);
     if (!sb) {
@@ -100,5 +102,9 @@ export function webView(
     principalsTouched = [...touched].sort(byId);
   }
 
-  return { subject, families, spokes, principalsTouched };
+  const magicEntryIndexes = log.flatMap((e, i) => isClaimful(e) && matchedFamilies.has(e.family) && isMagic(e) ? [i] : []);
+  return {
+    subject, families, spokes, principalsTouched,
+    ...(magicEntryIndexes.length === 0 ? {} : { magicEntryIndexes }),
+  };
 }

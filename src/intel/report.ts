@@ -6,6 +6,7 @@ export interface EveningReport {
   day: number;
   newFamilies: RumorId[];                 // first-heard-today stories
   entriesByVia: Record<string, number[]>; // via → entry indexes captured today
+  magicBySpell?: Record<string, number[]>;
   authoritySightings: number[];           // authority askings + watch-presence entries today
 }
 
@@ -34,17 +35,25 @@ export function eveningReport(log: readonly IntelEntry[], day: number): EveningR
     .sort(byId);
 
   const entriesByViaMap = new Map<string, number[]>();
+  const magicBySpell = new Map<string, number[]>();
   const authoritySightings: number[] = [];
   log.forEach((e, i) => {
     if (dayOf(e.tick) !== day) return;
-    const bucket = entriesByViaMap.get(e.via);
+    const target = e.provenance === undefined ? entriesByViaMap : magicBySpell;
+    const key = e.provenance === undefined ? e.via : e.provenance.spell;
+    const bucket = target.get(key);
     if (bucket) bucket.push(i);
-    else entriesByViaMap.set(e.via, [i]);
+    else target.set(key, [i]);
     if ((e.kind === 'asking' && e.authority) || e.kind === 'presence') authoritySightings.push(i);
   });
   const entriesByVia: Record<string, number[]> = Object.fromEntries(
     [...entriesByViaMap.entries()].sort(([a], [b]) => byId(a, b)),
   );
 
-  return { day, newFamilies, entriesByVia, authoritySightings };
+  return {
+    day, newFamilies, entriesByVia, authoritySightings,
+    ...(magicBySpell.size === 0 ? {} : { magicBySpell: Object.fromEntries(
+      [...magicBySpell.entries()].sort(([a], [b]) => byId(a, b)),
+    ) }),
+  };
 }

@@ -25,6 +25,9 @@ export function EveningReport({ report, onOpenBoard }: { report: EveningReportVi
           <li key={via}><span className="badge badge-via">{via}</span> {ix.length} report(s)</li>
         ))}</ul>
       )}
+      {report.magicBySpell && <ul>{Object.entries(report.magicBySpell).map(([spell, indexes]) => (
+        <li key={spell}><span className="badge badge-via"><Term id="magic" /> · {spell}</span> {indexes.length} observation(s)</li>
+      ))}</ul>}
 
       <h3><Term id="authority" /> sightings</h3>
       {report.authoritySightings.length === 0

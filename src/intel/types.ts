@@ -23,6 +23,7 @@ export interface VersionDiff { fromVersion: number; toVersion: number; changes: 
 /** One observed hop of a rumor: where it was heard, who said it, through which channel. */
 export interface RouteHop {
   tick: Tick; venue: VenueId; speaker: EntityId; addressedTo: EntityId; via: IntelEntry['via'];
+  provenance?: IntelEntry['provenance'];
 }
 
 /**

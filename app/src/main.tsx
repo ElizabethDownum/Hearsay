@@ -19,6 +19,7 @@ import { corroborations } from '../../src/intel/codex';
 import { webView, type WebSubject } from '../../src/intel/web';
 import { informantLedger } from '../../src/intel/ledger';
 import { eveningReport } from '../../src/intel/report';
+import { sourceLabel, singleInformantChannel, isMagic } from '../../src/intel/provenance';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { dayOf, minuteOfDay } from '../../src/core/time';
 import type { AssistLevel, IntelEntry } from '../../src/intel/types';
@@ -73,14 +74,15 @@ function damagingFamilies(log: readonly IntelEntry[], rules: Rules): Set<string>
 function codexDetailView(log: readonly IntelEntry[], codex: { npc: string; trait: string }[], rules: Rules): CodexDetailRow[] {
   return codex.map((h) => {
     const hits = corroborations(log, h.npc, h.trait, rules);
+    const rows = hits.flatMap((hit) => [log[hit.receivedIndex]!, log[hit.toldIndex]!]);
     const pairs = hits.map((hit) => ({
-      family: hit.family, viaFrom: log[hit.receivedIndex]!.via, viaTo: log[hit.toldIndex]!.via,
+      family: hit.family,
+      viaFrom: sourceLabel(log[hit.receivedIndex]!), viaTo: sourceLabel(log[hit.toldIndex]!),
       changeCount: hit.changes.length,
     }));
-    const vias = new Set(pairs.flatMap((p) => [p.viaFrom, p.viaTo]));
-    const sole = vias.size === 1 ? [...vias][0]! : null;
-    const singleChannelVia = pairs.length > 0 && sole && sole !== 'self' && sole !== 'dossier' ? sole : null;
-    return { npc: h.npc, trait: h.trait, hits: pairs.length, locked: pairs.length >= 3, pairs, singleChannelVia };
+    const singleChannelVia = singleInformantChannel(rows);
+    return { npc: h.npc, trait: h.trait, hits: pairs.length, locked: pairs.length >= 3,
+      pairs, singleChannelVia, ...(rows.some(isMagic) ? { hasMagic: true as const } : {}) };
   });
 }
 
