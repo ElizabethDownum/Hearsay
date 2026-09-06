@@ -14,6 +14,7 @@ import { ENEMY_ASSET_COUNT } from './gen';
 import type { EntityId } from '../sim/rumors/claim';
 import type { TownFixture } from '../sim/types';
 import type { GenConfig, GeneratedTown, InvariantFailure, ValidateOptions, ValidationReport } from './types';
+import { departedProblems } from './departed';
 
 const WEEKDAY_SAMPLE_DAY = 0; // dayOfWeek 0 — a work day
 const RESTDAY_SAMPLE_DAY = 6; // REST_DAY
@@ -263,6 +264,8 @@ export function validateTown(town: GeneratedTown, config: GenConfig, opts: Valid
       if (informantIds.has(id)) fail('enemy-net-sane', `${role} '${id}' is a dossier informant`);
     }
   }
+
+  for (const detail of departedProblems(town)) fail('departed-sane', detail);
 
   // Graph invariants only mean something on a structurally sound town.
   if (failures.length > 0) return { ok: false, failures };

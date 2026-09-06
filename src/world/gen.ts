@@ -4,6 +4,7 @@ import type { Npc, ScheduleEntry, Venue } from '../sim/types';
 import type { ObserverSpec } from '../sim/enemy/state';
 import type { DistrictInfo, Dossier, GenConfig, GenContent, GeneratedTown, OccupationDef, Secret } from './types';
 import type { ScenarioCast } from '../sim/scenario/types';
+import { generateDeparted } from './departed';
 
 /** Round to 2 decimals — keeps generated trust values readable and JSON-stable. */
 const r2 = (n: number): number => Math.round(n * 100) / 100;
@@ -437,5 +438,8 @@ export function generateTown(seed: string, config: GenConfig, content: GenConten
     npcIds: cast.filter((m) => m.district === d).map((m) => m.npc.id),
   }));
 
-  return { fixture: { venues, npcs: cast.map((m) => m.npc) }, districts, keystones, guards, secrets, dossier, cast: scenarioCast, stationDeal, enemyNet };
+  // Independent historical record after all existing streams and scenario retargeting.
+  const departed = generateDeparted(seed, { venues, npcs: cast.map((m) => m.npc) }, secrets, content.names);
+
+  return { fixture: { venues, npcs: cast.map((m) => m.npc) }, districts, keystones, guards, secrets, dossier, cast: scenarioCast, stationDeal, enemyNet, departed };
 }

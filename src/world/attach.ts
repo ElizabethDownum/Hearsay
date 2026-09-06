@@ -4,6 +4,7 @@ import { buildTownMap, buildWorld, enrollPlayer } from '../sim/world';
 import type { Rules } from '../sim/rules';
 import type { WorldState } from '../sim/types';
 import type { GeneratedTown } from './types';
+import { departedProblems } from './departed';
 
 /** His civilian assets sense the town at a flat vigilance v1 (spec: "vigilance 0.5 flat v1"). */
 const ENEMY_ASSET_VIGILANCE = 0.5;
@@ -16,6 +17,8 @@ const ENEMY_ASSET_VIGILANCE = 0.5;
  * hand-built fixture tests that don't care about the economy.
  */
 export function worldFromTown(town: GeneratedTown, seed: string, rules?: Rules): WorldState {
+  const problems = departedProblems(town);
+  if (problems.length > 0) throw new Error('worldFromTown: departed-sane: ' + problems.join('; '));
   const world = buildWorld(town.fixture, seed, rules);
   world.enemy.observers = town.guards.map((g) => ({ ...g }));
   world.enemy.map = buildTownMap(town.fixture);
@@ -48,6 +51,13 @@ export function worldFromTown(town: GeneratedTown, seed: string, rules?: Rules):
       attribution: SOMEONE,
     });
     world.claims[claim.id] = claim;
+    const departed = town.departed;
+    if (departed && departed.secretId === secret.id) {
+      world.departed = {
+        id: departed.id, name: departed.name, secretId: departed.secretId,
+        claimId: claim.id, reported: { ...departed.reported }, edge: { ...departed.edge },
+      };
+    }
     for (const witness of secret.witnesses) {
       world.beliefs[witness]![secret.id] = {
         claim, credence: 0.95, heardFrom: 'witnessed', heardAt: 0, firstHeardAt: 0,

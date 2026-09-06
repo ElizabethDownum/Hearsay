@@ -2,6 +2,7 @@ import type { EntityId, VenueId } from '../sim/rumors/claim';
 import type { Npc, TownFixture, Venue } from '../sim/types';
 import type { ObserverSpec } from '../sim/enemy/state';
 import type { ScenarioCast } from '../sim/scenario/types';
+import type { DepartedWitness } from '../sim/magic-types';
 
 /** Everything the generator is allowed to randomize, per town. */
 export interface GenConfig {
@@ -109,7 +110,7 @@ export interface DistrictInfo {
   npcIds: EntityId[];
 }
 
-/** Generator output: the sim-facing fixture plus procgen metadata the sim never reads. */
+/** Generator output: fixture plus metadata selectively copied into runtime by worldFromTown. */
 export interface GeneratedTown {
   fixture: TownFixture;
   districts: DistrictInfo[];
@@ -141,6 +142,9 @@ export interface GeneratedTown {
    * serve rerolls). Hand-built / fixture towns OMIT it (`undefined`), and `enemy-net-sane` skips them.
    */
   enemyNet?: { spymaster: EntityId; assets: EntityId[] } | null;
+  /** Historical data, never a living Secret.witnesses member. Generator sets value/null;
+   * null fails departed-sane and rerolls. Hand-built towns may omit the property. */
+  departed?: DepartedWitness | null;
 }
 
 export interface InvariantFailure { invariant: string; detail: string }

@@ -52,7 +52,7 @@ export function campaignMetrics(world: WorldState, family: RumorId): CampaignMet
   let halfTownTick: Tick | null = null;
   for (const entry of threadOf(world, family)) {
     if (entry.kind === 'inject') seen.add(entry.target);
-    else for (const h of entry.heardBy) seen.add(h.id);
+    else if (entry.kind === 'telling') for (const h of entry.heardBy) seen.add(h.id);
     if (halfTownTick === null && seen.size >= half) halfTownTick = entry.tick;
   }
 

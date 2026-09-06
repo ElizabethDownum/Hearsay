@@ -11,6 +11,7 @@ import type { NetworkState } from './network/types';
 import type { ScheduledSetup } from './phases';
 import type { NetworkSpeech } from './directives/types';
 import type { MagicState } from './magic';
+import type { RuntimeDeparted, SeanceRecord, NightVisitRecord } from './magic-types';
 
 export type { IntelEntry, IntelState, InformantSpec, HypothesisCard, CodexHypothesis, TagNote } from '../intel/entry';
 export type { ScenarioState, ScenarioStatus, ScenarioDef, ScenarioCast, WinCondition, Resolution } from './scenario/types';
@@ -160,7 +161,8 @@ export interface ResidueRecord {
   residueId: string; venue: VenueId; observer: EntityId | null;
 }
 export type ChronicleEntry = TellingRecord | InjectRecord | AskingRecord | InstitutionRecord
-  | VignetteRecord | NetworkSpeechRecord | ArtifactRecord | ScryRecord | ResidueRecord;
+  | VignetteRecord | NetworkSpeechRecord | ArtifactRecord | ScryRecord | ResidueRecord
+  | SeanceRecord | NightVisitRecord;
 
 export interface InquiryTask {
   /** Directive-created story inquiries use their owning directive id as this unique task id. */
@@ -256,6 +258,10 @@ export interface WorldState {
   artifacts?: Artifact[];
   /** Next artifact ordinal — ids are `a${artifactCounter}`. Absent until the first forgery. */
   artifactCounter?: number;
+  /** Copied historical data, present only when a town supplied a valid witness. */
+  departed?: RuntimeDeparted;
+  /** Absent until a successful ritual; campaign-wide. */
+  seanceUsed?: { operation: string; tick: Tick };
   magic?: MagicState;
   enemy: EnemyState;
   /** Latch keys of vignettes already fired — `${defId}:${a}:${b ?? '-'}` (pillar 7, replay-stable). */

@@ -3,9 +3,10 @@ import type { Belief, ChronicleEntry, WorldState } from './types';
 
 /**
  * Every recorded event belonging to one story family, in recorded (tick) order. Only
- * claimId-bearing records (tellings, injects) belong to a single family — endings carry a
- * `claimIds` list spanning families, so the `'claimId' in e` guard rightly excludes them and
- * the narrowed return type keeps callers from reaching for fields an InstitutionRecord lacks.
+ * claimId-bearing records (tellings, injects and séances) belong to a single family; membership
+ * does not imply a human `heardBy` list. Endings carry a `claimIds` list spanning families, so the
+ * `'claimId' in e` guard rightly excludes them and the narrowed return type keeps callers from
+ * reaching for fields an InstitutionRecord lacks.
  */
 export function threadOf(world: WorldState, family: RumorId): Extract<ChronicleEntry, { claimId: string }>[] {
   return world.chronicle.filter(
