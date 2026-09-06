@@ -1,5 +1,11 @@
 # Plan 9 author snapshots â€” 5 September 2026
 
+## Restart WIP, explicitly untested
+
+[Feature-link author continuation](2026-09-05-task-5b-feature-link-wip.md) was
+saved when Ellie requested a stop. It has no tests or compiler/runtime evidence.
+The validated debrief checkpoint remains eight modules/96 isolated cases.
+
 ## Latest recovered proposals
 
 These byte-preserved drafts are complete author proposals, not implemented or

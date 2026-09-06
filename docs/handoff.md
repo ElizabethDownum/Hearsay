@@ -4,6 +4,25 @@
 This project-local handoff supersedes the older shared AI memory. All writes in
 this session stayed inside Hearsay at Ellie's request.
 
+## Stopped for Ellie's computer restart
+
+Ellie requested: “get to a stopping point then actually stop, need to restart my
+computer soon.” Work is stopped. No worker or review process remains active, and
+no automatic dispatch or continuation has been scheduled. Wait for Ellie to resume.
+
+The last verified checkpoint is c91e9e8 (eight model modules/96 isolated cases).
+A subsequent feature-link author fragment is saved separately as
+docs/plans/drafts/2026-09-05-task-5b-feature-link-wip.md. It is UNTESTED: no test
+file, no compiler/runtime checks and no review. The shared evidence proposal is
+restored to the96-case version; the untested extension has its own filename.
+Do not count this as a ninth validated module or completed gameplay.
+
+On resume, start with this handoff and the current Git status. The prepared review
+resumes remain gated by the reported Claude reset,6 September00:00 CDT /05:00 UTC.
+The user's source/context/plan transmission confirmation persists. R15/Task2 code
+approval and Task4 plan approval remain pending; the scrying/watch plan reviews are
+saved. All writes stayed inside Hearsay; no push or production change occurred.
+
 ## Current state
 
 - Repository C:/Users/eliza/Desktop/ClaudeFiles/hearsay, main; no push.

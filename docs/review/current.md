@@ -12,6 +12,12 @@ Restart checkpoint: G2–G4 are committed through caa5a38. The controller's full
 
 Resumed after restart: H2's namespace fix is committed at 2fe440f and H1's scanner correction at a53551d. The controller's gate at that exact commit passes 1,737 tests in 113 files, lint, both typechecks, build, soak and MC. All 10 simulation blocks / 230 deterministic lines remain equal. Independent review closed the namespace issue but found two binding-stability gaps in the scanner. After Codex workers exhausted quota, Claude completed the scrying correction draft before hitting a new session limit. The scanner author and séance reviewer stopped without completed deliverables. No worker is running; the reported Claude reset is 15:20 CDT / 20:20 UTC on 5 September. Task 1 remains open.
 
+Restart stop: Ellie requested a complete stop for a computer restart. No workers
+remain active. The96-case checkpoint is saved; the newly started feature-link
+proposal is separately marked UNTESTED, with no authored tests or native checks.
+Its evidence extension cannot replace the verified shared proposal accidentally.
+No gameplay source changed, and no background continuation is scheduled.
+
 ## Current decisions and issues
 
 ### R1 — Recover the interrupted G2 work in place
