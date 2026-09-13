@@ -2,16 +2,15 @@ import { CLAIM_FIELDS, type EntityId, type RumorId } from './rumors/claim';
 import type { Belief, ChronicleEntry, WorldState } from './types';
 
 /**
- * Every recorded event belonging to one story family, in recorded (tick) order. Only
- * claimId-bearing records (tellings, injects and séances) belong to a single family; membership
- * does not imply a human `heardBy` list. Endings carry a `claimIds` list spanning families, so the
- * `'claimId' in e` guard rightly excludes them and the narrowed return type keeps callers from
- * reaching for fields an InstitutionRecord lacks.
+ * Injections, tellings and séances belonging to one story family, in recorded order.
+ * Family membership does not imply a human heardBy list. Optional artifact claim
+ * links remain separate debrief associations and do not join this family helper.
  */
 export function threadOf(world: WorldState, family: RumorId): Extract<ChronicleEntry, { claimId: string }>[] {
   return world.chronicle.filter(
     (e): e is Extract<ChronicleEntry, { claimId: string }> =>
-      'claimId' in e && world.claims[e.claimId]?.family === family,
+      (e.kind === 'inject' || e.kind === 'telling' || e.kind === 'seance')
+      && world.claims[e.claimId]?.family === family,
   );
 }
 
@@ -35,28 +34,17 @@ export function explainBelief(
   );
   if (telling) return telling;
   /**
-   * Plan 9: the fair-cop law reaches EVIDENCE too. A belief a document anchored was delivered by an
-   * artifact act, which is not a telling — showing paper is not speech, so `ArtifactRecord` carries
-   * neither a claim id nor a `heardBy` list. It is matched on what it does carry: the tick the page
-   * was put in front of this mind (`firstHeardAt`, which artifact ingestion sets to the act's tick),
-   * the viewer — named as `to` for a show/hand-over/re-show, and as `by` for a pickup, where the finder
-   * is their own source — AND the page itself.
-   *
-   * The page is the third term because the first two are not enough (review finding I-4): a beat can
-   * deliver TWO documents to one mind — a pickup and another holder's re-show resolve in the same
-   * beat-tail pass — and both beliefs then carry the same `firstHeardAt`. Matching on tick and viewer
-   * alone handed both of them the first record, so one belief was explained by a page it never read.
-   * The record's artifact must say what the belief says, field for field.
-   *
-   * Residual, lawful and deliberate: two documents with IDENTICAL text delivered to one viewer in one
-   * beat are indistinguishable BY CONTENT, so which of the two explanations each belief gets is
-   * arbitrary. Both answers are true statements about a page that really did put those words in that
-   * mind at that tick. Distinct pages, or distinct beats, resolve exactly.
+   * New document viewings carry the exact minted claim identity. Legacy records lack
+   * that association and retain the older tick/viewer/page-content fallback. Never use
+   * content to override an explicit different claim id: identical pages can be viewed
+   * by the same person in one beat and still mint distinct roots. This is explanation
+   * only; paper remains private and does not become an overheard utterance.
    */
   return world.chronicle.find(
     (e) => e.kind === 'artifact' && e.tick === belief.firstHeardAt
       && (e.to === npcId || (e.act === 'pickup' && e.by === npcId))
-      && pageSays(world, e.artifact, belief),
+      && (e.claimId === undefined ? pageSays(world, e.artifact, belief)
+        : e.claimId === belief.claim.id),
   ) ?? null;
 }
 

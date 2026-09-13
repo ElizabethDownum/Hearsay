@@ -331,6 +331,8 @@ export interface NetworkSpeech {
   addressedTo: EntityId;
   messageId: MessageId;
   spoken: SpokenNetworkPayload;
+  /** Private per-item roots captured at this hop, excluded from SpokenNetworkPayload. */
+  reportRoots?: string[];
   cause: {
     kind: 'player-action';
     action: 'tell' | 'ask' | 'sell' | 'recruit' | 'debrief'

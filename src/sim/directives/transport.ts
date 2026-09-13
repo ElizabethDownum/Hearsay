@@ -632,6 +632,11 @@ function attemptHop(
     addressedTo,
     messageId: message.id,
     spoken,
+    // projectPayload/replaceCarriedContent already validated this exact item order.
+    // Snapshot now: a later relay may omit or mutate the carried copy.
+    ...(message.payload.kind === 'field-report' ? {
+      reportRoots: message.payload.renderedItems!.map((item) => item.rootFingerprint),
+    } : {}),
     cause: cloneSerializable(message.cause),
   };
   if (final) receiveFinal(world, message, spoken, t, circle, rules);

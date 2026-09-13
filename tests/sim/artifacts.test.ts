@@ -252,6 +252,7 @@ describe('show — the document anchors a fresh family at evidence weight', () =
     expect(artifactById(world, 'a0')).toMatchObject({ heldBy: 'you', plantedAt: null });
     expect(world.chronicle.filter((entry) => entry.kind === 'artifact').at(-1)).toEqual({
       kind: 'artifact', tick: DAY1, act: 'show', artifact: 'a0', by: 'you', to: 'ada',
+      claimId: soleBelief(world, 'ada').claim.id,
     });
   });
 
@@ -311,6 +312,7 @@ describe('plant — venue XOR hand-over', () => {
     expect(soleBelief(world, 'ada').credence).toBe(ARTIFACT_CREDENCE);
     expect(world.chronicle.filter((entry) => entry.kind === 'artifact').at(-1)).toEqual({
       kind: 'artifact', tick: DAY1, act: 'plant', artifact: 'a0', by: 'you', to: 'ada',
+      claimId: soleBelief(world, 'ada').claim.id,
     });
   });
 

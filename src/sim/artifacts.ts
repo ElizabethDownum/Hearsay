@@ -148,11 +148,12 @@ export function applyForge(
  */
 function deliverDocument(
   world: WorldState, artifact: Artifact, shower: EntityId, viewer: EntityId, tick: Tick,
-): void {
+): string {
   const family = `f${world.claimCounter}`;
   const claim = mintClaim(world, { ...artifact.spec, family, parent: null });
   world.claims[claim.id] = claim;
   ingestEvidence(world, viewer, { tick, speaker: shower, claim }, ARTIFACT_CREDENCE);
+  return claim.id;
 }
 
 /** The shared preconditions of both paper-in-hand verbs: a real, dry document the avatar holds. */
@@ -205,9 +206,9 @@ export function applyShow(
 
   // --- Effects (all validation passed) — the paper stays in the shower's hand. ---
   const shower = world.playerId!;
-  deliverDocument(world, artifact, shower, to, tick);
+  const claimId = deliverDocument(world, artifact, shower, to, tick);
   world.chronicle.push({
-    kind: 'artifact', tick, act: 'show', artifact: artifact.id, by: shower, to,
+    kind: 'artifact', tick, act: 'show', artifact: artifact.id, by: shower, to, claimId,
   });
 }
 
@@ -242,9 +243,9 @@ export function applyPlant(
     // --- Effects (all validation passed) — the paper changes hands AND is read. ---
     artifact.heldBy = to;
     artifact.plantedAt = null;
-    deliverDocument(world, artifact, playerId, to, tick);
+    const claimId = deliverDocument(world, artifact, playerId, to, tick);
     world.chronicle.push({
-      kind: 'artifact', tick, act: 'plant', artifact: artifact.id, by: playerId, to,
+      kind: 'artifact', tick, act: 'plant', artifact: artifact.id, by: playerId, to, claimId,
     });
     return;
   }
@@ -443,9 +444,9 @@ export function resolveArtifacts(
     artifact.heldBy = finder;
     artifact.plantedAt = null;
     // The finder is their own source: nobody handed it over, and nobody is their own corroborator.
-    deliverDocument(world, artifact, finder, finder, tick);
+    const claimId = deliverDocument(world, artifact, finder, finder, tick);
     world.chronicle.push({
-      kind: 'artifact', tick, act: 'pickup', artifact: artifact.id, by: finder, to: null,
+      kind: 'artifact', tick, act: 'pickup', artifact: artifact.id, by: finder, to: null, claimId,
     });
   }
 
@@ -464,10 +465,12 @@ export function resolveArtifacts(
     if (hasReshown(world, id, holder)) continue;
 
     // The edge is the edge either way; only the substrate the viewing lands in differs.
+    let claimId: string | null = null;
     if (audience === world.playerId) showToAvatar(world, artifact, holder, circle.venue, tick);
-    else deliverDocument(world, artifact, holder, audience, tick);
+    else claimId = deliverDocument(world, artifact, holder, audience, tick);
     world.chronicle.push({
       kind: 'artifact', tick, act: 'reshow', artifact: id, by: holder, to: audience,
+      ...(claimId === null ? {} : { claimId }),
     });
   }
 }

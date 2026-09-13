@@ -129,6 +129,8 @@ export interface NetworkSpeechRecord {
   addressedTo: EntityId;
   messageId: string;
   spoken: NetworkSpeech['spoken'];
+  /** Private causal associations in spoken item order; never audible content. */
+  reportRoots?: string[];
   cause: NetworkSpeech['cause'];
   heardBy: { id: EntityId; addressed: boolean }[];
 }
@@ -151,6 +153,8 @@ export interface ArtifactRecord {
   artifact: string;
   by: EntityId;
   to: EntityId | VenueId | null;
+  /** Exact claim minted by this NPC viewing; absent when no claim is minted. */
+  claimId?: ClaimId;
 }
 export interface ScryRecord {
   kind: 'scry'; tick: Tick; operation: string; venue: VenueId;

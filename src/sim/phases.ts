@@ -514,6 +514,7 @@ function recordAndIngest(
       kind: 'network-speech', tick: speech.tick, venue: speech.venue,
       speaker: speech.speaker, addressedTo: speech.addressedTo,
       messageId: speech.messageId, spoken: cloneSerializable(speech.spoken),
+      ...(speech.reportRoots === undefined ? {} : { reportRoots: [...speech.reportRoots] }),
       cause: cloneSerializable(speech.cause),
       heardBy: speech.circleMembers.filter((member) => member !== speech.speaker)
         .sort().map((id) => ({ id, addressed: id === speech.addressedTo })),
