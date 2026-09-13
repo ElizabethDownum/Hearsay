@@ -16,7 +16,11 @@ with zero findings and the same gates/comparison passing. Root verified832 revie
 evidence entries. R16 guard self-presence is committed at `36d090c`; worker and
 controller pass2,055 tests/130 files and all six gates with unchanged complete
 simulation reports. Independent R16 code review is Approved with zero findings and
-the same gates independently passing. Root verified75 review entries; R17 is next.
+the same gates independently passing. Root verified75 review entries. R17 is now
+committed at `bc409d3`; worker/controller pass2,059 tests/131 files and all six gates
+with unchanged complete simulation reports. Independent R17 code review is Approved
+with zero findings and the same gates passing; root verified77 review entries.
+[R17 approval](review/2026-09-13-r17-code-approval.md).
 [R16 approval](review/2026-09-13-r16-code-approval.md).
 [Recording approval](review/2026-09-13-recording-code-approval.md).
 
@@ -71,8 +75,8 @@ frozen artifact identities are in the [6 September episode](episodes/2026-09-06-
 2. Task 7A is closed at committed `3020688`, with all applicable controller and
    independent gates passing. [Approval](review/2026-09-13-prose-code-approval.md).
    Preserve the exact [T4-A1/A2 amendment](plans/drafts/2026-09-05-task-4-base-reconciliation.md).
-3. Task5A1 is closed at `252a481`, and R16 is closed at `36d090c`.
-   Implement separately verified R17,5A2 and full5B model completion. Prose78-case,
+3. Task5A1 is closed at `252a481`, R16 at `36d090c`, and R17 at `bc409d3`.
+   Implement separately verified5A2 and full5B model completion. Prose78-case,
    outcome-history239-case and ordinary feature-link147-case proposals have
    independent approvals; they are not production implementations.
 4. Physical/magic/story links, calendar/terminal model,6/7B UI and8 integration/
@@ -85,7 +89,11 @@ frozen artifact identities are in the [6 September episode](episodes/2026-09-06-
    two Important issues: future operation records and unresolved ending evidence.
    The versioned correction passes 313 cases (278 preserved plus 35). Its review
    closes ending validation but retains one mixed-time receipt finding. A new
-   bounded correction preserves 313 and the exact reviewer regression.
+   bounded correction passes321 cases, preserving313 and adding the exact reviewer
+   regression plus seven controls. Independent replacement review is Approved,
+   zero findings; R30/R31 are closed. Root verified532 author and452 review entries,
+   each including all356 archived files. Only proposed threads.ts and additive
+   composition tests change. [Approval](review/2026-09-13-receipt-partition-proposal-approval.md).
    Task6/7B UI continues in a separate isolated checkout against the provisional
    interface; final certification
    must consume the independently approved correction.

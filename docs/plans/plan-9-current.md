@@ -4,14 +4,16 @@ Updated: 2026-09-13. Controller: Codex. **Implementation resumed.** Ellie clarif
 that the 6 September stop applied only to that session. Continue the plan with
 non-blocking judgments/issues saved for later review. See [the current handoff](../handoff.md).
 Current committed implementation checkpoint:
-**36d090cdb6da3be5814e72d4262efa4d67ac94ea** (R16 guard self-presence).
-Worker/controller full2,055 tests/130 files, lint, both compilers, build512.71/151.87gzip,
+**bc409d3d4cdba6bc1242a09ba1d24ab0b3c435fc** (R17 watch execution stage).
+Worker/controller full2,059 tests/131 files, lint, both compilers, build512.75/151.88gzip,
 soak andMC pass. All10 blocks/230 deterministic lines/four controls match the
 certified baseline. Nine complete predecessor/current worlds match after only the
 new metadata is stripped in the preceding5A1 proof. Independent5A1 code review is Approved with zero findings;
 the same six gates/comparison pass independently. Root verified832 review entries.
 R16 is independently Approved with zero findings and the same gates/comparison
-passing. Root verified75 review entries. R17 is the next separate unit.
+passing. Root verified75 review entries. R17 is independently Approved with zero
+findings and the same gates/comparison passing; root verified77 review entries.
+[R17 approval](../review/2026-09-13-r17-code-approval.md).
 [R16 approval](../review/2026-09-13-r16-code-approval.md).
 [Recording approval](../review/2026-09-13-recording-code-approval.md).
 
@@ -23,12 +25,11 @@ All 24 predicate definitions are unchanged. Independent 7A code review is
 passing independently. [Approval](../review/2026-09-13-prose-code-approval.md).
 Task7A and recording5A1 are closed with independent code approval through252a481.
 Physical198 and corrected magic241 proposals are independently approved with zero
-findings. Complete278-case pure composition review found two Important issues,
-future operation records and unresolved ending evidence. The313-case correction
-closes ending validation but needs one mixed-time receipt correction; all313 cases
-and the exact reviewer regression remain binding. Task6/7B UI
-authoring proceeds against the provisional frozen interface; final certification
-requires independent correction approval. [Latest review](../review/2026-09-13-composition-contract-review.md).
+findings. The complete321-case pure composition proposal now has independent
+approval with zero findings, closing R30 and preserving R31. Root verified532 author
+and452 reviewer entries, including each complete356-file archive. Task6/7B final UI
+proposal validation consumes this approved replacement; actual model installation
+still follows5A2 and its separate review. [Approval](../review/2026-09-13-receipt-partition-proposal-approval.md).
 Adopted A7 retains ritual purchase
 composers in Plan 10; they are outside Tasks 6/7B/8 and this execution.
 
@@ -266,15 +267,16 @@ original report links, gate reconstruction and retained artifact paths.
    its17th actual-ritual regression is now installed. Task5A1 is independently
    approved at `252a481`, with2,045 tests/129 files, all six gates, complete report
    comparison and nine complete-world metadata-only pairs independently passing.
-   R16 self-presence is independently approved at `36d090c`. Execute the separate
-   R17 watch-stage correction, then its own six gates/review, then
-   approved Task5A2 private outcome recording and separate review.
+   R16 self-presence is independently approved at `36d090c`, and R17 watch-stage
+   correction is independently approved at `bc409d3`, both with all six gates and
+   complete report comparisons passing. Execute approved Task5A2 private outcome
+   recording and its separate review next.
    Task5B's147-case receipt correction,198-case physical extension and241-case
    magic/story identity correction have independent proposal approval. Complete
-   calendar/terminal composition passes278 cases but review found two Important
-   issues (R30/R31). The 313-case correction closes ending validation but needs a
-   bounded mixed-time receipt correction, preserving all 313 cases and the exact
-   reviewer regression. After approval and actual5A2 reconciliation, install the
+   calendar/terminal composition now passes321 cases with independent zero-finding
+   approval, closing both R30/R31. The final replacement preserves all313 cases
+   plus eight additions and all earlier reviewed bodies. After actual5A2
+   reconciliation, install the
    complete model in five serial chunks with the scoped and accumulated gates,
    then obtain separate installed-code review. No debrief model is installed yet.
 7. **Task 6 + Task 7B debrief UI:** terminal-only props-fed panels, existing panel

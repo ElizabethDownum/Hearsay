@@ -17,10 +17,15 @@ R16 guard self-presence is committed at `36d090c`; worker/controller2,055 tests/
 files and all six gates pass with unchanged simulation reports. Independent R16
 code review is Approved with zero findings and the same gates independently passing.
 [R16 approval](2026-09-13-r16-code-approval.md). [Recording approval](2026-09-13-recording-code-approval.md).
-The313-case debrief correction closes ending validation but has one remaining
-mixed-time receipt finding. A new bounded correction preserves all313 cases and
-the exact reviewer regression; it needs independent approval before final model/UI
-certification. [Latest review](2026-09-13-composition-contract-review.md).
+R17 watch execution stage is committed at `bc409d3` and independently Approved with
+zero findings. Worker/controller/reviewer each pass2,059 tests/131 files and all
+six gates with unchanged complete simulation reports. Root verified77 review
+entries. [R17 approval](2026-09-13-r17-code-approval.md).
+The complete321-case debrief proposal is independently Approved with zero findings.
+R30's mixed-time receipt correction is closed and R31 ending validation remains
+closed. Root verified452 review entries, including all356 archived files. The
+approved replacement now supplies final UI proposal validation and later actual
+model installation. [Approval](2026-09-13-receipt-partition-proposal-approval.md).
 [Prose approval](2026-09-13-prose-code-approval.md). [Current handoff](handoff.md).
 
 Ellie's current instructions: audit the existing plan before continuing implementation; keep every change inside the Hearsay project folder; take the recommended behavior and hold questions/issues in this HTML document for later review.
@@ -209,6 +214,7 @@ probe fails. Task 2 closure is withheld while the bounded correction is prepared
 - **Recommended action:** require the existing attempted execution state before recording watch work. Preserve all physical location, window, beat and duplicate-night checks. Keep this behavioral correction separate from the new history metadata.
 - **Why:** execution.ts:settleDirectiveApplications and the retained pre-R17 trace in .superpowers/sdd/task-5a2-validation/pre-r17-watch-history.json. The private recording proposal preserved all old state, revealing rather than creating the premature completion.
 - **Status:** exact one-clause proposal plus four tests: native RED 3 failures/1 control; virtual affected GREEN 30/3, both compiler configurations and lint pass. Independent plan review approved implementation after R16 and its separate code review. Full production gates and independent code approval remain open. See docs/plans/drafts/2026-09-05-r17-watch-stage.md.
+- **Independent implementation closure, 13 September:** committed `bc409d3`, zero Critical/Important/Minor findings. Worker/controller/reviewer each pass2,059 tests/131 files and all six gates; all10 report blocks/230 deterministic lines/four controls match. Eight additional reviewer boundary cases pass. Root verified77 review entries. [Approval](2026-09-13-r17-code-approval.md).
 
 ### R18 — Preserve further watch-history observations outside R16/R17
 
@@ -217,6 +223,7 @@ probe fails. Task 2 closure is withheld while the bounded correction is prepared
 - **Evidence and limits:** watch-plan-review observations d1–d3 trace the current source; expiry after actual work is also in the retained native history probe. Cancellation and venue-mutation consequences are source-derived hypotheses until a bounded native reproduction is saved. Do not call them new passing tests or silently repair them under R17.
 - **Status:** held for later bounded work; no new gameplay rule or threshold selected. [Independent source review](2026-09-05-watch-plan-review.md).
 - **Closeout clarification, 13 September:** the independent premise audit confirms these do not block R16/R17 and are not automatically authorized repairs. Before final Plan9 certification, run and retain bounded post-R17 cancellation, expiry and interpreted-venue probes, then record a disposition for each result. A reproduced defect needs its own scoped proposal/review or an explicit later-plan disposition compatible with debrief truthfulness; it must not silently enter either approved watch patch. Audit: `.superpowers/sdd/r18-closeout-premise-audit-2026-09-13.md`, SHA-256 `3F9CD0F5137D6F26F3EA398D4CCEE3B2B4913ADAEAC7931D183C25E3AB36FFCE`.
+- **Probe dispatch:** bounded mechanism probes are active in an isolated checkout of independently approved R17 `bc409d3`. They will preserve cancellation/work/ledger, expiry and interpreted-venue traces with explicit controls and dispositions. No R18 repair is part of R17 or5A2.
 
 ### R19 — Handoff learning candidates stay project-local
 
@@ -375,17 +382,19 @@ The orchestration skill's role contract says, "You do not implement, deep-review
 
 ### R30 — Keep future operation records outside current terminal history
 
-- **Status:** Important proposal-review finding; bounded correction in progress, no debrief model installed.
+- **Status:** closed by independent review of the321-case receipt replacement, zero Critical/Important/Minor. No debrief model is installed; actual reconciliation and code review remain.
 - **Finding:** current enemy evidence and physical evidence include rows acquired beyond the view clock; feature references include future digest results. The calendar and chronicle already enforce this boundary.
 - **Adopted correction:** exclude known-future rows from current operation sections or retain them in explicitly typed beyond-clock sections. Preserve unknown-time rows as unknown and keep operation/orphan history reachable without inventing dates.
 - **Evidence:** two independent rewound-world probes fail against the frozen 278-case proposal. All original assertions remain binding alongside these regressions. [Independent review](2026-09-13-composition-proposal-review.md).
 - **Boundary:** author a versioned correction with real causal RED/GREEN and independent review; preserve the original proposal. UI work may continue provisionally but final certification consumes the approved replacement.
 - **Correction checkpoint:** versioned313-case proposal preserves all278 prior cases, adds35 controls and passes the five original reviewer probes; causal RED284 passed/29 failed, GREEN313. Both compilers/34-body lint/law checks pass. Root verified576 evidence entries and the three exact changed bodies. Independent correction review is active; a current-feature/later-duplicate interaction is under adversarial examination, without a verdict yet.
 - **Correction review:** Needs-fixes, zero Critical/one Important/zero Minor. A later duplicate receipt incorrectly removes a uniquely supported current feature. A second bounded correction now owns only proposed threads.ts and additive tests; retain a current projection without future indexes and preserve the future receipt separately. All313 cases and the exact reviewer regression remain binding. [Review](2026-09-13-composition-contract-review.md).
+- **Receipt replacement checkpoint:** the versioned321-case proposal preserves all313 cases and adds eight controls. Native causal RED314 passed/7 failed, GREEN321; the exact mixed-time reviewer probe and original five probes pass. Both compilers,34-body lint and four mandatory laws pass. Root verified532 evidence entries, including all356 archive files,32 unchanged bodies and two exact replacements. Current features retain a clock-scoped copy; the original link in beyondClock is context for later receipts, not a second feature creation. Independent replacement review is active. [Proposal](../plans/drafts/2026-09-13-task-5b-receipt-partition.md).
+- **Independent closure:** Approved for actual-base reconciliation, zero findings. Baseline313, RED314/7, GREEN321, exact mixed-time control and original five probes, both compilers,34-body lint and four law checks pass independently. Root verified all452 review entries, including356 archived files. R30 is closed and R31 remains closed. [Approval](2026-09-13-receipt-partition-proposal-approval.md).
 
 ### R31 — Resolve retained ending evidence before calling it consistent
 
-- **Status:** closed within the313-case proposal by independent review. Full model installation and the remaining R30 correction still require their own approval.
+- **Status:** closed within the313-case proposal and preserved by the independently approved321 replacement. Full model installation and separate code review remain.
 - **Finding:** won, exposed and caught metadata with matching kind/day but missing supporting records are labeled consistent. Three independent controls reproduce this.
 - **Adopted correction:** validate status-specific retained source identity; keep unresolvable or ambiguous payloads visible and mark them inconsistent. Preserve real ending fixtures and do not reconstruct missing history or rerun gameplay rules.
 - **Evidence:** the independent proposal suite passes 278 cases while the three additional malformed-payload cases fail. [Independent review](2026-09-13-composition-proposal-review.md).
