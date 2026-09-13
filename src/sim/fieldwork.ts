@@ -177,6 +177,17 @@ function townMapFor(world: WorldState): TownMap {
   return buildTownMap({ venues: Object.values(world.venues), npcs: Object.values(world.npcs) });
 }
 
+/** Public display labels only: the existing street directory, venues, and your avatar.
+ * Transient view data; no names are added to serialized world state or the enemy map. */
+export function claimNames(world: WorldState): Record<string, string> {
+  const map = townMapFor(world);
+  return Object.fromEntries([
+    ...map.venues.map((venue) => [venue.id, venue.id.replaceAll('-', ' ')]),
+    ...map.directory.map((person) => [person.id, world.npcs[person.id]?.name ?? person.id]),
+    ...(world.playerId === null ? [] : [[world.playerId, 'you']]),
+  ]);
+}
+
 export function playerView(world: WorldState): PlayerView {
   const tick = world.tick;
   const playerId = world.playerId;

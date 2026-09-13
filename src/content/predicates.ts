@@ -1,7 +1,7 @@
 import type { PredicateId } from '../sim/rumors/claim';
 import type { PredicateDef } from '../sim/rules';
 
-export const PREDICATES: Record<PredicateId, PredicateDef> = {
+const DEFINITIONS = {
   // ── damaging (16) ─────────────────────────────────────────────────────────
   'met-secretly-with':        { id: 'met-secretly-with',        juiciness: 0.7,  sinVersion: 'is-having-an-affair-with', factionRelevant: true,  valence: 'damaging' },
   'is-having-an-affair-with': { id: 'is-having-an-affair-with', juiciness: 0.9,  sinVersion: null,                        factionRelevant: false, valence: 'damaging' },
@@ -29,4 +29,7 @@ export const PREDICATES: Record<PredicateId, PredicateDef> = {
   // ── neutral (2) ───────────────────────────────────────────────────────────
   'is-the-true-heir-of':      { id: 'is-the-true-heir-of',      juiciness: 0.9,  sinVersion: null,                  factionRelevant: true,  valence: 'neutral' },
   'met-at-the-docks-by-night':{ id: 'met-at-the-docks-by-night',juiciness: 0.5,  sinVersion: 'met-secretly-with',   factionRelevant: false, valence: 'neutral' },
-};
+} satisfies Record<PredicateId, PredicateDef>;
+
+export type RegisteredPredicate = keyof typeof DEFINITIONS;
+export const PREDICATES: Record<PredicateId, PredicateDef> = DEFINITIONS;
