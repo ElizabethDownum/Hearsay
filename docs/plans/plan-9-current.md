@@ -4,7 +4,17 @@ Updated: 2026-09-13. Controller: Codex. **Implementation resumed.** Ellie clarif
 that the 6 September stop applied only to that session. Continue the plan with
 non-blocking judgments/issues saved for later review. See [the current handoff](../handoff.md).
 Current committed implementation checkpoint:
-**152f2a0d788d7166150ba31b25090f3aa21d199c** (Task 4C2 digest and auditor).
+**3020688c883259ddd5f95195841804e5dc4e9237** (complete claim prose 7A1/7A2).
+Worker and controller full gates pass: 2,028 tests/128 files, lint, both compilers,
+and browser build (512.40 kB / 151.77 kB gzip, existing size warning).
+All 24 predicate definitions are unchanged. Independent 7A code review is
+**Approved with zero findings**, with the same gates and all 78 focused cases
+passing independently. [Approval](../review/2026-09-13-prose-code-approval.md).
+Task 7A is closed; actual causal recording 5A1 is next.
+Physical 198 proposal is approved. Magic 240 review found one Important claim-alias
+identity defect; a versioned bounded correction is being authored independently
+alongside the remaining pure composition. Adopted A7 retains ritual purchase
+composers in Plan 10; they are outside Tasks 6/7B/8 and this execution.
 
 Task1's R15 correction and Task2 forensics now have independent approval. The
 R20 relay-reference fix at09e5458 closes the sole remaining Important finding.
@@ -41,7 +51,7 @@ comparator controls. Build JS507.93/150.39kB gzip retains the existing size warn
 Independent accumulated Task4 code review is **Approved with zero findings**.
 The reviewer passed the same full gates/comparison and independent replay/copy/
 100-seed generation probes. [Task4 approval](../review/2026-09-13-task-4-code-approval.md).
-Task4 is closed; corrected7A1/7A2 is the next implementation. Scrying has independent plan approval
+Tasks 4 and 7A are closed with independent code approval. Scrying has independent plan approval
 with A1; its certified baseline is09e5458 and preserve19 forensics cases/eight
 auditor calls in3C2. Séance's conditional T4-A1/A2 amendment is saved. The corrected
 78-case prose proposal has independent approval for future-base reconciliation.
@@ -226,7 +236,7 @@ original report links, gate reconstruction and retained artifact paths.
    tests are preserved by the exact correction amendment, which adds 34 regressions.
    All 78 virtual cases passed independent review with zero findings. Apply
    drafts/2026-09-05-task-7a-correction.md on the actual future Task 4 predecessor;
-   production implementation and its separate code review remain required.
+   Installed 7A1/7A2 is now independently approved at `3020688`, zero findings.
 6. **Task 5 debrief substrate and models:** first prove whether retained network
    speech uniquely reconstructs receipt/report chronology, then make only the
    missing correlations explicit. Author typed operation/report threads and semantic

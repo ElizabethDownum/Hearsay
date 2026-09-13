@@ -5,7 +5,11 @@ session”. Continue implementation according to the current plan, applying
 recommended defaults and saving non-blocking judgments/issues in `docs/review.html`
 for later review. Task 4C2 is committed at `152f2a0`; all six Task 4 gates and
 the full deterministic comparison pass. Independent accumulated code review is
-**Approved with zero findings**. Task4 is closed; corrected7A prose is next.
+**Approved with zero findings**. Task 4 is closed. Corrected 7A1 and desk prose 7A2
+are committed through `3020688`; worker and controller each pass the full
+**2,028 tests / 128 files**, lint, both compilers and browser build. Independent
+accumulated 7A code review is **Approved with zero findings**, with the same gates
+passing independently. Task 5A1 causal recording is next.
 
 This project-local handoff supersedes older shared AI memory. All writes remain
 inside Hearsay; no push is authorized by this resumption. The saved checkpoint and
@@ -55,25 +59,30 @@ frozen artifact identities are in the [6 September episode](episodes/2026-09-06-
 
 1. Read [current Plan9](plans/plan-9-current.md), the latest episode, Git status and
    `.superpowers/sdd/progress.md` plus `task-4-implementation-progress.md`.
-2. Execute corrected7A1 under `task-7a1-implementation-brief-2026-09-13.md`,
-   binding the actual committed documentation HEAD over approved Task4 source.
-   Then7A2 on committed7A1, full applicable gates and separate code review.
+2. Task 7A is closed at committed `3020688`, with all applicable controller and
+   independent gates passing. [Approval](review/2026-09-13-prose-code-approval.md).
    Preserve the exact [T4-A1/A2 amendment](plans/drafts/2026-09-05-task-4-base-reconciliation.md).
-3. After7A, continue5A recording with T5A-A1, separately
+3. Continue 5A1 recording with T5A-A1 under its actual-HEAD-bound brief, then separately
    verified R16/R17 watch fixes,5A2 and full5B model completion. Prose78-case,
    outcome-history239-case and ordinary feature-link147-case proposals have
    independent approvals; they are not production implementations.
 4. Physical/magic/story links, calendar/terminal model,6/7B UI and8 integration/
-   final review remain. The completed198-case physical-model proposal is under
-   independent review. A separate magic-operation/story author now works in a new
-   isolated worktree; its198-case integrated baseline passes.
-   Plan10 is outside this Plan9 execution.
+   final review remain. The198-case physical-model proposal is independently
+   Approved-for-base-reconciliation, zero findings.
+   [Proposal approval](review/2026-09-13-physical-links-proposal-approval.md).
+   The 240-case magic proposal review found one Important alias-identity defect;
+   a bounded versioned correction is being authored with a permanent regression.
+   Remaining pure composition is being authored in another isolated worktree.
+   The completed premise check supports existing semantic attention readers plus
+   calendar/terminal composition; player hypothesis cards remain ungraded notes.
+   Plan 10 is outside this run. Adopted A7 explicitly assigns ritual purchase
+   composers to Plan 10; Tasks 6/7B/8 must preserve that boundary.
 
 One production writer; root owns Git index and scoped commits. Preserve current
 provenance/physical unions when reconciling older virtual overlays. Capture native
 bytes/exits before formatting; PowerShell7 and `python -X utf8`. Snapshots start
 inside owned excluded `node_modules`, never collectible scratch `.test.ts` paths.
-The current measured full-suite count is 1,950/125 at `152f2a0`. Existing successful gates need no repetition without a change
+The current measured full-suite count is 2,028/128 at `3020688`. Existing successful gates need no repetition without a change
 or a stated checkpoint requirement.
 
 All deferred questions and PROVISIONAL local rulings, including R24/R25 receipt

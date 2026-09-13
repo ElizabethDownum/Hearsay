@@ -7,7 +7,10 @@ later review. Task 4C2 is committed at `152f2a0`. All six gates pass, including
 approved baseline with four comparator controls. Independent accumulated code
 review is **Approved with zero findings**, with the same full gates independently
 passing. [Task4 approval](review/2026-09-13-task-4-code-approval.md). Task4 is closed;
-corrected7A prose is next. [Current handoff](handoff.md).
+complete prose 7A1/7A2 is committed through `3020688` and independently Approved
+with zero findings. Worker, controller and reviewer each pass 2,028 tests/128 files,
+lint, both compilers and build. Task 5A1 recording is next.
+[Prose approval](2026-09-13-prose-code-approval.md). [Current handoff](handoff.md).
 
 Ellie's current instructions: audit the existing plan before continuing implementation; keep every change inside the Hearsay project folder; take the recommended behavior and hold questions/issues in this HTML document for later review.
 
@@ -273,9 +276,12 @@ probe fails. Task 2 closure is withheld while the bounded correction is prepared
   Approved-for-base-reconciliation, zero Critical/Important/Minor. Its own78-case
   GREEN,27-failure RED, five original-regression controls, compilers, registry
   firing and40 extra grammar/relational controls pass as expected. Original
-  artifacts remain unchanged. No prose production code has been implemented.
+  artifacts remain unchanged. Prose 7A1/7A2 is now committed through `3020688`;
+  worker/controller each pass 2,028 tests/128 files, lint, both compilers and build.
+  Independent installed-code review is Approved with zero findings and the same
+  full gates passing. [Code approval](2026-09-13-prose-code-approval.md).
 - **Closure:** [Independent prose correction approval](2026-09-05-prose-correction-approval.md).
-  Actual Task4-base reconciliation and later implemented-code review remain required.
+  Actual Task 4 reconciliation and implemented-code review are now complete.
 
 ### R23 — Recording repairs must preserve séance family membership
 
@@ -321,9 +327,34 @@ The orchestration skill's role contract says, "You do not implement, deep-review
 
 
 ### R26 — Count physical report slots without backdating ordinary evidence
-- **Status:** adopted PROVISIONAL pure-model correction; the 198-case physical proposal passes author validation and is in independent review. Production integration remains pending.
+- **Status:** adopted PROVISIONAL pure-model correction; the198-case physical proposal has independent approval with zero findings. Production integration remains pending. [Approval](review/2026-09-13-physical-links-proposal-approval.md).
 - **Issue:** in an actual report containing network, night-visit and asking rows, the ordinary receipt fold skipped the physical append slot. It could then treat the received asking row as the guard's earlier direct observation at tick 15 instead of its actual arrival at tick 45.
 - **Recommended action:** count proved physical append/dedupe slots when reconstructing ordinary report receipt. Preserve R24/R25 uncertainty for missing or ambiguous receipts and enforce the maximum possible append span, including when duplicate physical rows appear.
 - **Evidence:** all 147 inherited cases remain byte-for-byte unchanged; 51 additions give 198 total. Complete RED is 160 pass / 38 fail and GREEN is 198 pass. A separate preserved failure proves that duplicate physical rows must not extend the association by one row. Both compilers, scoped lint, firing checks and input integrity pass in the isolated author host.
-- **Boundary:** this changes a proposed debrief fold only. It records no new gameplay state and infers neither a caster from residue nor a ritual from chapel presence. Missing evidence remains unknown. The independent proposal review and actual-predecessor code review are still required.
+- **Boundary:** this changes a proposed debrief fold only. It records no new gameplay state and infers neither a caster from residue nor a ritual from chapel presence. Missing evidence remains unknown. Independent proposal review now passes; actual-predecessor implementation and code review remain required.
 - **To reverse:** revise the pure receipt mapping with explicit replacement controls; retain the original receipt chronicle, all historical failed/passing evidence, and uncertainty boundaries. No permission question blocks the existing plan.
+
+
+### R27 — Keep missing magic history explicit in the debrief
+- **Status:** adopted PROVISIONAL reader defaults. The 240-case magic/story proposal review found one Important identity defect (R29); a versioned correction is being authored. No production debrief code is installed.
+- **Recommended action:** identify a retained operation by spell plus operation ID; keep operation intent, actual captures, physical reporting and enemy acquisition separate. Historical price is unrecorded because the current operation records do not store it. Do not substitute the current economy price as history.
+- **Story rule:** a séance is later receipt of its retained historical claim and edge. It adds no new version, origin or human mutation. Claim-root identity and completeness of the two received intel rows are separate facts; missing or inconsistent references remain unresolved and visible.
+- **Orphan rule:** keep a raw held physical report even if its operation/trace history is missing. It proves retained held content only. A chapel visit does not prove ritual causation, and residue does not identify a caster.
+- **Evidence:** all198 inherited cases remain unchanged;42 additions give240 total. Complete RED is202pass/38fail, final GREEN240, with both compilers,29-file scoped lint and four rule-firing diagnostics per changed model path. Retained failures cover orphan report loss and an inconsistent ritual claim reference.
+- **Boundary and reversal:** these are pure debrief-reader choices over existing records. A future decision to record historical prices or additional causal links needs a separately scoped recording change; do not guess missing values or rewrite the frozen evidence. Independent proposal review and later actual-code verification remain required.
+
+
+### R28 — Keep player hypothesis cards as ungraded terminal notes
+- **Status:** adopted PROVISIONAL composition default; the remaining pure debrief composition is being authored. No terminal UI or new gameplay state is installed.
+- **Finding:** existing proposed attention and feature-link readers already supply semantic Counter-Sketch correspondence. Physical sightings/acquisition remain separate; no extra inferred questioning/watch mechanism is needed. What remains is composition of those sections and their receipt/digest calendar.
+- **Recommended action:** expose the player's retained hypothesis cards as detached current annotations at the terminal debrief. Do not grade them against unrelated feature IDs, call them proven or phantom, or backdate their current content into earlier days; their edit history is not retained.
+- **Boundary:** observed Counter-Sketch signals still receive the existing causal attention/feature comparison. Calendar entries use actual receipt/digest/attention dates and retain gaps/unknowns. A typed set of existing thread sections supplies reachability without a new universal causal index.
+- **Evidence and reversal:** an independent premise check traced the frozen240-case proposal and identified this remaining annotation contract. A later grading/history feature would need explicit semantic rules and recording; it is not inferred into the current plan. Independent proposal and actual-code review remain required.
+
+### R29 — A malformed alias must not change a ritual's story family
+
+- **Status:** independent magic-proposal review is Needs-fixes, zero Critical / one Important / zero Minor. A bounded correction and permanent regression are being authored in a separate isolated host. No affected reader is installed.
+- **Finding:** `storyThreads` stores versions by internal claim ID. A malformed second dictionary entry sharing the exact retained séance root's ID can overwrite its version and move the real ritual into an unrelated family. The exact root, `magicThreads` and legacy `threadOf` still agree on the original family.
+- **Adopted correction:** enforce the exact retained dictionary identity when joining a story event. Preserve unresolved history and all 240 existing acceptance cases; add the real-ritual alias reproduction permanently. This corrects a false causal explanation without adding gameplay recording or inferring a new root.
+- **Evidence:** the independent 240-case suite, both compilers, scoped lint and mandatory firing pass. A separate adversarial probe measures one failure and one passing control. [Review record](2026-09-13-magic-identity-proposal-review.md).
+- **Boundary:** the correction needs independent re-review before final composition consumes it. Original proposal and review evidence remain frozen; unrelated prose and recording work continues.

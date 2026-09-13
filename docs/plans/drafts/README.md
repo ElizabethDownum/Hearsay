@@ -1,5 +1,21 @@
 # Plan 9 author snapshots â€” 5 September 2026
 
+
+## 13 September physical proposal approval
+
+The [physical evidence/feature-link extension](2026-09-13-task-5b-physical-links.md),
+[author report](2026-09-13-task-5b-physical-links-author-report.md) and
+[constraints](task-5b-physical-links-constraints.md) are exact frozen copies.
+[Independent approval](../../review/2026-09-13-physical-links-proposal-approval.md)
+is Approved-for-base-reconciliation, zero findings:198cases(147preserved+51), both
+compilers/lint/firing and4extra reviewer probes pass. R26's mixed-slot correction
+retains the original receipt uncertainty/span boundaries. One reviewer-induced
+volatile cache exception is disclosed; semantic inputs and evidence remain intact.
+Task 4 actual code is independently approved at152f2a0 and complete7A at3020688.
+Magic240 review found one Important claim-alias identity defect; a separate author
+is preparing a bounded241 correction while remaining calendar/terminal composition
+proceeds. No production debrief model is installed. Earlier checkpoints follow.
+
 ## Evening native review continuation
 
 Ellie resumed after restart. Native seats are available. The
