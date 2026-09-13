@@ -88,6 +88,10 @@ function flipHiddenState(world: WorldState): void {
     };
     record.decision = PROFILE;
     record.execution = { state: 'aborted', changedAt: 45, dueAt: 60, waiting: null };
+    record.outcomes = [{ tick: 45, reportMessageId: null, result: {
+      outcome: 'hidden refusal', reason: 'private reason', evidence: [], source: 'dov',
+      uncertainty: 'high', reportedClaim: null, factRefs: [],
+    } }];
   }
   state.scrutiny.push({ observer: 'ada', principal: 'you', observedAt: 0, cause: 'confrontation' });
   for (const message of state.messages) {
@@ -663,6 +667,7 @@ const WORLD_ALIAS_PRONGS: Prong[] = [
 
 /** Every hidden name the constraints forbid the DESK SELECTOR from reading. */
 const FORBIDDEN_IN_SELECTOR: Prong[] = [
+  named('private outcome history', 'record', 'outcomes'),
   named('received (the mutated version)', 'record', 'received'),
   named('decision', 'record', 'decision'),
   named('execution', 'record', 'execution'),
@@ -712,6 +717,7 @@ describe('hidden-name source scan — the selector cannot name what it must not 
  *  whether the record is reached through the raw world or through an imported helper under an
  *  alias, which is why these are NAME questions and not dotted-path patterns. */
 const FORBIDDEN_IN_APP: Prong[] = [
+  named('private outcome history', 'record', 'outcomes'),
   named('the raw directive substrate', 'world.network', 'directiveState'),
   named('received (the mutated version)', 'record', 'received'),
   named('decision', 'record', 'decision'),

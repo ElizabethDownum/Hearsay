@@ -12,7 +12,7 @@ import type { InquiryTask, Npc, WorldState } from '../types';
 import { trustBetween } from '../world';
 import { evaluateReceivedBrief, type ReceivedBriefInput } from './evaluator';
 import { projectBrief } from './mutation';
-import { queueDirectiveReport, buildDirectiveReport } from './reports';
+import { queueDirectiveReport, buildDirectiveReport, recordDirectiveOutcome } from './reports';
 import { perceivedScrutiny } from './scrutiny';
 import {
   allocateNetworkMessage, allocateProjectedVersionId, strictNextBeat, validateNetworkRoute,
@@ -111,7 +111,9 @@ function abortRecord(
   queueReport = true,
 ): void {
   record.execution = { state: 'aborted', changedAt: tick, dueAt: null, waiting: null };
-  if (queueReport) queueDirectiveReport(world, record, profile, refusalResult(record, reason), rules, tick);
+  const result = refusalResult(record, reason);
+  if (queueReport) queueDirectiveReport(world, record, profile, result, rules, tick);
+  else recordDirectiveOutcome(record, result, tick);
 }
 
 function scheduleDirectiveDue(world: WorldState, record: DirectiveRecord, due: Tick): void {
@@ -218,15 +220,18 @@ export function initializeDirectiveReceipt(
 
   if (directPlayerReceipt) {
     let report = null;
-    if (profile.commitment === 'refuse' && record.received!.version.brief.report !== 'none') {
-      report = buildDirectiveReport(world, record, profile,
-        refusalResult(record, 'the recipient refused the received brief'), rules).report;
+    const result = profile.commitment === 'refuse'
+      ? refusalResult(record, 'the recipient refused the received brief') : null;
+    const outcome = result === null ? null : recordDirectiveOutcome(record, result, tick);
+    if (result !== null && record.received!.version.brief.report !== 'none') {
+      report = buildDirectiveReport(world, record, profile, result, rules).report;
     }
     validateNetworkRoute(world, record.recipient, [record.principalId]);
-    allocateNetworkMessage(world, record.principal, record.recipient, [record.principalId], {
+    const responseId = allocateNetworkMessage(world, record.principal, record.recipient, [record.principalId], {
       kind: 'directive-response', directiveId: record.id,
       response: profile.commitment, report,
     }, tick, null, { kind: 'player-action', action: 'directive', tick });
+    if (outcome !== null) outcome.reportMessageId = responseId;
   } else if (profile.commitment === 'refuse') {
     queueDirectiveReport(world, record, profile,
       refusalResult(record, 'the recipient refused the received brief'), rules, tick);

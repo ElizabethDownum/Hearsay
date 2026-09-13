@@ -341,6 +341,14 @@ export interface NetworkSpeech {
   } | null;
 }
 
+/** Private execution history, never projected into a received brief or spoken report. */
+export interface DirectiveOutcomeRecord {
+  tick: Tick;
+  result: DirectiveExecutionResult;
+  /** Correlates the actual response/report packet; null when no packet was queued. */
+  reportMessageId: MessageId | null;
+}
+
 export interface DirectiveRecord {
   id: DirectiveId;
   principal: Principal;
@@ -370,6 +378,8 @@ export interface DirectiveRecord {
     workedDays?: number[];
   } | null;
   receivedReports: { receivedAt: Tick; via: EntityId; report: DirectiveReportPayload }[];
+  /** Absent until an execution outcome is observed; legacy absence means unrecorded. */
+  outcomes?: DirectiveOutcomeRecord[];
 }
 
 export type ScrutinyCause =

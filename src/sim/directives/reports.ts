@@ -5,7 +5,7 @@ import type { Rules } from '../rules';
 import type { WorldState } from '../types';
 import { allocateNetworkMessage } from './state';
 import type {
-  DirectiveDecisionProfile, DirectiveExecutionResult, DirectiveRecord,
+  DirectiveDecisionProfile, DirectiveExecutionResult, DirectiveOutcomeRecord, DirectiveRecord,
   DirectiveReportEvidence, DirectiveReportPayload, MessageId, SpokenNetworkPayload,
 } from './types';
 import { correlationOf } from './types';
@@ -67,6 +67,17 @@ export function buildDirectiveReport(
   };
 }
 
+/** Save the actual local result before report policy/candor can omit or transform it. */
+export function recordDirectiveOutcome(
+  record: DirectiveRecord, result: DirectiveExecutionResult, tick: Tick,
+): DirectiveOutcomeRecord {
+  const outcome: DirectiveOutcomeRecord = {
+    tick, result: cloneSerializable(result), reportMessageId: null,
+  };
+  (record.outcomes ?? (record.outcomes = [])).push(outcome);
+  return outcome;
+}
+
 /** Queue through only the reply route physically retained in the received version. */
 export function queueDirectiveReport(
   world: WorldState,
@@ -77,24 +88,26 @@ export function queueDirectiveReport(
   completedAt: Tick,
 ): MessageId | null {
   const route = record.received?.version.replyRoute ?? null;
-  if (route === null) return null;
   const seen = new Set<string>();
-  for (const id of route) {
+  for (const id of route ?? []) {
     if (id === record.recipient) {
       throw new Error(`directive report '${record.id}': received route contains self-hop '${id}'`);
     }
     if (seen.has(id)) throw new Error(`directive report '${record.id}': duplicate route actor '${id}'`);
     seen.add(id);
   }
+  const outcome = recordDirectiveOutcome(record, result, completedAt);
+  if (route === null) return null;
   const built = buildDirectiveReport(world, record, profile, result, rules);
   if (emptyReport(built.report)) return null;
   const availableAfter = Math.max(completedAt, profile.timing.reportAt ?? completedAt);
-  return allocateNetworkMessage(world, record.principal, record.recipient, [...route], {
+  outcome.reportMessageId = allocateNetworkMessage(world, record.principal, record.recipient, [...route], {
     kind: 'directive-report', directiveId: record.id, report: built.report,
     factRefs: built.factRefs,
     enemyAction: profile.candor === 'ordinary' || profile.candor === 'guarded'
       ? cloneSerializable(result.enemyAction ?? null) : null,
   }, availableAfter, null, null);
+  return outcome.reportMessageId;
 }
 
 /** HQ bookkeeping is driven by correlation, while completion facts come only from heard speech. */
