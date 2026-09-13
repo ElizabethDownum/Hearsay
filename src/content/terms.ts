@@ -74,6 +74,12 @@ export const TERMS: Record<string, TermDef> = {
   'magic': { id: 'magic', label: 'Magic', short: 'Observation through a ritual. It supplies no independent informant channel.', entry: null },
   'scene-presence': { id: 'scene-presence', label: 'Seen in the scene', short: 'A person visible at a known venue and time. Presence alone does not say they serve the watch.', entry: null },
   'arcane-residue': { id: 'arcane-residue', label: 'Arcane residue', short: 'A physical trace where scrying begins. Local witnesses may report it; it does not name the caster.', entry: null },
+  'verb-seance': { id: 'verb-seance', label: 'Hold a séance',
+    short: '20 coin, once per campaign. A chapel or cathedral before 04:00. The departed gives testimony and one relationship.', entry: null },
+  'the-departed': { id: 'the-departed', label: 'The departed',
+    short: 'A historical witness whose account survives: a true secret and one real relationship.', entry: null },
+  'night-visit': { id: 'night-visit', label: 'Night visit',
+    short: 'A chapel or cathedral visit before 04:00. A guard must report it; the spymaster can witness it directly.', entry: null },
   // ── the network economy: your standing, your payroll, your reach (Plan 8) ──
   'station':         { id: 'station', label: 'Station', short: 'The seat the seed deals your avatar — noble or lowlife. Fixed for the campaign; it sets your standing in town.', entry: null },
   'standing':        { id: 'standing', label: 'Standing', short: 'What your station lets you do: which venue doors open without suspicion, and the one room you may host in.', entry: null },

@@ -77,4 +77,5 @@ export const VERB_TERM: Record<Action['kind'], string> = {
   plant: 'verb-plant',
   show: 'verb-show',
   scry: 'verb-scry',
+  seance: 'verb-seance',
 };

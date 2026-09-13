@@ -190,7 +190,7 @@ describe('Task 13 registry — exactly eight new nouns, and no copy that promise
    */
   const LATER_PLAN_TERM_IDS = [
     'verb-forge', 'verb-plant', 'verb-show', 'verb-scry', 'scrying', 'magic',
-    'scene-presence', 'arcane-residue',
+    'scene-presence', 'arcane-residue', 'verb-seance', 'the-departed', 'night-visit',
   ];
 
   it('the registry grew by exactly 8 from Task-12 HEAD (later-plan registrations named and excluded)', () => {
