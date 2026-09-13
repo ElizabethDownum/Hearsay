@@ -859,6 +859,7 @@ export function settleDirectiveApplications(world: WorldState, tick: Tick, rules
         abortRecord(world, record, record.decision, tick, rules, 'rendezvous window missed');
       }
     } else if (application.kind === 'enemy-watch'
+      && record.execution.state === 'attempted'
       && record.execution.changedAt < tick
       && tick % CONVERSATION_BEAT === 0
       && dayOf(tick) >= application.startDay
