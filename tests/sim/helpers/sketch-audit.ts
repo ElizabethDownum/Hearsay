@@ -9,10 +9,10 @@ import type { WorldState } from '../../../src/sim/types';
  * the named observer actually heard. This is the debrief substrate guarantee — no
  * feature may float free of a witnessed event.
  *
- * Task 12 adds the network channel. Task 3 adds a third, physical channel: a residue
- * ref resolves to an actual sighting and, when reported, the exact heard envelope and
- * spoken atom. A residue feature must keep its physical discriminant so it cannot fall
- * through to a same-tick ordinary asking.
+ * Task 12 adds the network channel. Tasks 3 and 4 add physical residue and night-visit
+ * channels: each ref resolves to an actual sighting and, when reported, the exact heard
+ * envelope and spoken atom. Physical features must keep their discriminants so they
+ * cannot fall through to a same-tick ordinary asking.
  */
 export function auditSketch(world: WorldState): void {
   for (const feature of world.enemy.sketch) {
@@ -23,7 +23,55 @@ export function auditSketch(world: WorldState): void {
       if (feature.kind === 'arcane-residue') {
         expect(ref.residue, `feature ${feature.id} physical ref ${JSON.stringify(ref)} lacks its residue discriminant`).toBeDefined();
       }
+      if (feature.kind === 'night-visit') expect(ref.nightVisit).toBeDefined();
+      if (feature.kind === 'runaround' && ref.claimId === null && ref.messageId === null) {
+        expect(ref.residue ?? ref.nightVisit,
+          `runaround ${feature.id} null-id ref lacks its physical marker`).toBeDefined();
+      }
+
+      if (ref.nightVisit !== undefined) {
+        expect(ref.residue).toBeUndefined();
+        expect(ref.claimId).toBeNull(); expect(ref.messageId).toBeNull();
+        const visit = ref.nightVisit;
+        const entry = world.enemy.evidence.find((candidate) => candidate.kind === 'night-visit'
+          && candidate.tick === ref.tick && candidate.observer === ref.observer
+          && candidate.nightVisit.actor === visit.actor && candidate.nightVisit.witness === visit.witness
+          && candidate.nightVisit.observedAt === visit.observedAt);
+        expect(entry, 'night visit ref must match physical evidence').toBeDefined();
+        if (entry?.kind !== 'night-visit') throw new Error('missing night visit evidence');
+        expect(entry.tick).toBe(visit.observedAt); expect(entry.observer).toBe(visit.witness);
+        expect(entry.speaker).toBeNull(); expect(entry.addressedTo).toBeNull();
+        expect(entry.claimId).toBeNull(); expect(entry.family).toBeNull();
+        if (feature.kind === 'night-visit') {
+          expect(feature.subject).toBe(visit.actor); expect(feature.family).toBeNull();
+          expect(feature.venue).toBe(entry.venue);
+          expect(feature.district).toBe(world.enemy.map.venues.find((venue) => venue.id === entry.venue)?.district ?? null);
+        }
+        expect(world.chronicle.some((row) => row.kind === 'night-visit' && row.tick === visit.observedAt
+          && row.observer === visit.witness && row.actor === visit.actor && row.venue === entry.venue),
+        'night visit must have the exact recorded physical sighting').toBe(true);
+        if (entry.receipt === undefined) {
+          expect(visit.witness, 'only the real principal ingests a direct sighting').toBe(world.network.spymaster);
+        } else {
+          const receipt = entry.receipt;
+          expect(receipt.observer).toBe(world.network.spymaster);
+          expect(receipt.tick).toBeGreaterThanOrEqual(visit.observedAt);
+          const speech = world.chronicle.find((row) => row.kind === 'network-speech'
+            && row.tick === receipt.tick && row.messageId === receipt.messageId
+            && row.heardBy.some((hearer) => hearer.id === receipt.observer));
+          expect(speech, 'night visit receipt must name an actual heard envelope').toBeDefined();
+          if (speech?.kind !== 'network-speech' || speech.spoken.kind !== 'field-report') {
+            throw new Error('missing night visit field report');
+          }
+          expect(speech.spoken.items.some(({ observation }) => observation.kind === 'presence'
+            && observation.observedAt === visit.observedAt && observation.venue === entry.venue
+            && observation.actor === visit.actor && observation.witness === visit.witness),
+          'the exact night visit atom must actually have been spoken').toBe(true);
+        }
+        continue;
+      }
       if (ref.residue !== undefined) {
+        expect(ref.nightVisit).toBeUndefined();
         expect(ref.claimId).toBeNull();
         expect(ref.messageId).toBeNull();
         expect(ref.observer).toBe(ref.residue.witness);
@@ -83,7 +131,8 @@ export function auditSketch(world: WorldState): void {
 
       // (1) the ref resolves to a captured EvidenceEntry (same tick/observer/claimId/messageId).
       const entry = world.enemy.evidence.find(
-        (e) => e.kind !== 'arcane-residue' && e.tick === ref.tick && e.observer === ref.observer
+        (e) => e.kind !== 'arcane-residue' && e.kind !== 'night-visit'
+          && e.tick === ref.tick && e.observer === ref.observer
           && e.claimId === ref.claimId && (e.network?.messageId ?? null) === ref.messageId);
       expect(entry, `feature ${feature.id} ref ${JSON.stringify(ref)} matches no EvidenceEntry`).toBeDefined();
 

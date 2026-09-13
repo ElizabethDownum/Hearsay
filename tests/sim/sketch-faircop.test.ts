@@ -132,6 +132,14 @@ describe('physical residue fair-cop chain', () => {
     if (fault === 'missing-ref-discriminant') delete ref.residue;
     expect(() => auditSketch(world)).toThrow();
   });
+
+it('the night-visit marker precondition runs before the residue value branch', () => {
+  const world = residueAuditWorld(true);
+  const feature = world.enemy.sketch.find((row) => row.kind === 'arcane-residue')!;
+  expect(feature.evidence[0]!.residue).toBeDefined();
+  feature.kind = 'night-visit';
+  expect(() => auditSketch(world)).toThrow();
+});
 });
 
 /** The same witness heard an ordinary asking at the exact tick and venue of the physical sighting. */

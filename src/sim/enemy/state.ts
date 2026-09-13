@@ -112,8 +112,8 @@ export type EvidenceEntry =
  * resolves by `(tick, observer, claimId)`; a NETWORK ref resolves by
  * `(tick, observer, messageId)` against a `network-speech` chronicle row with that id/tick whose
  * `heardBy` names the observer. Old claim/network/asking refs retain their existing resolution. A
- * residue ref requires both ids null and resolves to its physical sighting plus any actual report
- * receipt.
+ * residue or night-visit ref requires both ids null and resolves to its physical sighting plus
+ * any actual report receipt.
  */
 export interface SketchEvidenceRef {
   tick: Tick;
@@ -121,12 +121,13 @@ export interface SketchEvidenceRef {
   claimId: ClaimId | null;
   messageId: MessageId | null;
   residue?: ResidueEvidenceData;
+  nightVisit?: NightVisitEvidenceData;
 }
 
 export interface SketchFeature {
   id: string;
   kind: 'district-activity' | 'entry-point' | 'origin-vague' | 'carrier-profile' | 'runaround'
-    | 'forged-document' | 'arcane-residue';
+    | 'forged-document' | 'arcane-residue' | 'night-visit';
   day: number;
   family: RumorId | null;
   subject: EntityId | null;

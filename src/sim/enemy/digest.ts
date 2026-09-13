@@ -135,7 +135,10 @@ const sameRefs = (a: readonly SketchEvidenceRef[], b: readonly SketchEvidenceRef
     && ref.messageId === b[i]!.messageId
     && ref.residue?.id === b[i]!.residue?.id
     && ref.residue?.witness === b[i]!.residue?.witness
-    && ref.residue?.observedAt === b[i]!.residue?.observedAt);
+    && ref.residue?.observedAt === b[i]!.residue?.observedAt
+    && ref.nightVisit?.actor === b[i]!.nightVisit?.actor
+    && ref.nightVisit?.witness === b[i]!.nightVisit?.witness
+    && ref.nightVisit?.observedAt === b[i]!.nightVisit?.observedAt);
 
 /**
  * Plan 8 Task 10 — exposure escalation tiers (P6 deferral #2). How hard the PLAYER'S OWN
@@ -192,6 +195,7 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
     tick: e.tick, observer: e.observer, claimId: e.claimId,
     messageId: e.network?.messageId ?? null,
     ...(e.kind === 'arcane-residue' ? { residue: { ...e.residue } } : {}),
+    ...(e.kind === 'night-visit' ? { nightVisit: { ...e.nightVisit } } : {}),
   });
 
   // ── Heuristic 9: feature ids `sf${counter + i}` in emission order — reads the counter, never writes it.
@@ -371,6 +375,7 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
       evidence: lead.evidence.map((row) => ({
         ...row,
         ...(row.residue === undefined ? {} : { residue: { ...row.residue } }),
+        ...(row.nightVisit === undefined ? {} : { nightVisit: { ...row.nightVisit } }),
       })),
     });
     const watchRows = rows.filter((row) => row.kind === 'watch').sort(byStart);
@@ -422,6 +427,18 @@ export function enemyDigest(state: EnemyState, day: number, rules: Rules, pressu
       kind: 'arcane-residue', day, family: null, subject: null,
       venue: e.venue, district: districtOf.get(e.venue) ?? null,
       detail: `arcane residue observed at ${e.venue} (day ${dayOf(e.residue.observedAt)})`,
+      evidence: [ref(e)],
+    });
+  }
+
+  for (const e of state.evidence) {
+    if (e.kind !== 'night-visit') continue;
+    const subject = e.nightVisit.actor;
+    if (has((feature) => feature.kind === 'night-visit' && feature.subject === subject)) continue;
+    addFeature({
+      kind: 'night-visit', day, family: null, subject, venue: e.venue,
+      district: districtOf.get(e.venue) ?? null,
+      detail: `${subject} seen at ${e.venue} before 04:00 (day ${dayOf(e.nightVisit.observedAt)}, witness ${e.nightVisit.witness})`,
       evidence: [ref(e)],
     });
   }
