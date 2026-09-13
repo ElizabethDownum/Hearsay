@@ -31,8 +31,14 @@ Frozen evidence under `.superpowers/sdd`:
 
 The original review incorrectly carries R16's PowerShell capture description into
 its R17 worker-evidence paragraph. R17 actually used Python binary pipes with
-before/after source identity. The reviewer is preserving the report and adding an
-immutable evidence erratum. Its independent committed checks already use the
+before/after source identity. The reviewer preserved the report and sealed an
+immutable evidence erratum, independently checking all15 worker capture pairs.
+Root read the erratum and verified both supplemental entries. The addendum at
+`r17-code-review-validation-2026-09-13/evidence-addendum.md` has SHA-256
+`C37020A49610547D123272A4364AA0D4645B127BB1C279FE8DD2F28D162B2A8E`; its
+two-file supplement inventory has SHA-256
+`51D1A4FE6B8EFD58408F025B407DA0FE93AE2EE702FEFAFA09016FB926B7EDE8`.
+Its independent committed checks already use the
 complete binary capture chain; this factual correction does not affect approval.
 The two failed reviewer preflight assumptions and the worker's initial sandbox
 loader denial also remain preserved and explicitly distinguished from test failures.

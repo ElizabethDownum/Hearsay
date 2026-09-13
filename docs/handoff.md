@@ -1,5 +1,7 @@
 # Hearsay — resumed, 13 September 2026
 
+[Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+
 Ellie clarified on 13 September that the 6 September stop was “just for that one
 session”. Continue implementation according to the current plan, applying
 recommended defaults and saving non-blocking judgments/issues in `docs/review.html`
@@ -23,6 +25,8 @@ with zero findings and the same gates passing; root verified77 review entries.
 [R17 approval](review/2026-09-13-r17-code-approval.md).
 [R16 approval](review/2026-09-13-r16-code-approval.md).
 [Recording approval](review/2026-09-13-recording-code-approval.md).
+
+Latest: Task5A2 is committed at78ff1c2, with worker/controller2,078 tests/132 files, all six gates and unchanged complete simulation reports. Root verified12 full world pairs with81 outcomes/54 packet links and221 predecessor archive files. Independent code review is Approved with zero findings; root verified104 review entries. The649-case UI proposal has one Important contrast finding; its654-case correction is in independent re-review. R18 normal-phase cancellation/HQ restoration is confirmed and has its own scoped correction author. [UI review](review/2026-09-13-ui-proposal-review.md). [R18 dispositions](review/2026-09-13-r18-measured-dispositions.md).
 
 This project-local handoff supersedes older shared AI memory. All writes remain
 inside Hearsay; no push is authorized by this resumption. The saved checkpoint and
@@ -76,7 +80,7 @@ frozen artifact identities are in the [6 September episode](episodes/2026-09-06-
    independent gates passing. [Approval](review/2026-09-13-prose-code-approval.md).
    Preserve the exact [T4-A1/A2 amendment](plans/drafts/2026-09-05-task-4-base-reconciliation.md).
 3. Task5A1 is closed at `252a481`, R16 at `36d090c`, and R17 at `bc409d3`.
-   Implement separately verified5A2 and full5B model completion. Prose78-case,
+   Task5A2 is closed at78ff1c2. Install full5B model completion. Prose78-case,
    outcome-history239-case and ordinary feature-link147-case proposals have
    independent approvals; they are not production implementations.
 4. Physical/magic/story links, calendar/terminal model,6/7B UI and8 integration/
@@ -94,9 +98,12 @@ frozen artifact identities are in the [6 September episode](episodes/2026-09-06-
    zero findings; R30/R31 are closed. Root verified532 author and452 review entries,
    each including all356 archived files. Only proposed threads.ts and additive
    composition tests change. [Approval](review/2026-09-13-receipt-partition-proposal-approval.md).
-   Task6/7B UI continues in a separate isolated checkout against the provisional
-   interface; final certification
-   must consume the independently approved correction.
+   Task6/7B UI is frozen on the approved321 model:649 cases pass, with41 new UI
+   cases and287 existing app/registry cases. Both compilers,46-body lint and native
+   rendered surfaces pass; root verified1,004 author entries, including365 archived
+   files and18 exact targets. Independent UI review found one contrast defect; its
+   separate654-case correction is in independent re-review. Actual
+   installation and interactive browser checks remain.
    [Latest composition review](review/2026-09-13-composition-contract-review.md).
    The completed premise check supports existing semantic attention readers plus
    calendar/terminal composition; player hypothesis cards remain ungraded notes.
@@ -107,7 +114,7 @@ One production writer; root owns Git index and scoped commits. Preserve current
 provenance/physical unions when reconciling older virtual overlays. Capture native
 bytes/exits before formatting; PowerShell7 and `python -X utf8`. Snapshots start
 inside owned excluded `node_modules`, never collectible scratch `.test.ts` paths.
-The current measured full-suite count is 2,055/130 at `36d090c`. Existing successful gates need no repetition without a change
+The current measured full-suite count is 2,078/132 at `78ff1c2`. Existing successful gates need no repetition without a change
 or a stated checkpoint requirement.
 
 All deferred questions and PROVISIONAL local rulings, including R24/R25 receipt

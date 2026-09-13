@@ -1,5 +1,7 @@
 # Current review — 13 September 2026
 
+[Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+
 **Implementation resumed.** Ellie clarified that the 6 September stop applied only
 to that session. Continue the plan and save non-blocking judgments/issues here for
 later review. Task 4C2 is committed at `152f2a0`. All six gates pass, including
@@ -26,6 +28,17 @@ R30's mixed-time receipt correction is closed and R31 ending validation remains
 closed. Root verified452 review entries, including all356 archived files. The
 approved replacement now supplies final UI proposal validation and later actual
 model installation. [Approval](2026-09-13-receipt-partition-proposal-approval.md).
+The final Task6/7B UI proposal passes649 cases (321 model,41 new UI and287 existing
+app/registry cases), both compilers,46-body lint and its rendered three-surface
+lesson. Independent UI review found one Important contrast defect; a separate
+correction now passes654 cases (all649 retained plusfive actual-style checks) and
+is in independent re-review. All other requirements pass. Root verified1,004 author
+and464 reviewer entries, including their365-file archives. No UI is installed and
+interactive browser verification remains. [Review](2026-09-13-ui-proposal-review.md).
+Task5A2 is committed at78ff1c2: worker/controller2,078 tests/132 files and all six
+gates pass, with10 report blocks/230 lines/four controls equal. Twelve complete
+world pairs differ only by the new outcomes; root verified221 predecessor files
+and81 outcomes/54 packet links. Independent code review is Approved with zero findings; root verified104 review entries.
 [Prose approval](2026-09-13-prose-code-approval.md). [Current handoff](handoff.md).
 
 Ellie's current instructions: audit the existing plan before continuing implementation; keep every change inside the Hearsay project folder; take the recommended behavior and hold questions/issues in this HTML document for later review.
@@ -48,10 +61,10 @@ panel behavior; a purchase composer, manual layout audit and many-seed magic bal
 remain outside this stage.
 Séance's conditional plan amendment is saved. The corrected 78-case prose proposal
 has fresh independent approval. Recording review's séance-family correction is
-adopted under R23. Task5A2 private outcome recording has independent proposal
+adopted under R23. Task5A2 private outcome recording had independent proposal
 approval with zero findings: 239 affected cases and twelve complete-world pairs
-pass ([review](review/2026-09-05-outcome-history-plan-approval.md)). It remains
-unimplemented. The ninth partial debrief module, ordinary feature linkage, now has an independently approved147-case correction (96 earlier,48 feature and3 receipt-boundary cases), zerofindings. R25 retains the provisional local decision and native approval evidence. The following recovery
+pass ([review](review/2026-09-05-outcome-history-plan-approval.md)). The actual implementation is now committed and independently Approved, as
+recorded above. The ninth partial debrief module, ordinary feature linkage, now has an independently approved147-case correction (96 earlier,48 feature and3 receipt-boundary cases), zerofindings. R25 retains the provisional local decision and native approval evidence. The following recovery
 paragraphs are historical checkpoints.
 
 Status at session start: Plan 9 Task 1, fix wave two. HEAD 49cc3e7 contains the first five fixes and G1. Two unfinished G2 test edits were preserved in a project-local recovery snapshot. The inherited working tree passes 1,710 tests in 113 files, lint, both typechecks and the production build. The JavaScript bundle remains 489.63 kB (145.02 kB gzip). Remaining fixes and independent review are in progress. This is a recovery baseline, not Task 1 completion.
@@ -223,7 +236,7 @@ probe fails. Task 2 closure is withheld while the bounded correction is prepared
 - **Evidence and limits:** watch-plan-review observations d1–d3 trace the current source; expiry after actual work is also in the retained native history probe. Cancellation and venue-mutation consequences are source-derived hypotheses until a bounded native reproduction is saved. Do not call them new passing tests or silently repair them under R17.
 - **Status:** held for later bounded work; no new gameplay rule or threshold selected. [Independent source review](2026-09-05-watch-plan-review.md).
 - **Closeout clarification, 13 September:** the independent premise audit confirms these do not block R16/R17 and are not automatically authorized repairs. Before final Plan9 certification, run and retain bounded post-R17 cancellation, expiry and interpreted-venue probes, then record a disposition for each result. A reproduced defect needs its own scoped proposal/review or an explicit later-plan disposition compatible with debrief truthfulness; it must not silently enter either approved watch patch. Audit: `.superpowers/sdd/r18-closeout-premise-audit-2026-09-13.md`, SHA-256 `3F9CD0F5137D6F26F3EA398D4CCEE3B2B4913ADAEAC7931D183C25E3AB36FFCE`.
-- **Probe dispatch:** bounded mechanism probes are active in an isolated checkout of independently approved R17 `bc409d3`. They will preserve cancellation/work/ledger, expiry and interpreted-venue traces with explicit controls and dispositions. No R18 repair is part of R17 or5A2.
+- **Measured disposition, 13 September:** normal-phase probes confirm cancellation followed by ordinary-presence work and HQ restoration. A separate identity-preserving correction proposal is commissioned at78ff1c2. Eight worked reports precede expiry refusal;5A2 preserves private outcomes. Relocator changes guidance only, with no venue divergence. The home-0 control never receives the order. Root verified39 handoff entries/38 final inputs; provenance limitations and every scope are in the [measured disposition](2026-09-13-r18-measured-dispositions.md). No R18 repair is part of R17 or5A2.
 
 ### R19 — Handoff learning candidates stay project-local
 
@@ -400,3 +413,9 @@ The orchestration skill's role contract says, "You do not implement, deep-review
 - **Evidence:** the independent proposal suite passes 278 cases while the three additional malformed-payload cases fail. [Independent review](2026-09-13-composition-proposal-review.md).
 - **Boundary:** no recording/schema/gameplay change is licensed. The versioned correction preserves all existing assertions and needs independent reconciliation review before model or UI certification.
 - **Independent disposition:** closed within the313-case proposal. Real endings and all malformed/missing/ambiguous/future controls pass; retained source identities now resolve without rerunning gameplay. The complete model still needs R30's remaining correction, installation and separate code review. [Review](2026-09-13-composition-contract-review.md).
+
+### R32 — Changed debrief values need readable theme colors
+
+- **Issue:** independent UI proposal review measures inline changed text at1.54:1 in dark mode and exact changed cells at2.46:1 in light mode.
+- **Action:** a bounded correction must make both surfaces readable in both themes, preserve explicit Changed text and exact values, and add an actual-style regression.
+- **Status:** correction frozen with654 cases passing; identical-test oldCSS run652/2 reproduces both failures. Only terminal CSS andfive appended style assertions change, retaining47 other bodies/all649 prior cases. Root verified544 entries/365archivefiles. Independent correction review is active; later installed browser checks remain required. [Review](2026-09-13-ui-proposal-review.md).

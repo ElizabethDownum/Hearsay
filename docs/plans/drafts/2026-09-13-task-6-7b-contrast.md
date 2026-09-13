@@ -1,0 +1,2985 @@
+# Task 6 / 7B contrast correction: readable changed words and exact values
+
+13 September 2026. Complete-code proposal, no production installation. The frozen
+649-case predecessor received Needs-fixes: zero Critical, one Important and zero
+Minor findings. Its inline dark-theme and exact-value light-theme pairs failed
+normal-text contrast. Every other reviewed requirement passed. This new package
+addresses only that finding and requires separate independent correction review.
+
+The complete map contains the same 49 paths. Only app/src/theme.css and the additive
+tests/app/debrief-laws.test.ts suffix change. All 29 approved model bodies, all 649
+old case identities/assertions, 16 other UI bodies and two existing app test bodies
+are preserved. Old reports, source maps, archives and all 1,004 sealed entries stay
+byte-identical. This correction owns only the new task-6-7b-contrast-* outputs.
+
+Replace the one terminal marker rule with:
+
+```css
+.debrief-change, .debrief-desk .diff-cell { background: var(--ink); color: var(--paper); font-weight: 600; }
+```
+
+Both presentations use the existing theme's ink/paper pair in reverse. The exact
+value override applies only under the terminal desk; the shared live-panel
+.diff-cell rule and palette values remain unchanged. No component, claim comparison,
+Changed label, before/after prose, seven-field detail, deleted-only value, model,
+gameplay, registry, asset, session or keyboard behavior changes.
+
+Five permanent cases append to the existing gate-law test path: four calculate
+normal-text contrast from actual CSS selectors and palette tokens, and one protects
+the shared live-panel primitive. Explicit and automatic palette values are checked
+for parity. The bounded solid-color resolver fails on unsupported color syntax;
+it is not a browser cascade/layout engine. RED retains the unchanged 649 CSS and
+adds the identical five tests: only dark inline and light exact-value cases fail.
+GREEN changes only the one CSS rule and passes all 654 cases.
+
+The three serial units remain 7B registry (five paths), 6A panels/styles (ten paths),
+and 6B terminal gate/laws (three paths). Their complete maps are disjoint and retain
+the original dependency order. In this correction only 6A's theme.css and 6B's
+debrief-laws.test.ts differ; 7B is exact. A production writer installing the original
+proposal uses these complete corrected bodies after actual-base reconciliation.
+A writer applying the correction after a prior installation changes only those two
+paths. Do not copy author hosts or legacy recording/watch overlays into production.
+
+Run the complete 654-case model/UI/registry suite, both compiler configurations,
+scoped lint and existing fence/firing controls. The separate SSR capture retains
+world purity. Later installed browser testing still must verify both themes,
+normal and deleted-only changed values, pointer/keyboard/focus/scrolling and two
+viewports using the carried concrete narrative procedure. Neither calculated
+contrast nor SSR fulfills that browser gate. All inherited scope limits remain.
+
+The following carried plan includes historical predecessor evidence where labelled.
+The correction report and new source-delta/chunk/inventory records bind final results.
+
+# Carried complete implementation plan
+
+Complete-code proposal, isolated at `252a4813e1efffd15a5f08936bd3d64e2343af67`.
+This document is an implementation plan. Its virtual bodies are not production code.
+Installation requires the separately reviewed Task 5B model and actual predecessor
+reconciliation. Independent review of this UI proposal is also required.
+
+The completed campaign opens a reading desk with Threads, Sketch timeline and Overlay.
+Stories and report copies read as prose; the seven retained claim fields remain in
+expandable comparisons. Actual changes have both text labels and highlighting. A
+responsible mind is named only from a retained causal event. Missing roots, ambiguous
+identities, omitted items and unknown dates remain visible. The three surfaces share
+one detached DebriefView and never read the world themselves.
+
+## Boundaries and prerequisites
+
+Use actual source from the fixed checkout, including approved 7A2 claim prose and
+committed 5A1 recording. The archive preserves the actual chronicle comments and its
+identical inject / telling / séance guard. Obsolete virtual 5A1 source overrides were
+removed. The author host retains only named future R16 / R17 / 5A2 directive overlays.
+Those bodies support this proposal's fixed test host; they are not UI installation
+targets. At implementation, compare the committed prerequisites to their approved
+intent and run the model cases. Do not overwrite newer production source with any
+legacy overlay just to reproduce this host.
+
+The versioned model corrections change only threads.ts, index.ts and additive
+composition.test.ts cases. Their operations.beyondClock has separately typed
+enemyEvidence, physicalEvidence and featureReferences arrays. Original indexes are
+identities, not array positions. The UI renders current / unknown rows in their normal
+sections and keeps the known future partition separate. Resolution consistency is
+supplied by the model; the UI does not rerun the referee or repair a damaged ending.
+The exact upstream authority, source hashes and case counts are bound in the author
+report, receipt-reconciliation.json and release-bindings.json. Final native validation
+binds the approved 321-case source map
+`d3b54a75415482ab5f5045940a43215093532ee42cd3943934b09b4a8b4e6b05`.
+The preserved predecessor evidence passed 649 integrated cases and produced 640
+passed / nine failed with its public terminal entries disabled. This contrast
+correction adds five style cases: full GREEN is 654 passed and causal style RED is
+652 passed / two failed. The frozen 278 input stays intact.
+
+For a current feature with a later duplicate receipt, the current link is projected to
+current / unknown references with no future indexes. The complete link also remains
+in the later-receipt section. The UI labels current feature IDs with later receipt
+context explicitly; a repeated feature there does not mean a second future creation.
+Both the rejected 313 model and provisional 638 UI evidence remain preserved.
+
+R8 keeps performed, observed, received, acquired and digested dates separate. R9
+shows distinct kind / subject evidence groups and the actual named identification
+day, never a numerical threshold countdown. R10 reuses the existing broad sim import
+fence, including its type-import ban in panels. R28 keeps current hypothesis cards
+ungraded and outside historical calendar reconstruction. R29 keeps duplicate claim
+versions ambiguous. Physical sightings do not become semantic attention, and a
+chapel sighting does not prove a ritual or its caster. Existing model uncertainty and
+all inherited cases remain binding; no model change is requested for UI convenience.
+
+A7 purchase / forge / plant / show / scry / séance composers remain Plan 10 work.
+Near misses, unfired threads and counterfactual replay are outside this unit. Task 8's
+legal two-council arc and terminal canary lesson remain separate integration work.
+
+## Public interfaces and reading behavior
+
+| File / interface | Responsibility and consumer |
+| --- | --- |
+| app/src/townview.ts, erased DebriefView export | Existing legal type seam for every terminal panel; adds no runtime import. |
+| DebriefReading.tsx: DebriefClaim, DebriefReport, When, RetainedDetails, nameFrom | Props-only claim / reported-copy prose and retained-field comparisons, explicit unknown time, escaped retained details and public name fallback. |
+| DebriefThreads.tsx: DebriefThreads, DebriefArt | Story / artifact / message / report-item / directive / magic / physical families, their orphans, all chronicle categories and known future records. |
+| DebriefTimeline.tsx: DebriefTimeline | Sparse calendar, actual identification marker, received board, later acquisitions / digests, explicit gaps and undated rows. |
+| DebriefOverlay.tsx: DebriefOverlay | Received signals versus actual attention, independently resulting features, distinct lag sets, reported headquarters accounts, undated current ledger and ungraded notes. |
+| DebriefEnding.tsx: DebriefEnding | Ending card, Open / Back / Escape, three ARIA tabs and presentation-only navigation. |
+| app/src/main.tsx: App | Sole terminal debriefView call and payload construction; public names / resolved art passed as props. Existing session, input actions and save / replay remain unchanged. |
+
+The five panels import no sim module, even for types. The existing type-only townview
+barrel and legal content / time modules supply their contracts. DebriefArt contains
+the already resolved paper slot plus four resolved icon / fallback pairs, not an
+asset lookup or world reader. The root resolves registered slots only after terminal
+status. No new config exception or redundant import-fence rule is introduced.
+
+The actual main branch tests scenario status before computing debriefView. A running
+or scenario-free campaign never invokes that fold, passes no hidden payload and
+keeps the existing live composition. All four actual terminal outcomes reach exactly
+one fold. A terminal guard in the existing global keyboard listener leaves native
+Space activation to terminal controls; its running shortcuts remain intact. The
+existing playback terminal guard and session action / replay boundaries are unchanged.
+
+Every section has an explicit empty / missing state. Exact record details are escaped
+React text in disclosure elements. Claim prose uses the approved renderClaim and
+ClaimReading implementation. The word diff compares two retained complete copies;
+exact field changes remain authoritative for deleted-only wording and missing parents.
+Duplicate candidate versions expose all candidates without assigning one to an event.
+Report-stage omission or unknown association never becomes proof of a spoken item.
+Current carried packets are labelled as current copies, not pristine originals.
+
+Received claim copies on Overlay and returned headquarters / directive reports have
+their own primary prose lines. Actual local result claims, literal network copies
+and magic captures also use the same approved renderer; exact records remain in
+disclosures. A reported claim is never replaced with its private pristine original.
+
+Only a consistent ending gets its established causal sentence. Missing / inconsistent
+resolution data keeps the retained status and explicitly declines to narrate a proved
+cause. Actual magic price is unrecorded. Unknown and ambiguous fields remain distinct
+from none / unchanged / no linked record. No absence is promoted to a phantom.
+
+## Serial implementation units
+
+Use one production writer and index owner. Before every unit, inspect status and the
+actual prerequisite diff. Implement complete bodies below only in the listed paths.
+Review / reconcile source drift explicitly; never copy the entire author snapshot.
+
+1. **7B, registry and fallback preparation.** Own src/content/terms.ts,
+   assets/manifest.json, app/src/assets.ts, docs/asset-slots.md and
+   tests/app/jargon.test.ts. Register the 17 missing terms and four null slots;
+   retain the existing scrying slot and action terms. The old debrief term continues
+   to mean compelled asset questioning. The final epigraph is registered verbatim.
+   Preserve every existing term / slot / glyph and append only named registrations.
+   The jargon size assertion names the new later-plan terms without weakening its
+   original Task 13 assertion. Run actual jargon / asset tests and both compiler
+   configurations; inspect the registry-only diff. No asset is acquired or wired.
+
+2. **6A, the props-only desk.** Own the five Debrief*.tsx panels, app/src/townview.ts,
+   app/src/theme.css, tests/app/debrief-ui.test.tsx,
+   tests/app/debrief-history.test.tsx and tests/app/helpers/debrief-campaign.ts.
+   Requires 7B and approved installed Task 5B. Add the type-only seam, reuse printed
+   paper / ink / typography / table primitives and make only terminal styles.
+   Run the permanent UI and retained-history cases plus inherited model tests,
+   both compilers and scoped lint. Inspect the broad sim-import law on all five
+   paths. Native handlers prove navigation semantics; browser interaction is a
+   separate gate below. No main wiring or production fixture hook belongs here.
+
+3. **6B, the actual terminal composition boundary.** Own app/src/main.tsx,
+   tests/app/debrief-gate.test.tsx and tests/app/debrief-laws.test.ts. Requires 6A.
+   Replace the old placeholder ending only, export App for its actual composition
+   probe, and add the terminal keyboard early return. Fold once inside the actual
+   terminal branch; preserve hooks, live folds and session / clock behavior.
+   Run the complete proposal suite, both actual compiler configurations, scoped lint,
+   the real import-fence and hoisted / aliased gate firing controls, jargon / asset
+   integrity, and the browser narrative procedure. Actual implementation also gets
+   the project's applicable accumulated code gates and independent code review.
+
+The final reserved subject is `feat: the debrief — the curtain lifts behind one gate`.
+Do not use it for an incomplete registry-only or two-surface change. Independent UI
+proposal review precedes implementation; final Plan 9 closure belongs to Task 8 and
+whole-branch review. The evidence source inventory and chunk maps partition exactly
+18 UI targets, with no overlap between implementation units.
+
+## Concrete campaign lesson and later browser procedure
+
+The permanent terminalStory helper stages one retained witness of Ada's real injected
+claim: Bez stole two, severity four. It then runs actual queued network forwarding
+and the engine clock through a complete nightly ending. Literal Ada speaks count two,
+severity four, at tick 15; exaggerator Bez forwards count four, severity five, to the
+player at tick 30. The original claim remains count two, severity four. The story
+targets Bez while the campaign's usurper is Dov, so the two-member
+council objective has no qualifying turn and the clock ends the campaign at tick 1440.
+This is a staged witness plus real causal relays and a real clock loss, not a generated
+full-game canary or a claimed solution to Task 8.
+
+Read Threads first: the loss did not require the rumor to die. The report arrived,
+and Bez changed its count and severity, but it was a story about the wrong person for the stated
+objective. Inspect the two spoken copies and the exact count field. Read Sketch
+timeline next: the player sees the report only at its retained receipt; observation
+and acquisition markers retain their own dates. Read Overlay last: a received report
+is a reported account, not proof of enemy questioning or a resulting feature. Empty
+actual-attention and ungraded current notes are honest outcomes for this fixture.
+The epigraph explains why the lesson is a possibility, not a deterministic seed recipe.
+
+This author stage uses native SSR and calls the actual React navigation / registered
+keyboard callbacks. It does not launch a server or browser and does not certify layout,
+pointer hit targets, native focus, scrolling or accessibility in an interactive browser.
+Later implementation must perform the following concrete local exercise:
+
+1. Verify installed source / model hashes and rerun the permanent native cases. Confirm
+   Edge or Chrome and local Vite are still available; do not install a browser package
+   or use a personal profile. Create an owned temporary browser-evidence directory.
+2. Serve the actual app on an explicitly loopback-bound free port. Separately create
+   an owned temporary Vite harness, outside production paths, importing terminalStory,
+   debriefView, claimNames, DebriefEnding and the actual slot resolver. Render the exact
+   returned view with the same root art props as main. Expose only that fixture's
+   pre-render world hash and current hash for comparison. This harness changes no
+   production source, session API or action log. Preserve its complete bytes and argv.
+3. Launch an owned headless Edge / Chrome profile with a local-only DevTools endpoint
+   and record its version, command, port and profile path. Any background Start-Process
+   uses -WindowStyle Hidden. Use built-in local DevTools / WebSocket tooling if present;
+   absence of a callable transport is a reported blocker to this browser gate, not an
+   SSR substitute. Close only the owned browser / server after capture.
+4. Visit the actual running app first: verify the live playback / planner surface,
+   no Open the debrief control and no terminal DOM. Then visit the fixture harness.
+   Verify the clock-loss card. Focus Open and activate it once with Space and once
+   with Enter after returning. Each activation must open the actual Threads surface.
+5. Inspect the spoken count two / count four prose and the count detail row naming Bez.
+   Click Sketch timeline, then Overlay, then Threads. Record screenshots and visible
+   text for all three, plus selected tab / labelled panel IDs and exactly one focusable
+   tab button. Exercise ArrowRight, ArrowLeft wrap, Home, End, Tab to the panel, and
+   Escape / Back. Verify focus lands on the selected tab after arrow navigation and
+   no hidden live shortcut consumes Space. The fixture hash must remain unchanged.
+6. Expand an exact record and a field comparison; verify horizontal / page scrolling
+   at 1280 × 900 and 390 × 844, in the existing light and dark themes. Confirm changed,
+   unproved and missing states have readable text independent of color. Verify null
+   slots render glyphs / flat paper, titles use registered vocabulary, and the epigraph
+   is visible. Save native console errors, action sequence, DOM / text captures,
+   screenshots and hash comparison. Report any unmet native interaction or visual
+   check honestly; do not mark this browser gate complete from the author SSR proof.
+
+## Verification and failure policy
+
+The author host archives only the fixed tracked source into its excluded node_modules
+snapshot. Virtual source maps supply complete proposals and named prerequisites;
+native TypeScript and Vitest resolve the same bodies. A narrow filesystem read adapter
+lets the existing source-based jargon / registry tests inspect those exact virtual
+files. It does not replace their assertions or read a previous author's mutable cache.
+Automatic JSX matches the actual app compiler mode. Each measured native prefix keeps
+binary stdout / stderr, real exit, exact source map and native configuration.
+
+Causal RED keeps the exact permanent tests and lexical registry references, but returns
+the old resolved placeholder at the public terminal entries. GREEN restores the actual
+flow. The separate self-review RED proves the existing keyboard listener consumed
+terminal Space before the guard. Firing controls test the real ESLint configuration,
+and source checks reject hoisted / aliased hidden folds. Running behavior proves the
+fold is never called; source structure proves no other terminal payload route exists.
+
+Inherited model bodies and test identities remain intact except the exact independently
+reviewed three-body contract replacement. All failed assembly / harness / compiler
+attempts remain labelled as such. Neither host setup failures nor a missing dependency
+source map are represented as product regressions or silent test passes. The author
+report binds final arithmetic, native evidence, two adversarial passes and limitations.
+
+## Exact corrected source bodies
+
+### app/src/panels/DebriefReading.tsx
+
+SHA-256: `0de3a56d0d6dc4e4b3c01e558197960c64bbfb9e0133f933539145ad4659c863`. Unit: `6a-panels`.
+
+<!-- BEGIN FILE app/src/panels/DebriefReading.tsx -->
+`````tsx
+import { Fragment } from 'react';
+import { dayOf, minuteOfDay } from '../../../src/core/time';
+import { renderClaim, type ClaimText, type NameOf } from '../../../src/content/render';
+import { CLAIM_DETAIL_FIELDS, ClaimReading } from './ClaimReading';
+import { Term } from './Term';
+import type { DebriefView } from '../townview';
+
+export const nameFrom = (names: Readonly<Record<string, string>>): NameOf => (id) =>
+  Object.prototype.hasOwnProperty.call(names, id) ? names[id]! : id;
+
+export function When({ tick }: { tick: number | null }) {
+  if (tick === null) return <Term id="unrecorded" />;
+  const minute = minuteOfDay(tick);
+  return <>day {dayOf(tick)} · {String(Math.floor(minute / 60)).padStart(2, '0')}:{String(minute % 60).padStart(2, '0')}</>;
+}
+
+/** Complete retained values stay inspectable; React escapes every string. */
+export function RetainedDetails({ value, label = 'Read the retained record' }: { value: unknown; label?: string }) {
+  return <details className="debrief-detail"><summary>{label}</summary><pre>{JSON.stringify(value, null, 2) ?? 'Unrecorded'}</pre></details>;
+}
+
+type Report = DebriefView['calendar']['days'][number]['overlay']['headquartersAccounts'][number]['copy']['report'];
+/** Read the retained reported copy; this presentation never promotes it to an actual result. */
+export function DebriefReport({ report, names }: { report: Report; names: Readonly<Record<string, string>> }) {
+  return <div className="debrief-reported-copy">
+    <p>{report.outcome ?? 'Outcome unrecorded'}{report.reason === null ? '' : ' · '+report.reason}</p>
+    <p>Reported source: {report.source === null ? 'unrecorded' : nameFrom(names)(report.source)}.
+      {' '}Stated uncertainty: {report.uncertainty ?? 'unrecorded'}.</p>
+    {report.evidence === null ? <p>Reported evidence unrecorded.</p> : report.evidence.map((item, index) => item.kind === 'claim'
+      ? <DebriefClaim key={index} claim={item.reported} names={names} /> : <p key={index}>{item.text}</p>)}
+  </div>;
+}
+
+type Change = { field: keyof ClaimText; from: unknown; to: unknown };
+
+/** Mark only text that differs between two actually retained claim copies. Field changes remain the authority. */
+function changedWords(before: string, after: string): { word: string; changed: boolean }[] {
+  const left = before.match(/\S+\s*/g) ?? []; const right = after.match(/\S+\s*/g) ?? [];
+  const lengths = Array.from({ length: left.length + 1 }, () => Array<number>(right.length + 1).fill(0));
+  for (let a = left.length - 1; a >= 0; a--) for (let b = right.length - 1; b >= 0; b--)
+    lengths[a]![b] = left[a] === right[b] ? 1 + lengths[a + 1]![b + 1]!
+      : Math.max(lengths[a + 1]![b]!, lengths[a]![b + 1]!);
+  const unchanged = new Set<number>(); let a = 0; let b = 0;
+  while (a < left.length && b < right.length) {
+    if (left[a] === right[b]) { unchanged.add(b); a++; b++; }
+    else if (lengths[a + 1]![b]! >= lengths[a]![b + 1]!) a++; else b++;
+  }
+  return right.map((word, index) => ({ word, changed: !unchanged.has(index) }));
+}
+
+export function DebriefClaim({ claim, before = null, changes = null, changedBy = null, names }: {
+  claim: ClaimText; before?: ClaimText | null; changes?: readonly Change[] | null;
+  changedBy?: string | null; names: Readonly<Record<string, string>>;
+}) {
+  const nameOf = nameFrom(names); const changed = new Set(changes?.map((row) => row.field) ?? []);
+  const comparable = before !== null && changes !== null && changes.length > 0;
+  return <div className="claim-reading">
+    {comparable ? <>
+      <p className="desk-note">Earlier account</p><ClaimReading claim={before} nameOf={nameOf} detail={false} />
+      <p className="desk-note">This account — marked words changed</p>
+      <p>{changedWords(renderClaim(before, nameOf), renderClaim(claim, nameOf)).map((row, index) => row.changed
+        ? <mark key={index} className="debrief-change">{row.word}</mark> : <Fragment key={index}>{row.word}</Fragment>)}</p>
+    </> : <ClaimReading claim={claim} nameOf={nameOf} detail={false} />}
+    {changes === null ? <p className="desk-note">Earlier comparison <Term id="unrecorded" />.</p>
+      : changes.length === 0 ? <p className="desk-note">No recorded change to the claim fields.</p>
+        : <p><Term id="claim-change" />: {changedBy === null ? 'the responsible mind is unrecorded' : nameOf(changedBy)}.
+          {!comparable && ' The earlier complete copy is unavailable; only the recorded field changes are shown.'}</p>}
+    <details><summary>Compare the fields</summary><table className="board-table"><thead><tr>
+      <th>Field</th><th>Earlier value</th><th>This value</th><th>Recorded change</th>
+    </tr></thead><tbody>{CLAIM_DETAIL_FIELDS.map((field) => {
+      const change = changes?.find((row) => row.field === field);
+      return <tr key={field}><th scope="row"><Term id={field} /></th>
+        <td>{before === null && !change ? 'Unrecorded' : String(change ? change.from : before?.[field])}</td>
+        <td className={changed.has(field) ? 'diff-cell' : undefined}>{String(claim[field])}</td>
+        <td>{changed.has(field) ? 'Changed' : changes === null ? 'Unknown' : 'Unchanged'}</td></tr>;
+    })}</tbody></table></details>
+  </div>;
+}
+`````
+<!-- END FILE app/src/panels/DebriefReading.tsx -->
+
+### app/src/panels/DebriefThreads.tsx
+
+SHA-256: `8455e19fabeea379dcb8b3370f6f31ae08cfe5aded0c74df9031e1d02ed87c0b`. Unit: `6a-panels`.
+
+<!-- BEGIN FILE app/src/panels/DebriefThreads.tsx -->
+`````tsx
+import type { DebriefView } from '../townview';
+import type { Resolved } from '../assets';
+import { DebriefClaim, DebriefReport, nameFrom, RetainedDetails, When } from './DebriefReading';
+import { Term } from './Term';
+
+export interface DebriefArt {
+  paper: Resolved;
+  icons: Record<'letter' | 'forgery-quill' | 'scrying' | 'seance', { resolved: Resolved; fallback: string }>;
+}
+
+function Icon({ art }: { art: DebriefArt['icons']['letter'] }) {
+  return <span aria-hidden="true" className="debrief-icon">{art.resolved.kind === 'asset'
+    ? <img src={art.resolved.url} alt="" /> : art.resolved.kind === 'layers'
+      ? art.resolved.urls.map((url, index) => <img key={index} src={url} alt="" />) : art.fallback}</span>;
+}
+
+/** No identity is inferred from matching words; each reader's unresolved rows stay reachable. */
+export function DebriefThreads({ view, names, art }: {
+  view: DebriefView; names: Readonly<Record<string, string>>; art: DebriefArt;
+}) {
+  const op = view.operations; const nameOf = nameFrom(names);
+  return <section className="panel debrief-surface" aria-label="Threads">
+    <h2><Term id="thread">Threads</Term></h2>
+    <p>Follow the recorded copies and actual handoffs. A planned route or a missing record is not proof that a message landed.</p>
+    <h3>Stories</h3>
+    {op.stories.length === 0 && <p>No story family retained.</p>}
+    {op.stories.map((thread, ti) => <article className="debrief-card" key={`${thread.id}:${ti}`}>
+      <h4>{thread.family}</h4>
+      <p>{thread.died === null ? 'Continuation unrecorded' : thread.died ? 'No active continuation retained' : 'An active continuation remains'}
+        {' '}· last recorded activity <When tick={thread.lastActivityAt} />.</p>
+      <p>Evidence records: {thread.becameEvidence.length ? thread.becameEvidence.join(', ') : 'none linked'}.
+        {' '}Paper links: {thread.artifactIds.length ? thread.artifactIds.join(', ') : 'none recorded'}.</p>
+      <ol>{thread.events.map((event) => {
+        const versions = thread.versions.filter((row) => row.claim.id === event.claimId);
+        const version = versions.length === 1 ? versions[0]! : null;
+        const parents = version?.claim.parent === null ? [] : thread.versions.filter((row) => row.claim.id === version?.claim.parent);
+        const before = version?.parentState === 'recorded' && parents.length === 1 ? parents[0]!.claim : null;
+        return <li key={event.chronicleIndex}><When tick={event.record.tick} /> · {event.record.kind} · record {event.chronicleIndex}
+          {version === null ? <><p><Term id="ambiguous" /> claim {event.claimId}: {versions.length} retained candidates. No candidate is chosen.</p>
+            <RetainedDetails value={versions} label="Read candidate copies" /></>
+            : <DebriefClaim claim={version.claim} before={before} changes={event.changes} changedBy={event.changedBy} names={names} />}
+          <RetainedDetails value={event.record} />
+        </li>;
+      })}</ol>
+      <details><summary>Every retained version and belief</summary>
+        {thread.versions.map((version, index) => <div key={index}><p>{version.claim.id} · parent {version.parentState}</p>
+          <DebriefClaim claim={version.claim} changes={version.changes} names={names} /></div>)}
+        <RetainedDetails value={thread.beliefs} label="Read retained beliefs" />
+      </details>
+    </article>)}
+
+    <h3><Icon art={art.icons.letter} /><Term id="artifact">Artifacts</Term> and <Term id="forgery" /></h3>
+    {op.artifacts.length === 0 && <p>No paper history retained.</p>}
+    {op.artifacts.map((thread, index) => <article className="debrief-card" key={`${thread.id}:${index}`}>
+      <h4><Icon art={art.icons['forgery-quill']} />{thread.artifactId}</h4>
+      {thread.artifact ? <><p>Forged <When tick={thread.artifact.forgedTick} />. Current holder: {thread.artifact.heldBy === null ? 'none'
+        : nameOf(thread.artifact.heldBy)}. Current placement: {thread.artifact.plantedAt ?? 'none'}.</p>
+        <DebriefClaim claim={thread.artifact.spec} names={names} /></> : <p>Paper object <Term id="unrecorded" />; its events remain.</p>}
+      <ol>{thread.events.map((event) => <li key={event.chronicleIndex}><When tick={event.record.tick} /> · {event.record.act}
+        {' '}· claim link {event.claimLink}{event.family !== null && <> · story {event.family}</>}
+        {event.claim && <DebriefClaim claim={event.claim} names={names} />}<RetainedDetails value={event.record} /></li>)}</ol>
+    </article>)}
+
+    <h3><Term id="network" /> routes</h3>
+    {op.messages.length === 0 && <p>No packet history retained.</p>}
+    {op.messages.map((thread, index) => <article className="debrief-card" key={`${thread.id}:${index}`}>
+      <h4>{thread.messageId}</h4><p>Transport: {thread.transport} · <When tick={thread.transportAt} />.</p>
+      <p>Planned route: {thread.plannedRoute === null ? 'unrecorded' : thread.plannedRoute.map(nameOf).join(' → ') || 'empty'}.</p>
+      <ol>{thread.stages.map((stage) => <li key={stage.chronicleIndex}><When tick={stage.tick} /> · {nameOf(stage.speaker)} → {nameOf(stage.addressedTo)}
+        {' '}at {stage.venue} · {stage.copy.kind}. Heard by {stage.heardBy.map((row) => nameOf(row.id)).join(', ') || 'no recorded audience'}.
+        <p>{stage.changes === null ? 'Earlier copy unrecorded' : stage.changes.length === 0 ? 'No recorded copy change'
+          : `Copy changed at ${nameOf(stage.speaker)}'s speech`}. Omitted roots: {stage.omittedRoots === null ? 'unknown' : stage.omittedRoots.join(', ') || 'none proved'}.</p>
+        {stage.copy.kind === 'directive-report' && <DebriefReport report={stage.copy.report} names={names} />}
+        {stage.copy.kind === 'field-report' && stage.copy.items.map((item, index) => item.observation.kind === 'utterance'
+          ? <DebriefClaim key={index} claim={item.observation.reported} names={names} /> : null)}
+        <RetainedDetails value={{ copy: stage.copy, changes: stage.changes, reportRoots: stage.reportRoots }} label="Read this spoken copy and changes" /></li>)}</ol>
+      <RetainedDetails value={thread.carriedCopy} label="Read the current carried copy (not a pristine original)" />
+    </article>)}
+
+    <h3>Reported items</h3>
+    {op.reportItems.length === 0 && <p>No report-item roots retained.</p>}
+    {op.reportItems.map((thread, index) => <article className="debrief-card" key={`${thread.id}:${index}`}>
+      <h4>{thread.rootFingerprint}</h4><RetainedDetails value={thread.held} label="Read original and reported holdings" />
+      {thread.packets.map((packet, pi) => <div key={`${packet.messageId}:${pi}`}><p>Packet {packet.messageId} · transport {packet.transport}.</p>
+        <ol>{packet.stages.map((stage, si) => {
+          const earlier = si > 0 ? packet.stages[si - 1]! : null;
+          const observation = stage.item?.observation;
+          const previous = earlier?.status === 'spoken' ? earlier.item?.observation : null;
+          const claim = observation?.kind === 'utterance' ? observation.reported : null;
+          const before = previous?.kind === 'utterance' && stage.changes !== null ? previous.reported : null;
+          const changes = claim && before ? Object.keys(claim).filter((key) => claim[key as keyof typeof claim] !== before[key as keyof typeof before])
+            .map((key) => ({ field: key as keyof typeof claim, from: before[key as keyof typeof before], to: claim[key as keyof typeof claim] })) : null;
+          return <li key={`${stage.chronicleIndex}:${si}`}><When tick={stage.tick} /> · {nameOf(stage.speaker)} → {nameOf(stage.addressedTo)}
+            <p>{stage.status === 'omitted' ? 'Omitted from this speech; the envelope did not deliver this item.'
+              : stage.status === 'unknown' ? 'Item association unknown; no content is assigned to this root.' : 'This item was spoken.'}</p>
+            {claim && <DebriefClaim claim={claim} before={before} changes={changes} changedBy={changes?.length ? stage.speaker : null} names={names} />}
+            <RetainedDetails value={{ item: stage.item, changes: stage.changes, heardBy: stage.heardBy }} label="Read this item, audience and changes" /></li>;
+        })}</ol></div>)}
+    </article>)}
+
+    <h3><Term id="directive">Directives</Term></h3>
+    {op.directives.length === 0 && <p>No directives retained.</p>}
+    {op.directives.map((thread, index) => <article className="debrief-card" key={`${thread.id}:${index}`}>
+      <h4>{thread.directiveId}</h4><p>{nameOf(thread.principalId)} instructed {nameOf(thread.recipient)} at <When tick={thread.issuedAt} />.</p>
+      <p>{thread.deliveredCopy === null ? 'Delivery unrecorded' : <>Received <When tick={thread.deliveredCopy.tick} /></>}.
+        {' '}Latest execution state: {thread.latestRun?.state ?? 'unrecorded'}.</p>
+      <p>Actual local results: {thread.localResults === null ? 'unrecorded, not proof of no work' : `${thread.localResults.length} retained`}.</p>
+      <RetainedDetails value={thread.authoredCopy} label="Read the authored instruction" />
+      <RetainedDetails value={thread.deliveredCopy} label="Read the received instruction" />
+      {thread.localResults?.map((outcome, index) => <div key={index}><p>Actual local result at <When tick={outcome.tick} />: {outcome.result.outcome}.</p>
+        {outcome.result.reportedClaim && <DebriefClaim claim={outcome.result.reportedClaim} names={names} />}</div>)}
+      <RetainedDetails value={thread.localResults} label="Read actual local results" />
+      {thread.returnedAccounts.map((account, index) => <div key={index}><p>Returned account received <When tick={account.receivedAt} /> via {nameOf(account.via)}.</p>
+        <DebriefReport report={account.report} names={names} /></div>)}
+      <RetainedDetails value={thread.returnedAccounts} label="Read returned accounts (which may differ)" />
+      <p>Associated packets: {thread.messageIds.join(', ') || 'none retained'}.</p>
+    </article>)}
+
+    <h3><Term id="magic" /></h3>
+    {op.magic.operations.length === 0 && <p>No ritual or scrying operation retained.</p>}
+    {op.magic.operations.map((thread, index) => <article className="debrief-card" key={`${thread.id}:${index}`}>
+      <h4><Icon art={art.icons[thread.spell === 'scrying' ? 'scrying' : 'seance']} /><Term id={thread.spell === 'scrying' ? 'scrying' : 'seance'} /> · {thread.operation}</h4>
+      <p>Operation records: {thread.recordState}. Historical price: unrecorded.</p>
+      {thread.spell === 'scrying' ? <><p>Window: {thread.window === null ? 'unrecorded or inconsistent' : <><When tick={thread.window.from} /> to <When tick={thread.window.to} /> · {thread.window.phase}</>}.
+        {' '}Captures: {thread.captureState}. Residue link: {thread.residue.association}.</p>
+        <RetainedDetails value={thread.residue} label="Read the trace, physical reports and evidence links" /></>
+        : <><p>Historical claim: {thread.claim.state}. Receipt: {thread.receiptState}. This later testimony is not a newly created story.</p>
+          {thread.claim.value && <DebriefClaim claim={thread.claim.value} changes={[]} names={names} />}</>}
+      <RetainedDetails value={thread.records} label="Read actual operation records" />
+      {thread.intel.map((capture, index) => capture.entry.reported
+        ? <div key={index}><p>Captured account · receipt <When tick={capture.learnedAt} /> · {capture.association}.</p>
+          <DebriefClaim claim={capture.entry.reported} names={names} /></div> : null)}
+      <RetainedDetails value={thread.intel} label="Read actual captures and their receipt associations" />
+    </article>)}
+    <RetainedDetails value={op.magic.unassociatedIntel} label="Magic captures without a proved operation" />
+    <RetainedDetails value={op.magic.residuesWithoutOperation} label="Physical residue history without an operation" />
+
+    <h3>Physical sightings and acquisition</h3>
+    <p>A chapel visit does not prove a ritual. Residue does not identify a caster. These records do not create a questioning or watch episode.</p>
+    <ol>{op.physical.records.map((row) => <li key={row.chronicleIndex}><When tick={row.record.tick} /> · {row.record.kind} at {row.record.venue}
+      <RetainedDetails value={row.record} /></li>)}</ol>
+    {op.physical.evidence.map((row) => <article className="debrief-card" key={row.evidenceIndex}><h4>Physical evidence {row.evidenceIndex} · {row.entry.kind}</h4>
+      <p>Observed <When tick={row.arrival.observedAt} />; enemy acquired <When tick={row.arrival.learnedAt} /> · {row.arrival.timing}.</p>
+      <p>Sighting records: {row.sightingIndexes.join(', ') || 'unrecorded'}.</p><RetainedDetails value={row} /></article>)}
+
+    <h3><Term id="evidence-arrival" /></h3>
+    {op.enemyEvidence.map((row) => <article id={`debrief-evidence-${row.evidenceIndex}`} className="debrief-card" key={row.evidenceIndex}>
+      <h4>Evidence {row.evidenceIndex} · {row.entry.kind}</h4><p>Observed <When tick={row.arrival.observedAt} />; enemy acquired <When tick={row.arrival.learnedAt} />.</p>
+      {row.entry.reported && <DebriefClaim claim={row.entry.reported} names={names} />}<RetainedDetails value={row} /></article>)}
+    <RetainedDetails value={op.featureReferences} label="Every feature and its retained reference resolution" />
+    <h3><Term id="orphan-history" /></h3>
+    <RetainedDetails value={op.unresolvedStories} label="Story events without a resolvable claim" />
+    <RetainedDetails value={view.chronicle} label="Every chronological record, including institutions and vignettes" />
+    <RetainedDetails value={view.recordsBeyondClock} label="Records beyond the retained clock (kept separately)" />
+    {'beyondClock' in op && <><h3>Known future operation records</h3>
+      <p>This section holds future evidence and later receipt information. A feature may already be current and appear here again as context for a later receipt; that does not mean it was created again in the future.</p>
+      <p>Later receipt context for current feature IDs: {op.beyondClock.featureReferences.filter((later) => op.featureReferences.some((current) => current.feature.id === later.feature.id))
+        .map((row) => row.feature.id).join(', ') || 'none'}.</p>
+      <RetainedDetails value={op.beyondClock} label="Read future evidence, physical acquisitions and feature references" /></>}
+  </section>;
+}
+`````
+<!-- END FILE app/src/panels/DebriefThreads.tsx -->
+
+### app/src/panels/DebriefTimeline.tsx
+
+SHA-256: `ba1a151fa1c789c2b88641a6e0bc22f56fd26879fe348f653b0ff45b76c0ad7c`. Unit: `6a-panels`.
+
+<!-- BEGIN FILE app/src/panels/DebriefTimeline.tsx -->
+`````tsx
+import type { DebriefView } from '../townview';
+import { DebriefClaim, nameFrom, RetainedDetails, When } from './DebriefReading';
+import { Term } from './Term';
+
+export function DebriefTimeline({ view, names }: { view: DebriefView; names: Readonly<Record<string, string>> }) {
+  const calendar = view.calendar; const nameOf = nameFrom(names);
+  return <section className="panel debrief-surface" aria-label="Sketch timeline">
+    <h2><Term id="timeline" /></h2>
+    <p>Observation, receipt and the enemy's later conclusions have separate dates. Distinct evidence is shown; there is no numerical countdown to your name.</p>
+    <nav className="tag-row" aria-label="Calendar days">{calendar.days.map((day) => <a className="desk-btn" key={day.day} href={`#debrief-day-${day.day}`}>Day {day.day}</a>)}</nav>
+    {calendar.days.map((day) => <article className="debrief-card" id={`debrief-day-${day.day}`} key={day.day}>
+      <h3>Day {day.day}</h3>
+      {day.gapBefore > 0 && <p className="desk-note">{day.gapBefore} intervening day(s) have no retained calendar entry.</p>}
+      <p>Through <When tick={day.through} />.</p>
+      <p className={day.sketch.identifiedOnDay === day.day ? 'debrief-identification' : undefined}>
+        {day.sketch.identified ? <>Your identity was recorded on day {day.sketch.identifiedOnDay}.</> : 'Your identity had not been recorded in the retained conclusions.'}</p>
+      <p>{day.sketch.evidenceKeys.length} distinct retained evidence group(s), by kind and subject.</p>
+      <ul>{day.sketch.evidenceKeys.map((key, index) => <li key={index}>{key.kind} · {key.subject === null ? 'no named subject' : nameOf(key.subject)}
+        {' '}· features {key.featureIds.join(', ')}</li>)}</ul>
+      <h4>What the enemy had concluded</h4>
+      {day.sketch.known.length === 0 && <p>No conclusion retained for this date.</p>}
+      <ul>{day.sketch.known.map((feature, index) => <li key={`${feature.id}:${index}`}>
+        <strong>{feature.id}</strong> · {feature.kind} · {feature.detail}
+        <RetainedDetails value={feature.evidence} label="Read the evidence references" /></li>)}</ul>
+      <RetainedDetails value={day.decisions} label="Read decisions recorded on this day, in their retained order" />
+      <h4>Observed and reported timestamps</h4>
+      <p>Chronicle records: {day.observedChronicleIndexes.join(', ') || 'none'}.
+        {' '}Player-account observations: {day.observationEntryIndexes.join(', ') || 'none'}.
+        {' '}Enemy-evidence observations: {day.observedEvidenceIndexes.join(', ') || 'none'}.</p>
+      <p className="desk-note">A reported observation time does not establish when anyone learned the account.</p>
+      <h4>What arrived</h4>
+      <p>New player receipts: {day.newlyReceivedEntryIndexes.join(', ') || 'none'}.
+        {' '}New enemy acquisitions: {day.newlyAcquiredEvidenceIndexes.join(', ') || 'none'}.</p>
+      <h4>Your received board at this date</h4>
+      {day.player.log.length === 0 && <p>No received board entries.</p>}
+      <ol>{day.player.log.map((entry, index) => <li key={index}>{entry.kind} at {entry.venue}
+        {entry.reported && <DebriefClaim claim={entry.reported} names={names} />}<RetainedDetails value={entry} label="Read this received board entry" /></li>)}</ol>
+      <RetainedDetails value={day.player.knowledge} label="Read receipt dates and original entry indexes" />
+    </article>)}
+    <h3>Undated and unresolved history</h3>
+    <p>{calendar.unknownKnowledge.length} player receipt(s) and {calendar.unknownEvidenceIndexes.length} enemy acquisition(s) have unrecorded dates.
+      {' '}They are not placed on day zero.</p>
+    <RetainedDetails value={calendar.unknownKnowledge} label="Player entries with unknown receipt dates" />
+    <RetainedDetails value={calendar.unknownEvidenceIndexes} label="Enemy evidence with unknown acquisition dates" />
+    <RetainedDetails value={calendar.unrecordedSketch} label="Features without a retained digest date" />
+  </section>;
+}
+`````
+<!-- END FILE app/src/panels/DebriefTimeline.tsx -->
+
+### app/src/panels/DebriefOverlay.tsx
+
+SHA-256: `4fc188d3af96a5fc8018917bb0306cba6549706217fecd5c04b03e733fa02e3b`. Unit: `6a-panels`.
+
+<!-- BEGIN FILE app/src/panels/DebriefOverlay.tsx -->
+`````tsx
+import type { DebriefView } from '../townview';
+import { DebriefClaim, DebriefReport, nameFrom, RetainedDetails, When } from './DebriefReading';
+import { Term } from './Term';
+
+const STATUS: Record<DebriefView['calendar']['days'][number]['overlay']['signals'][number]['status'], string> = {
+  'corroborated-attention': 'Corroborated by actual attention; this alone does not prove a resulting feature.',
+  'partly-corroborated': 'Partly corroborated; unmatched original entries remain unproved.',
+  'unrecorded-work': 'Related work history is unrecorded; absence is not proved.',
+  'issued-unproved': 'An instruction was issued, but this does not prove it was performed.',
+  'unproved-signal': 'No retained causal match; this signal is unproved, not established as a phantom.',
+};
+
+export function DebriefOverlay({ view, names }: { view: DebriefView; names: Readonly<Record<string, string>> }) {
+  const nameOf = nameFrom(names);
+  return <section className="panel debrief-surface" aria-label="Overlay">
+    <h2><Term id="overlay" /></h2>
+    <p>Compare your received signals with actual attention, reported accounts and resulting features. Each is a separate fact.</p>
+    <p>A <Term id="phantom" /> needs evidence of fabrication. An unproved signal or missing history cannot establish one.</p>
+    {view.calendar.days.map((day) => <article className="debrief-card" key={day.day}>
+      <h3>Day {day.day}</h3><p>Through <When tick={day.through} />.</p>
+      <h4>Your signals</h4>
+      {day.overlay.signals.length === 0 && <p>No received signal at this date.</p>}
+      <ul>{day.overlay.signals.map((signal, index) => <li key={`${signal.id}:${index}`}>
+        <p>{signal.kind} · {signal.key}</p><p className={signal.status === 'corroborated-attention' ? 'debrief-corroborated' : 'debrief-uncertain'}>
+          {STATUS[signal.status]}</p>
+        <p>Original entries: {signal.entryIndexes.join(', ')}. Matched entries: {signal.matchedEntryIndexes.join(', ') || 'none'}.
+          {' '}Unproved entries: {signal.unmatchedEntryIndexes.join(', ') || 'none'}.</p>
+        <p>Actual attention: {signal.attentionIds.join(', ') || 'none linked'}.
+          {' '}Resulting feature links: {signal.featureIds.join(', ') || 'none linked'}.</p>
+        <RetainedDetails value={signal} label="Read the exact signal correspondence" /></li>)}</ul>
+      <h4><Term id="actual-attention" /></h4>
+      {day.overlay.attention.actual.length === 0 && <p>No actual attention retained through this date.</p>}
+      <ul>{day.overlay.attention.actual.map((act) => <li key={act.id}>{nameOf(act.actor)} · {act.kind} at {act.venue}
+        {' '}· performed <When tick={act.occurredAt} /> · {act.id}<RetainedDetails value={act} /></li>)}</ul>
+      <h4><Term id="lag" /></h4>
+      <p>Actual attention without a matched received signal: {day.overlay.lag.unseenAttentionIds.join(', ') || 'none'}.</p>
+      <p>Features without a counter-signal link: {day.overlay.lag.featuresWithoutCounterLinkIds.join(', ') || 'none'}.
+        {' '}An absent link is not proof that you knew nothing.</p>
+      <h4>Resulting features</h4>
+      <RetainedDetails value={day.overlay.features} label="Read features and their causal reference states" />
+      <p>Unresolved semantic feature links: {day.overlay.unresolvedFeatureIds.join(', ') || 'none'}.
+        {' '}Physical references may have a valid receipt and deliberately no semantic attention act.</p>
+      <h4>Copies you actually heard</h4>
+      <ul>{day.overlay.receivedReportItems.map((item, index) => <li key={index}>{item.rootFingerprint} · {item.stage.status}
+        {' '}· {nameOf(item.stage.speaker)} at <When tick={item.stage.tick} />
+        {item.stage.status === 'spoken' && item.stage.item?.observation.kind === 'utterance'
+          && <DebriefClaim claim={item.stage.item.observation.reported} names={names} />}
+        <RetainedDetails value={item} label="Read the received copy and recorded changes" /></li>)}</ul>
+      <h4><Term id="reported-account">Headquarters' reported accounts</Term></h4>
+      <p>Recorded speeches, not proof that every claim was true or accepted into a ledger.</p>
+      <ul>{day.overlay.headquartersAccounts.map((account) => <li key={account.chronicleIndex}>Headquarters heard or said this account at <When tick={account.receivedAt} />
+        <DebriefReport report={account.copy.report} names={names} />
+        <RetainedDetails value={account.copy} /></li>)}</ul>
+    </article>)}
+    <h3>Current headquarters bookkeeping</h3><p>Update times are unrecorded; these rows are not reconstructed on earlier days.</p>
+    <RetainedDetails value={view.headquartersLedger.entries} />
+    <h3><Term id="hypothesis-card">Your terminal notes</Term></h3>
+    <p>Current player-authored notes. Ungraded; their earlier edits are not retained and they are outside the historical calendar.</p>
+    {view.annotations.cards.length === 0 ? <p>No retained hypothesis cards.</p> : <ul>{view.annotations.cards.map((card, index) => <li key={`${card.id}:${index}`}>
+      <p>{card.text}</p><RetainedDetails value={card} label="Read this current annotation" /></li>)}</ul>}
+  </section>;
+}
+`````
+<!-- END FILE app/src/panels/DebriefOverlay.tsx -->
+
+### app/src/panels/DebriefEnding.tsx
+
+SHA-256: `47fdc841d82594910769de67cb13a4d41a2f11f5e1d561a198a0ea71402e44d0`. Unit: `6a-panels`.
+
+<!-- BEGIN FILE app/src/panels/DebriefEnding.tsx -->
+`````tsx
+import { useReducer, type CSSProperties, type KeyboardEvent } from 'react';
+import { TERMS } from '../../../src/content/terms';
+import type { DebriefView } from '../townview';
+import { DebriefThreads, type DebriefArt } from './DebriefThreads';
+import { DebriefTimeline } from './DebriefTimeline';
+import { DebriefOverlay } from './DebriefOverlay';
+import { RetainedDetails } from './DebriefReading';
+import { Term } from './Term';
+
+const ENDINGS: Record<DebriefView['ending']['status'], { cls: string; term: string; line: string }> = {
+  won: { cls: 'ending-won', term: 'denounce', line: 'The council turned on the usurper. You won.' },
+  'lost-clock': { cls: 'ending-clock', term: 'coronation', line: 'The clock ran out; the crown landed.' },
+  'lost-exposed': { cls: 'ending-lost', term: 'unmasking', line: 'The enemy sketch converged on your people.' },
+  'lost-caught': { cls: 'ending-lost', term: 'arrest', line: 'A guard heard you speak the words yourself.' },
+};
+const TABS = [{ key: 'threads', term: 'thread', label: 'Threads' },
+  { key: 'timeline', term: 'timeline', label: 'Sketch timeline' },
+  { key: 'overlay', term: 'overlay', label: 'Overlay' }] as const;
+type Tab = typeof TABS[number]['key'];
+type Navigation = { open: boolean; tab: Tab };
+type NavigationAction = { kind: 'open' | 'close' } | { kind: 'tab'; tab: Tab };
+const navigate = (state: Navigation, action: NavigationAction): Navigation => action.kind === 'tab'
+  ? { open: true, tab: action.tab } : { ...state, open: action.kind === 'open' };
+
+/** Props-only terminal flow: navigation changes presentation, never the session or its action log. */
+export function DebriefEnding({ view, names, art }: {
+  view: DebriefView; names: Readonly<Record<string, string>>; art: DebriefArt;
+}) {
+  const [navigation, dispatch] = useReducer(navigate, { open: false, tab: 'threads' });
+  const ending = ENDINGS[view.ending.status];
+  const line = view.ending.resolutionState === 'consistent' ? ending.line
+    : 'The campaign ended with this recorded status. Its cause is not proved by the retained history.';
+  const moveTab = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1
+      : event.key === 'ArrowRight' ? (index + 1) % TABS.length
+        : event.key === 'ArrowLeft' ? (index + TABS.length - 1) % TABS.length : null;
+    if (next === null) return;
+    event.preventDefault(); event.stopPropagation(); dispatch({ kind: 'tab', tab: TABS[next]!.key });
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+  };
+  if (!navigation.open) return <div className={`ending ${ending.cls}`}>
+    <h1><Term id={ending.term} /></h1><p>{line}</p>
+    {view.ending.resolutionState !== 'consistent' && <p>Ending details are {view.ending.resolutionState}; the retained status is shown.</p>}
+    <button className="desk-btn" title={TERMS['terminal-debrief']!.short} onClick={() => dispatch({ kind: 'open' })}>
+      Open the {TERMS['terminal-debrief']!.label.toLowerCase()}</button>
+  </div>;
+  const paper: CSSProperties = art.paper.kind === 'fallback' ? {} : {
+    backgroundImage: (art.paper.kind === 'asset' ? [art.paper.url] : art.paper.urls).map((url) => `url(${JSON.stringify(url)})`).join(', '),
+  };
+  return <main className="debrief-desk" style={paper} aria-label="Terminal debrief"
+    onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); dispatch({ kind: 'close' }); } }}>
+    <header><h1><Term id="terminal-debrief" /></h1><p>{line}</p>
+      <p className="debrief-epigraph"><Term id="debrief-epigraph" /></p>
+      <button className="desk-btn" onClick={() => dispatch({ kind: 'close' })}>Back to the ending</button>
+      <RetainedDetails value={view.ending} label="Read the retained ending and its consistency" />
+    </header>
+    <div className="tag-row" role="tablist" aria-label="Debrief surfaces">{TABS.map((tab, index) => <button
+      key={tab.key} className="desk-btn" role="tab" id={`debrief-tab-${tab.key}`} aria-controls={`debrief-panel-${tab.key}`}
+      aria-selected={navigation.tab === tab.key} tabIndex={navigation.tab === tab.key ? 0 : -1}
+      title={TERMS[tab.term]!.short}
+      onClick={() => dispatch({ kind: 'tab', tab: tab.key })} onKeyDown={(event) => moveTab(event, index)}>
+      {tab.label}</button>)}</div>
+    <div role="tabpanel" tabIndex={0} id={`debrief-panel-${navigation.tab}`} aria-labelledby={`debrief-tab-${navigation.tab}`}>
+      {navigation.tab === 'threads' ? <DebriefThreads view={view} names={names} art={art} />
+        : navigation.tab === 'timeline' ? <DebriefTimeline view={view} names={names} /> : <DebriefOverlay view={view} names={names} />}
+    </div>
+  </main>;
+}
+`````
+<!-- END FILE app/src/panels/DebriefEnding.tsx -->
+
+### src/content/terms.ts
+
+SHA-256: `40d09da1555c5f50f39a0a08d827140507eb32a9c8b27d6e8293c155bf933f6f`. Unit: `7b-registry`.
+
+<!-- BEGIN FILE src/content/terms.ts -->
+`````typescript
+export interface TermDef {
+  id: string;
+  /** The exact label the UI renders (also the highlight target). */
+  label: string;
+  /** Tooltip line, <= 120 chars, mechanical truth in plain words. */
+  short: string;
+  /** Expanded codex-of-terms entry; null until a UI plan needs the long form. */
+  entry: string | null;
+}
+
+export const TERMS: Record<string, TermDef> = {
+  // ── the rumor machine ──
+  'family':          { id: 'family', label: 'Story', short: 'One rumor and all its mutated versions share a family — different tellings of the same story.', entry: null },
+  'version':         { id: 'version', label: 'Version', short: 'The exact wording one mind holds. Versions differ where minds changed them.', entry: null },
+  'diff':            { id: 'diff', label: 'Difference', short: 'The changed fields between two versions — each change fingerprints the mind that made it.', entry: null },
+  'attribution':     { id: 'attribution', label: 'Source (claimed)', short: 'Who the story SAYS it came from. Mutable, often wrong — and the key to tracing.', entry: null },
+  // ── the structured claim (the seven fields every telling carries) ──
+  'subject':         { id: 'subject', label: 'Subject', short: 'Who a claim is about — the person the story targets. Attributors and vaguers move it.', entry: null },
+  'predicate':       { id: 'predicate', label: 'Predicate', short: 'What a claim alleges — the deed itself. Neutral deeds moralize into sins as they spread.', entry: null },
+  'object':          { id: 'object', label: 'Object', short: 'A claim\'s second party — the accomplice or counterparty, when the deed names one.', entry: null },
+  'count':           { id: 'count', label: 'Count', short: 'How many, in a claim that counts. Exaggerators double it; minimizers halve it.', entry: null },
+  'severity':        { id: 'severity', label: 'Severity', short: 'How grave a claim is, 1 to 5. Dramatists max it; peacemakers walk it down.', entry: null },
+  'place':           { id: 'place', label: 'Place', short: 'Where a claim says the deed happened. Relocators strip it away to "somewhere".', entry: null },
+  'corroboration':   { id: 'corroboration', label: 'Corroboration', short: 'Hearing a story from apparently independent sources. Manufactured independence still counts.', entry: null },
+  'apparent-source': { id: 'apparent-source', label: 'Apparent source', short: 'Who a hearer THINKS a telling came from — the surviving attribution, or the teller.', entry: null },
+  'credence':        { id: 'credence', label: 'Credence', short: 'How much a mind believes a story, 0 to 1. Trust, plausibility, and corroboration move it.', entry: null },
+  'stance':          { id: 'stance', label: 'Stance', short: 'Belief tiers: dismiss (<0.2), repeat (0.5+), believe (0.75+). Acting takes believing.', entry: null },
+  'freshness':       { id: 'freshness', label: 'Freshness', short: 'Stories go stale in ~3 days unless newly corroborated. Stale news is not retold.', entry: null },
+  'juiciness':       { id: 'juiciness', label: 'Juiciness', short: 'How tellable a story is on its own. Juicy stories race; dull ones die.', entry: null },
+  'circle':          { id: 'circle', label: 'Circle', short: 'A conversation at a venue. Same circle = hear; same venue = see who is present.', entry: null },
+  'overheard':       { id: 'overheard', label: 'Overheard', short: 'Heard without being addressed. Bystanders catch words by the same physics as guards.', entry: null },
+  'access':          { id: 'access', label: 'Access', short: 'Venues are public, invitational, or private. Standing decides which doors open.', entry: null },
+  'bridge':          { id: 'bridge', label: 'Bridge', short: 'A person who frequents two districts. Stories cross firebreaks only on their feet.', entry: null },
+  'firebreak':       { id: 'firebreak', label: 'Firebreak', short: 'Districts that share no venues. Rumors cannot jump them without a bridge.', entry: null },
+  // ── secrets and sources ──
+  'secret':          { id: 'secret', label: 'Secret', short: 'A true thing someone witnessed. Never volunteered — extracted by trust or compulsion.', entry: null },
+  'discretion':      { id: 'discretion', label: 'Held close', short: 'A belief its holder will not gossip about. Trust above 0.7, or authority, unlocks it.', entry: null },
+  'witnessed':       { id: 'witnessed', label: 'Witnessed', short: 'Known first-hand, not heard. Witnessed beliefs are near-certain and start silent.', entry: null },
+  'via':             { id: 'via', label: 'Via', short: 'The channel an entry reached you through: your own eyes, the dossier, or a named informant.', entry: null },
+  'informant':       { id: 'informant', label: 'Informant', short: 'A townsperson on your payroll. Their reports pass through THEIR traits — eyes can lie.', entry: null },
+  'dossier':         { id: 'dossier', label: 'Dossier', short: 'Your day-0 briefing. Everything in it is true — and never enough.', entry: null },
+  // ── your boards ──
+  'evidence-board':  { id: 'evidence-board', label: 'Evidence Board', short: 'Auto-collects what you lawfully heard, clusters versions, highlights diffs. Thinking stays yours.', entry: null },
+  'codex':           { id: 'codex', label: 'Codex', short: 'Your trait deductions. Propose a trait, corroborate from observed pairs, lock at three.', entry: null },
+  'lock':            { id: 'lock', label: 'Lock', short: 'Three corroborating observations confirm a codex hypothesis. Locks trust your channels.', entry: null },
+  'fingerprint':     { id: 'fingerprint', label: 'Fingerprint', short: 'The tell-tale change pattern a trait leaves on stories it retells.', entry: null },
+  'counter-sketch':  { id: 'counter-sketch', label: 'Counter-Sketch', short: 'Your sketch of HIS sketch — what you believe the enemy has pieced together about you.', entry: null },
+  'hypothesis-card': { id: 'hypothesis-card', label: 'Card', short: 'Your written hunch with your confidence. The game files it and never grades it.', entry: null },
+  'assist-level':    { id: 'assist-level', label: 'Assist', short: 'Perception help, 0-3: raw notes, clustering+diffs, trait candidates, route sketches.', entry: null },
+  'web-view':        { id: 'web-view', label: 'Web', short: 'The provenance web around a subject: which stories touch it, and who carried each hop to you.', entry: null },
+  'ledger':          { id: 'ledger', label: 'Ledger', short: 'One channel\'s whole record — every report a via filed, and which stories other channels also carried.', entry: null },
+  'evening-report':  { id: 'evening-report', label: 'Evening report', short: 'The day\'s haul, batched: new stories, who brought each, and every authority sighting.', entry: null },
+  'day-planner':     { id: 'day-planner', label: 'Planner', short: 'Pause to plan: travel, tell a circle-mate, ask, post informants. Verbs queue for their next beat.', entry: null },
+  'terms-codex':     { id: 'terms-codex', label: 'Terms', short: 'The glossary of every game term — hover any label for its meaning, or read them all here.', entry: null },
+  // ── your verbs (the planner's logged actions) ──
+  'verb-travel':     { id: 'verb-travel', label: 'Travel', short: 'Move your avatar to a venue. Takes effect on the very next tick the sim steps.', entry: null },
+  'verb-tell':       { id: 'verb-tell', label: 'Tell', short: 'Speak a story to a circle-mate, under full physics. Fires on the next conversation beat.', entry: null },
+  'verb-ask':        { id: 'verb-ask', label: 'Ask', short: 'Ask the circle-mate you name about a story or a person — fires next beat, addressed to exactly them, and observable.', entry: null },
+  'verb-post':       { id: 'verb-post', label: 'Post informant', short: 'Ask an informant for a mid-day post at a venue. It is a REQUESTED post until they take it up themselves.', entry: null },
+  'verb-note':       { id: 'verb-note', label: 'Margin note', short: 'Pin a private note to anything. Read by nothing in the town — a hunch, never evidence.', entry: null },
+  'verb-recruit':    { id: 'verb-recruit', label: 'Recruit', short: 'Approach an in-circle NPC with one of the four MICE handles. They accept, refuse, or ask for time. Priced.', entry: null },
+  'verb-set-drop':   { id: 'verb-set-drop', label: 'Set dead drop', short: 'Place a dead drop at a public venue; a courier tasked via it skips the face handoff — no meeting, co-location broken.', entry: null },
+  'verb-courier':    { id: 'verb-courier', label: 'Courier', short: 'Ask an asset to carry your story to a target. They judge the moment; any telling rides their traits.', entry: null },
+  'verb-meet':       { id: 'verb-meet', label: 'Meet', short: 'Offer one asset a safehouse rendezvous. Only their own acceptance ever puts them in the room.', entry: null },
+  'verb-host':       { id: 'verb-host', label: 'Host', short: 'Send invitations to a salon or back-room evening. Each guest answers for themselves. Priced, and on the record.', entry: null },
+  'verb-debrief':    { id: 'verb-debrief', label: 'Debrief', short: 'Compel an asset at the safehouse to answer, bypassing their discretion. Costs their trust and a strike.', entry: null },
+  'verb-sell':       { id: 'verb-sell', label: 'Sell', short: 'Sell a story to a circle-mate for coin. Priced by its severity — and selling it leaks it, same as telling.', entry: null },
+  'verb-directive':  { id: 'verb-directive', label: 'Directive', short: 'Hand an outcome brief to a present asset or relay; they decide how to act, and any report must travel back.', entry: null },
+  'verb-forge':      { id: 'verb-forge', label: 'Forge', short: 'Commission a forged document carrying a fixed claim. Priced, and the ink needs a day to dry.', entry: null },
+  'verb-plant':      { id: 'verb-plant', label: 'Plant', short: 'Leave a document where it will be found, or hand it to a circle-mate. Never both at once.', entry: null },
+  'verb-show':       { id: 'verb-show', label: 'Show', short: 'Hold a document up to a circle-mate and keep it. Paper is believed further than any mouth.', entry: null },
+  'verb-scry': { id: 'verb-scry', label: 'Scry', short: 'Buy a remote scene tomorrow: up to an hour, in 15-minute steps. Costs 15 coin and leaves physical residue.', entry: null },
+  'scrying': { id: 'scrying', label: 'Scrying', short: 'A view of one venue as events happen. It shows words faithfully; the words themselves may be false.', entry: null },
+  'magic': { id: 'magic', label: 'Magic', short: 'Observation through a ritual. It supplies no independent informant channel.', entry: null },
+  'scene-presence': { id: 'scene-presence', label: 'Seen in the scene', short: 'A person visible at a known venue and time. Presence alone does not say they serve the watch.', entry: null },
+  'arcane-residue': { id: 'arcane-residue', label: 'Arcane residue', short: 'A physical trace where scrying begins. Local witnesses may report it; it does not name the caster.', entry: null },
+  'verb-seance': { id: 'verb-seance', label: 'Hold a séance',
+    short: '20 coin, once per campaign. A chapel or cathedral before 04:00. The departed gives testimony and one relationship.', entry: null },
+  'the-departed': { id: 'the-departed', label: 'The departed',
+    short: 'A historical witness whose account survives: a true secret and one real relationship.', entry: null },
+  'night-visit': { id: 'night-visit', label: 'Night visit',
+    short: 'A chapel or cathedral visit before 04:00. A guard must report it; the spymaster can witness it directly.', entry: null },
+  // ── the network economy: your standing, your payroll, your reach (Plan 8) ──
+  'station':         { id: 'station', label: 'Station', short: 'The seat the seed deals your avatar — noble or lowlife. Fixed for the campaign; it sets your standing in town.', entry: null },
+  'standing':        { id: 'standing', label: 'Standing', short: 'What your station lets you do: which venue doors open without suspicion, and the one room you may host in.', entry: null },
+  'noble':           { id: 'noble', label: 'Noble', short: 'The high-born station. Opens the salon and hosts its evenings there; the back rooms stay shut to you.', entry: null },
+  'lowlife':         { id: 'lowlife', label: 'Lowlife', short: 'The low-born station. Opens the back rooms and hosts their evenings; the salon stays shut to you.', entry: null },
+  'salon':           { id: 'salon', label: 'Salon', short: 'The noble\'s invitational room. A noble\'s standing opens it and hosts salon evenings; a lowlife is shut out.', entry: null },
+  'back-room':       { id: 'back-room', label: 'Back room', short: 'The lowlife\'s invitational room. A lowlife\'s standing opens it and hosts evenings there; a noble is shut out.', entry: null },
+  'hosting':         { id: 'hosting', label: 'Hosting', short: 'An evening in your own room. You send the invitations; each guest decides. Priced, and the list is on the record.', entry: null },
+  'recruit':         { id: 'recruit', label: 'Recruit', short: 'Ask a townsperson to serve, through one of the four MICE handles — they answer for themselves, each handle its own way.', entry: null },
+  'mice-money':      { id: 'mice-money', label: 'Money', short: 'Money buys fast — and leaks to higher bidders. The one handle with no conviction or leverage behind it.', entry: null },
+  'mice-ideology':   { id: 'mice-ideology', label: 'Ideology', short: 'Ideology binds hardest — but won\'t carry or give up a smear against its own faction, even under pressure.', entry: null },
+  'mice-coercion':   { id: 'mice-coercion', label: 'Coercion', short: 'Coercion holds by leverage, so their trust starts lowest — the handle nearest to turning against you.', entry: null },
+  'mice-ego':        { id: 'mice-ego', label: 'Ego', short: 'Ego is bought with flattery — and their own reports inflate: every count and grievance exaggerated.', entry: null },
+  'courier':         { id: 'courier', label: 'Courier', short: 'An asset carrying your story toward a target on their own schedule and their own judgement of the moment.', entry: null },
+  'dead-drop':       { id: 'dead-drop', label: 'Dead drop', short: 'A cache at a public venue a courier learns, so the handoff skips co-location — no meeting of yours to be seen.', entry: null },
+  'compartment':     { id: 'compartment', label: 'Compartment', short: 'What an asset knows — who recruited them, which drops and ops they carried. Interrogation reads exactly this.', entry: null },
+  'walk-in':         { id: 'walk-in', label: 'Walk-in', short: 'An enemy asset who has flipped to you — unbidden, they hand over a real piece of his sketch each week.', entry: null },
+  'turncoat':        { id: 'turncoat', label: 'Turncoat', short: 'An asset whose reports quietly stop matching reality — cross-check your channels to catch one.', entry: null },
+  'debrief':         { id: 'debrief', label: 'Debrief', short: 'Compelling your own asset to answer at the safehouse — it bypasses their discretion at the cost of their trust.', entry: null },
+  'stipend':         { id: 'stipend', label: 'Stipend', short: 'The fixed sum the treasury draws each rest-day week — your steady income. It never grows, so spend deliberately.', entry: null },
+  'wage':            { id: 'wage', label: 'Wage', short: 'What each asset draws from the treasury weekly. Miss it and they take a strike, and their trust slides.', entry: null },
+  'brokerage':       { id: 'brokerage', label: 'Brokerage', short: 'Selling a story you hold for coin, priced by its severity — and the sale leaks the story, the same as telling it.', entry: null },
+  'network':         { id: 'network', label: 'Network', short: 'Your roster at a glance — each asset\'s wages, strikes, posting, and how much they\'ve learned. Trust you infer.', entry: null },
+  'treasury':        { id: 'treasury', label: 'Treasury', short: 'Your coin, the next stipend, and what every verb costs — money prices your choices, it is never a second game.', entry: null },
+  // ── the directive network: you set the mission, the asset owns the moment (Plan 11) ──
+  'directive':       { id: 'directive', label: 'Directive', short: 'An outcome brief handed to an asset. They read the real situation and decide how — or whether — to act.', entry: 'A directive is a request that travels. You author the mission and every handoff lever, hand it to someone standing in front of you, and it walks the rest of the way on real feet through real conversations. What arrives may not be what you wrote: each relay is a mind, and minds shorten, soften, embellish, and forget. The recipient reads the version that actually reached them, against the situation actually in front of them, and may refuse, defer, attempt it literally, adapt it, or abort. The desk shows you what YOU wrote and what physically came back — never whether it arrived, never what they decided.' },
+  'brief':           { id: 'brief', label: 'Brief', short: 'The authored body of a directive: mission, levers, window, purpose. Only a received copy can be acted on.', entry: 'The brief is the object you compose. It is not the object your recipient obeys: the copy that physically reaches them is the only executable one, and it carries whatever mutations the route put into it. Your ledger keeps the pristine version you wrote, because that is what you know. The two can differ by a name, a deadline, or the whole point — and nothing in the game will tell you which.' },
+  'priority':        { id: 'priority', label: 'Priority', short: 'How urgently you framed the mission: routine, important, or urgent. One lever among eight, never a score.', entry: null },
+  'purpose':         { id: 'purpose', label: 'Purpose', short: 'The why you chose to share — or withheld. Sharing it buys understanding and costs a secret if the brief is read.', entry: null },
+  'report-expectation': { id: 'report-expectation', label: 'Report expectation', short: 'How much you asked to hear back: nothing, the outcome, the reasoning, or the full account.', entry: null },
+  'scrutiny':        { id: 'scrutiny', label: 'Scrutiny', short: 'How closely an asset believes they are being watched. Inferred from your treatment of them — never a shown meter.', entry: 'Scrutiny is a belief inside someone else\'s head, built only from things they could actually observe: being questioned, leaned on with authority, retasked, cut out of something, or confronted. It decays on its own. It is never a meter: no number, no bar, and no selector anywhere in this game exposes it, because a meter would turn a person into an instrument. You infer it the way you would infer it in life — from how guarded they have become since the last time you pushed. High scrutiny guards loyal people exactly as readily as disloyal ones, so guarded behaviour is never proof of betrayal.' },
+  'sound-out':       { id: 'sound-out', label: 'Sound out', short: 'Send an asset to gauge someone\'s willingness or arrange a meeting. It never enrolls anyone.', entry: 'Sounding out is reconnaissance on a person. An asset raises the subject, watches the answer, and reports what they observed — willingness voiced, a meeting agreed, a door closed. It cannot recruit: final enrollment stays a moment your avatar is physically present for. The report says what was observed, not a grade; there is no eligibility score behind it to reveal.' },
+  'runaround':       { id: 'runaround', label: 'Runaround', short: 'A false lead the enemy spends real nights chasing. It burns his attention only while his own evidence supports it.', entry: null },
+  // ── the hunt ──
+  'sketch':          { id: 'sketch', label: 'Ghost sketch', short: 'The enemy investigates a ghost — every traced operation adds a feature to it.', entry: null },
+  'sketch-feature':  { id: 'sketch-feature', label: 'Feature', short: 'One deduced trait of the ghost: a district, an entry point, a carrier profile.', entry: null },
+  'watch':           { id: 'watch', label: 'Watch', short: 'Guards posted to a district evening after evening. A countermeasure you can SEE.', entry: null },
+  'interrogation':   { id: 'interrogation', label: 'Interrogation', short: 'A named target compelled to answer at an invitational venue. Authority opens mouths.', entry: null },
+  'inquiry':         { id: 'inquiry', label: 'Asking-around', short: 'Someone is asking questions about a story or a person. Asking is itself observable.', entry: null },
+  'authority':       { id: 'authority', label: 'With authority', short: 'A question carrying the watch\'s weight. Refusing discretion does not survive it.', entry: null },
+  'exposure':        { id: 'exposure', label: 'Exposure', short: 'How much of the ghost sketch points at YOUR people. Distinct features, never raw count.', entry: null },
+  'pressure':        { id: 'pressure', label: 'Pressure', short: 'How exposed you are: score 3+ doubles the enemy nightly watches; score 5+ also doubles his interrogations.', entry: null },
+  'identified':      { id: 'identified', label: 'Identified', short: 'The carrier profile has your face. The hunt is over unless you already won.', entry: null },
+  // ── the campaign ──
+  'doom-clock':      { id: 'doom-clock', label: 'Doom clock', short: 'The campaign\'s natural deadline. Day 40: the coronation happens with or without you.', entry: null },
+  'council':         { id: 'council', label: 'Council', short: 'The electors. When enough of them believe the worst, they act — that is your win.', entry: null },
+  'usurper':         { id: 'usurper', label: 'Usurper', short: 'The one about to be crowned. Your objective walks and talks and has secrets.', entry: null },
+  'denounce':        { id: 'denounce', label: 'Denunciation', short: 'The council turns on the usurper — an institutional act the town itself performs.', entry: null },
+  'coronation':      { id: 'coronation', label: 'Coronation', short: 'The clock ran out. The crown lands; the campaign is lost.', entry: null },
+  'unmasking':       { id: 'unmasking', label: 'Unmasking', short: 'The enemy\'s sketch converged on you. The slow loss, arrived.', entry: null },
+  'arrest':          { id: 'arrest', label: 'Arrest', short: 'A guard heard you speak the words yourself — caught in the act. The campaign ends in the cell.', entry: null },
+  'objective-topple':{ id: 'objective-topple', label: 'Topple the usurper', short: 'Turn the council before day 40: quorum of electors believing act-tier dirt on the usurper.', entry: null },
+  // ── vignettes ──
+  'vignette-public-quarrel':   { id: 'vignette-public-quarrel', label: 'Public quarrel', short: 'Two rivals who each believe the worst finally collide in public. The town takes notes.', entry: null },
+  'vignette-merchant-ruin':    { id: 'vignette-merchant-ruin', label: 'Ruin', short: 'When enough creditors believe the bankruptcy, the shop shutters — visibly.', entry: null },
+  'vignette-broken-betrothal': { id: 'vignette-broken-betrothal', label: 'Broken betrothal', short: 'A lover who believes the affair breaks it off. Love turns rival; kin hear why.', entry: null },
+  // ── traits (trait-<id>) ──
+  'trait-exaggerator': { id: 'trait-exaggerator', label: 'Exaggerator', short: 'Numbers double and severity climbs each retelling. Storyteller scale.', entry: null },
+  'trait-attributor':  { id: 'trait-attributor', label: 'Attributor', short: 'Fills a vague "someone" with a name from their own grudges. Vague claims are loaded guns.', entry: null },
+  'trait-moralizer':   { id: 'trait-moralizer', label: 'Moralizer', short: 'Rewrites deeds into the sin register: a night meeting becomes an affair.', entry: null },
+  'trait-partisan':    { id: 'trait-partisan', label: 'Partisan', short: 'Softens their faction\'s sins, sharpens the rival\'s. Fires on faction-relevant claims only.', entry: null },
+  'trait-skeptic':     { id: 'trait-skeptic', label: 'Skeptic', short: 'Retells nothing uncorroborated. A gatekeeper where rumors go to die.', entry: null },
+  'trait-literalist':  { id: 'trait-literalist', label: 'Literalist', short: 'Passes stories through unchanged. Rare, precious routing infrastructure.', entry: null },
+  'trait-minimizer':   { id: 'trait-minimizer', label: 'Minimizer', short: 'Halves counts and walks severity down one. Everything was probably fine.', entry: null },
+  'trait-dramatist':   { id: 'trait-dramatist', label: 'Dramatist', short: 'Any damaging story lands at maximum severity. There are no small scandals.', entry: null },
+  'trait-name-dropper':{ id: 'trait-name-dropper', label: 'Name-dropper', short: 'Swaps a named source for a name from their own grudges. Breaks your traces.', entry: null },
+  'trait-vaguener':    { id: 'trait-vaguener', label: 'Vague teller', short: 'Named sources dissolve into "someone". The fog that kills traceroutes.', entry: null },
+  'trait-numberer':    { id: 'trait-numberer', label: 'Numberer', short: 'Invents a count of exactly three where the story had none.', entry: null },
+  'trait-peacemaker':  { id: 'trait-peacemaker', label: 'Peacemaker', short: 'Walks damaging stories down two severity steps. Surely it was a misunderstanding.', entry: null },
+  'trait-objectifier': { id: 'trait-objectifier', label: 'Objectifier', short: 'Drags a grudge-list name into the story\'s empty accomplice slot.', entry: null },
+  'trait-relocator':   { id: 'trait-relocator', label: 'Relocator', short: 'Strips the where from stories. It happened somewhere or other.', entry: null },
+  // ── predicates (predicate-<id>) ──
+  'predicate-met-secretly-with':           { id: 'predicate-met-secretly-with', label: 'Met secretly with', short: 'A claim of an unwitnessed meeting — juicy on its own; one moralizing retelling from becoming an affair.', entry: null },
+  'predicate-is-having-an-affair-with':     { id: 'predicate-is-having-an-affair-with', label: 'Having an affair', short: 'An accusation of an affair — the moralizer\'s final landing spot; no sin-version sits above it.', entry: null },
+  'predicate-stole':                        { id: 'predicate-stole', label: 'Stole', short: 'An accusation of theft — faction-relevant, and the sin-version several lesser claims moralize into.', entry: null },
+  'predicate-is-bankrupt':                  { id: 'predicate-is-bankrupt', label: 'Bankrupt', short: 'A claim of financial ruin — faction-relevant, and the credence the merchant-ruin vignette watches for.', entry: null },
+  'predicate-owes-money-to':                { id: 'predicate-owes-money-to', label: 'Owes money to', short: 'A claim of unpaid debt — mild alone; one moralizing retelling turns it into an accusation of theft.', entry: null },
+  'predicate-poisoned':                     { id: 'predicate-poisoned', label: 'Poisoned', short: 'An accusation of poisoning — the gravest dirt in the game; the watch treats it as treason talk.', entry: null },
+  'predicate-forged-the-lineage':           { id: 'predicate-forged-the-lineage', label: 'Forged the lineage', short: 'An accusation of a falsified bloodline — faction-relevant, and among the juiciest claims in play.', entry: null },
+  'predicate-plans-to-seize-the-throne':    { id: 'predicate-plans-to-seize-the-throne', label: 'Plans to seize the throne', short: 'A claim of plotting the crown — faction-relevant; believed dirt like this is what topples a usurper.', entry: null },
+  'predicate-bribed-the-council':           { id: 'predicate-bribed-the-council', label: 'Bribed the council', short: 'An accusation of buying votes — faction-relevant corruption aimed straight at the council\'s credence.', entry: null },
+  'predicate-embezzles-guild-funds':        { id: 'predicate-embezzles-guild-funds', label: 'Embezzles guild funds', short: 'An accusation of skimming guild coin — faction-relevant, and comfortably juicy on its own.', entry: null },
+  'predicate-consorts-with-smugglers':      { id: 'predicate-consorts-with-smugglers', label: 'Consorts with smugglers', short: 'A claim of smuggler dealings — faction-relevant; guilt by association still counts as dirt.', entry: null },
+  'predicate-cheats-at-cards':              { id: 'predicate-cheats-at-cards', label: 'Cheats at cards', short: 'An accusation of card-sharping — petty and faction-neutral; one retelling from being called theft.', entry: null },
+  'predicate-fathered-a-bastard':           { id: 'predicate-fathered-a-bastard', label: 'Fathered a bastard', short: 'A claim of an unacknowledged child — faction-neutral; one moralizing retelling from an affair charge.', entry: null },
+  'predicate-broke-a-betrothal':            { id: 'predicate-broke-a-betrothal', label: 'Broke a betrothal', short: 'A claim of a broken engagement — faction-neutral, and the claim the broken-betrothal vignette mints.', entry: null },
+  'predicate-publicly-quarreled-with':      { id: 'predicate-publicly-quarreled-with', label: 'Publicly quarreled with', short: 'A claim of an open falling-out — faction-neutral, and the claim the public-quarrel vignette mints.', entry: null },
+  'predicate-shuttered-the-shop':           { id: 'predicate-shuttered-the-shop', label: 'Shuttered the shop', short: 'A claim the shop has closed — faction-neutral, the visible proof the merchant-ruin vignette produces.', entry: null },
+  'predicate-blessed-the-harvest':          { id: 'predicate-blessed-the-harvest', label: 'Blessed the harvest', short: 'A flattering claim of good fortune — faction-neutral, and the least tellable line in the registry.', entry: null },
+  'predicate-rescued-the-drowning-child':   { id: 'predicate-rescued-the-drowning-child', label: 'Rescued the drowning child', short: 'A flattering claim of heroism — faction-neutral, and surprisingly juicy for good news.', entry: null },
+  'predicate-gave-alms-to-the-poor':        { id: 'predicate-gave-alms-to-the-poor', label: 'Gave alms to the poor', short: 'A flattering claim of charity — faction-neutral and only modestly tellable.', entry: null },
+  'predicate-won-the-regatta':              { id: 'predicate-won-the-regatta', label: 'Won the regatta', short: 'A flattering claim of a sporting win — faction-neutral, middling juiciness.', entry: null },
+  'predicate-is-favored-at-court':          { id: 'predicate-is-favored-at-court', label: 'Favored at court', short: 'A flattering claim of royal favor — faction-relevant; the partisan trait sharpens or softens it by side.', entry: null },
+  'predicate-nursed-the-sick-through-fever':{ id: 'predicate-nursed-the-sick-through-fever', label: 'Nursed the sick through fever', short: 'A flattering claim of nursing the sick — faction-neutral and only modestly tellable.', entry: null },
+  'predicate-is-the-true-heir-of':          { id: 'predicate-is-the-true-heir-of', label: 'The true heir', short: 'A claim of true parentage to the throne — faction-relevant, and nearly as juicy as poison itself.', entry: null },
+  'predicate-met-at-the-docks-by-night':    { id: 'predicate-met-at-the-docks-by-night', label: 'Met at the docks by night', short: 'A neutral claim of a night meeting at the docks — one retelling from being called a secret meeting.', entry: null },
+  // Terminal-only debrief vocabulary (Task 7B).
+  "terminal-debrief": {"id": "terminal-debrief", "label": "Debrief", "short": "The campaign has ended. Read retained causes, received copies and what remains unknown.", "entry": null},
+  "artifact": {"id": "artifact", "label": "Artifact", "short": "A physical document has fixed text; each viewing can begin a separate story.", "entry": null},
+  "forgery": {"id": "forgery", "label": "Forgery", "short": "A commissioned document. Its paper stays fixed while people can change their accounts of it.", "entry": null},
+  "seance": {"id": "seance", "label": "Séance", "short": "Later testimony from the departed. It does not create a new historical claim or prove a visible visit was a ritual.", "entry": null},
+  "thread": {"id": "thread", "label": "Thread", "short": "Follow one retained story, operation or report root without merging unrelated identities.", "entry": null},
+  "timeline": {"id": "timeline", "label": "Sketch timeline", "short": "Observation, receipt, acquisition and the enemy’s later conclusions keep their actual dates.", "entry": null},
+  "overlay": {"id": "overlay", "label": "Overlay", "short": "Compare received signals with actual attention and resulting features, keeping unproved links explicit.", "entry": null},
+  "phantom": {"id": "phantom", "label": "Phantom", "short": "A fabricated appearance of attention requires evidence of fabrication; missing history does not prove it.", "entry": null},
+  "lag": {"id": "lag", "label": "Lag", "short": "Actual attention without a matched received signal is shown separately from features without signal links.", "entry": null},
+  "debrief-epigraph": {"id": "debrief-epigraph", "label": "what can happen, not what will happen", "short": "Each campaign teaches possibilities in the information system, not an answer key for another seed.", "entry": null},
+  "unrecorded": {"id": "unrecorded", "label": "Unrecorded", "short": "The retained history does not supply this fact. A missing record is not proof that nothing happened.", "entry": null},
+  "ambiguous": {"id": "ambiguous", "label": "Ambiguous", "short": "More than one retained candidate fits. No candidate is silently chosen.", "entry": null},
+  "reported-account": {"id": "reported-account", "label": "Reported account", "short": "What someone said or headquarters heard; it may differ from the actual work.", "entry": null},
+  "actual-attention": {"id": "actual-attention", "label": "Actual attention", "short": "Retained performed questioning, compelled answers or staffed watch work, separate from resulting evidence.", "entry": null},
+  "claim-change": {"id": "claim-change", "label": "Claim change", "short": "An exact change between retained claim fields. A responsible mind is named only when the record supports it.", "entry": null},
+  "evidence-arrival": {"id": "evidence-arrival", "label": "Evidence arrival", "short": "When the enemy actually acquired evidence, which may be later than the reported observation.", "entry": null},
+  "orphan-history": {"id": "orphan-history", "label": "Unresolved history", "short": "Retained events whose operation, root, receipt or date cannot be resolved remain available to read.", "entry": null},
+};
+`````
+<!-- END FILE src/content/terms.ts -->
+
+### assets/manifest.json
+
+SHA-256: `21e72bbf5738b79b81f6b51a667392be7af4c0b02ea56dd1445b8254a4bd2593`. Unit: `7b-registry`.
+
+<!-- BEGIN FILE assets/manifest.json -->
+`````json
+{
+  "version": 1,
+  "slots": {
+    "font.display": "fonts/Cinzel-Regular.woff2",
+    "font.text": "fonts/EBGaramond-Regular.woff2",
+    "font.ui": "fonts/Inter-Regular.woff2",
+    "texture.paper.board": null,
+    "frame.portrait.neutral": null,
+    "portrait.npc.pool": null,
+    "icon.ui.rumor": null,
+    "icon.ui.coin": null,
+    "icon.ui.courier": null,
+    "icon.ui.dead-drop": null,
+    "icon.ui.salon": null,
+    "icon.ui.walk-in": null,
+    "icon.ui.scrying": null,
+    "map.token.courier": null,
+    "icon.venue.tavern": null,
+    "icon.venue.market": null,
+    "icon.venue.chapel": null,
+    "icon.venue.workshop": null,
+    "icon.venue.well": null,
+    "icon.venue.guard-post": null,
+    "icon.venue.cathedral": null,
+    "icon.venue.docks": null,
+    "icon.venue.safehouse": null,
+    "icon.venue.home": null,
+    "icon.venue.salon": null,
+    "icon.venue.palazzo": null,
+    "icon.venue.press": null,
+    "icon.ui.letter": null,
+    "icon.ui.forgery-quill": null,
+    "icon.ui.seance": null,
+    "texture.paper.debrief": null
+  }
+}
+`````
+<!-- END FILE assets/manifest.json -->
+
+### app/src/assets.ts
+
+SHA-256: `ac6b81d2b979809262e623d3a6a0dbcd946ca6aa85f64e9aff4f8fcd783d0a22`. Unit: `7b-registry`.
+
+<!-- BEGIN FILE app/src/assets.ts -->
+`````typescript
+/**
+ * The asset-manifest seam (docs/asset-slots.md, binding). DOM-free logic only — this module is
+ * imported directly by vitest (no jsdom) as well as by the app. It resolves slot ids to either a
+ * real asset (once GDM provenance is CONFIRMED in assets/LICENSES.md) or a primitive fallback.
+ * Assets are never load-bearing: a missing/null slot always renders its fallback.
+ *
+ * Loader: a static Vite JSON import — the SAME assets/manifest.json that tests/app/assets.test.ts
+ * re-reads independently via fs, so a bug in either reader can't silently pass the other's checks.
+ */
+import manifest from '../../assets/manifest.json';
+import { fnv1a32 } from '../../src/core/rng';
+
+type ManifestSlots = Record<string, string | string[] | null>;
+const slots = (manifest as { version: number; slots: ManifestSlots }).slots;
+
+export type Resolved =
+  | { kind: 'asset'; url: string }
+  | { kind: 'layers'; urls: string[] }
+  | { kind: 'fallback' };
+
+/**
+ * Resolve a registered slot id to its asset, layered recipe, or primitive fallback.
+ * Throws on an id that isn't a KEY in the manifest at all (even null counts as registered) — no
+ * ad-hoc slots. Plans 8–10 must add a row to docs/asset-slots.md (and a null key here) before any
+ * code may reference a new slot id. The throw is that rule's teeth.
+ */
+export function resolveSlot(id: string): Resolved {
+  if (!Object.prototype.hasOwnProperty.call(slots, id)) {
+    throw new Error(`resolveSlot: unregistered slot id '${id}' — add it to docs/asset-slots.md and assets/manifest.json first`);
+  }
+  const value = slots[id]!;
+  if (value === null) return { kind: 'fallback' };
+  if (Array.isArray(value)) return { kind: 'layers', urls: value };
+  return { kind: 'asset', url: value };
+}
+
+/** Unicode-glyph fallback for every icon.venue.* archetype in the registry (asset-slots.md row 2). */
+export const VENUE_GLYPHS: Record<string, string> = {
+  tavern: '❦',
+  market: '⚖',
+  chapel: '✝',
+  workshop: '⚒',
+  well: '◉',
+  'guard-post': '⛨',
+  cathedral: '✚',
+  docks: '⚓',
+  safehouse: '⌂',
+  home: '▪',
+  salon: '❧',
+  palazzo: '♛',
+  press: '✒',
+};
+
+/**
+ * Unicode-glyph fallbacks for the Plan 8 Task 11 UI icons (asset-slots.md, icon.ui.* rows). Each slot
+ * is registered null in the manifest (wired never — assets still gated), so the game SHIPS these
+ * dingbat-class glyphs (art-direction: fallback glyphs are dingbats, never emoji faces). A panel that
+ * wants an icon renders the glyph; if a licensed pack ever lands, resolveSlot swaps it in with no
+ * panel change.
+ */
+export const UI_GLYPHS: Record<string, string> = {
+  coin: '¤',
+  courier: '✉',
+  'dead-drop': '⚑',
+  salon: '❧',
+  'walk-in': '⇥',
+  scrying: '◉',
+  letter: '✉',
+  'forgery-quill': '✒',
+  seance: '✧',
+};
+
+/** Unicode-glyph fallback for the town-view map tokens (asset-slots.md, map.token.* rows). */
+export const MAP_TOKEN_GLYPHS: Record<string, string> = {
+  courier: '◈',
+};
+
+/** Number of hue bands the initials-avatar fallback rotates through — see note below. */
+const DISTRICT_HUE_BANDS = 8;
+
+/** First letters of up to two id segments (split on `-`/`_`), uppercased. Pure string op — no name lookup. */
+function initialsFor(npcId: string): string {
+  const parts = npcId.split(/[-_\s]+/).filter((p) => p.length > 0);
+  if (parts.length >= 2) return (parts[0]!.charAt(0) + parts[1]!.charAt(0)).toUpperCase();
+  const only = parts[0] ?? npcId;
+  return only.slice(0, 2).toUpperCase() || '?';
+}
+
+/**
+ * Deterministic face: pick from the portrait.npc.pool via fnv1a32(`${worldSeed}:${npcId}`), or an
+ * initials-avatar fallback when the pool is empty (true today — no portrait pack is CONFIRMED).
+ *
+ * CONSCIOUS DEVIATION (noted for Ellie): the fallback hue is meant to be faction-tinted per
+ * asset-slots.md's "faction-tinted" fallback contract, but faction/district assignment lives in
+ * WorldState and this module is DOM-free, seam-only, composition-root-adjacent code that must NOT
+ * import sim/world (headless-sim law) — portraitFor only ever receives (npcId, worldSeed). The
+ * honest substitute is a "district" proxy hashed from the id itself (fnv1a32(`${worldSeed}:district:${npcId}`)
+ * mod DISTRICT_HUE_BANDS), NOT the real district/faction. It is still deterministic and stable per
+ * (npc, seed), but it is a stand-in, not the real faction tint — revisit once portraits are wired
+ * and a real per-NPC district/faction can be threaded through as a prop instead.
+ */
+export function portraitFor(
+  npcId: string,
+  worldSeed: string,
+): Resolved | { kind: 'initials'; initials: string; districtHue: number } {
+  const poolSlot = slots['portrait.npc.pool'];
+  const pool = Array.isArray(poolSlot) ? poolSlot : typeof poolSlot === 'string' ? [poolSlot] : [];
+  if (pool.length > 0) {
+    const idx = fnv1a32(`${worldSeed}:${npcId}`) % pool.length;
+    return { kind: 'asset', url: pool[idx]! };
+  }
+  const districtIndex = fnv1a32(`${worldSeed}:district:${npcId}`) % DISTRICT_HUE_BANDS;
+  const districtHue = Math.round((districtIndex * 360) / DISTRICT_HUE_BANDS);
+  return { kind: 'initials', initials: initialsFor(npcId), districtHue };
+}
+`````
+<!-- END FILE app/src/assets.ts -->
+
+### docs/asset-slots.md
+
+SHA-256: `a1875e76d06b150e55bd74965a3913c8aaa1de8c6626f1113b94f83cd185d01e`. Unit: `7b-registry`.
+
+<!-- BEGIN FILE docs/asset-slots.md -->
+`````markdown
+# Hearsay — Asset Slot Architecture
+
+**Status:** ARCHITECTURE (authored 2026-07-05, ahead of Plan 7). This document is the canonical
+registry of every visual asset slot the game renders, the contract each slot obeys, and the
+seam future plans/AI sessions use to wire purchased assets in. Plan 7's authoring MUST consume
+this doc (it defines Plan 7's asset-manifest task); Plans 8–10 add slots here, never ad-hoc.
+
+## Style commitment (and the pivot path)
+
+**2D, resolution-independent, "printed matter" — NOT pixel art.** Rationale:
+
+1. **The boards are documents.** Evidence Board / Codex / Counter-Sketch are text-dense surfaces —
+   diffs, tables, testimony. Crisp type on parchment coheres; pixel fonts and low-res portraits
+   fight exactly the surfaces the player stares at most.
+2. **The town view is a diagram, not a world.** Space is discrete (venue graph + circles; "the sim
+   never knows pixels"), so the map renders as a living node-graph. Pixel art buys nothing on a
+   diagram; clean vector nodes + tokens do.
+3. **Theme synergy:** a Renaissance city-state with a printing quarter — woodcut/engraving-flavored
+   illustration makes the whole game read as period print. The game about information looks like
+   printed information.
+4. **Practical:** resolution independence (Steam Deck → 4K) and CSS/SVG tinting (faction colors,
+   suspect states) come free with flat/vector-leaning art; pixel art needs integer scaling discipline
+   everywhere.
+
+**Pivot safety:** every slot below is resolved through a data manifest. Style lives in the assets,
+not the code. If Ellie's purchased packs turn out pixel-style (they're plentiful and cheap), the ONLY
+things that change are the manifest, the art-direction doc, and a font/scaling choice — zero engine
+or panel code. Buy what you love; the architecture doesn't care.
+
+## The manifest seam (Plan 7 implements this — the "placeholder" contract)
+
+- `assets/manifest.json` — pure data (content split, same law as Rules/GenContent):
+  `slotId → file path | layered recipe | null`. Checked into the repo alongside the packs.
+- `assets/LICENSES.md` — per-pack license inventory. **No asset is wired before its pack passes the
+  commercial-redistribution gate** (see `asset-shopping-brief.md`).
+- `app/src/assets.ts` (composition root only) resolves slots → URLs/recipes; **panels receive
+  resolved props** (the panels lint fence stays intact).
+- **Every slot has a primitive fallback** (CSS shape / initials-avatar / unicode glyph / flat color).
+  A missing or null slot NEVER blocks a build or a plan — assets are additive, never a dependency.
+  This is the standing law from Ellie: no asset hunting; placeholders always ship.
+- **Deterministic portrait assignment:** `portraitFor(npcId, worldSeed)` picks from the pool or
+  composes a layered recipe via the existing seeded-stream discipline (`Rng(seed, 'portraits')`) —
+  same NPC, same face, every session, every machine.
+
+## Slot registry v1 (= Ellie's acquisition focus list, in priority order)
+
+| # | Slot family | Count needed | Contract | Fallback primitive | Surfaces | Wired in |
+|---|-------------|--------------|----------|--------------------|----------|----------|
+| 1 | `portrait.npc.*` | Layered system (≥8 bases × hair/clothing/accessory layers) **or** ≥100 statics, commoner-heavy | square PNG, transparent, ≥256px, one framing family | initials-avatar disc, faction-tinted | Board cluster detail, Codex rows, Counter-Sketch, town tooltips, debrief | Plan 7 |
+| 2 | `icon.venue.*` | 13: tavern, market, chapel, workshop, well, guard-post, cathedral, docks, salon, palazzo, press, safehouse, home | SVG or mono PNG ≥64px, recolorable, ONE style set | unicode glyph + label | Town-view nodes, board venue refs, day-planner | Plan 7 |
+| 3 | `icon.ui.*` | ~20: rumor, inquiry, watch-eye, secret-lock, informant, courier, dead-drop, coin, salon, walk-in, letter, forgery-quill, scrying, séance, doomclock, arrest, duel, faction ×3, assist, alert | same set/style as #2 (buy together) | unicode glyph | All panels, toasts, timeline | Plan 7 (subset), 8–9 (rest) |
+| 4 | `texture.paper.*` | 4–6: full-page parchment ×2, tileable grain, desk/leather | ≥1024px, subtle contrast, readable overlay text in light+dark | flat CSS color + border | Board backgrounds, debrief, dossier | Plan 7 |
+| 5 | `frame.portrait.*` | 2–3 nine-slice border variants (neutral / suspect / your-informant) | PNG nine-slice or CSS border-image | CSS border, state-tinted | Everywhere portraits render | Plan 7 |
+| 6 | `font.display` / `font.ui` | 2 (DON'T buy — Google Fonts OFL: Cinzel / IM Fell / EB Garamond + Inter / Source Sans 3) | woff2, OFL license file in assets/ | system serif/sans stack | Everything | Plan 7 |
+| 7 | `map.token.*` | optional: NPC/watch/player/courier tokens for the graph view | tiny SVG/PNG, recolorable | colored circles/rings + dingbat glyph (these look GOOD on a diagram — genuinely optional) | Town view | Plan 7+ |
+| 8 | `sfx.ui.*` | v1.1 — separate brief later | — | silence | — | post-v1 |
+
+**Purchase guidance lives in `asset-shopping-brief.md`** (search terms, red flags, GDM license verdict).
+Buying order if budget-constrained: **1 → 2+3 (one pack) → 4**; 5–7 are polish.
+
+**Plan 8 Task 11 additions (2026-07-09):** `icon.ui.{coin,courier,dead-drop,salon,walk-in}` and
+`map.token.courier` register here first (manifest keys `null`, fallback dingbat glyphs in
+`app/src/assets.ts` UI_GLYPHS / MAP_TOKEN_GLYPHS) — **wired never this plan, assets still gated.**
+Note the deliberate choice of **`icon.ui.walk-in`, NOT `icon.ui.turncoat`** (the plan's Global
+Constraints line named `turncoat`): a turncoat icon would have **no lawful render site** — turncoats
+are player-invisible by pillar law (`networkView` never exposes the flip), so a `turncoat` slot could
+only ever bait a future epistemic violation. The player-facing walk-in (an enemy asset who flipped to
+you, whose tip is a lawful intel row) is the honest slot. Controller adjudication, Task 11.
+
+Plan 9 Task 3 registers `icon.ui.scrying` as null; primitive fallback `◉`.
+No media is wired. The planned séance and debrief slots remain their own tasks.
+
+## Rules for future plans & AI sessions
+
+1. **Plan 7 authoring** consumes this doc: it must include (a) the `assets.ts` loader + manifest task
+   with per-slot fallbacks, (b) the inventory/license-gate task (skipped gracefully if `assets/` is
+   empty), (c) the art-direction doc written FROM whatever packs exist at authoring time.
+2. **New visual features in Plans 8–10 register slots HERE first** (add a row, then reference the
+   slot id in the plan task) — no plan may hardcode an asset path.
+3. **The P5 dev shell (Tasks 7–8) stays text-only** — it predates the manifest on purpose; do not
+   retrofit it. First asset-rendering surface is Plan 7's real UI.
+4. **Never block on assets.** A slot with no asset renders its fallback and the game ships that way
+   if need be. Assets upgrade the look; they are never load-bearing.
+5. **License gate is absolute:** unlisted-in-LICENSES.md ⇒ unwired, no exceptions (Steam is the bar).
+
+## Plan 9 Task 7B terminal additions
+
+Registered null before use; no media is wired. The terminal composition root resolves
+these slots and passes the results to props-only panels. Primitive fallbacks always work.
+Existing icon.ui.scrying remains unchanged and is reused for retained scrying operations.
+
+| Slot | Fallback | Lawful terminal render site |
+| --- | --- | --- |
+| `icon.ui.letter` | `✉` glyph plus Artifact text | Artifact history heading |
+| `icon.ui.forgery-quill` | `✒` glyph plus artifact ID | Retained forged-document history |
+| `icon.ui.seance` | `✧` glyph plus Séance text | Retained séance operation heading |
+| `texture.paper.debrief` | Existing flat paper color and border | Terminal reading desk |
+
+These display slots add no purchase/composer control and imply no caster or ritual
+causation for a mere physical sighting. Those controls remain in Plan 10 under A7.
+`````
+<!-- END FILE docs/asset-slots.md -->
+
+### app/src/townview.ts
+
+SHA-256: `da1e7dbedc20d9f95b135f7e0f5b02121fd96b14cd3d2c18770c4e99a4aa62f3`. Unit: `6a-panels`.
+
+<!-- BEGIN FILE app/src/townview.ts -->
+`````typescript
+/**
+ * The composition root's town-view TYPE surface — the seam that lets the fenced town diagram be
+ * typed against the exact contracts the root produces, without importing engine VALUE code.
+ *
+ * Why this file exists (epistemic-honesty lint fence + the "same rule value" law):
+ *   The town directory is fenced by the panels-law block (eslint.config.js): NO imports from the
+ *   sim/world/bots/harness trees — value OR type — so a town component can never reach into the
+ *   engine. But the diagram's props ARE, verbatim, the sim's `PlayerView` (the epistemic selector)
+ *   and its layout input IS the public-street `TownMap`; both types live in the fenced sim tree.
+ *   The fence's rule value is BINDING-fixed (Plan-7 constraint: extend the files array, same rule
+ *   value, no new block, no allowTypeImports), so the town files obtain the NAMES through this
+ *   UNFENCED app-root module instead. These are `export type` re-exports — fully erased at build,
+ *   carrying ZERO runtime coupling — so the runtime fence (no engine values in town/) is completely
+ *   intact: types flow, values do not. This mirrors how the panels get `BoardView` from
+ *   src/intel/types rather than reaching into the sim themselves.
+ */
+export type { PlayerView } from '../../src/sim/fieldwork';
+export type { TownMap } from '../../src/sim/enemy/state';
+// Plan 8 Task 11 — the network surface's epistemic view-models + the one price table's type. Same
+// erased-type-only re-export discipline: names flow to the fenced panels, zero runtime coupling.
+export type { NetworkView, NetworkAssetView, NetworkDropView, CourierRoute } from '../../src/sim/fieldwork';
+export type { EconomyDef } from '../../src/sim/rules';
+
+// ── Plan 11 Task 13 — the directive desk and the local composers ────────────────────────────────
+// Same erased-type-only discipline. The desk panel and the composer are props-only like every other
+// panel; these names are the ONLY way the fenced app/src/panels/** tree learns the shapes of the
+// directive ledger, the frozen local offer, the eight handoff levers, the public approach history,
+// and the public network intel row. A VALUE export here would fire the townview scan-pin in
+// tests/lint/determinism-law.test.ts, so the runtime fence stays intact: types flow, values do not.
+export type { DirectiveLedgerView, DirectiveLedgerRow } from '../../src/sim/directives/view';
+export type {
+  DirectiveBrief, DirectiveHandoff, DirectiveMission, DirectiveTarget, ShapePayload,
+  PlayerDirectiveApplication, DirectivePriority, DirectiveAuthority, DirectiveDiscretion,
+  DirectiveSpecificity, ReportExpectation, AdvisoryGuidance,
+  DirectiveReportPayload, DirectiveReportEvidence,
+} from '../../src/sim/directives/types';
+export type { Mice } from '../../src/sim/network/types';
+export type { RecruitmentHistoryRow } from '../../src/sim/network/recruitment';
+export type { NetworkIntelEntry } from '../../src/intel/entry';
+export type { InjectSpec } from '../../src/sim/actions';
+export type { LocalOffer, LocalActionIntent, NonLocalActionIntent } from './loop/session';
+
+// Task 6 terminal props; erased types only, covered by the existing barrel scan.
+export type { DebriefView } from '../../src/sim/debrief/index';
+`````
+<!-- END FILE app/src/townview.ts -->
+
+### app/src/theme.css
+
+SHA-256: `3755a13d95873c445d166cded5fa986a04b5526e81f557a4e888f243488d8af1`. Unit: `6a-panels`.
+
+<!-- BEGIN FILE app/src/theme.css -->
+`````css
+/**
+ * Hearsay theme tokens — derived from docs/art-direction.md (STANDING LAW, byte-exact hex values
+ * from the "Palette" table). This file supplies the printed-matter look for every surface: boards,
+ * town view, and chrome all read these custom properties rather than hardcoding color or type.
+ *
+ * Font files are served from the repo-level assets/fonts/ tree (assets/manifest.json's
+ * font.display / font.text / font.ui slots). vite.config.ts scopes `publicDir` to that one folder
+ * (fonts only — never the whole assets/ tree, which also holds unconfirmed-license art packs), so
+ * the files are served/copied verbatim at stable ROOT-ABSOLUTE paths in both `npm run app:dev` and
+ * `npm run app:build` — no relative-depth math, no /@fs/ dev-only path, no build-time hash to chase.
+ * app/index.html's preloads use the same absolute paths.
+ */
+
+/* ---------- @font-face: the three OFL families, regular weight only (the only weight the
+   manifest currently wires — see docs/asset-slots.md row 6 / assets/manifest.json). ---------- */
+
+@font-face {
+  font-family: 'Cinzel';
+  src: url('/Cinzel-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'EB Garamond';
+  src: url('/EBGaramond-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/Inter-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---------- Palette: light ("parchment") is the default; dark ("chalk on slate") applies via
+   prefers-color-scheme. `[data-theme]` overrides win over BOTH — the attribute selector's higher
+   specificity ((0,2,0) vs. plain :root's (0,1,0)) beats the media-scoped :root regardless of source
+   order, so an explicit data-theme="light" holds even under a dark OS, and vice versa. ---------- */
+
+:root {
+  --paper: #f3ead8;
+  --ink: #221a12;
+  --sepia: #7a5c3e;
+  --verdigris: #3e6e64;
+  --vermilion: #9e2b25;
+  --gilt: #b8912f;
+  --wash: rgba(122, 92, 62, 0.08);
+
+  /* Typography (docs/art-direction.md "Typography" section). */
+  --font-display: 'Cinzel', serif;
+  --font-text: 'EB Garamond', Georgia, serif;
+  --font-ui: 'Inter', system-ui, sans-serif;
+
+  /* Scale: 12/14/16/20/28px steps; boards default 14 EB Garamond; never below 12. */
+  --step-0: 12px;
+  --step-1: 14px;
+  --step-2: 16px;
+  --step-3: 20px;
+  --step-4: 28px;
+
+  /* Motion: paper doesn't animate. State changes cross-fade <=150ms. */
+  --motion-fade: 150ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #23201b;
+    --ink: #e8dfce;
+    --sepia: #a98f6e;
+    --verdigris: #6fa79a;
+    --vermilion: #c65b4e;
+    --gilt: #d4b25e;
+    --wash: rgba(169, 143, 110, 0.1);
+  }
+}
+
+:root[data-theme='light'] {
+  --paper: #f3ead8;
+  --ink: #221a12;
+  --sepia: #7a5c3e;
+  --verdigris: #3e6e64;
+  --vermilion: #9e2b25;
+  --gilt: #b8912f;
+  --wash: rgba(122, 92, 62, 0.08);
+}
+
+:root[data-theme='dark'] {
+  --paper: #23201b;
+  --ink: #e8dfce;
+  --sepia: #a98f6e;
+  --verdigris: #6fa79a;
+  --vermilion: #c65b4e;
+  --gilt: #d4b25e;
+  --wash: rgba(169, 143, 110, 0.1);
+}
+
+/* ---------- Base rules ---------- */
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: var(--step-1);
+  line-height: 1.5;
+}
+
+/* Focus-visible rings in verdigris — never rely on color alone elsewhere, but a focus ring is
+   the one place a single outline channel is the whole point. */
+:focus-visible {
+  outline: 2px solid var(--verdigris);
+  outline-offset: 2px;
+}
+
+/* Small-caps utility (district labels, board headers) — font-variant-caps first, with a
+   letter-spacing nudge so synthesized small caps (fonts without a true smcp table) still read as
+   intentional letterspaced capitals rather than cramped fallback text. */
+.small-caps {
+  font-variant-caps: small-caps;
+  letter-spacing: 0.03em;
+}
+
+/* Hairline --sepia borders (rules, dividers, board hairlines). */
+hr {
+  border: none;
+  border-top: 1px solid var(--sepia);
+}
+
+.hairline {
+  border: 1px solid var(--sepia);
+}
+
+/* ---------- Components (Plan-7 Task 8: the interactive surface). All ink-on-paper, hairline
+   --sepia rules, small-caps headers; colour is never the only channel (badges pair tint with a
+   glyph/weight). Panels read these classes; they never hardcode hex (art-direction law). ---------- */
+
+/* The jargon law's runtime face: a registered term with a hover/focus gloss. Dotted underline so
+   it reads as "defined word" without colour, per the never-colour-alone rule. */
+.term {
+  position: relative;
+  border-bottom: 1px dotted var(--sepia);
+  cursor: help;
+}
+.term-tip {
+  position: absolute;
+  left: 0;
+  top: 1.4em;
+  z-index: 20;
+  width: max-content;
+  max-width: 260px;
+  padding: 4px 8px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--sepia);
+  font-family: var(--font-text);
+  font-size: var(--step-0);
+  line-height: 1.35;
+}
+
+/* Provenance: the via badge every intel row wears (sepia), the vermilion single-channel lock, the
+   gilt lock. Each carries its own glyph so the meaning survives with colour stripped. */
+.badge {
+  display: inline-block;
+  font-family: var(--font-ui);
+  font-size: var(--step-0);
+  font-variant-caps: small-caps;
+  letter-spacing: 0.03em;
+  padding: 0 6px;
+  border: 1px solid var(--sepia);
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.badge-via { color: var(--sepia); }
+.badge-lock { color: var(--gilt); border-color: var(--gilt); }
+.badge-danger { color: var(--vermilion); border-color: var(--vermilion); font-weight: 600; }
+
+/* Margin notes (amendment #5b): verdigris = YOUR things. A chip plus a one-line composer. */
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-ui);
+  font-size: var(--step-0);
+  color: var(--verdigris);
+  border: 1px solid var(--verdigris);
+  border-radius: 10px;
+  padding: 0 4px 0 8px;
+  margin: 2px 4px 2px 0;
+}
+.tag-chip button {
+  border: none;
+  background: none;
+  color: var(--verdigris);
+  cursor: pointer;
+  font: inherit;
+  padding: 0 2px;
+}
+.tag-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin: 4px 0; }
+.tag-row input {
+  font-family: var(--font-ui);
+  font-size: var(--step-0);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--sepia);
+  padding: 1px 4px;
+}
+
+/* Broadsheet tables: hairline rules, small-caps headers, --wash zebra, gilt diff highlight
+   (editor's ink, not neon). */
+.board-table { border-collapse: collapse; font-family: var(--font-ui); font-size: var(--step-1); }
+.board-table th, .board-table td { border: 1px solid var(--sepia); padding: 2px 8px; text-align: left; }
+.board-table th { font-variant-caps: small-caps; letter-spacing: 0.03em; font-weight: 600; }
+.board-table tbody tr:nth-child(even) { background: var(--wash); }
+.diff-cell { background: var(--gilt); color: var(--paper); font-weight: 600; }
+
+/* Chrome: the spymaster's desk. Letterpress buttons, paper warmth, ink hierarchy. */
+.panel { font-family: var(--font-text); }
+.panel h2 { font-family: var(--font-display); font-size: var(--step-3); letter-spacing: 0.04em; margin: 0 0 8px; }
+.panel h3 { font-family: var(--font-ui); font-size: var(--step-2); margin: 12px 0 4px; }
+.desk-btn {
+  font-family: var(--font-ui);
+  font-size: var(--step-1);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--sepia);
+  padding: 2px 10px;
+  cursor: pointer;
+}
+.desk-btn:disabled { color: var(--sepia); cursor: not-allowed; opacity: 0.6; }
+.desk-btn[aria-pressed='true'] { border-color: var(--ink); border-width: 2px; font-weight: 600; }
+.desk-note { font-family: var(--font-ui); font-size: var(--step-0); color: var(--sepia); }
+
+/* The directive desk (Plan 11): a filed record and its label/value pairs, plus the composer's
+   fieldsets. Existing tokens only — sepia hairlines on paper, UI face for labels, text face for
+   values; no new colour, no new type scale, no asset. */
+.desk-record { border-left: 2px solid var(--sepia); padding: 4px 0 4px 10px; margin: 10px 0; }
+.desk-fields { display: grid; grid-template-columns: max-content 1fr; gap: 0 10px; margin: 4px 0; }
+.desk-fields dt {
+  font-family: var(--font-ui);
+  font-size: var(--step-0);
+  color: var(--sepia);
+  font-variant-caps: small-caps;
+  letter-spacing: 0.03em;
+}
+.desk-fields dd { font-family: var(--font-text); font-size: var(--step-1); margin: 0; }
+.desk-fieldset {
+  border: 1px solid var(--sepia);
+  padding: 6px 10px;
+  margin: 8px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: baseline;
+}
+.desk-fieldset legend {
+  font-family: var(--font-ui);
+  font-size: var(--step-0);
+  font-variant-caps: small-caps;
+  letter-spacing: 0.04em;
+  color: var(--sepia);
+  padding: 0 4px;
+}
+.desk-fieldset label { font-family: var(--font-ui); font-size: var(--step-0); }
+
+/* Full-page ending cards: gilt win, sepia clock, vermilion exposure/arrest. */
+.ending {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--paper);
+  text-align: center;
+  padding: 24px;
+}
+.ending h1 { font-family: var(--font-display); font-size: var(--step-4); letter-spacing: 0.06em; margin: 0; }
+.ending-won h1 { color: var(--gilt); }
+.ending-clock h1 { color: var(--sepia); }
+.ending-lost h1 { color: var(--vermilion); }
+.ending p { font-family: var(--font-text); max-width: 46ch; }
+
+/* Reduced motion: none. The cross-fade above is the only motion this theme ever authorizes, and
+   this media query removes even that. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Terminal printed-matter reading desk. Every status also has explicit text. */
+.debrief-desk { max-width: 1120px; margin: 0 auto; padding: 24px; background-color: var(--paper); color: var(--ink); }
+.debrief-desk h1 { font-family: var(--font-display); }
+.debrief-epigraph { font-style: italic; max-width: 60ch; }
+.debrief-surface { margin-top: 20px; }
+.debrief-card { margin: 16px 0; padding: 12px 16px; border: 1px solid var(--sepia); overflow-wrap: anywhere; }
+.debrief-card h4 { margin: 4px 0 10px; font-family: var(--font-ui); }
+.debrief-card p, .debrief-surface > p { max-width: 80ch; }
+.debrief-detail pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--step-0); }
+.debrief-change, .debrief-desk .diff-cell { background: var(--ink); color: var(--paper); font-weight: 600; }
+.debrief-identification { border-left: 4px solid var(--gilt); padding-left: 8px; font-weight: 600; }
+.debrief-uncertain { color: var(--sepia); border-left: 2px dotted currentColor; padding-left: 8px; }
+.debrief-corroborated { font-weight: 600; }
+.debrief-desk [role='tab'][aria-selected='true'] { border-color: var(--ink); border-width: 2px; font-weight: 600; }
+.debrief-desk :focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.debrief-icon { display: inline-block; margin-right: 6px; }
+.debrief-icon img { max-width: 1.25em; max-height: 1.25em; vertical-align: middle; }
+@media (max-width: 600px) { .debrief-desk { padding: 12px; } .debrief-card { padding: 8px; } .debrief-card .board-table { display: block; overflow-x: auto; } }
+`````
+<!-- END FILE app/src/theme.css -->
+
+### app/src/main.tsx
+
+SHA-256: `53e7a34623e1b4b07be2957b221aa82112e4ba1808e0b4fb3b961ebf3ee86405`. Unit: `6b-gate`.
+
+<!-- BEGIN FILE app/src/main.tsx -->
+`````tsx
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import './theme.css';
+import { debriefView } from '../../src/sim/debrief/index';
+import { DebriefEnding } from './panels/DebriefEnding';
+import { resolveSlot, UI_GLYPHS } from './assets';
+
+// ── Composition root: engine VALUE imports are legal ONLY here and in loop/** (the composition-root
+// fence). Everything below the panels boundary receives props; nothing there reaches the engine. ──
+import { newSession, type LocalActionIntent, type NonLocalActionIntent } from './loop/session';
+import { makeClock } from './loop/clock';
+import { KEYMAP, VERB_TERM, type UIAction } from './input/actions';
+import { TERMS } from '../../src/content/terms';
+import { computeLayout } from './town/layout';
+import { TownCanvas } from './town/TownCanvas';
+import { claimNames, playerView, networkView, courierRouteView } from '../../src/sim/fieldwork';
+import { directiveView } from '../../src/sim/directives/view';
+import { recruitmentHistoryView } from '../../src/sim/network/recruitment';
+import { boardView } from '../../src/intel/board';
+import { counterSketchView } from '../../src/intel/countersketch';
+import { corroborations } from '../../src/intel/codex';
+import { webView, type WebSubject } from '../../src/intel/web';
+import { informantLedger } from '../../src/intel/ledger';
+import { eveningReport } from '../../src/intel/report';
+import { sourceLabel, singleInformantChannel, isMagic } from '../../src/intel/provenance';
+import { STANDARD_RULES } from '../../src/content/rules';
+import { dayOf, minuteOfDay } from '../../src/core/time';
+import type { AssistLevel, IntelEntry } from '../../src/intel/types';
+import type { Rules } from '../../src/sim/rules';
+
+import { Term } from './panels/Term';
+import { EvidenceBoard } from './panels/EvidenceBoard';
+import { Codex, type CodexDetailRow } from './panels/Codex';
+import { CounterSketch } from './panels/CounterSketch';
+import { WebViewPanel } from './panels/WebViewPanel';
+import { InformantLedger } from './panels/InformantLedger';
+import { EveningReport } from './panels/EveningReport';
+import { DayPlanner } from './panels/DayPlanner';
+import { TermsCodex } from './panels/TermsCodex';
+import { Network } from './panels/Network';
+import { Treasury } from './panels/Treasury';
+import { Directives } from './panels/Directives';
+
+const SEED = 'cor-1';
+type PanelKind = Extract<UIAction, { kind: 'open-panel' }>['panel'];
+const TABS: { key: PanelKind; term: string }[] = [
+  { key: 'board', term: 'evidence-board' }, { key: 'codex', term: 'codex' },
+  { key: 'counter', term: 'counter-sketch' }, { key: 'web', term: 'web-view' },
+  { key: 'ledger', term: 'ledger' }, { key: 'planner', term: 'day-planner' },
+  { key: 'network', term: 'network' }, { key: 'treasury', term: 'treasury' },
+  { key: 'report', term: 'evening-report' }, { key: 'terms', term: 'terms-codex' },
+  { key: 'directives', term: 'directive' },
+];
+
+/** The next rest-day (day-of-week 6) on or after `day` — when the weekly stipend next credits. */
+function nextStipendDay(day: number): number {
+  return day + ((6 - (day % 7)) + 7) % 7;
+}
+const SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
+
+// ── Composition-root view-model folds (computed here so panels stay props-only) ──────────────────
+
+/** Families whose predicate valence Rules judges damaging — the web's objective `damagingIds`. Intel
+ *  itself never reads Rules (the fence), so the caller computes this and passes it in. */
+function damagingFamilies(log: readonly IntelEntry[], rules: Rules): Set<string> {
+  const s = new Set<string>();
+  for (const e of log) {
+    if (e.kind === 'utterance' && e.family && e.reported
+      && rules.predicates[e.reported.predicate]?.valence === 'damaging') s.add(e.family);
+  }
+  return s;
+}
+
+/** The Codex detail model: every corroboration enriched with the via each half reached you through,
+ *  and the single-channel flag — set when every pair rests on one informant channel (never self/
+ *  dossier). This is the provenance-visible obligation, computed once per render. */
+function codexDetailView(log: readonly IntelEntry[], codex: { npc: string; trait: string }[], rules: Rules): CodexDetailRow[] {
+  return codex.map((h) => {
+    const hits = corroborations(log, h.npc, h.trait, rules);
+    const rows = hits.flatMap((hit) => [log[hit.receivedIndex]!, log[hit.toldIndex]!]);
+    const pairs = hits.map((hit) => ({
+      family: hit.family,
+      viaFrom: sourceLabel(log[hit.receivedIndex]!), viaTo: sourceLabel(log[hit.toldIndex]!),
+      changeCount: hit.changes.length,
+    }));
+    const singleChannelVia = singleInformantChannel(rows);
+    return { npc: h.npc, trait: h.trait, hits: pairs.length, locked: pairs.length >= 3,
+      pairs, singleChannelVia, ...(rows.some(isMagic) ? { hasMagic: true as const } : {}) };
+  });
+}
+
+const pad = (n: number) => String(n).padStart(2, '0');
+const fmtTick = (t: number) => `day ${dayOf(t)} · ${pad(Math.floor(minuteOfDay(t) / 60))}:${pad(minuteOfDay(t) % 60)}`;
+
+export function App() {
+  const sessionRef = useRef(newSession(SEED));
+  const clockRef = useRef(makeClock());
+  const tagId = useRef(0);
+  const [, force] = useReducer((x: number) => x + 1, 0);
+  const [panel, setPanel] = useState<PanelKind | null>('planner');
+  const [speed, setSpeed] = useState<0 | 0.25 | 0.5 | 1 | 2 | 4>(0); // start paused: pause-to-plan
+  const [assist, setAssist] = useState<AssistLevel>(1);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [webNpc, setWebNpc] = useState<string | null>(null);
+  const [ledgerVia, setLedgerVia] = useState<string>('self');
+  const [toast, setToast] = useState<string>('');
+  const [localRequested, setLocalRequested] = useState(false);
+
+  const session = sessionRef.current;
+  const world = session.world;
+  useEffect(() => { clockRef.current.speed = speed; }, [speed]);
+
+  // The playback loop: real elapsed-ms → whole ticks (clock) → session.advance. The sim mutates in
+  // place; `force` re-renders. advance halts on a terminal status; a failed queued verb surfaces its
+  // throw here (already dropped from the log) — we toast it and keep the clean world it landed on.
+  useEffect(() => {
+    let raf = 0; let last = performance.now();
+    const frame = (now: number) => {
+      const dt = now - last; last = now;
+      raf = requestAnimationFrame(frame);
+      if (sessionRef.current.world.scenario && sessionRef.current.world.scenario.status !== 'running') return;
+      const ticks = clockRef.current.onFrame(dt);
+      if (ticks <= 0) return;
+      try {
+        const result = sessionRef.current.advance(ticks);
+        if (result.stopped === 'local-offer') {
+          clockRef.current.speed = 0;
+          setSpeed(0);
+        }
+      } catch (err) { setToast(err instanceof Error ? err.message : String(err)); }
+      force();
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // Keyboard: every key is a UIAction via the data-driven KEYMAP (rebindable later). Typing in a
+  // field is never hijacked. select-venue/npc/assist/verb are pointer-driven, absent from the map.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Terminal controls own their native activation keys; live shortcuts are inactive.
+      if (sessionRef.current.world.scenario && sessionRef.current.world.scenario.status !== 'running') return;
+      const el = e.target as HTMLElement;
+      if (el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return;
+      const a = KEYMAP[e.key];
+      if (!a) return;
+      e.preventDefault();
+      if (a.kind === 'pause') setSpeed((s) => (s === 0 ? 1 : 0));
+      else if (a.kind === 'speed') setSpeed(a.speed);
+      else if (a.kind === 'open-panel') setPanel(a.panel);
+      else if (a.kind === 'close') setPanel(null);
+      else if (a.kind === 'assist') setAssist(a.level);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Town layout is deterministic and map-stable across ticks — compute it ONCE per world. Kept above
+  // the ending early-return so the hook order never changes (Rules of Hooks).
+  const layout = useMemo(
+    () => computeLayout(playerView(sessionRef.current.world).map, sessionRef.current.seed), [],
+  );
+
+  const submitVerb = (intent: NonLocalActionIntent) => {
+    const { queuedFor, refused } = session.submit(intent);
+    // The toast speaks registered language (jargon law): the verb's TERMS label, never a raw kind.
+    setToast(refused
+      ? `${TERMS[VERB_TERM[intent.kind]]!.label} refused — a local interaction is pending for ${fmtTick(queuedFor)}`
+      : `${TERMS[VERB_TERM[intent.kind]]!.label} queued for ${fmtTick(queuedFor)} — unpause to fire`);
+    force();
+  };
+  const addTag = (target: string, text: string) =>
+    submitVerb({ kind: 'tag', op: 'add', id: `tag-${tagId.current++}`, target, text });
+  const removeTag = (id: string) => submitVerb({ kind: 'tag', op: 'remove', id, target: null, text: null });
+  const requestLocal = () => {
+    const result = session.requestLocalInteraction();
+    setLocalRequested(!result.refused);
+    if (!result.refused) setToast(`Local moment requested for ${fmtTick(result.requestedFor)} — unpause to reach it`);
+    force();
+  };
+  // The ONLY way a local act leaves this shell: composed against the token the session froze, so the
+  // venue/circle it was chosen in is provably the venue/circle it executes in (offer/execution
+  // identity). A refusal is the ENGINE's word, surfaced verbatim — the composer never pre-judges it.
+  const chooseLocal = (intent: LocalActionIntent) => {
+    const offer = session.localOffer();
+    if (!offer) return;
+    try {
+      const { queuedFor } = session.chooseLocal(offer.token, intent);
+      setLocalRequested(false);
+      setToast(`${TERMS[VERB_TERM[intent.kind]]!.label} chosen for ${fmtTick(queuedFor)} — unpause to play the beat`);
+    } catch (err) {
+      setToast(err instanceof Error ? err.message : String(err));
+    }
+    force();
+  };
+
+  const status = world.scenario?.status;
+  if (status && status !== 'running') {
+    // The sole hidden-model composition point. Nothing is folded or passed to live panels.
+    const debrief = debriefView(world);
+    if (debrief === null) throw new Error('Terminal debrief unavailable');
+    return <DebriefEnding view={debrief} names={claimNames(world)} art={{
+      paper: resolveSlot('texture.paper.debrief'),
+      icons: {
+        letter: { resolved: resolveSlot('icon.ui.letter'), fallback: UI_GLYPHS.letter! },
+        'forgery-quill': { resolved: resolveSlot('icon.ui.forgery-quill'), fallback: UI_GLYPHS['forgery-quill']! },
+        scrying: { resolved: resolveSlot('icon.ui.scrying'), fallback: UI_GLYPHS.scrying! },
+        seance: { resolved: resolveSlot('icon.ui.seance'), fallback: UI_GLYPHS.seance! },
+      },
+    }} />;
+  }
+
+  // ── View models: every surface below is a pure fold the composition root computes ──
+  const view = playerView(world);
+  const names = claimNames(world);
+  const nameOf = (id: string): string => Object.prototype.hasOwnProperty.call(names, id) ? names[id]! : id;
+  const log = world.intel.log;
+  const tags = world.intel.tags;
+  const watchSightings = new Set(log.filter((e) => e.kind === 'presence').map((e) => e.venue));
+  const cast = world.scenario?.cast;
+  const webSubject: WebSubject = webNpc
+    ? { kind: 'npc', id: webNpc }
+    : { kind: 'objective', usurper: cast?.usurper ?? '', council: cast?.council ?? [] };
+  const web = webView(log, webSubject, damagingFamilies(log, STANDARD_RULES));
+  const vias = ['self', 'dossier', ...world.intel.informants.map((i) => i.id)];
+  // One board fold serves both the board panel and the planner's family-ask list (the brief's
+  // "family from board clusters"): the families the player can ask about are the clusters the
+  // board shows, so family-asking unlocks with clustering (assist >= 1), exactly like the board.
+  const board = boardView(log, assist, STANDARD_RULES);
+  // The network surface (Task 11): the roster/treasury/courier folds, all through epistemic selectors.
+  const net = networkView(world);
+  const courierRoutes = courierRouteView(world);
+  // The directive desk + the public approach history: two more epistemic selectors, same fence.
+  const directives = directiveView(world);
+  const approaches = recruitmentHistoryView(world);
+  const stipendDay = nextStipendDay(view.scenario?.day ?? dayOf(world.tick));
+  const localOffer = session.localOffer();
+
+  return (
+    <main style={{ fontFamily: 'var(--font-text)', maxWidth: 1200, margin: '0 auto', padding: 16 }}>
+      <header style={{ display: 'flex', gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', margin: 0 }}>Hearsay</h1>
+        <span className="desk-note">seed {session.seed} · {fmtTick(world.tick)}
+          {view.scenario ? ` / ${view.scenario.daysTotal}d` : ''} · {status}</span>
+      </header>
+
+      <div className="tag-row" role="toolbar" aria-label="playback">
+        <button className="desk-btn" aria-pressed={speed === 0} onClick={() => setSpeed((s) => (s === 0 ? 1 : 0))}>
+          {speed === 0 ? '▶ run' : '⏸ pause'}
+        </button>
+        {SPEEDS.map((s) => (
+          <button key={s} className="desk-btn" aria-pressed={speed === s} onClick={() => setSpeed(s)}>{s}×</button>
+        ))}
+        <span className="desk-note"><Term id="assist-level" />:</span>
+        {[0, 1, 2, 3].map((l) => (
+          <button key={l} className="desk-btn" aria-pressed={assist === l} onClick={() => setAssist(l as AssistLevel)}>{l}</button>
+        ))}
+      </div>
+
+      {toast && <p className="desk-note" role="status">{toast} <button className="desk-btn" onClick={() => setToast('')}>×</button></p>}
+      {localOffer && <p className="desk-note" role="status">Choose your action in this moment</p>}
+
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 380px', minWidth: 320 }}>
+          <TownCanvas view={view} layout={layout} selected={selected} watchSightings={watchSightings} courierRoutes={courierRoutes} onSelect={setSelected} />
+          {selected && <p className="desk-note">selected: {selected}</p>}
+        </div>
+
+        <div style={{ flex: '2 1 480px', minWidth: 360 }}>
+          <div className="tag-row" role="tablist" aria-label="boards">
+            {TABS.map((t) => (
+              <button key={t.key} className="desk-btn" aria-pressed={panel === t.key} onClick={() => setPanel(t.key)}>
+                <Term id={t.term} />
+              </button>
+            ))}
+          </div>
+
+          {panel === 'board' && <EvidenceBoard view={board} nameOf={nameOf} tags={tags} onAddTag={addTag} onRemoveTag={removeTag} />}
+          {panel === 'codex' && <Codex rows={codexDetailView(log, world.intel.codex, STANDARD_RULES)} />}
+          {panel === 'counter' && <CounterSketch view={counterSketchView(log, world.intel.cards)} />}
+          {panel === 'web' && (
+            <div>
+              {webNpc && <button className="desk-btn" onClick={() => setWebNpc(null)}>← objective web</button>}
+              <WebViewPanel web={web} onSelectNpc={setWebNpc} />
+            </div>
+          )}
+          {panel === 'ledger' && (
+            <div>
+              <div className="tag-row"><span className="desk-note"><Term id="via" />:</span>
+                {vias.map((v) => <button key={v} className="desk-btn" aria-pressed={ledgerVia === v} onClick={() => setLedgerVia(v)}>{v}</button>)}
+              </div>
+              <InformantLedger ledger={informantLedger(log, ledgerVia)} onSelectFamily={() => setPanel('board')} />
+            </div>
+          )}
+          {panel === 'planner' && (
+            <DayPlanner
+              view={view} nameOf={nameOf} paused={speed === 0}
+              coin={world.coin} economy={STANDARD_RULES.economy} onVerb={submitVerb}
+              onRequestLocal={requestLocal}
+              offer={localOffer} net={net} board={board} onLocal={chooseLocal}
+              localPending={localRequested || localOffer !== null} />
+          )}
+          {panel === 'network' && <Network view={net} history={approaches} />}
+          {panel === 'directives' && <Directives view={directives} nameOf={nameOf} />}
+          {panel === 'treasury' && <Treasury coin={world.coin} stipendDay={stipendDay} economy={STANDARD_RULES.economy} />}
+          {panel === 'report' && <EveningReport report={eveningReport(log, view.scenario?.day ?? dayOf(world.tick))} onOpenBoard={() => setPanel('board')} />}
+          {panel === 'terms' && <TermsCodex />}
+        </div>
+      </div>
+    </main>
+  );
+}
+
+createRoot(document.getElementById('root')!).render(<App />);
+`````
+<!-- END FILE app/src/main.tsx -->
+
+### tests/app/jargon.test.ts
+
+SHA-256: `b7b986fe13d987ed14b0f7794200efb8c17f841ed3881772cc500058645a7b96`. Unit: `7b-registry`.
+
+<!-- BEGIN FILE tests/app/jargon.test.ts -->
+`````typescript
+import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { TERMS } from '../../src/content/terms';
+import { PREDICATES } from '../../src/content/predicates';
+import { TRAITS } from '../../src/content/traits';
+import { VERB_TERM } from '../../app/src/input/actions';
+import { FIELDS } from '../../app/src/panels/EvidenceBoard';
+
+/**
+ * The no-unregistered-jargon law (amendment #5c), given teeth: every player-facing label in the
+ * playable surface renders through a REGISTERED `TERMS` id, or this test goes red. This is a plain
+ * fs source-scan (same idiom as tests/app/assets.test.ts's manifest read and
+ * tests/lint/determinism-law.test.ts's comment-stripped statement scan) — deliberately NOT a DOM/
+ * render test (the brief's "fs, not DOM" instruction; the standing DOM-testing deferral #8 holds).
+ *
+ * Scope: every app/src/panels/*.tsx source PLUS app/src/main.tsx. The brief scopes the scan to
+ * panels/*.tsx; main.tsx is the composition root but it ALSO renders player-facing text directly —
+ * the ending cards (EndingScreen's <Term id={e.term} />) and the playback toast
+ * (`${TERMS[VERB_TERM[intent.kind]]!.label} queued...`) both resolve through the very same TERMS
+ * registry the panels law protects. Excluding main.tsx would leave the loudest player-facing text
+ * in the whole app (how the campaign ends) outside the law's reach, so this scan generalizes
+ * cleanly to include it: same file shape (.tsx), same collection rules, same registry.
+ */
+const here = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(here, '../..');
+const panelsDir = path.join(repoRoot, 'app/src/panels');
+const mainFile = path.join(repoRoot, 'app/src/main.tsx');
+
+const panelFiles = fs.readdirSync(panelsDir)
+  .filter((f) => f.endsWith('.tsx'))
+  .map((f) => path.join(panelsDir, f));
+const scannedPaths = [...panelFiles, mainFile];
+
+// Comments must not fool the scan (a commented-out `<Term id="ghost-id" />` in diff noise should
+// never count as a real render either way). A SINGLE combined pass (not block-then-line as two
+// separate passes) is required: main.tsx's own header prose has a `//` line comment mentioning
+// "loop/**" — a block-comment-style opener that never actually opens one. Two separate passes
+// would let the block-comment regex find that `/*`-look-alike (it doesn't know it's already inside
+// a `//` line) and swallow everything up to the NEXT real `*/` two doc-comments later, silently
+// deleting real code (the TABS array) from the scan. One alternation, scanned left-to-right, lets
+// the `//` line comment claim the whole line (including its embedded `/**`) before the block
+// alternative ever gets a chance to misfire on it.
+//
+// Known blind spot (accepted): comment markers INSIDE string literals ("http://…", 'a /* b') would
+// be mis-stripped — this is a regex scan, not a lexer, and it has no notion of string context. No
+// scanned file triggers it today; if one ever does, the non-vacuity floor and the per-file hit
+// counts are the tripwire (real hits would silently vanish, dropping the count).
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (m) => (m.startsWith('/*') ? ' ' : ''));
+}
+
+type Hit = { file: string; id: string };
+
+/** Collects every STRING-LITERAL jargon reference the brief names: `<Term id="...">` (either quote
+ *  style) and `TERMS['...']` / `TERMS["..."]` bracket-literal lookups, plus the `term: '...'` object-
+ *  literal field main.tsx's ENDINGS/TABS maps use to carry a term id one level of indirection away
+ *  from the JSX (`<Term id={e.term} />` / `<Term id={t.term} />` — the id itself is still a source
+ *  string literal, just spelled as a record VALUE instead of a JSX attribute). */
+function collectHits(strippedSrc: string, file: string): Hit[] {
+  const hits: Hit[] = [];
+  for (const m of strippedSrc.matchAll(/<Term\s+id=["']([^"']+)["']/g)) hits.push({ file, id: m[1]! });
+  for (const m of strippedSrc.matchAll(/TERMS\[\s*["']([^"']+)["']\s*\]/g)) hits.push({ file, id: m[1]! });
+  for (const m of strippedSrc.matchAll(/\bterm:\s*["']([^"']+)["']/g)) hits.push({ file, id: m[1]! });
+  return hits;
+}
+
+const scanned = scannedPaths.map((p) => {
+  const rel = path.relative(repoRoot, p).replace(/\\/g, '/');
+  const raw = fs.readFileSync(p, 'utf8');
+  const stripped = stripComments(raw);
+  return { file: rel, raw, stripped };
+});
+
+const allHits: Hit[] = scanned.flatMap(({ file, stripped }) => collectHits(stripped, file));
+
+/** The one diagnostic the law actually raises: a collected hit whose id is not in the registry. */
+const unregistered = (hits: Hit[]): Hit[] => hits.filter((h) => TERMS[h.id] === undefined);
+
+// ── The law's firing proof (Plan 11 Task 13 fix wave) ────────────────────────────────────────────
+// The live sweep above reads repository files only, so — by construction — every id it examines is
+// already registered and no assertion in it can ever be OBSERVED firing. This block pushes a
+// synthetic unregistered term through the SAME `stripComments` → `collectHits` → `TERMS[id]`
+// pipeline the live sweep runs, and asserts the diagnostic appears. The live sweep is untouched.
+describe('the no-unregistered-jargon law FIRES on an injected term (proof, not presence)', () => {
+  const VIOLATION = [
+    'export function Ghost() {',
+    '  return <p><Term id="ghost-jsx" /> {TERMS[\'ghost-lookup\']!.label}</p>;',
+    '}',
+    "const TABS = [{ key: 'ghost', term: 'ghost-record' }];",
+    '// <Term id="ghost-comment" /> — a commented-out render is not a render, and must NOT be collected',
+  ].join('\n');
+  const injected = collectHits(stripComments(VIOLATION), 'synthetic.tsx');
+
+  it('the REAL extractor collects all three literal forms, and skips the commented one', () => {
+    expect(injected.map((h) => h.id).sort()).toEqual(['ghost-jsx', 'ghost-lookup', 'ghost-record']);
+  });
+
+  it('the REAL diagnostic reports every injected id (this is the assertion the live sweep runs)', () => {
+    expect(unregistered(injected).map((h) => h.id).sort())
+      .toEqual(['ghost-jsx', 'ghost-lookup', 'ghost-record']);
+  });
+
+  it('…and stays silent on the real surface: no live hit is unregistered', () => {
+    expect(unregistered(allHits)).toEqual([]);
+  });
+});
+
+describe('no-unregistered-jargon scan (amendment #5c) — every string-literal Term/TERMS reference resolves', () => {
+  it('the scan is not vacuous: it really finds <Term id> / TERMS[...] / term: literals across panels + main.tsx', () => {
+    expect(allHits.length).toBeGreaterThan(50);
+  });
+
+  it.each(allHits.map((h, i) => ({ ...h, i })))(
+    '#$i $file -> "$id" resolves in TERMS',
+    ({ file, id }) => {
+      expect(TERMS[id], `unregistered term id '${id}' rendered in ${file}`).toBeDefined();
+    },
+  );
+});
+
+describe('registry-driven wiring — ids rendered by ITERATING a registry, not by a source string literal', () => {
+  // The tell composer (DayPlanner) builds its predicate <option> list by iterating TERMS' own
+  // predicate-* keys, so it can never drift from TERMS by construction. The real drift risk runs
+  // the OTHER way: src/content/predicates.ts (the sim's actual predicate registry) growing a
+  // predicate that TERMS never learned a label for — silently dropping it from the tell UI with no
+  // failing test anywhere. This proves every PREDICATES id has a live predicate-<id> TERMS entry.
+  it('every PREDICATES id has a registered predicate-<id> TERMS entry', () => {
+    expect(Object.keys(PREDICATES).length).toBeGreaterThan(0); // the check below would be vacuous otherwise
+  });
+  it.each(Object.keys(PREDICATES))('predicate-%s resolves in TERMS', (id) => {
+    expect(TERMS[`predicate-${id}`], `PREDICATES has '${id}' but TERMS has no 'predicate-${id}'`).toBeDefined();
+  });
+
+  // The Codex panel renders `<Term id={\`trait-${r.trait}\`} />` — a template literal driven by
+  // world.intel.codex hypotheses, whose `trait` field ranges over TRAITS' own ids. Same shape of
+  // risk: a new trait added to src/content/traits.ts without a matching TERMS entry would render a
+  // Codex row that throws (Term.tsx's runtime law) the first time a player locks that trait.
+  it('every TRAITS id has a registered trait-<id> TERMS entry', () => {
+    expect(Object.keys(TRAITS).length).toBeGreaterThan(0);
+  });
+  it.each(Object.keys(TRAITS))('trait-%s resolves in TERMS', (id) => {
+    expect(TERMS[`trait-${id}`], `TRAITS has '${id}' but TERMS has no 'trait-${id}'`).toBeDefined();
+  });
+
+  // main.tsx's toast speaks `TERMS[VERB_TERM[intent.kind]]!.label` — VERB_TERM (app/src/input/
+  // actions.ts) is a total map from every Action['kind'] to a TERMS id, keyed by the TYPE union, so
+  // TypeScript already guarantees VERB_TERM is total. What it can't guarantee is that every VALUE
+  // in that map is still a REGISTERED term id — this closes that loop cheaply, verb by verb.
+  it('every VERB_TERM value resolves in TERMS (closes the toast loop)', () => {
+    expect(Object.keys(VERB_TERM).length).toBeGreaterThan(0);
+  });
+  it.each(Object.entries(VERB_TERM))('VERB_TERM.%s -> "%s" resolves in TERMS', (kind, termId) => {
+    expect(TERMS[termId], `VERB_TERM['${kind}'] -> '${termId}' is not registered in TERMS`).toBeDefined();
+  });
+
+  // EvidenceBoard's cluster-detail table renders its seven field row-headers by ITERATING its
+  // exported FIELDS array through `<Term id={f} />` — non-literal ids the literal scan above never
+  // sees. All seven resolve today, but rename/remove one of those TERMS entries and Term.tsx throws
+  // at runtime with no failing test anywhere — this sweep (importing the panel's own array, so the
+  // check can never drift from the source) closes that gap.
+  it('EvidenceBoard.FIELDS is non-empty (the sweep below would be vacuous otherwise)', () => {
+    expect(FIELDS.length).toBeGreaterThan(0);
+  });
+  it.each([...FIELDS])('EvidenceBoard field "%s" resolves in TERMS', (field) => {
+    expect(TERMS[field], `EvidenceBoard renders <Term id="${field}"> via FIELDS but TERMS has no '${field}'`).toBeDefined();
+  });
+});
+
+// ── Task 13: the directive desk's registry obligation ────────────────────────────────────────────
+// The panel glob above ALREADY auto-covers app/src/panels/Directives.tsx (the scan reads the whole
+// directory), so every <Term id="..."> the new desk renders is swept by the law with no edit here.
+// What the glob cannot check is the registry side of the bargain: that the eight promised nouns
+// really landed, that `verb-directive` was NOT double-registered (it shipped in Task 6), and that
+// the copy the presets speak no longer PROMISES a remote NPC will comply.
+describe('Task 13 registry — exactly eight new nouns, and no copy that promises compliance', () => {
+  /** The registry size at Task-12 HEAD (commit 1aad346), counted from the source at dispatch. */
+  const TASK_12_HEAD_TERM_COUNT = 133;
+  const NEW_TERM_IDS = [
+    'directive', 'brief', 'priority', 'purpose', 'report-expectation', 'scrutiny',
+    'sound-out', 'runaround',
+  ];
+  /**
+   * Terms registered by LATER plans, named and subtracted so this assertion keeps proving the thing it
+   * was written to prove — that Plan 11 Task 13 added exactly EIGHT nouns — instead of decaying into a
+   * whole-registry size pin that every subsequent plan must edit blind. Each id here is also asserted
+   * to exist, so the subtraction can never quietly absorb a term that was removed rather than added.
+   * Plan 9 Task 1 (artifacts) registers the three artifact verbs.
+   */
+  const LATER_PLAN_TERM_IDS = [
+    // Task 7B terminal vocabulary; preserve the original Task 13 growth assertion.
+    "terminal-debrief",
+    "artifact",
+    "forgery",
+    "seance",
+    "thread",
+    "timeline",
+    "overlay",
+    "phantom",
+    "lag",
+    "debrief-epigraph",
+    "unrecorded",
+    "ambiguous",
+    "reported-account",
+    "actual-attention",
+    "claim-change",
+    "evidence-arrival",
+    "orphan-history",
+    'verb-forge', 'verb-plant', 'verb-show', 'verb-scry', 'scrying', 'magic',
+    'scene-presence', 'arcane-residue', 'verb-seance', 'the-departed', 'night-visit',
+  ];
+
+  it('the registry grew by exactly 8 from Task-12 HEAD (later-plan registrations named and excluded)', () => {
+    for (const id of LATER_PLAN_TERM_IDS) {
+      expect(TERMS[id], `'${id}' is named as a later-plan term but is not registered`).toBeDefined();
+    }
+    expect(Object.keys(TERMS).length - LATER_PLAN_TERM_IDS.length)
+      .toBe(TASK_12_HEAD_TERM_COUNT + 8);
+  });
+
+  it.each(NEW_TERM_IDS)('registers "%s" with a label and a <=120 char short line', (id) => {
+    const term = TERMS[id];
+    expect(term, `Task 13 owes TERMS a '${id}' entry`).toBeDefined();
+    expect(term!.id).toBe(id);
+    expect(term!.label.length).toBeGreaterThan(0);
+    expect(term!.short.length).toBeGreaterThan(0);
+    expect(term!.short.length).toBeLessThanOrEqual(120);
+  });
+
+  it('`verb-directive` is NOT re-registered — Task 6 landed it and it still resolves', () => {
+    expect(NEW_TERM_IDS).not.toContain('verb-directive');
+    expect(TERMS['verb-directive']).toBeDefined();
+    expect(VERB_TERM.directive).toBe('verb-directive');
+  });
+
+  it('the scrutiny entry says in long form that it is inferred behaviour, never a shown meter', () => {
+    const entry = TERMS['scrutiny']!.entry;
+    expect(entry, 'scrutiny owes a long-form codex entry').not.toBeNull();
+    expect(entry!.toLowerCase()).toContain('infer');
+    expect(entry!.toLowerCase()).toMatch(/never a (shown |visible )?meter|no meter|never shown/);
+  });
+
+  // "You set the mission; the asset owns the moment": no preset's copy may state that a requested
+  // detail WILL happen. These are the four the task names, plus the posting preset the
+  // "requested post is not operational post" law reaches.
+  it.each(['verb-recruit', 'recruit', 'verb-courier', 'courier', 'verb-meet', 'verb-host', 'hosting', 'verb-post'])(
+    '"%s" copy no longer promises compliance',
+    (id) => {
+      const copy = `${TERMS[id]!.short} ${TERMS[id]!.entry ?? ''}`.toLowerCase();
+      for (const promise of [
+        'bring an in-circle npc onto your roster',
+        'turn a townsperson into an asset',
+        'pull one asset to your safehouse',
+        'they keep the mid-day post',
+        'task an asset to carry your story to a target',
+        'you pick the guest circle',
+      ]) {
+        expect(copy, `${id} still promises: "${promise}"`).not.toContain(promise);
+      }
+    },
+  );
+});
+
+describe('raw-label sweep (deferred scope #6 — warning list, report-only, never a failing gate in v1)', () => {
+  // A label rendered as a bare JSX text node (not through <Term>) is not (yet) illegal — deferred
+  // scope #6 pins the raw-label sweep at "warns", hard-fail arrives once the panel surface
+  // stabilizes (Plan 9/10). This walks JSX text nodes (text runs between `>` and `<`, stopping at
+  // any `{` so an inline expression container never gets swallowed into the run) and flags any
+  // node whose FULL trimmed text is byte-identical to a registered label. It's a scan, not a
+  // parser — exactly the cheap-and-over-strict idiom the townview law uses.
+  const labels = new Set(Object.values(TERMS).map((t) => t.label));
+  type Warning = { file: string; label: string };
+  const warnings: Warning[] = [];
+  for (const { file, stripped } of scanned) {
+    for (const m of stripped.matchAll(/>([^<>{}]+)</g)) {
+      const text = m[1]!.trim();
+      if (text.length > 0 && labels.has(text)) warnings.push({ file, label: text });
+    }
+  }
+
+  it('records (never fails on) raw JSX text nodes that literally equal a registered label', () => {
+    if (warnings.length > 0) {
+      console.log('[jargon scan] raw-label warnings (deferred #6, not a failure):', JSON.stringify(warnings));
+    }
+    expect(Array.isArray(warnings)).toBe(true); // this describe block can never go red — warning list only
+  });
+});
+`````
+<!-- END FILE tests/app/jargon.test.ts -->
+
+### tests/app/debrief-ui.test.tsx
+
+SHA-256: `b72c764a633b9c0c6b6cd37f856affbc8c991512c8a54c816bfadb2281a2b072`. Unit: `6a-panels`.
+
+<!-- BEGIN FILE tests/app/debrief-ui.test.tsx -->
+`````tsx
+import { describe, expect, it, vi } from 'vitest';
+import { Children, isValidElement, type KeyboardEvent, type ReactElement, type ReactNode } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { resolveSlot, UI_GLYPHS } from '../../app/src/assets';
+import { DebriefEnding } from '../../app/src/panels/DebriefEnding';
+import { DebriefThreads, type DebriefArt } from '../../app/src/panels/DebriefThreads';
+import { DebriefTimeline } from '../../app/src/panels/DebriefTimeline';
+import { DebriefOverlay } from '../../app/src/panels/DebriefOverlay';
+import { DebriefClaim } from '../../app/src/panels/DebriefReading';
+import { debriefView, type DebriefView } from '../../src/sim/debrief/index';
+import { claimNames } from '../../src/sim/fieldwork';
+import { cloneSerializable, hashWorld } from '../../src/sim/hash';
+import { terminalStory } from './helpers/debrief-campaign';
+
+const navigation = vi.hoisted(() => ({ active: false, ready: false, state: undefined as unknown }));
+vi.mock('react', async () => {
+  const actual = await vi.importActual<typeof import('react')>('react');
+  type Hook = <S, A>(reducer: (state: S, action: A) => S, initial: S) => [S, (action: A) => void];
+  const original = actual.useReducer as unknown as Hook;
+  const useReducer: Hook = (reducer, initial) => {
+    if (!navigation.active) return original(reducer, initial);
+    if (!navigation.ready) { navigation.state = initial; navigation.ready = true; }
+    return [navigation.state as typeof initial, (action) => { navigation.state = reducer(navigation.state as typeof initial, action); }];
+  };
+  return { ...actual, useReducer };
+});
+
+const art: DebriefArt = { paper: resolveSlot('texture.paper.debrief'), icons: {
+  letter: { resolved: resolveSlot('icon.ui.letter'), fallback: UI_GLYPHS.letter! },
+  'forgery-quill': { resolved: resolveSlot('icon.ui.forgery-quill'), fallback: UI_GLYPHS['forgery-quill']! },
+  scrying: { resolved: resolveSlot('icon.ui.scrying'), fallback: UI_GLYPHS.scrying! },
+  seance: { resolved: resolveSlot('icon.ui.seance'), fallback: UI_GLYPHS.seance! },
+} };
+const fixture = () => { const { world, claimId } = terminalStory(); const view = debriefView(world); if (!view) throw new Error('no terminal model');
+  return { world, view, claimId, names: claimNames(world) }; };
+const html = (node: ReactNode) => renderToStaticMarkup(node);
+type Props = { children?: ReactNode; role?: string; id?: string; onClick?: () => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void; 'aria-selected'?: boolean; tabIndex?: number };
+function elements(node: ReactNode): ReactElement<Props>[] {
+  return Children.toArray(node).flatMap((child) => isValidElement<Props>(child) ? [child, ...elements(child.props.children)] : []);
+}
+function control(view: DebriefView, names: Record<string, string>) {
+  navigation.ready = false;
+  return () => { navigation.active = true; try { return DebriefEnding({ view, names, art }); } finally { navigation.active = false; } };
+}
+
+describe('one real terminal campaign is readable across all three surfaces', () => {
+  it('the nightly clock ends a real two-hop exaggerated report campaign, preserving the losing account', () => {
+    const { world, view, claimId, names } = fixture();
+    expect(world.tick).toBe(1440); expect(world.scenario?.status).toBe('lost-clock');
+    expect(world.scenario?.resolution).toMatchObject({ kind: 'lost-clock', turned: [] });
+    const packet = view.operations.reportItems.find((row) => row.held.some((held) => held.content.kind === 'raw'
+      && held.content.observation.kind === 'utterance' && held.content.observation.claim.id === claimId))!.packets[0]!;
+    const spoken = packet.stages.filter((stage) => stage.status === 'spoken');
+    expect(spoken.map((stage) => stage.speaker)).toEqual(['ada', 'bez']);
+    expect(spoken[0]!.item!.observation).toMatchObject({ kind: 'utterance', reported: { count: 2 } });
+    expect(spoken[1]!.item!.observation).toMatchObject({ kind: 'utterance', reported: { count: 4 } });
+    expect(world.claims[claimId]!.count).toBe(2);
+    const before = hashWorld(world);
+    const threads = html(<DebriefThreads view={view} names={names} art={art} />);
+    expect(threads).toContain('marked words changed'); expect(threads).toContain('Claim change');
+    expect(threads).toContain('Bez'); expect(threads).toContain('debrief-change');
+    expect(threads).toContain('Changed'); expect(threads).toContain('current carried copy');
+    const timeline = html(<DebriefTimeline view={view} names={names} />);
+    expect(timeline).toContain('Your received board at this date'); expect(timeline).toContain('day 0');
+    expect(timeline).toContain('Your identity had not been recorded');
+    const overlay = html(<DebriefOverlay view={view} names={names} />);
+    expect(overlay).toContain('Copies you actually heard'); expect(overlay).toContain('Bez');
+    expect(overlay).toContain('Headquarters'); expect(overlay).toContain('Ungraded');
+    expect(hashWorld(world)).toBe(before); expect(debriefView(world)).toEqual(view);
+  });
+
+  it('the actual open and tab handlers expose each surface, preserve selection and close without a world mutation', () => {
+    const { world, view, names } = fixture(); const before = hashWorld(world); const render = control(view, names);
+    let tree = render(); expect(html(tree)).toContain('Open the'); expect(html(tree)).not.toContain('role="tabpanel"');
+    elements(tree).find((node) => node.type === 'button')!.props.onClick!(); tree = render();
+    expect(html(tree)).toContain('what can happen, not what will happen');
+    for (const key of ['timeline', 'overlay', 'threads']) {
+      elements(tree).find((node) => node.props.id === 'debrief-tab-'+key)!.props.onClick!(); tree = render();
+      expect(html(tree)).toContain('id="debrief-panel-'+key+'"');
+      const tabs = elements(tree).filter((node) => node.props.role === 'tab');
+      expect(tabs.filter((node) => node.props['aria-selected'])).toHaveLength(1);
+      expect(tabs.filter((node) => node.props.tabIndex === 0)).toHaveLength(1);
+      const tablist = html(tree).split('role="tablist"')[1]!.split('</div>')[0]!;
+      expect(tablist.match(/tabindex="0"/g)).toHaveLength(1);
+      expect(tablist).not.toContain('<span'); // No nested focusable tooltip defeats the roving tab stop.
+    }
+    elements(tree).find((node) => node.type === 'button' && node.props.role !== 'tab')!.props.onClick!();
+    expect(html(render())).toContain('Open the'); expect(hashWorld(world)).toBe(before);
+  });
+
+  it('arrow, Home, End and Escape handlers provide real roving-tab actions with explicit accessible targets', () => {
+    const { view, names } = fixture(); const render = control(view, names);
+    elements(render()).find((node) => node.type === 'button')!.props.onClick!();
+    let tree = render(); const focus = [vi.fn(), vi.fn(), vi.fn()];
+    const key = (value: string, tab: string) => {
+      const preventDefault = vi.fn(); const stopPropagation = vi.fn();
+      const event = { key: value, preventDefault, stopPropagation, currentTarget: { parentElement: {
+        querySelectorAll: () => focus.map((focus) => ({ focus })),
+      } } } as unknown as KeyboardEvent<HTMLButtonElement>;
+      elements(tree).find((node) => node.props.id === 'debrief-tab-'+tab)!.props.onKeyDown!(event);
+      expect(preventDefault).toHaveBeenCalledOnce(); expect(stopPropagation).toHaveBeenCalledOnce(); tree = render();
+    };
+    key('ArrowRight', 'threads'); expect(html(tree)).toContain('id="debrief-panel-timeline"'); expect(focus[1]).toHaveBeenCalledOnce();
+    key('End', 'timeline'); expect(html(tree)).toContain('id="debrief-panel-overlay"');
+    key('Home', 'overlay'); expect(html(tree)).toContain('id="debrief-panel-threads"');
+    key('ArrowLeft', 'threads'); expect(html(tree)).toContain('id="debrief-panel-overlay"');
+    const event = { key: 'Escape', preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as KeyboardEvent<HTMLButtonElement>;
+    elements(tree).find((node) => node.type === 'main')!.props.onKeyDown!(event);
+    expect(html(render())).toContain('Open the'); expect(event.stopPropagation).toHaveBeenCalledOnce();
+  });
+});
+
+describe('truthful ambiguous and incomplete terminal presentation', () => {
+  it.each(['missing', 'inconsistent'] as const)('a %s ending cause is not narrated as a proved guard accusation', (state) => {
+    const { view, names } = fixture(); const changed = cloneSerializable(view);
+    changed.ending.status = 'lost-caught'; changed.ending.resolutionState = state;
+    const render = control(changed, names); let tree = render();
+    expect(html(tree)).toContain('cause is not proved'); expect(html(tree)).not.toContain('A guard heard you speak');
+    elements(tree).find((node) => node.type === 'button')!.props.onClick!(); tree = render();
+    expect(html(tree)).toContain('cause is not proved'); expect(html(tree)).not.toContain('A guard heard you speak');
+  });
+
+  it('a conflicting retained claim alias is shown as ambiguous without assigning its prose to the real event', () => {
+    const { view, names } = fixture(); const changed = cloneSerializable(view); const story = changed.operations.stories[0]!;
+    const original = story.versions[0]!; story.versions.push({ ...original, claim: { ...original.claim, count: 999 } });
+    const result = html(<DebriefThreads view={changed} names={names} art={art} />);
+    expect(result).toContain('No candidate is chosen'); expect(result).toContain('Read candidate copies');
+    expect(result).toContain('Ambiguous'); expect(result).not.toContain('999</mark>');
+  });
+
+  it('a missing parent cannot acquire a prose diff or a named responsible mind', () => {
+    const { view, names } = fixture(); const claim = view.operations.stories[0]!.versions[0]!.claim;
+    const result = html(<DebriefClaim claim={claim} names={names} changes={null} />);
+    expect(result).toContain('Earlier comparison'); expect(result).toContain('Unrecorded');
+    expect(result).not.toContain('<mark'); expect(result).not.toContain('Claim change');
+  });
+
+  it('deleted-only wording remains a visible exact field change even if the later prose adds no word', () => {
+    const { view, names } = fixture(); const before = view.operations.stories[0]!.versions[0]!.claim;
+    const claim = { ...before, object: null, count: null };
+    const result = html(<DebriefClaim claim={claim} before={before} changes={[{ field: 'count', from: before.count, to: null }]} changedBy="bez" names={names} />);
+    expect(result).toContain('Earlier account'); expect(result).toContain('This account'); expect(result).toContain('Changed');
+    expect(result).toContain('Bez'); expect(result).toContain('null');
+  });
+
+  it('all raw orphan histories and every chronicle category remain reachable as escaped inspectable text', () => {
+    const { view, names } = fixture(); const changed = cloneSerializable(view);
+    changed.annotations.cards.push({ id: '<script>unsafe</script>', text: '<script>unsafe</script>', createdTick: 0,
+      updatedTick: 0, confidence: 0.5, links: [] });
+    const threads = html(<DebriefThreads view={changed} names={names} art={art} />);
+    for (const text of ['Magic captures without a proved operation', 'Physical residue history without an operation',
+      'Story events without a resolvable claim', 'including institutions and vignettes', 'beyond the retained clock']) expect(threads).toContain(text);
+    const overlay = html(<DebriefOverlay view={changed} names={names} />);
+    expect(overlay).toContain('&lt;script&gt;unsafe&lt;/script&gt;'); expect(overlay).not.toContain('<script>unsafe');
+    expect(overlay).toContain('Ungraded'); expect(html(<DebriefTimeline view={changed} names={names} />)).not.toContain('unsafe');
+  });
+});
+`````
+<!-- END FILE tests/app/debrief-ui.test.tsx -->
+
+### tests/app/debrief-gate.test.tsx
+
+SHA-256: `addfc46f3f609677828743e4e99a4c678bb0b0811f3293b655ab47a94e0c2509`. Unit: `6b-gate`.
+
+<!-- BEGIN FILE tests/app/debrief-gate.test.tsx -->
+`````tsx
+import { describe, expect, it, vi } from 'vitest';
+import { createElement, type EffectCallback } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { STANDARD_RULES as R } from '../../src/content/rules';
+import { applyInject } from '../../src/sim/actions';
+import { applyAction } from '../../src/sim/campaign';
+import { hashWorld } from '../../src/sim/hash';
+import { scenarioNightly } from '../../src/sim/scenario/referee';
+import { step } from '../../src/sim/step';
+import type { WorldState } from '../../src/sim/types';
+import { buildWorld, enrollPlayer } from '../../src/sim/world';
+import type { Session } from '../../app/src/loop/session';
+import { miniTown } from '../sim/helpers/minitown';
+import { terminalStory } from './helpers/debrief-campaign';
+
+const gate = vi.hoisted(() => {
+  // These app checks run from the repository root, as do the existing source/fence checks.
+  const root = process.cwd().replaceAll('\\', '/');
+  return { world: null as WorldState | null, denyLive: false, calls: [] as WorldState[],
+    session: root + '/app/src/loop/session.ts' };
+});
+vi.mock(gate.session, async () => {
+  const actual = await vi.importActual<typeof import('../../app/src/loop/session')>(gate.session);
+  return { ...actual, newSession: (seed: string): Session => {
+    if (gate.world === null) return actual.newSession(seed);
+    const forbidden = () => { throw new Error('Rendering must not execute a session command'); };
+    return { seed, world: gate.world, log: [], submit: forbidden, requestLocalInteraction: forbidden,
+      cancelLocalInteraction: forbidden, chooseLocal: forbidden, advance: forbidden, localOffer: () => null,
+      speechQueuedForBeat: () => false, save: () => ({ seed, log: [] }) };
+  } };
+});
+vi.mock('react-dom/client', () => ({ createRoot: () => ({ render: () => undefined }) }));
+
+async function renderApp(world: WorldState, effects?: EffectCallback[]) {
+  gate.world = world;
+  const react = await import('react');
+  const effectSpy = effects ? vi.spyOn(react, 'useEffect').mockImplementation((effect) => { effects.push(effect); }) : null;
+  const models = await import('../../src/sim/debrief/index');
+  const original = models.debriefView;
+  const spy = vi.spyOn(models, 'debriefView').mockImplementation((input) => {
+    gate.calls.push(input);
+    if (gate.denyLive && (input.scenario === null || input.scenario.status === 'running')) throw new Error('Hidden fold reached a live campaign');
+    return original(input);
+  });
+  vi.stubGlobal('document', { getElementById: () => ({}) });
+  try {
+    const local = await import('../../app/src/loop/session');
+    expect(local.newSession('probe').world, 'the actual main session import must receive this fixture').toBe(world);
+    const { App } = await import('../../app/src/main'); const result = renderToStaticMarkup(createElement(App));
+    if (world.scenario !== null && world.scenario.status !== 'running') expect(result).toContain('Open the');
+    return result;
+  }
+  finally { effectSpy?.mockRestore(); spy.mockRestore(); vi.unstubAllGlobals(); gate.world = null; gate.denyLive = false; }
+}
+function fresh() {
+  const town = miniTown(); for (const npc of town.npcs) { npc.traits = ['literalist']; npc.edges = []; }
+  const world = buildWorld(town, 'debrief-ui-gate', R); enrollPlayer(world, { home: 'backroom' }); world.enemy.observers = [];
+  world.scenario = { defId: 'debrief-ui-gate', days: 1, win: { kind: 'council-turns', quorum: 2 },
+    cast: { usurper: 'bez', council: ['ada', 'cyn'] }, status: 'running', resolution: null };
+  return world;
+}
+const claim = { subject: 'bez', predicate: 'stole', object: null, count: 2, severity: 4 as const, place: 'square', attribution: 'someone' };
+
+describe('the actual main composition branch keeps terminal truth out of running panels', () => {
+  it('the actual registered keyboard handler leaves terminal Space activation alone and preserves running shortcuts', async () => {
+    const world = terminalStory().world; const effects: EffectCallback[] = []; await renderApp(world, effects);
+    const callbacks: ((event: KeyboardEvent) => void)[] = []; const cleanup: (() => void)[] = [];
+    vi.stubGlobal('window', { addEventListener: (kind: string, callback: (event: KeyboardEvent) => void) => {
+      if (kind === 'keydown') callbacks.push(callback);
+    }, removeEventListener: () => undefined });
+    vi.stubGlobal('requestAnimationFrame', () => 1); vi.stubGlobal('cancelAnimationFrame', () => undefined);
+    try {
+      for (const effect of effects) { const result = effect(); if (result) cleanup.push(result); }
+      expect(callbacks).toHaveLength(1); const preventDefault = vi.fn(); const before = hashWorld(world);
+      const event = { key: ' ', target: { tagName: 'BUTTON' }, preventDefault } as unknown as KeyboardEvent;
+      callbacks[0]!(event); expect(preventDefault).not.toHaveBeenCalled(); expect(hashWorld(world)).toBe(before);
+      world.scenario!.status = 'running'; callbacks[0]!(event); expect(preventDefault).toHaveBeenCalledOnce();
+    } finally { for (const close of cleanup) close(); vi.unstubAllGlobals(); }
+  });
+
+  it.each(['running', 'scenario-free'] as const)('%s rendering never calls any debrief fold or receives a terminal payload', async (state) => {
+    const world = fresh(); if (state === 'scenario-free') world.scenario = null;
+    world.enemy.sketch.push({ id: 'hidden', kind: 'carrier-profile', day: 0, subject: 'you', family: null,
+      district: null, detail: 'PRIVATE MODEL SENTINEL', evidence: [] });
+    gate.calls = []; gate.denyLive = true; const before = hashWorld(world);
+    const html = await renderApp(world);
+    expect(gate.calls).toEqual([]); expect(html).not.toContain('PRIVATE MODEL SENTINEL');
+    expect(html).not.toContain('Terminal debrief'); expect(html).not.toContain('Open the');
+    expect(html).toContain('playback'); expect(hashWorld(world)).toBe(before);
+  });
+
+  it.each(['won', 'lost-clock', 'lost-exposed', 'lost-caught'] as const)('the actual %s resolution reaches exactly one fold and the opening card', async (status) => {
+    let world = fresh();
+    if (status === 'lost-clock') world = terminalStory().world;
+    else if (status === 'won') {
+      applyInject(world, 'ada', claim); applyInject(world, 'cyn', claim); scenarioNightly(world, R);
+    } else if (status === 'lost-exposed') {
+      world.enemy.sketch.push({ id: 'retained-identity', kind: 'carrier-profile', day: 0, subject: 'you', family: null,
+        district: null, detail: 'the retained avatar carrier profile', evidence: [] }); scenarioNightly(world, R);
+    } else {
+      world.scenario!.days = 10; world.enemy.observers = [{ id: 'bez', vigilance: 1 }]; world.playerVenue = 'square'; world.tick = 15;
+      applyAction(world, { tick: 15, kind: 'tell', to: 'ada', spec: claim }, R); step(world, R);
+    }
+    expect(world.scenario!.status).toBe(status); gate.calls = []; const before = hashWorld(world);
+    const html = await renderApp(world);
+    expect(gate.calls).toHaveLength(1); expect(gate.calls[0]).toBe(world); expect(html).toContain('Open the');
+    expect(html).not.toContain('aria-label="playback"'); expect(hashWorld(world)).toBe(before);
+  });
+});
+`````
+<!-- END FILE tests/app/debrief-gate.test.tsx -->
+
+### tests/app/debrief-laws.test.ts
+
+SHA-256: `7d0dd02536d94ac6a66bdda9adbaf41de3f5e9c6199b8e6dd862cbc506704240`. Unit: `6b-gate`.
+
+<!-- BEGIN FILE tests/app/debrief-laws.test.ts -->
+`````typescript
+import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import ts from 'typescript';
+import { ESLint } from 'eslint';
+import { TERMS } from '../../src/content/terms';
+import { resolveSlot, UI_GLYPHS } from '../../app/src/assets';
+
+const root = process.cwd();
+const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8');
+const PANELS = ['DebriefReading', 'DebriefThreads', 'DebriefTimeline', 'DebriefOverlay', 'DebriefEnding'];
+const NEW_TERMS = ['terminal-debrief', 'artifact', 'forgery', 'seance', 'thread', 'timeline', 'overlay', 'phantom', 'lag',
+  'debrief-epigraph', 'unrecorded', 'ambiguous', 'reported-account', 'actual-attention', 'claim-change', 'evidence-arrival', 'orphan-history'];
+const parse = (source: string) => ts.createSourceFile('probe.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+
+function terminalGateIssues(source: string): string[] {
+  const file = parse(source); const calls: ts.CallExpression[] = []; const names: ts.Identifier[] = [];
+  const consumers: (ts.JsxOpeningElement | ts.JsxSelfClosingElement)[] = [];
+  const visit = (node: ts.Node) => {
+    if (ts.isIdentifier(node) && node.text === 'debriefView') names.push(node);
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'debriefView') calls.push(node);
+    if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && node.tagName.getText(file) === 'DebriefEnding') consumers.push(node);
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  const enclosingGate = (node: ts.Node): ts.IfStatement | null => {
+    let child = node; let parent = child.parent;
+    while (parent) {
+      if (ts.isIfStatement(parent) && child === parent.thenStatement
+        && parent.expression.getText(file).replace(/\s/g, '') === "status&&status!=='running'") return parent;
+      child = parent; parent = child.parent;
+    }
+    return null;
+  };
+  const issues: string[] = [];
+  if (calls.length !== 1) issues.push('exactly one fold call required');
+  if (consumers.length !== 1) issues.push('exactly one terminal consumer required');
+  if (names.length !== 2) issues.push('only the import and direct call may reference debriefView');
+  if (!calls[0] || !consumers[0] || enclosingGate(calls[0]) === null
+    || enclosingGate(calls[0]) !== enclosingGate(consumers[0])) issues.push('fold and payload must share the terminal then branch');
+  if (!source.includes('const status = world.scenario?.status;')) issues.push('status must derive from the actual scenario');
+  return issues;
+}
+
+describe('the actual terminal boundary and unchanged broad panel fence', () => {
+  it('main contains exactly one guarded fold and one guarded payload consumer, with no alias references', () => {
+    expect(terminalGateIssues(read('app/src/main.tsx'))).toEqual([]);
+  });
+  it('the same source check fires when the real fold is hoisted outside the terminal branch', () => {
+    const source = read('app/src/main.tsx'); const call = '    const debrief = debriefView(world);';
+    expect(source).toContain(call);
+    const broken = source.replace(call, '').replace('  const status = world.scenario?.status;',
+      '  const status = world.scenario?.status;\n  const debrief = debriefView(world);');
+    expect(terminalGateIssues(broken)).toContain('fold and payload must share the terminal then branch');
+  });
+  it('the same source check rejects a second alias of the hidden fold', () => {
+    expect(terminalGateIssues(read('app/src/main.tsx')+'\nconst leakedFold = debriefView;\n'))
+      .toContain('only the import and direct call may reference debriefView');
+  });
+  it.each(PANELS)('the existing actual config bans value and type sim imports at %s.tsx', async (panel) => {
+    const eslint = new ESLint({ cwd: root }); const filePath = path.join(root, 'app/src/panels/'+panel+'.tsx');
+    for (const source of ["import { debriefView } from '../../../src/sim/debrief/index'; void debriefView;",
+      "import type { DebriefView } from '../../../src/sim/debrief/index'; export type Props = DebriefView;"]) {
+      const results = await eslint.lintText(source, { filePath });
+      expect(results.flatMap((row) => row.messages).some((row) => row.ruleId === 'no-restricted-imports')).toBe(true);
+    }
+    const actual = await eslint.lintText(read('app/src/panels/'+panel+'.tsx'), { filePath });
+    expect(actual.flatMap((row) => row.messages)).toEqual([]);
+  });
+  it('the existing townview seam re-exports only erased types, including the complete debrief contract', () => {
+    const valid = (source: string) => parse(source).statements.every((node) => ts.isExportDeclaration(node) && node.isTypeOnly);
+    const source = read('app/src/townview.ts'); expect(source).toContain("export type { DebriefView } from '../../src/sim/debrief/index'");
+    expect(valid(source)).toBe(true);
+    expect(valid(source+"\nexport { debriefView } from '../../src/sim/debrief/index';")).toBe(false);
+    expect(valid(source+"\nimport '../../src/sim/debrief/index';")).toBe(false);
+  });
+});
+
+describe('registered terminal vocabulary and primitive asset fallbacks', () => {
+  it('all new terms are registered once, with bounded truthful tooltip text', () => {
+    const source = read('src/content/terms.ts');
+    for (const id of NEW_TERMS) {
+      expect(TERMS[id]?.id).toBe(id); expect(TERMS[id]!.short.length).toBeGreaterThan(0); expect(TERMS[id]!.short.length).toBeLessThanOrEqual(120);
+      const pattern = new RegExp('[\'\"]'+id+'[\'\"]\\s*:', 'g');
+      expect([...source.matchAll(pattern)]).toHaveLength(1);
+    }
+    expect(TERMS['debrief']!.short).toContain('Compelling your own asset');
+    expect(TERMS['terminal-debrief']!.short).toContain('campaign has ended');
+    expect(TERMS['debrief-epigraph']!.label).toBe('what can happen, not what will happen');
+    expect(TERMS.phantom!.short).toContain('missing history does not prove it');
+  });
+  it('every new slot is documented, null and resolvable, with a nonempty glyph or flat paper fallback', () => {
+    const manifest = JSON.parse(read('assets/manifest.json')) as { slots: Record<string, unknown> };
+    for (const id of ['icon.ui.letter', 'icon.ui.forgery-quill', 'icon.ui.seance', 'texture.paper.debrief']) {
+      expect(manifest.slots[id]).toBeNull(); expect(resolveSlot(id)).toEqual({ kind: 'fallback' });
+      expect(read('docs/asset-slots.md')).toContain('`'+id+'`'); expect(read('app/src/main.tsx')).toContain("resolveSlot('"+id+"')");
+    }
+    for (const id of ['letter', 'forgery-quill', 'seance', 'scrying']) expect(UI_GLYPHS[id]!.length).toBeGreaterThan(0);
+    expect(manifest.slots['icon.ui.scrying']).toBeNull();
+    expect(read('app/src/theme.css')).toContain('background-color: var(--paper)');
+  });
+});
+
+// This bounded solid-color calculation reads the actual stylesheet. It is not a
+// browser cascade/layout substitute; unsupported color syntax fails explicitly.
+type ContrastRule = { selectors: string[]; declarations: [string, string][]; order: number };
+function contrastRules(source: string): ContrastRule[] {
+  const clean = source.replace(/\/\*[\s\S]*?\*\//g, '');
+  return [...clean.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((match, order) => ({
+    selectors: match[1]!.split(',').map((value) => value.trim()), order,
+    declarations: match[2]!.split(';').map((value) => value.trim()).filter(Boolean).map((value) => {
+      const colon = value.indexOf(':'); if (colon < 1) throw new Error('Unsupported CSS declaration: '+value);
+      return [value.slice(0, colon).trim(), value.slice(colon + 1).trim()] as [string, string];
+    }),
+  }));
+}
+function contrastDeclarations(rules: ContrastRule[], selectors: string[]): Record<string, string> {
+  const selected = rules.flatMap((rule) => {
+    const matches = rule.selectors.filter((selector) => selectors.includes(selector));
+    return matches.length === 0 ? [] : [{ ...rule, specificity: Math.max(...matches.map((selector) =>
+      (selector.match(/\./g) ?? []).length)) }];
+  }).sort((left, right) => left.specificity - right.specificity || left.order - right.order);
+  if (selected.length === 0) throw new Error('Actual CSS selector missing: '+selectors.join(', '));
+  return Object.fromEntries(selected.flatMap((rule) => rule.declarations.map(([property, value]) =>
+    [property === 'background' ? 'background-color' : property, value])));
+}
+function actualContrast(theme: 'light' | 'dark', surface: 'inline' | 'exact'): number {
+  const rules = contrastRules(read('app/src/theme.css'));
+  const palette = contrastDeclarations(rules, [":root[data-theme='"+theme+"']"]);
+  const automaticPalettes = rules.filter((rule) => rule.selectors.includes(':root'));
+  expect(automaticPalettes).toHaveLength(2);
+  const automatic = Object.fromEntries(automaticPalettes[theme === 'light' ? 0 : 1]!.declarations);
+  for (const token of ['--ink', '--paper', '--gilt']) expect(palette[token]).toBe(automatic[token]);
+  const style = contrastDeclarations(rules, surface === 'inline'
+    ? ['.debrief-change', '.debrief-desk .debrief-change'] : ['.diff-cell', '.debrief-desk .diff-cell']);
+  const hex = (value: string | undefined): string => {
+    if (value === undefined) throw new Error('Actual text color/background is unspecified');
+    const variable = /^var\((--[\w-]+)\)$/.exec(value);
+    const resolved = variable ? palette[variable[1]!] : value;
+    if (resolved === undefined || !/^#[0-9a-f]{6}$/i.test(resolved)) throw new Error('Unsupported actual color: '+value);
+    return resolved;
+  };
+  const luminance = (value: string): number => {
+    const rgb = [1, 3, 5].map((index) => parseInt(value.slice(index, index + 2), 16) / 255)
+      .map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * rgb[0]! + 0.7152 * rgb[1]! + 0.0722 * rgb[2]!;
+  };
+  const foreground = luminance(hex(style.color)); const background = luminance(hex(style['background-color']));
+  return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+}
+describe('terminal changed words and exact values retain actual theme contrast', () => {
+  it.each([
+    { theme: 'light', surface: 'inline' }, { theme: 'dark', surface: 'inline' },
+    { theme: 'light', surface: 'exact' }, { theme: 'dark', surface: 'exact' },
+  ] as const)('$theme $surface text meets normal-text contrast from actual CSS tokens and selectors', ({ theme, surface }) => {
+    const ratio = actualContrast(theme, surface);
+    expect(ratio, theme+' '+surface+' actual contrast ratio '+ratio).toBeGreaterThanOrEqual(4.5);
+  });
+  it('the shared live-panel changed-value primitive keeps its original color treatment', () => {
+    const shared = contrastDeclarations(contrastRules(read('app/src/theme.css')), ['.diff-cell']);
+    expect(shared).toMatchObject({ 'background-color': 'var(--gilt)', color: 'var(--paper)', 'font-weight': '600' });
+  });
+});
+`````
+<!-- END FILE tests/app/debrief-laws.test.ts -->
+
+### tests/app/debrief-history.test.tsx
+
+SHA-256: `b8599b29aba769912ec9fdbaa27158280621ba88b8bbffedf77d5634f8afc781`. Unit: `6a-panels`.
+
+<!-- BEGIN FILE tests/app/debrief-history.test.tsx -->
+`````tsx
+import { describe, expect, it } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { DebriefThreads, type DebriefArt } from '../../app/src/panels/DebriefThreads';
+import { DebriefTimeline } from '../../app/src/panels/DebriefTimeline';
+import { DebriefOverlay } from '../../app/src/panels/DebriefOverlay';
+import { resolveSlot, UI_GLYPHS } from '../../app/src/assets';
+import { renderClaim } from '../../src/content/render';
+import { at } from '../../src/core/time';
+import { enemyDigest } from '../../src/sim/enemy/digest';
+import { prepareTick } from '../../src/sim/phases';
+import type { NetworkSpeech } from '../../src/sim/directives/types';
+import { STANDARD_RULES as R } from '../../src/content/rules';
+import { applyForge, applyShow } from '../../src/sim/artifacts';
+import { applyAction } from '../../src/sim/campaign';
+import { applyEnemyDecision, captureEvidence } from '../../src/sim/counterintel';
+import { debriefView } from '../../src/sim/debrief/index';
+import { holdFieldObservation, queueUnqueuedFieldReports } from '../../src/sim/directives/field-reports';
+import { blankIntel, claimNames } from '../../src/sim/fieldwork';
+import { cloneSerializable, hashWorld } from '../../src/sim/hash';
+import { scenarioNightly } from '../../src/sim/scenario/referee';
+import { runUntil, step } from '../../src/sim/step';
+import type { WorldState } from '../../src/sim/types';
+import { buildWorld, enrollPlayer } from '../../src/sim/world';
+import { miniTown } from '../sim/helpers/minitown';
+import { scryWorld } from '../sim/helpers/scry-world';
+import { nightVisitWorld } from '../sim/helpers/seance-town';
+import { terminalStory } from './helpers/debrief-campaign';
+
+const art: DebriefArt = { paper: resolveSlot('texture.paper.debrief'), icons: {
+  letter: { resolved: resolveSlot('icon.ui.letter'), fallback: UI_GLYPHS.letter! },
+  'forgery-quill': { resolved: resolveSlot('icon.ui.forgery-quill'), fallback: UI_GLYPHS['forgery-quill']! },
+  scrying: { resolved: resolveSlot('icon.ui.scrying'), fallback: UI_GLYPHS.scrying! },
+  seance: { resolved: resolveSlot('icon.ui.seance'), fallback: UI_GLYPHS.seance! },
+} };
+function fresh() {
+  const town = miniTown(); town.npcs = town.npcs.filter((npc) => ['ada', 'bez'].includes(npc.id));
+  for (const npc of town.npcs) { npc.traits = ['literalist']; npc.edges = []; }
+  const world = buildWorld(town, 'debrief-ui-history', R); enrollPlayer(world, { home: 'backroom' }); world.enemy.observers = [];
+  return world;
+}
+function finish(world: WorldState) {
+  world.scenario = { defId: 'ui-history', days: Math.floor(world.tick / 1440) + 1, win: { kind: 'council-turns', quorum: 1 },
+    cast: { usurper: 'bez', council: ['ada'] }, status: 'running', resolution: null };
+  scenarioNightly(world, R); return world;
+}
+function render(world: WorldState) {
+  const before = hashWorld(world); const view = debriefView(world); if (!view) throw new Error('terminal model missing');
+  const names = claimNames(world);
+  const result = { view, threads: renderToStaticMarkup(<DebriefThreads view={view} names={names} art={art} />),
+    timeline: renderToStaticMarkup(<DebriefTimeline view={view} names={names} />),
+    overlay: renderToStaticMarkup(<DebriefOverlay view={view} names={names} />) };
+  expect(hashWorld(world)).toBe(before); return result;
+}
+function watch() {
+  const world = fresh(); world.network.spymaster = 'ada';
+  world.network.enemyAssets.push({ id: 'bez', mice: null, wagePaidThroughDay: 0, strikes: 0, facts: [] });
+  world.enemy.observers = [{ id: 'bez', vigilance: 1 }];
+  applyEnemyDecision(world, { day: 0, features: [], inquiries: [], interrogations: [], watches: [
+    { district: 'd0', posts: [{ guard: 'bez', venue: 'square' }], startDay: 1 },
+  ] });
+  const record = world.network.directiveState!.records[0]!;
+  const packet = world.network.directiveState!.messages.find((row) => row.payload.kind === 'directive')!;
+  if (packet.payload.kind !== 'directive') throw new Error('watch packet missing');
+  record.authored.brief.report = 'none'; packet.payload.version.brief.report = 'none';
+  runUntil(world, 2581, R); runUntil(world, record.received!.version.brief.active.until + 1, R);
+  return finish(world);
+}
+
+describe('operation and receipt distinctions survive actual rendering', () => {
+  it('a fixed forged sheet and its separately minted viewing story are both readable with null-slot glyphs', () => {
+    const world = fresh(); world.playerVenue = 'square';
+    applyForge(world, { subject: 'bez', predicate: 'stole', object: null, count: 2,
+      severity: 4, place: 'square', attribution: 'someone' }, 0, R); world.tick = 1440;
+    applyShow(world, 'a0', 'ada', 1440, [{ venue: 'square', members: ['you', 'ada'] }]);
+    const result = render(finish(world));
+    expect(result.view.operations.artifacts[0]!.storyFamilies).toEqual([result.view.operations.stories[0]!.family]);
+    expect(result.threads).toContain('Current holder:'); expect(result.threads).toContain('✉'); expect(result.threads).toContain('✒');
+    expect(result.threads).toContain('Paper links:');
+  });
+
+  it('actual delayed physical acquisition is displayed after observation without naming a caster or attention act', () => {
+    const world = scryWorld(); world.npcs.boss!.schedule = [{ days: 'all', from: 0, to: 1440, venue: 'away' }];
+    applyAction(world, { tick: 0, kind: 'scry', venue: 'hall', day: 1, from: 0, to: 60 }, R);
+    world.tick = 1440; runUntil(world, 2880, R);
+    world.npcs.boss!.schedule = [{ days: 'all', from: 0, to: 1440, venue: 'hq' }]; runUntil(world, 2926, R);
+    const result = render(finish(world)); const physical = result.view.operations.physical.evidence[0]!;
+    expect(physical.arrival).toMatchObject({ observedAt: 1440, learnedAt: 2925, timing: 'report' });
+    const portion = result.threads.split('Physical evidence ')[1]!.split('</article>')[0]!;
+    expect(portion).toContain('day 1'); expect(portion).toContain('day 2'); expect(portion).toContain('enemy acquired');
+    expect(result.threads).toContain('Residue does not identify a caster');
+    expect(result.view.calendar.days.at(-1)!.overlay.attention.actual).toEqual([]);
+    expect(result.overlay).toContain('deliberately no semantic attention act');
+  });
+
+  it('a real séance and same-place chapel sighting remain separate histories with no invented ritual witness', () => {
+    const world = nightVisitWorld(); applyAction(world, { tick: 0, kind: 'seance' }, R); runUntil(world, 46, R);
+    const result = render(finish(world));
+    expect(result.view.operations.magic.operations).toHaveLength(1);
+    expect(result.view.operations.physical.records.some((row) => row.record.kind === 'night-visit')).toBe(true);
+    expect(result.threads).toContain('This later testimony is not a newly created story');
+    expect(result.threads).toContain('A chapel visit does not prove a ritual'); expect(result.threads).toContain('✧');
+  });
+
+  it.each(['omitted', 'unknown'] as const)('an actual retained %s report stage shows no invented spoken account', (state) => {
+    const { world } = terminalStory();
+    const speech = world.chronicle.find((row) => row.kind === 'network-speech' && row.speaker === 'bez')!;
+    if (speech.kind !== 'network-speech' || speech.spoken.kind !== 'field-report') throw new Error('real report missing');
+    if (state === 'omitted') { speech.spoken.items = []; speech.reportRoots = []; } else delete speech.reportRoots;
+    const result = render(world); const packet = result.view.operations.reportItems[0]!.packets[0]!;
+    expect(packet.stages.at(-1)).toMatchObject({ status: state, item: null, changes: null });
+    const portion = result.threads.split('<h3>Reported items</h3>')[1]!.split('<h3>')[0]!;
+    expect(portion).toContain(state === 'omitted' ? 'Omitted from this speech' : 'Item association unknown');
+    expect(portion.match(/This item was spoken\./g)).toHaveLength(1); expect(portion).not.toContain('marked words changed');
+  });
+
+  it('a day-one human receipt leaves the earlier board empty and unknown receipts stay off both days', () => {
+    const world = fresh(); holdFieldObservation(world, 'player', 'ada', { kind: 'raw', observation: {
+      kind: 'presence', tick: 0, venue: 'square', actor: 'bez',
+    } }, null, ['you'], null, []);
+    queueUnqueuedFieldReports(world); runUntil(world, 1440, R); expect(world.intel.log).toEqual([]);
+    world.playerVenue = 'square'; runUntil(world, 1441, R); finish(world);
+    const result = render(world); const day0 = result.timeline.split('id="debrief-day-0"')[1]!.split('</article>')[0]!;
+    const day1 = result.timeline.split('id="debrief-day-1"')[1]!.split('</article>')[0]!;
+    expect(day0).toContain('No received board entries'); expect(day1).not.toContain('No received board entries');
+    expect(result.view.calendar.days[1]!.player.knowledge[0]!.learnedAt).toBe(1440);
+    world.chronicle = world.chronicle.filter((row) => row.kind !== 'network-speech'); const missing = render(world);
+    expect(missing.view.calendar.days.every((day) => day.player.log.length === 0)).toBe(true);
+    expect(missing.timeline).toContain('1 player receipt(s)'); expect(missing.timeline).toContain('not placed on day zero');
+  });
+
+  it('actual no-report watch work remains readable after expiry without a fabricated headquarters account', () => {
+    const result = render(watch()); const overlay = result.view.calendar.days.at(-1)!.overlay;
+    expect(overlay.attention.actual.some((act) => act.kind === 'watch')).toBe(true); expect(overlay.headquartersAccounts).toEqual([]);
+    expect(result.threads).toContain('Latest execution state: aborted'); expect(result.overlay).toContain('performed');
+    expect(result.overlay).toContain('Actual attention without a matched received signal: watch:');
+  });
+
+  it.each(['received', 'issued'] as const)('removing actual %s watch history yields readable uncertainty instead of a false phantom', (state) => {
+    const world = watch(); const record = world.network.directiveState!.records[0]!;
+    const work = record.outcomes!.find((row) => row.result.enemyAction?.kind === 'watch-worked')!.result.enemyAction!;
+    world.intel.log.push({ ...blankIntel(), kind: 'presence', via: 'self', tick: work.occurredAt,
+      venue: work.venue, actor: work.guard, overheard: true }); delete record.outcomes;
+    if (state === 'issued') record.received = null;
+    const result = render(world); const signal = result.view.calendar.days.at(-1)!.overlay.signals.find((row) => row.kind === 'watch')!;
+    expect(signal.status).toBe(state === 'received' ? 'unrecorded-work' : 'issued-unproved');
+    expect(result.overlay).toContain(state === 'received' ? 'Related work history is unrecorded' : 'does not prove it was performed');
+    expect(result.overlay).not.toContain('This is a phantom');
+  });
+});
+
+// Add after the exact independently reviewed 313-case contract has been bound.
+it('known future feature references stay in the separate terminal section instead of current conclusions', () => {
+  const { world } = terminalStory();
+  const future = { id: 'UI_FUTURE_FEATURE', kind: 'carrier-profile' as const, day: 9, subject: 'you',
+    family: null, district: null, detail: 'not a current conclusion', evidence: [] };
+  world.enemy.decisions.push({ day: 9, features: [future], inquiries: [], watches: [], interrogations: [] });
+  world.enemy.sketch.push(future);
+  const result = render(world);
+  expect(result.view.operations.featureReferences.some((row) => row.feature.id === future.id)).toBe(false);
+  expect(result.view.operations.beyondClock.featureReferences.some((row) => row.feature.id === future.id)).toBe(true);
+  expect(result.threads.split('<h3>Known future operation records</h3>')[0]).not.toContain(future.id);
+  expect(result.threads.split('<h3>Known future operation records</h3>')[1]).toContain(future.id);
+  expect(result.timeline).not.toContain(future.id); expect(result.overlay).not.toContain(future.id);
+});
+
+it('rewound actual physical receipts remain inspectable in the future partition without a current acquisition card', () => {
+  const world = scryWorld(); applyAction(world, { tick: 0, kind: 'scry', venue: 'hall', day: 1, from: 0, to: 60 }, R);
+  world.tick = 1440; runUntil(world, 1486, R); finish(world); world.tick = 1439;
+  const result = render(world);
+  expect(result.view.operations.physical.evidence).toEqual([]);
+  expect(result.view.operations.beyondClock.physicalEvidence.length).toBeGreaterThan(0);
+  const physical = result.threads.split('<h3>Physical sightings and acquisition</h3>')[1]!.split('<h3>')[0]!;
+  expect(physical).not.toContain('Physical evidence ');
+  expect(result.threads).toContain('Read future evidence, physical acquisitions and feature references');
+  expect(result.view.operations.beyondClock.physicalEvidence[0]!.evidenceIndex).toBeGreaterThanOrEqual(0);
+});
+
+it('a current supported feature stays readable when a duplicate receipt is separately beyond the clock', () => {
+  const town = miniTown(); town.npcs = town.npcs.filter((npc) => npc.id !== 'dov');
+  for (const npc of town.npcs) { npc.edges = npc.edges.filter((edge) => edge.to !== 'dov'); npc.traits = npc.id === 'bez' ? ['moralizer'] : []; }
+  const world = buildWorld(town, 'mixed-time-ui-control', R); enrollPlayer(world, { home: 'square' });
+  applyForge(world, { subject: 'cyn', predicate: 'met-secretly-with', object: null, count: 2, severity: 4,
+    place: 'square', attribution: 'someone' }, at(0, 8), R); world.tick = at(1, 8);
+  applyAction(world, { tick: world.tick, kind: 'plant', artifact: 'a0', to: 'ada', venue: null }, R, prepareTick(world, R));
+  world.tick = at(1, 9); const family = Object.keys(world.beliefs.ada!)[0]!;
+  world.network.spymaster = 'bez'; world.enemy.observers = [];
+  world.inquiries.bez = [{ about: { family }, from: 'enemy', expiresDay: 3, asked: [], answersHeard: 0, addressee: 'ada' }];
+  const answer = step(world, R).utterances.find((row) => row.mode === 'answer' && row.speaker === 'ada' && row.claim.family === family)!;
+  const feature = enemyDigest(world.enemy, 1, R).features.find((row) => row.kind === 'forged-document')!;
+  world.enemy.decisions = [{ day: 1, features: [cloneSerializable(feature)], inquiries: [], interrogations: [], watches: [] }];
+  world.enemy.sketch = [cloneSerializable(feature)]; world.tick = 2879;
+  const index = world.enemy.evidence.findIndex((row) => row.kind === 'utterance' && row.claimId === answer.claim.id);
+  const entry = world.enemy.evidence[index]!; if (entry.kind !== 'utterance') throw new Error('actual current evidence missing');
+  const speech: NetworkSpeech = { tick: 4320, venue: 'square', speaker: entry.observer!, addressedTo: 'cyn',
+    circleMembers: [entry.observer!, 'cyn'], messageId: 'future-duplicate-ui', cause: null,
+    spoken: { kind: 'field-report', onwardTo: null, items: [{ factRefs: [], observation: { kind: 'utterance',
+      observedAt: entry.tick, venue: entry.venue, speaker: entry.speaker, addressedTo: entry.addressedTo, overheard: entry.overheard,
+      mode: entry.mode, claimId: entry.claimId, family: entry.family, reported: entry.reported, document: true } }] } };
+  world.chronicle.push({ ...speech, kind: 'network-speech', heardBy: [{ id: 'cyn', addressed: true }] });
+  const capturedFrom = world.enemy.evidence.length;
+  world.network.spymaster = 'cyn'; captureEvidence(world, { tick: 4320, positions: {}, utterances: [], askings: [], networkSpeeches: [speech] }, R);
+  const duplicateIndex = world.enemy.evidence.findIndex((row, evidenceIndex) => evidenceIndex >= capturedFrom
+    && row.kind === 'utterance' && row.claimId === entry.claimId && row.observer === speech.speaker);
+  expect(duplicateIndex).toBeGreaterThanOrEqual(capturedFrom);
+  const result = render(finish(world)); const current = result.view.operations.featureReferences.find((row) => row.feature.id === feature.id)!;
+  expect(current, 'the current supported feature must remain in the rendered current-reference section').toBeDefined();
+  expect(current.references[0]).toMatchObject({ resolution: 'resolved', evidenceIndexes: [index], laterEvidenceIndexes: [] });
+  const currentDetail = result.threads.split('Every feature and its retained reference resolution</summary>')[1]!.split('</details>')[0]!;
+  expect(currentDetail).toContain(feature.id);
+  const future = result.view.operations.beyondClock.enemyEvidence;
+  expect(future.some((row) => row.entry.kind === 'network' && row.entry.network.messageId === speech.messageId)).toBe(true);
+  expect(future.some((row) => row.evidenceIndex === duplicateIndex && row.entry.claimId === entry.claimId)).toBe(true);
+  expect(result.view.operations.beyondClock.featureReferences.find((row) => row.feature.id === feature.id)!
+    .references[0]!.laterEvidenceIndexes).toContain(duplicateIndex);
+  for (const row of future) {
+    expect(result.view.operations.enemyEvidence.some((candidate) => candidate.evidenceIndex === row.evidenceIndex)).toBe(false);
+    for (const reference of current.references) {
+      expect(reference.evidenceIndexes).not.toContain(row.evidenceIndex);
+      expect(reference.laterEvidenceIndexes).not.toContain(row.evidenceIndex);
+      expect(reference.undatedEvidenceIndexes).not.toContain(row.evidenceIndex);
+    }
+  }
+  expect(result.threads.split('<h3>Known future operation records</h3>')[1]).toContain('future-duplicate-ui');
+  expect(result.threads).toContain('Later receipt context for current feature IDs: '+feature.id);
+  expect(result.threads).toContain('does not mean it was created again in the future');
+});
+
+it('the actual received report copy reads as prose on Overlay without substituting the private original', () => {
+  const { world, claimId } = terminalStory(); const result = render(world);
+  const item = result.view.calendar.days.at(-1)!.overlay.receivedReportItems.find((row) => row.stage.status === 'spoken')!.stage.item!;
+  if (item.observation.kind !== 'utterance') throw new Error('received claim absent');
+  const nameOf = (id: string) => claimNames(world)[id] ?? id;
+  expect(item.observation.reported.count).toBe(4); expect(world.claims[claimId]!.count).toBe(2);
+  const received = renderToStaticMarkup(<p>{renderClaim(item.observation.reported, nameOf)}</p>);
+  const original = renderToStaticMarkup(<p>{renderClaim(world.claims[claimId]!, nameOf)}</p>);
+  expect(result.overlay).toContain(received); expect(result.overlay).not.toContain(original);
+});
+
+it('typed retained headquarters and returned directive claims read as reports with exact details still available', () => {
+  const world = watch(); const view = render(world).view; const names = claimNames(world); const directive = view.operations.directives[0]!;
+  const reported = { subject: 'bez', predicate: 'stole', object: null, count: 17, severity: 4 as const, place: 'square', attribution: 'someone' };
+  const report = { outcome: 'The asset reported this account', reason: null,
+    evidence: [{ kind: 'claim' as const, claimId: 'retained-report-reference', reported }], source: 'bez', uncertainty: 'high' as const };
+  directive.returnedAccounts.push({ receivedAt: world.tick, via: 'bez', report });
+  view.calendar.days.at(-1)!.overlay.headquartersAccounts.push({ chronicleIndex: 999, receivedAt: world.tick,
+    copy: { kind: 'directive-report', directiveId: directive.directiveId, report, enemyAction: null, factRefs: [], onwardTo: null } });
+  const prose = renderToStaticMarkup(<p>{renderClaim(reported, (id) => names[id] ?? id)}</p>);
+  const threads = renderToStaticMarkup(<DebriefThreads view={view} names={names} art={art} />);
+  const overlay = renderToStaticMarkup(<DebriefOverlay view={view} names={names} />);
+  expect(threads).toContain(prose); expect(overlay).toContain(prose);
+  expect(threads).toContain('Read returned accounts'); expect(overlay).toContain('not proof that every claim was true');
+});
+`````
+<!-- END FILE tests/app/debrief-history.test.tsx -->
+
+### tests/app/helpers/debrief-campaign.ts
+
+SHA-256: `556bd190d3e246bb2e27f23ceef4a438224946f4088aab4ce3a67688d5e987e1`. Unit: `6a-panels`.
+
+<!-- BEGIN FILE tests/app/helpers/debrief-campaign.ts -->
+`````typescript
+import { STANDARD_RULES as R } from '../../../src/content/rules';
+import { applyInject } from '../../../src/sim/actions';
+import { holdFieldObservation, queueUnqueuedFieldReports } from '../../../src/sim/directives/field-reports';
+import { runUntil } from '../../../src/sim/step';
+import { buildWorld, enrollPlayer } from '../../../src/sim/world';
+import { miniTown } from '../../sim/helpers/minitown';
+
+/** Staged retained witness, real two-hop reporting/trait mutation and a complete nightly campaign ending. */
+export function terminalStory() {
+  const town = miniTown();
+  for (const npc of town.npcs) { npc.traits = ['literalist']; npc.edges = []; }
+  town.npcs.find((npc) => npc.id === 'bez')!.traits = ['exaggerator'];
+  town.npcs.find((npc) => npc.id === 'bez')!.schedule = [
+    { days: 'all', from: 0, to: 30, venue: 'square' }, { days: 'all', from: 30, to: 1440, venue: 'backroom' },
+  ];
+  for (const id of ['cyn', 'dov']) town.npcs.find((npc) => npc.id === id)!.schedule = [{ days: 'all', from: 0, to: 1440, venue: 'home-0' }];
+  const world = buildWorld(town, 'debrief-ui-lesson', R); enrollPlayer(world, { home: 'backroom' });
+  world.enemy.observers = [];
+  world.scenario = { defId: 'debrief-ui-lesson', days: 1, win: { kind: 'council-turns', quorum: 2 },
+    cast: { usurper: 'dov', council: ['ada', 'cyn'] }, status: 'running', resolution: null };
+  const claim = applyInject(world, 'ada', { subject: 'bez', predicate: 'stole', object: null, count: 2,
+    severity: 4, place: 'square', attribution: 'someone' });
+  holdFieldObservation(world, 'player', 'ada', { kind: 'raw', observation: { kind: 'utterance', tick: 0,
+    venue: 'square', speaker: 'ada', addressedTo: 'bez', claim, overheard: false, mode: 'telling' } }, null, ['bez', 'you'], null, []);
+  queueUnqueuedFieldReports(world);
+  world.tick = 15; runUntil(world, 1440, R);
+  return { world, claimId: claim.id };
+}
+`````
+<!-- END FILE tests/app/helpers/debrief-campaign.ts -->
+

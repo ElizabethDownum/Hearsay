@@ -1,9 +1,13 @@
 # Plan 9 — current execution plan
 
+[Task5A2 code approval](../review/2026-09-13-outcome-history-code-approval.md).
+
 Updated: 2026-09-13. Controller: Codex. **Implementation resumed.** Ellie clarified
 that the 6 September stop applied only to that session. Continue the plan with
 non-blocking judgments/issues saved for later review. See [the current handoff](../handoff.md).
-Current committed implementation checkpoint:
+Latest committed source is **78ff1c2553de8691ce40b71cb8a145a89e84d0d7** (5A2 private outcome history). Worker/controller pass2,078 tests/132 files and all six gates; the complete10-block/230-line comparison and four controls remain equal. Root verified12 complete world pairs and221 predecessor files. Independent5A2 code review is Approved with zero findings; root verified104 review entries. Next install the five approved321-model units, then corrected6/7B UI andTask8. UI review has one contrast correction; separate R18 cancellation correction is being authored. Both require independent review before installation.
+
+Prior independently approved implementation checkpoint:
 **bc409d3d4cdba6bc1242a09ba1d24ab0b3c435fc** (R17 watch execution stage).
 Worker/controller full2,059 tests/131 files, lint, both compilers, build512.75/151.88gzip,
 soak andMC pass. All10 blocks/230 deterministic lines/four controls match the
