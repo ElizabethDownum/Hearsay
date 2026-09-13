@@ -1,3 +1,5 @@
+import { renderClaim, type NameOf } from '../../../src/content/render';
+import { ClaimReading, CLAIM_DETAIL_FIELDS } from './ClaimReading';
 import type { BoardView, Cluster, TagNote } from '../../../src/intel/types';
 import { useState } from 'react';
 import { sourceKey, sourceLabel } from '../../../src/intel/provenance';
@@ -8,7 +10,7 @@ import { TagChip } from './TagChip';
  *  Exported so the jargon scan (tests/app/jargon.test.ts) can sweep them registry-style — these ids
  *  reach <Term> by ITERATION, not as string literals in JSX, so the literal scan alone never sees
  *  them (renaming one of the seven TERMS entries would otherwise throw at runtime with no failing test). */
-export const FIELDS = ['subject', 'predicate', 'object', 'count', 'severity', 'place', 'attribution'] as const;
+export const FIELDS = CLAIM_DETAIL_FIELDS;
 
 /**
  * The Evidence Board — the broadsheet that auto-collects what you lawfully heard. Task-8 upgrades:
@@ -17,8 +19,8 @@ export const FIELDS = ['subject', 'predicate', 'object', 'count', 'severity', 'p
  * BoardView plus the tags + tag verbs (tags are sim-blind by law, so they only ride the UI).
  */
 export function EvidenceBoard({
-  view, tags, onAddTag, onRemoveTag,
-}: { view: BoardView; tags: TagNote[]; onAddTag(target: string, text: string): void; onRemoveTag(id: string): void }) {
+  view, tags, onAddTag, onRemoveTag, nameOf = (id) => id,
+}: { view: BoardView; nameOf?: NameOf; tags: TagNote[]; onAddTag(target: string, text: string): void; onRemoveTag(id: string): void }) {
   const [selected, setSelected] = useState<string | null>(null);
   const clusters = view.clusters ?? [];
   const cluster = clusters.find((c) => c.family === selected) ?? null;
@@ -30,13 +32,14 @@ export function EvidenceBoard({
   return (
     <section className="panel">
       <h2><Term id="evidence-board" /> <span className="desk-note">(<Term id="assist-level" /> {view.level}; {view.entries.length} entries)</span></h2>
-      {view.clusters === null ? <RawNotes view={view} /> : (
+      {view.clusters === null ? <RawNotes view={view} nameOf={nameOf} /> : (
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <ul>
             {clusters.map((c) => (
               <li key={c.family}>
                 <button className="desk-btn" onClick={() => setSelected(c.family)}>
-                  {c.family} — {c.versions.length} <Term id="version" />(s)
+                  {c.family} — {c.versions[0] ? renderClaim(c.versions[0].reported, nameOf) : 'No account recorded.'}
+                  {' '}· {c.versions.length} <Term id="version" />(s)
                 </button>
                 {' '}{viasOf(c.entryIndexes).map((v) => <span key={v.key} className="badge badge-via">{v.label}</span>)}
                 {view.suggestions?.[c.family]?.length ? <span className="desk-note"> · candidates: {view.suggestions[c.family]!.join(', ')}</span> : ''}
@@ -44,29 +47,33 @@ export function EvidenceBoard({
               </li>
             ))}
           </ul>
-          {cluster && <ClusterDetail cluster={cluster} view={view} />}
+          {cluster && <ClusterDetail cluster={cluster} view={view} nameOf={nameOf} />}
         </div>
       )}
     </section>
   );
 }
 
-function RawNotes({ view }: { view: BoardView }) {
+function RawNotes({ view, nameOf }: { view: BoardView; nameOf: NameOf }) {
   return <ol>{view.entries.map((e, i) => (
     <li key={i}>
       t{e.tick} {e.kind === 'scene-presence' ? <><Term id="scene-presence" /> {e.actor}</> : e.kind === 'arcane-residue' ? <Term id="arcane-residue" /> : e.kind} @{e.venue} <span className="badge badge-via"><Term id="via" /> {sourceLabel(e)}</span>
-      {e.reported ? ` — "${e.reported.subject} ${e.reported.predicate}"` : ''}
+      {e.reported && <ClaimReading claim={e.reported} nameOf={nameOf} />}
     </li>
   ))}</ol>;
 }
 
-function ClusterDetail({ cluster, view }: { cluster: Cluster; view: BoardView }) {
+export function ClusterDetail({ cluster, view, nameOf = (id) => id }: { cluster: Cluster; view: BoardView; nameOf?: NameOf }) {
   const diffs = view.diffs?.[cluster.family] ?? [];
   const changedByVersion = new Map<number, Set<string>>();
   for (const d of diffs) changedByVersion.set(d.toVersion, new Set(d.changes.map((c) => c.field)));
   return (
     <div>
       <h3>{cluster.family}</h3>
+      <ol>{cluster.versions.map((version, index) => <li key={index}>
+        <ClaimReading claim={version.reported} nameOf={nameOf} detail={false} />
+      </li>)}</ol>
+      <details><summary>Compare the fields</summary>
       <table className="board-table"><thead><tr><th>field</th>{cluster.versions.map((_, i) => <th key={i}>v{i}</th>)}</tr></thead>
         <tbody>{FIELDS.map((f) => (
           <tr key={f}><td><Term id={f} /></td>{cluster.versions.map((v, i) => (
@@ -74,7 +81,7 @@ function ClusterDetail({ cluster, view }: { cluster: Cluster; view: BoardView })
               {String(v.reported[f])}
             </td>))}
           </tr>))}
-        </tbody></table>
+        </tbody></table></details>
       {view.routes?.[cluster.family] && (
         <ol>{view.routes[cluster.family]!.map((h, i) => (
           <li key={i}>t{h.tick}: {h.speaker} → {h.addressedTo} @{h.venue} <span className="badge badge-via"><Term id="via" /> {sourceLabel(h)}</span></li>))}

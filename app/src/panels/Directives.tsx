@@ -1,3 +1,5 @@
+import type { NameOf } from '../../../src/content/render';
+import { ClaimReading } from './ClaimReading';
 import { dayOf, minuteOfDay } from '../../../src/core/time';
 import type {
   AdvisoryGuidance, DirectiveLedgerRow, DirectiveLedgerView, DirectiveMission,
@@ -24,7 +26,7 @@ import { Term } from './Term';
 const pad = (n: number) => String(n).padStart(2, '0');
 const fmtTick = (t: number) => `day ${dayOf(t)} · ${pad(Math.floor(minuteOfDay(t) / 60))}:${pad(minuteOfDay(t) % 60)}`;
 
-export function Directives({ view }: { view: DirectiveLedgerView }) {
+export function Directives({ view, nameOf = (id) => id }: { view: DirectiveLedgerView; nameOf?: NameOf }) {
   return (
     <section className="panel">
       <h2><Term id="directive" /></h2>
@@ -34,7 +36,7 @@ export function Directives({ view }: { view: DirectiveLedgerView }) {
             Nothing on the desk. Hand a <Term id="brief" /> to someone standing in front of you.
           </p>
         )
-        : view.rows.map((row) => <DirectiveRow key={row.id} row={row} />)}
+        : view.rows.map((row) => <DirectiveRow key={row.id} row={row} nameOf={nameOf} />)}
       <p className="desk-note">
         Every line here is your own paperwork or a report that physically reached you. Whether the{' '}
         <Term id="brief" /> arrived, and what was made of it, is not the desk&apos;s to say.
@@ -43,7 +45,7 @@ export function Directives({ view }: { view: DirectiveLedgerView }) {
   );
 }
 
-function DirectiveRow({ row }: { row: DirectiveLedgerRow }) {
+function DirectiveRow({ row, nameOf }: { row: DirectiveLedgerRow; nameOf: NameOf }) {
   const brief = row.authored;
   return (
     <article className="desk-record" aria-label={`directive ${row.id}`}>
@@ -79,19 +81,19 @@ function DirectiveRow({ row }: { row: DirectiveLedgerRow }) {
         <dt><Term id="purpose" /></dt>
         <dd>{brief.purpose === null ? <span className="desk-note">withheld</span> : brief.purpose}</dd>
       </dl>
-      <Reports rows={row.reports} />
+      <Reports rows={row.reports} nameOf={nameOf} />
     </article>
   );
 }
 
-function Reports({ rows }: { rows: DirectiveLedgerRow['reports'] }) {
+function Reports({ rows, nameOf }: { rows: DirectiveLedgerRow['reports']; nameOf: NameOf }) {
   if (rows.length === 0) return <p className="desk-note">Nothing has come back yet.</p>;
   return (
     <ul aria-label="returned reports">
       {rows.map((row, index) => (
         <li key={index}>
           <span className="desk-note">{fmtTick(row.receivedAt)} · via {row.via}</span>
-          <ReportFields report={row.report} />
+          <ReportFields report={row.report} nameOf={nameOf} />
         </li>
       ))}
     </ul>
@@ -99,7 +101,7 @@ function Reports({ rows }: { rows: DirectiveLedgerRow['reports'] }) {
 }
 
 /** A label appears ONLY where the returned field is non-null: silence is data, a blank row is noise. */
-function ReportFields({ report }: { report: DirectiveReportPayload }) {
+function ReportFields({ report, nameOf }: { report: DirectiveReportPayload; nameOf: NameOf }) {
   return (
     <dl className="desk-fields">
       {report.outcome !== null && <><dt>outcome</dt><dd>{report.outcome}</dd></>}
@@ -108,17 +110,17 @@ function ReportFields({ report }: { report: DirectiveReportPayload }) {
       {report.uncertainty !== null && <><dt>uncertainty</dt><dd>{report.uncertainty}</dd></>}
       {report.evidence !== null && (
         <><dt>evidence</dt><dd><ul>{report.evidence.map((item, index) => (
-          <li key={index}>{evidenceLine(item)}</li>
+          <li key={index}><EvidenceLine item={item} nameOf={nameOf} /></li>
         ))}</ul></dd></>
       )}
     </dl>
   );
 }
 
-function evidenceLine(item: DirectiveReportEvidence): string {
+function EvidenceLine({ item, nameOf }: { item: DirectiveReportEvidence; nameOf: NameOf }) {
   return item.kind === 'observation'
     ? item.text
-    : `${item.reported.subject} ${item.reported.predicate}${item.reported.object === null ? '' : ` ${item.reported.object}`}`;
+    : <ClaimReading claim={item.reported} nameOf={nameOf} />;
 }
 
 function missionLine(mission: DirectiveMission): string {

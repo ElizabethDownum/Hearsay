@@ -1,3 +1,5 @@
+import { renderClaim, type NameOf } from '../../../src/content/render';
+import { ClaimReading } from './ClaimReading';
 import { useState } from 'react';
 import { TERMS } from '../../../src/content/terms';
 import { TICKS_PER_DAY } from '../../../src/core/time';
@@ -294,6 +296,7 @@ export function directiveIssues(draft: DirectiveDraft, sources: ComposerSources)
 // ── The panel ────────────────────────────────────────────────────────────────────────────────────
 
 export interface DayPlannerProps {
+  nameOf?: NameOf;
   view: PlayerView;
   paused: boolean;
   coin: number;
@@ -387,13 +390,16 @@ function DropComposer({
 // ── The offered local moment ─────────────────────────────────────────────────────────────────────
 
 function LocalMoment(props: DayPlannerProps & { offer: LocalOffer }) {
-  const { view, coin, economy, offer, net, board, onLocal } = props;
+  const { view, coin, economy, offer, net, board, onLocal, nameOf = (id: string) => id } = props;
   const circle = sortedIds(offer.circleMembers);
   const roster = new Set(rosterIds(net));
   const informants = new Set(view.informants.map((row) => row.id));
   const assetsHere = circle.filter((id) => roster.has(id));
   const informantsHere = circle.filter((id) => informants.has(id));
-  const families = Object.keys(payloadsFrom(board)).sort();
+  const payloads = payloadsFrom(board);
+  const families = Object.keys(payloads).sort();
+  const familyLabels = Object.fromEntries(families.map((family) =>
+    [family, `${family} — ${renderClaim(payloads[family]!.claim, nameOf)}`]));
 
   return (
     <section aria-label="local moment" className="desk-record">
@@ -401,17 +407,17 @@ function LocalMoment(props: DayPlannerProps & { offer: LocalOffer }) {
         You are at {offer.venue}. In this moment, with these people: {circle.length === 0 ? 'nobody' : circle.join(', ')}.
       </p>
       <TellComposer circle={circle} people={directoryIds(view)} venues={venueIds(view)} onLocal={onLocal} />
-      <AskComposer circle={circle} people={directoryIds(view)} families={families} onLocal={onLocal} />
-      <SellComposer circle={circle} families={families} onLocal={onLocal} />
+      <AskComposer circle={circle} people={directoryIds(view)} families={families} familyLabels={familyLabels} onLocal={onLocal} />
+      <SellComposer circle={circle} families={families} familyLabels={familyLabels} onLocal={onLocal} />
       <RecruitComposer
-        candidates={circle.filter((id) => !roster.has(id))} families={families}
+        candidates={circle.filter((id) => !roster.has(id))} families={families} familyLabels={familyLabels}
         coin={coin} economy={economy} onLocal={onLocal} />
       <DebriefComposer assets={assetsHere} atSafehouse={offer.venue === 'safehouse'} onLocal={onLocal} />
       <HostComposer circle={circle} station={view.station} venues={venueIds(view)}
         coin={coin} economy={economy} onLocal={onLocal} />
       <PresetComposer
         assetsHere={assetsHere} informantsHere={informantsHere} people={directoryIds(view)}
-        venues={venueIds(view)} board={board} coin={coin} economy={economy} onLocal={onLocal} />
+        venues={venueIds(view)} board={board} coin={coin} economy={economy} nameOf={nameOf} onLocal={onLocal} />
       <DirectiveComposer {...props} />
     </section>
   );
@@ -464,8 +470,8 @@ function TellComposer({
 }
 
 function AskComposer({
-  circle, people, families, onLocal,
-}: { circle: string[]; people: string[]; families: string[]; onLocal(i: LocalActionIntent): void }) {
+  circle, people, families, familyLabels, onLocal,
+}: { circle: string[]; people: string[]; families: string[]; familyLabels: Record<string, string>; onLocal(i: LocalActionIntent): void }) {
   const [to, setTo] = useState('');
   const [mode, setMode] = useState<'family' | 'subject'>('subject');
   const [family, setFamily] = useState('');
@@ -487,7 +493,7 @@ function AskComposer({
           {families.length > 0 && <option value="family">{TERMS['family']!.label}</option>}</select></label>
         {useFamily
           ? <select className="desk-btn" aria-label="ask story" value={fam} onChange={(e) => setFamily(e.target.value)}>
-              {families.map((f) => <option key={f} value={f}>{f}</option>)}</select>
+              {families.map((f) => <option key={f} value={f}>{familyLabels[f] ?? f}</option>)}</select>
           : <select className="desk-btn" aria-label="ask person" value={subj} onChange={(e) => setSubject(e.target.value)}>
               {people.map((p) => <option key={p} value={p}>{p}</option>)}</select>}
         <button className="desk-btn" aria-label="submit ask"
@@ -498,8 +504,8 @@ function AskComposer({
 }
 
 function SellComposer({
-  circle, families, onLocal,
-}: { circle: string[]; families: string[]; onLocal(i: LocalActionIntent): void }) {
+  circle, families, familyLabels, onLocal,
+}: { circle: string[]; families: string[]; familyLabels: Record<string, string>; onLocal(i: LocalActionIntent): void }) {
   const [to, setTo] = useState('');
   const [family, setFamily] = useState('');
   const target = to || circle[0] || '';
@@ -512,7 +518,7 @@ function SellComposer({
         : (
           <div className="tag-row">
             <label>sell <select className="desk-btn" aria-label="sell story" value={fam} onChange={(e) => setFamily(e.target.value)}>
-              {families.map((f) => <option key={f} value={f}>{f}</option>)}</select></label>
+              {families.map((f) => <option key={f} value={f}>{familyLabels[f] ?? f}</option>)}</select></label>
             <label>to <select className="desk-btn" aria-label="sell buyer" value={target} onChange={(e) => setTo(e.target.value)}>
               {circle.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
             <button className="desk-btn" aria-label="submit sell"
@@ -524,9 +530,9 @@ function SellComposer({
 }
 
 function RecruitComposer({
-  candidates, families, coin, economy, onLocal,
+  candidates, families, familyLabels, coin, economy, onLocal,
 }: {
-  candidates: string[]; families: string[]; coin: number; economy: EconomyDef;
+  candidates: string[]; families: string[]; familyLabels: Record<string, string>; coin: number; economy: EconomyDef;
   onLocal(i: LocalActionIntent): void;
 }) {
   const [target, setTarget] = useState('');
@@ -553,7 +559,7 @@ function RecruitComposer({
                 onChange={(e) => setLeverage(e.target.value)}>
                 {families.length === 0
                   ? <option value="">— none held —</option>
-                  : families.map((f) => <option key={f} value={f}>{f}</option>)}</select></label>
+                  : families.map((f) => <option key={f} value={f}>{familyLabels[f] ?? f}</option>)}</select></label>
             )}
             <span className="desk-note">{cost} coin</span>
             <button className="desk-btn" aria-label="submit recruit" disabled={!affordable}
@@ -632,10 +638,10 @@ function HostComposer({
 /** The three COMPATIBILITY shortcuts. Each is labelled a preset: the fully composed directive below
  *  reaches the same typed application with every route/envelope/report/purpose lever still editable. */
 function PresetComposer({
-  assetsHere, informantsHere, people, venues, board, coin, economy, onLocal,
+  assetsHere, informantsHere, people, venues, board, coin, economy, nameOf, onLocal,
 }: {
   assetsHere: string[]; informantsHere: string[]; people: string[]; venues: string[];
-  board: BoardView; coin: number; economy: EconomyDef; onLocal(i: LocalActionIntent): void;
+  board: BoardView; nameOf: NameOf; coin: number; economy: EconomyDef; onLocal(i: LocalActionIntent): void;
 }) {
   const payloads = payloadsFrom(board);
   const families = Object.keys(payloads).sort();
@@ -679,7 +685,7 @@ function PresetComposer({
               <label><Term id="family" /> <select className="desk-btn" aria-label="courier story" value={family} onChange={(e) => setCourierFamily(e.target.value)}>
                 {families.length === 0
                   ? <option value="">— none held —</option>
-                  : families.map((f) => <option key={f} value={f}>{f}</option>)}</select></label>
+                  : families.map((f) => <option key={f} value={f}>{f} — {renderClaim(payloads[f]!.claim, nameOf)}</option>)}</select></label>
               <label>to <select className="desk-btn" aria-label="courier target" value={to} onChange={(e) => setCourierTarget(e.target.value)}>
                 {people.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
               <span className="desk-note">{economy.courierRun} coin</span>
@@ -689,6 +695,7 @@ function PresetComposer({
                   kind: 'courier', asset: carrier, target: to, viaDrop: null, spec: payload!.claim,
                 })}>preset · hand it over</button>
             </div>
+            {payload && <ClaimReading claim={payload.claim} nameOf={nameOf} />}
             <div className="tag-row">
               <label>meet <select className="desk-btn" aria-label="meet asset" value={meeter} onChange={(e) => setMeetAsset(e.target.value)}>
                 {assetsHere.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
@@ -704,7 +711,7 @@ function PresetComposer({
 // ── The full directive composer: ten independent levers ──────────────────────────────────────────
 
 function DirectiveComposer(props: DayPlannerProps & { offer: LocalOffer }) {
-  const { view, net, board, offer, onLocal } = props;
+  const { view, net, board, offer, onLocal, nameOf = (id: string) => id } = props;
   const sources: ComposerSources = { view, net, board, offer };
   const [draft, setDraft] = useState<DirectiveDraft>(() => defaultDirectiveDraft(sources));
   const set = <K extends keyof DirectiveDraft>(key: K, value: DirectiveDraft[K]) =>
@@ -715,6 +722,7 @@ function DirectiveComposer(props: DayPlannerProps & { offer: LocalOffer }) {
   const people = directoryIds(view);
   const venues = venueIds(view);
   const families = Object.keys(draft.payloads).sort();
+  const selectedStory = draft.payloads[missionFamilyOf(draft, families)];
   const missionOptions: MissionOptions = { people, venues, families, tick: offer.tick };
   const issues = directiveIssues(draft, sources);
   const rendezvous = rendezvousWindowOf(draft, offer.tick);
@@ -796,7 +804,8 @@ function DirectiveComposer(props: DayPlannerProps & { offer: LocalOffer }) {
           onChange={(e) => set('mission', withMissionFamily(draft, e.target.value))}>
           {families.length === 0
             ? <option value="">— none held —</option>
-            : families.map((f) => <option key={f} value={f}>{f}</option>)}</select></label>
+            : families.map((f) => <option key={f} value={f}>{f} — {renderClaim(draft.payloads[f]!.claim, nameOf)}</option>)}</select></label>
+        {selectedStory && <ClaimReading claim={selectedStory.claim} nameOf={nameOf} />}
         {families.length === 0 && (
           <span className="desk-note" aria-label="directive payload note">no delivered story to send</span>
         )}

@@ -10,7 +10,7 @@ import { KEYMAP, VERB_TERM, type UIAction } from './input/actions';
 import { TERMS } from '../../src/content/terms';
 import { computeLayout } from './town/layout';
 import { TownCanvas } from './town/TownCanvas';
-import { playerView, networkView, courierRouteView } from '../../src/sim/fieldwork';
+import { claimNames, playerView, networkView, courierRouteView } from '../../src/sim/fieldwork';
 import { directiveView } from '../../src/sim/directives/view';
 import { recruitmentHistoryView } from '../../src/sim/network/recruitment';
 import { boardView } from '../../src/intel/board';
@@ -212,6 +212,8 @@ function App() {
 
   // ── View models: every surface below is a pure fold the composition root computes ──
   const view = playerView(world);
+  const names = claimNames(world);
+  const nameOf = (id: string): string => Object.prototype.hasOwnProperty.call(names, id) ? names[id]! : id;
   const log = world.intel.log;
   const tags = world.intel.tags;
   const watchSightings = new Set(log.filter((e) => e.kind === 'presence').map((e) => e.venue));
@@ -273,7 +275,7 @@ function App() {
             ))}
           </div>
 
-          {panel === 'board' && <EvidenceBoard view={board} tags={tags} onAddTag={addTag} onRemoveTag={removeTag} />}
+          {panel === 'board' && <EvidenceBoard view={board} nameOf={nameOf} tags={tags} onAddTag={addTag} onRemoveTag={removeTag} />}
           {panel === 'codex' && <Codex rows={codexDetailView(log, world.intel.codex, STANDARD_RULES)} />}
           {panel === 'counter' && <CounterSketch view={counterSketchView(log, world.intel.cards)} />}
           {panel === 'web' && (
@@ -292,14 +294,14 @@ function App() {
           )}
           {panel === 'planner' && (
             <DayPlanner
-              view={view} paused={speed === 0}
+              view={view} nameOf={nameOf} paused={speed === 0}
               coin={world.coin} economy={STANDARD_RULES.economy} onVerb={submitVerb}
               onRequestLocal={requestLocal}
               offer={localOffer} net={net} board={board} onLocal={chooseLocal}
               localPending={localRequested || localOffer !== null} />
           )}
           {panel === 'network' && <Network view={net} history={approaches} />}
-          {panel === 'directives' && <Directives view={directives} />}
+          {panel === 'directives' && <Directives view={directives} nameOf={nameOf} />}
           {panel === 'treasury' && <Treasury coin={world.coin} stipendDay={stipendDay} economy={STANDARD_RULES.economy} />}
           {panel === 'report' && <EveningReport report={eveningReport(log, view.scenario?.day ?? dayOf(world.tick))} onOpenBoard={() => setPanel('board')} />}
           {panel === 'terms' && <TermsCodex />}
