@@ -1,9 +1,10 @@
 # Plan 9 — current execution plan
 
-Updated: 2026-09-06. Controller: Codex. **Stopped at Ellie's explicit handoff request.**
-No worker/background continuation is active; resume only on a new go-ahead.
-See [the current handoff](../handoff.md). Current implementation HEAD:
-**336b51b1fc77669084cead621d87ef8fd8736f09** (séance 4A).
+Updated: 2026-09-13. Controller: Codex. **Implementation resumed.** Ellie clarified
+that the 6 September stop applied only to that session. Continue the plan with
+non-blocking judgments/issues saved for later review. See [the current handoff](../handoff.md).
+Current committed implementation checkpoint:
+**152f2a0d788d7166150ba31b25090f3aa21d199c** (Task 4C2 digest and auditor).
 
 Task1's R15 correction and Task2 forensics now have independent approval. The
 R20 relay-reference fix at09e5458 closes the sole remaining Important finding.
@@ -28,9 +29,19 @@ accumulated code review is Approved with zero findings; the reviewer independent
 passed the same fullgates/comparison. [Task3 approval](../review/2026-09-05-scrying-code-approval.md).
 Task 3 is closed. Task 4A historical witness metadata is committed at 336b51b:
 worker/controller focused 59/4 and both typechecks pass, with four exact new bodies
-and eleven scoped paths verified. Task 4B's priced local ritual is paused after
-preflight: no source/test changes or gates remain. Its brief is saved for actual-HEAD
-reconciliation on resume. Full Task 4 gates and independent review remain at 4D. Scrying has independent plan approval
+and eleven scoped paths verified. Task 4B's priced local ritual is committed at
+aaaa57b: worker/controller focused 281/5 and both typechecks pass; scoped lint/diff
+pass. Root verified four exact new bodies, eleven source hashes and 46 evidence
+hashes. Task 4C1 physical reporting is committed at c7bc363: worker/controller
+focused 30/3 and both compilers pass; scoped lint/diff pass. Task 4C2 is committed
+at 152f2a0: worker/controller focused 127/6, both compilers and scoped lint/diff
+pass. Full Task 4 gates pass: 1,950 tests/125 files, lint, both compilers, build,
+soak and MC. All 10 blocks/230 deterministic lines match Task 3 with all four
+comparator controls. Build JS507.93/150.39kB gzip retains the existing size warning.
+Independent accumulated Task4 code review is **Approved with zero findings**.
+The reviewer passed the same full gates/comparison and independent replay/copy/
+100-seed generation probes. [Task4 approval](../review/2026-09-13-task-4-code-approval.md).
+Task4 is closed; corrected7A1/7A2 is the next implementation. Scrying has independent plan approval
 with A1; its certified baseline is09e5458 and preserve19 forensics cases/eight
 auditor calls in3C2. Séance's conditional T4-A1/A2 amendment is saved. The corrected
 78-case prose proposal has independent approval for future-base reconciliation.

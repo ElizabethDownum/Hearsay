@@ -1,12 +1,17 @@
-# Current review — 6 September 2026
+# Current review — 13 September 2026
 
-**Hearsay is stopped at Ellie's explicit handoff request.** Task4A is committed;
-Task4B is paused after preflight with no source/test changes. No worker or
-automatic continuation is active. [Current handoff](handoff.md).
+**Implementation resumed.** Ellie clarified that the 6 September stop applied only
+to that session. Continue the plan and save non-blocking judgments/issues here for
+later review. Task 4C2 is committed at `152f2a0`. All six gates pass, including
+1,950 tests/125 files; all 10 report blocks/230 deterministic lines match the
+approved baseline with four comparator controls. Independent accumulated code
+review is **Approved with zero findings**, with the same full gates independently
+passing. [Task4 approval](review/2026-09-13-task-4-code-approval.md). Task4 is closed;
+corrected7A prose is next. [Current handoff](handoff.md).
 
 Ellie's current instructions: audit the existing plan before continuing implementation; keep every change inside the Hearsay project folder; take the recommended behavior and hold questions/issues in this HTML document for later review.
 
-Latest checkpoint: the received-report correction is committed at09e5458. All1,783
+Earlier checkpoint: the received-report correction is committed at09e5458. All1,783
 tests in114 files and all six implementation gates pass; the ten deterministic
 simulation report blocks remain unchanged. Independent focused review Approved
 with zero findings; controller gates also pass at that commit.
@@ -19,7 +24,7 @@ The shared auditor preserves the original assertions; existing panels distinguis
 magic from human channels. [Validation report](review/2026-09-05-scrying-implementation-validation.md).
 Independent accumulated [code review](review/2026-09-05-scrying-code-approval.md)
 is Approved with zero findings, allsixgates/comparison independently passed.
-Task 3 is closed. Task 4A is committed at 336b51b (59 focused tests and both typechecks pass independently); the priced local ritual in Task 4B is paused before implementation. Full Task 4 verification and code review remain at 4D. The approval covers engine/session and rendered
+Task 3 is closed. Task 4A is committed at 336b51b (59 focused tests and both typechecks pass independently). Task 4B is committed at aaaa57b (281 focused tests in five files and both typechecks pass independently; scoped lint/diff pass). Task 4C1/C2 and full controller verification are now complete as recorded above; independent Task4 code review is Approved with zero findings. The Task 3 approval covers engine/session and rendered
 panel behavior; a purchase composer, manual layout audit and many-seed magic balance
 remain outside this stage.
 Séance's conditional plan amendment is saved. The corrected 78-case prose proposal
@@ -313,3 +318,12 @@ The orchestration skill's role contract says, "You do not implement, deep-review
 - **Evidence:** [independent review](review/2026-09-05-feature-links-plan-review.md), 144 authored cases pass; reviewer acceptance146pass/1fail. The [binding amendment](plans/drafts/2026-09-05-task-5b-missing-receipt-amendment.md) cites the acquisition contract and preserves all147 acceptance cases.
 - **Author correction:** [complete version](plans/drafts/2026-09-05-task-5b-feature-links-receipt-corrected.md) preserves all144 cases plus three reviewer controls. NativeRED146/1 becomesGREEN147/147; both compilers/lint and actual rule-firing pass. Only the supporting evidence fold changes.
 - **Independent approval:** [focused native review](review/2026-09-05-feature-links-receipt-correction-approval.md), zerofindings. RED146/1 → GREEN147, bothcompilers/lint/firing and a separate exact-key diagnostic pass. Actual-predecessor reconciliation, fullmagic/calendar composition and eventual production code review remain.
+
+
+### R26 — Count physical report slots without backdating ordinary evidence
+- **Status:** adopted PROVISIONAL pure-model correction; the 198-case physical proposal passes author validation and is in independent review. Production integration remains pending.
+- **Issue:** in an actual report containing network, night-visit and asking rows, the ordinary receipt fold skipped the physical append slot. It could then treat the received asking row as the guard's earlier direct observation at tick 15 instead of its actual arrival at tick 45.
+- **Recommended action:** count proved physical append/dedupe slots when reconstructing ordinary report receipt. Preserve R24/R25 uncertainty for missing or ambiguous receipts and enforce the maximum possible append span, including when duplicate physical rows appear.
+- **Evidence:** all 147 inherited cases remain byte-for-byte unchanged; 51 additions give 198 total. Complete RED is 160 pass / 38 fail and GREEN is 198 pass. A separate preserved failure proves that duplicate physical rows must not extend the association by one row. Both compilers, scoped lint, firing checks and input integrity pass in the isolated author host.
+- **Boundary:** this changes a proposed debrief fold only. It records no new gameplay state and infers neither a caster from residue nor a ritual from chapel presence. Missing evidence remains unknown. The independent proposal review and actual-predecessor code review are still required.
+- **To reverse:** revise the pure receipt mapping with explicit replacement controls; retain the original receipt chronicle, all historical failed/passing evidence, and uncertainty boundaries. No permission question blocks the existing plan.

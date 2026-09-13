@@ -1,18 +1,43 @@
-# Hearsay — stopped for now, 6 September 2026
+# Hearsay — resumed, 13 September 2026
 
-Ellie requested a `$handoff` and to “bring work with Hearsay to a close for now”.
-Work is stopped. No worker or task-owned background process remains running;
-no continuation is scheduled. Wait for a new go-ahead before resuming.
+Ellie clarified on 13 September that the 6 September stop was “just for that one
+session”. Continue implementation according to the current plan, applying
+recommended defaults and saving non-blocking judgments/issues in `docs/review.html`
+for later review. Task 4C2 is committed at `152f2a0`; all six Task 4 gates and
+the full deterministic comparison pass. Independent accumulated code review is
+**Approved with zero findings**. Task4 is closed; corrected7A prose is next.
 
-This project-local handoff supersedes older shared AI memory. All session writes
-remain inside Hearsay; no push occurred. The detailed record and frozen artifact
-identities are in the [latest episode](episodes/2026-09-06-scrying-closure-and-seance-checkpoint.md).
+This project-local handoff supersedes older shared AI memory. All writes remain
+inside Hearsay; no push is authorized by this resumption. The saved checkpoint and
+frozen artifact identities are in the [6 September episode](episodes/2026-09-06-scrying-closure-and-seance-checkpoint.md).
 
 ## Verified checkpoint
 
-- Production/test source: **336b51b1fc77669084cead621d87ef8fd8736f09**, séance4A.
-  The final handoff commit changes documentation only. The working tree is clean
-  after that commit; there is no Task4B source/test WIP.
+- Task 4 source is **152f2a0d788d7166150ba31b25090f3aa21d199c**. Controller full
+  suite: **1,950 tests across 125 files**; lint, both compilers, build, soak and
+  Monte Carlo pass. All **10 report blocks / 230 deterministic lines** match the
+  approved Task 3 baseline, with four comparator controls. Build JS is
+  507.93 kB / 150.39 kB gzip; the existing size warning persists. Independent
+  accumulated review is Approved, zero Critical/Important/Minor, with the same
+  gates/comparison independently passing. [Approval](review/2026-09-13-task-4-code-approval.md).
+  [Validation record](review/2026-09-13-seance-and-night-visits-validation.md).
+- Night-visit digest/auditor Task 4C2: worker/controller **127 focused tests in
+  six files**, both compilers and scoped lint/diff pass. Five source hashes and
+  45 evidence hashes verified; the full frozen tests and three T4-A1 controls
+  are retained. Actual growth is 18 cases.
+
+- Night-visit reporting Task 4C1: **c7bc36368f9d3005647be0c96725b33a187ff59d**.
+  Worker/controller **30 focused tests in three files**, both compilers, and
+  scoped lint/diff pass. Eight source paths and 41 evidence hashes verified.
+
+- Séance Task 4B: **aaaa57bd6bea2ce11414440f8c702173b53fb4b4**. Worker and controller
+  passed **281 focused tests in five files** and both TypeScript configurations;
+  scoped lint/diff passed. Eleven source paths and four exact frozen new bodies
+  verified. Full Task4 gates and independent review now pass.
+
+- Prior historical-witness source: **336b51b1fc77669084cead621d87ef8fd8736f09**,
+  Task 4A. The September 6 handoff commit was documentation only; Task 4B above
+  and Task 4C2 above are newer implementation checkpoints.
 - Scrying Task3 is independently Approved with zero findings at60506d9. Worker,
   controller and reviewer each passed six gates: **1,868 tests/121 files**, lint,
   both compilers, build, soak and Monte Carlo. Ten complete report blocks/230
@@ -20,34 +45,35 @@ identities are in the [latest episode](episodes/2026-09-06-scrying-closure-and-s
   gzip; its size warning remains. [Independent approval](review/2026-09-05-scrying-code-approval.md).
 - Historical-witness Task4A is committed: worker/controller **59 focused tests in
   four files and both compilers pass**; scoped lint passes. Four exact new bodies
-  and eleven file hashes verified. Full Task4 gates and code review remain at4D.
+  and eleven file hashes verified. Full Task4 gates and code review are now complete.
   [Implementation report](review/2026-09-06-historical-witness-implementation.md).
-- Task4B stopped after preflight; two late-created owned test files were removed
-  without running. No production edits or4B gates remain. Worker authority is
-  released. [Pause report](review/2026-09-06-seance-action-paused.md).
+- At the September 6 pause, Task 4B stopped after preflight; two owned test files were removed
+  without running. That historical pause was superseded by the completed
+  September 13 implementation above. [Pause report](review/2026-09-06-seance-action-paused.md).
 
 ## Resume order
 
 1. Read [current Plan9](plans/plan-9-current.md), the latest episode, Git status and
    `.superpowers/sdd/progress.md` plus `task-4-implementation-progress.md`.
-2. Bind the prepared `task-4b-implementation-brief-2026-09-06.md` to the new actual
-   documentation HEAD, proving its source still equals336b51b. Resume4B,4C1,4C2,
-   then4D full gates/comparison and separate accumulated code review. Preserve
-   the exact [T4-A1/A2 amendment](plans/drafts/2026-09-05-task-4-base-reconciliation.md).
-3. Corrected7A prose follows Task4 approval. Then5A recording with T5A-A1, separately
+2. Execute corrected7A1 under `task-7a1-implementation-brief-2026-09-13.md`,
+   binding the actual committed documentation HEAD over approved Task4 source.
+   Then7A2 on committed7A1, full applicable gates and separate code review.
+   Preserve the exact [T4-A1/A2 amendment](plans/drafts/2026-09-05-task-4-base-reconciliation.md).
+3. After7A, continue5A recording with T5A-A1, separately
    verified R16/R17 watch fixes,5A2 and full5B model completion. Prose78-case,
    outcome-history239-case and ordinary feature-link147-case proposals have
    independent approvals; they are not production implementations.
 4. Physical/magic/story links, calendar/terminal model,6/7B UI and8 integration/
-   final review remain. The new physical-model author brief was prepared but
-   **never dispatched**. Plan10 is outside this paused Plan9 execution.
+   final review remain. The completed198-case physical-model proposal is under
+   independent review. A separate magic-operation/story author now works in a new
+   isolated worktree; its198-case integrated baseline passes.
+   Plan10 is outside this Plan9 execution.
 
 One production writer; root owns Git index and scoped commits. Preserve current
 provenance/physical unions when reconciling older virtual overlays. Capture native
 bytes/exits before formatting; PowerShell7 and `python -X utf8`. Snapshots start
 inside owned excluded `node_modules`, never collectible scratch `.test.ts` paths.
-The last actual full-suite baseline remains1,868/121; do not report an inferred
-Task4 full count. Existing successful gates need no repetition without a change
+The current measured full-suite count is 1,950/125 at `152f2a0`. Existing successful gates need no repetition without a change
 or a stated checkpoint requirement.
 
 All deferred questions and PROVISIONAL local rulings, including R24/R25 receipt
