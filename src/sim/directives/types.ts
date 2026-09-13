@@ -212,7 +212,9 @@ export type ReportedFieldObservation =
       kind: 'asking'; observedAt: Tick; venue: VenueId; speaker: EntityId;
       addressedTo: EntityId; overheard: boolean; authority: boolean; about: InquiryKey;
     }
-  | { kind: 'presence'; observedAt: Tick; venue: VenueId; actor: EntityId }
+  | { kind: 'presence'; observedAt: Tick; venue: VenueId; actor: EntityId;
+      /** Only the scoped night-visit capture marks its actual physical witness. Omission retains ordinary presence semantics. */
+      witness?: EntityId }
   | {
       kind: 'network-speech'; observedAt: Tick; venue: VenueId; speaker: EntityId;
       addressedTo: EntityId; overheard: boolean; messageId: MessageId;

@@ -58,6 +58,11 @@ export interface ResidueEvidenceData {
 export interface PhysicalReceipt {
   tick: Tick; observer: EntityId; messageId: MessageId;
 }
+export interface NightVisitEvidenceData {
+  actor: EntityId;
+  witness: EntityId;
+  observedAt: Tick;
+}
 
 export interface EvidenceBase {
   tick: Tick;
@@ -72,27 +77,34 @@ export type EvidenceEntry =
   | (EvidenceBase & {
       kind: 'utterance'; mode: 'telling' | 'answer'; claimId: ClaimId; family: RumorId;
       reported: ReportedClaim; about: null; network?: never; leaked?: never;
-      residue?: never; receipt?: never;
+      residue?: never; nightVisit?: never; receipt?: never;
       document?: true;
     })
   | (EvidenceBase & {
       kind: 'asking'; mode: null; claimId: null; family: RumorId | null;
       reported: null; about: InquiryKeyData; network?: never; leaked?: never;
-      residue?: never; receipt?: never;
+      residue?: never; nightVisit?: never; receipt?: never;
     })
   | (EvidenceBase & {
       kind: 'network'; mode: null; claimId: ClaimId | null; family: RumorId | null;
       reported: ReportedClaim | null; about: InquiryKeyData | null;
       network: NetworkEvidence;
       leaked?: { from: EntityId; fact: CompartmentFact };
-      residue?: never; receipt?: never;
+      residue?: never; nightVisit?: never; receipt?: never;
     })
   | (Omit<EvidenceBase, 'speaker' | 'addressedTo'> & {
       kind: 'arcane-residue'; speaker: null; addressedTo: null; mode: null;
       claimId: null; family: null; reported: null; about: null;
       network?: never; leaked?: never;
       residue: ResidueEvidenceData;
+      nightVisit?: never;
       receipt?: PhysicalReceipt;
+    })
+  | (Omit<EvidenceBase, 'speaker' | 'addressedTo'> & {
+      kind: 'night-visit'; speaker: null; addressedTo: null; mode: null;
+      claimId: null; family: null; reported: null; about: null;
+      nightVisit: NightVisitEvidenceData; receipt?: PhysicalReceipt;
+      residue?: never; network?: never; leaked?: never;
     });
 
 /**

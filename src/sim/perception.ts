@@ -45,7 +45,9 @@ export interface TickEvents {
 }
 
 export type Observation =
-  | { kind: 'presence'; tick: Tick; venue: VenueId; actor: EntityId }
+  | { kind: 'presence'; tick: Tick; venue: VenueId; actor: EntityId;
+      /** Only the scoped night-visit capture marks its actual physical witness. Omission retains ordinary presence semantics. */
+      witness?: EntityId }
   | { kind: 'utterance'; tick: Tick; venue: VenueId; speaker: EntityId;
       addressedTo: EntityId; claim: Claim; overheard: boolean; mode: 'telling' | 'answer';
       document?: true }

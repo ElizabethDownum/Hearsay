@@ -29,6 +29,7 @@ import { queueUnqueuedFieldReports } from './directives/field-reports';
 import { pruneScrutiny } from './directives/scrutiny';
 import type { NetworkSpeech } from './directives/types';
 import { beginScryWindows, residueEvents, captureScryIntel } from './magic';
+import { captureNightVisits } from './night-visits';
 import {
   attemptDirective, collectDirectiveActIntents, expireDirectiveExecutions,
   expireDirectiveActsBeforeCollection, markDirectiveDue,
@@ -550,6 +551,7 @@ function recordAndIngest(
     }
   }
 
+  captureNightVisits(world, events);
   captureIntel(world, events, rules);
   captureScryIntel(world, events);
   queueUnqueuedFieldReports(world);

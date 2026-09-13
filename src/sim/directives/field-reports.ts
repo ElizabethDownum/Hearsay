@@ -22,6 +22,7 @@ import { queueNetworkMessage } from './transport';
 import {
   ingestEnemyResidue, ingestPlayerResidue, rememberResidueSighting, reportResidue,
 } from '../residue';
+import { ingestEnemyNightVisit } from '../night-visit';
 
 const blankIntelFields = (): Omit<IntelEntry, 'tick' | 'venue' | 'via' | 'kind' | 'overheard'> => ({
   speaker: null, addressedTo: null, mode: null, authority: false, claimId: null, family: null,
@@ -180,6 +181,7 @@ function rawReportedObservation(row: HeldFieldObservation): ReportedFieldObserva
       return {
         kind: 'presence', observedAt: observation.tick,
         venue: observation.venue, actor: observation.actor,
+        ...(observation.witness === undefined ? {} : { witness: observation.witness }),
       };
     case 'network-speech':
       return {
@@ -252,6 +254,7 @@ function projectReportedObservation(
       return {
         kind: 'presence', observedAt: observation.observedAt,
         venue: observation.venue, actor: observation.actor,
+        ...(observation.witness === undefined ? {} : { witness: observation.witness }),
       };
     case 'network-speech': {
       const spoken = cloneSerializable(observation.spoken);
@@ -376,7 +379,7 @@ function ingestPlayerItem(
   } else if (observation.kind === 'presence') {
     world.intel.log.push({
       ...blankIntelFields(), tick: observation.observedAt, venue: observation.venue, via,
-      kind: 'presence', overheard: true, actor: observation.actor,
+      kind: observation.witness === undefined ? 'presence' : 'scene-presence', overheard: true, actor: observation.actor,
     });
   } else if (observation.kind === 'arcane-residue') {
     ingestPlayerResidue(world, observation, via);
@@ -401,6 +404,10 @@ function ingestEnemyItem(
   const observation = item.observation;
   if (observation.kind === 'arcane-residue') {
     ingestEnemyResidue(world, observation, physicalReceipt);
+    return;
+  }
+  if (observation.kind === 'presence' && observation.witness !== undefined) {
+    ingestEnemyNightVisit(world, { ...observation, witness: observation.witness }, physicalReceipt);
     return;
   }
   let entry: EvidenceEntry | null = null;
