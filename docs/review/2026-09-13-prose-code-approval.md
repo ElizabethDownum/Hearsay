@@ -24,8 +24,15 @@ Root read it and verified all11 reviewed source hashes and five successful nativ
 exits. Controller raw stdout/stderr, exits and exact commands/source bindings live
 under `task-7a-implementation-validation/controller-final/`; reviewer evidence is
 under `task-7a-code-review-validation-2026-09-13/` in the same SDD directory.
-An evidence-only addendum is being requested to clarify the reviewer's combined
-log capture and inventory; no missing original byte fidelity is assumed.
+The evidence-only completion addendum clarifies that successful reviewer logs are
+PowerShell all-stream transcripts, not separately proven native byte captures. The
+sandbox-denial log was transcribed after its first file was overwritten; it is a
+later textual record, not recovered original bytes. Those limitations qualify the
+report's earlier raw-evidence wording. Controller native binary evidence remains
+complete, and no code verdict or measured successful exit changes.
+Addendum SHA-256 `50DE31F9F6B2C6A018F38E2B2AC0E347BC76A17DA6C3E1B0561E5D667A6C70A7`;
+self-excluding inventory `3D76CE3FCC8FC2C2790D4F5E1BA2249E8A0058D60BB2B35A1A3097E6B5D3AF52`.
+Root verified all15 retained entries. Original report and retained logs stay frozen.
 
 The worker omitted a pre-application patch check for existing-file hunks; current
 seams and final scoped changes were checked directly. Its first manifest wrongly

@@ -9,7 +9,18 @@ review is **Approved with zero findings**, with the same full gates independentl
 passing. [Task4 approval](review/2026-09-13-task-4-code-approval.md). Task4 is closed;
 complete prose 7A1/7A2 is committed through `3020688` and independently Approved
 with zero findings. Worker, controller and reviewer each pass 2,028 tests/128 files,
-lint, both compilers and build. Task 5A1 recording is next.
+lint, both compilers and build. Task5A1 recording is committed at252a481, with
+worker/controller2,045 tests/129 files and all six gates passing, unchanged complete
+simulation reports and nine-world metadata-only compatibility. Independent code
+review is Approved with zero findings and the same gates independently passing.
+R16 guard self-presence is committed at `36d090c`; worker/controller2,055 tests/130
+files and all six gates pass with unchanged simulation reports. Independent R16
+code review is Approved with zero findings and the same gates independently passing.
+[R16 approval](2026-09-13-r16-code-approval.md). [Recording approval](2026-09-13-recording-code-approval.md).
+The313-case debrief correction closes ending validation but has one remaining
+mixed-time receipt finding. A new bounded correction preserves all313 cases and
+the exact reviewer regression; it needs independent approval before final model/UI
+certification. [Latest review](2026-09-13-composition-contract-review.md).
 [Prose approval](2026-09-13-prose-code-approval.md). [Current handoff](handoff.md).
 
 Ellie's current instructions: audit the existing plan before continuing implementation; keep every change inside the Hearsay project folder; take the recommended behavior and hold questions/issues in this HTML document for later review.
@@ -187,6 +198,7 @@ probe fails. Task 2 closure is withheld while the bounded correction is prepared
 - **Status:** root implemented the bounded correction at 7d5608f after Ellie's direct-continuation go-ahead. Twenty-four new rejecting assertions failed before the helper changes; all 93 scanner cases pass afterward, including three positive-control tests. Full suite 1,764/113, lint, both typechecks, build, soak and MC pass; all ten complete report blocks /230 deterministic lines match. A shared const-declaration predicate also rejects mutable anchor initializers, and the stricter safe-value proof preserves conservative API-write detection. Independent approval remains pending; no self-review is represented as independent approval.
 
 ### R16 — A guard knows where they are standing
+- **Current execution:** closed at `36d090c`, from approved `252a481`. Native RED3 failures/7 controls; focused39 pass. Worker/controller/reviewer each pass2,055 tests/130 files and all six gates; all10 simulation blocks/230 deterministic lines/four controls remain equal. Independent review Approved with zero findings, plus seven adversarial controls. [Approval](2026-09-13-r16-code-approval.md).
 - **Issue:** an enemy watch's standard advisory expects the guard at their own post. The evaluator searches a feed that deliberately excludes its observer, so the guard keeps deferring.
 - **Recommended action:** satisfy self-presence from the recipient's existing local venue. Preserve observation requirements for others and all avoid/time guidance. No new self observation or changed game constants.
 - **Why:** evaluator.ts expected-presence check, execution.ts localFeed and counterintel.ts authored advisory. A full-loop control with the actual unchanged outcome-report policy defers with the advisory and works after removing only that advisory. The earlier “standard full-report” wording described a staged policy incorrectly; the new default-policy control supersedes it.
@@ -204,6 +216,7 @@ probe fails. Task 2 closure is withheld while the bounded correction is prepared
 - **Recommended action:** keep the two approved clauses bounded. Preserve raw local outcomes and returned claims separately in the debrief. Queue separate mechanism probes/proposals for cancellation, expiry reporting and interpreted-venue consistency before declaring final watch/debrief closeout.
 - **Evidence and limits:** watch-plan-review observations d1–d3 trace the current source; expiry after actual work is also in the retained native history probe. Cancellation and venue-mutation consequences are source-derived hypotheses until a bounded native reproduction is saved. Do not call them new passing tests or silently repair them under R17.
 - **Status:** held for later bounded work; no new gameplay rule or threshold selected. [Independent source review](2026-09-05-watch-plan-review.md).
+- **Closeout clarification, 13 September:** the independent premise audit confirms these do not block R16/R17 and are not automatically authorized repairs. Before final Plan9 certification, run and retain bounded post-R17 cancellation, expiry and interpreted-venue probes, then record a disposition for each result. A reproduced defect needs its own scoped proposal/review or an explicit later-plan disposition compatible with debrief truthfulness; it must not silently enter either approved watch patch. Audit: `.superpowers/sdd/r18-closeout-premise-audit-2026-09-13.md`, SHA-256 `3F9CD0F5137D6F26F3EA398D4CCEE3B2B4913ADAEAC7931D183C25E3AB36FFCE`.
 
 ### R19 — Handoff learning candidates stay project-local
 
@@ -336,7 +349,7 @@ The orchestration skill's role contract says, "You do not implement, deep-review
 
 
 ### R27 — Keep missing magic history explicit in the debrief
-- **Status:** adopted PROVISIONAL reader defaults. The 240-case magic/story proposal review found one Important identity defect (R29); a versioned correction is being authored. No production debrief code is installed.
+- **Status:** adopted PROVISIONAL reader defaults. The original240-case proposal's identity finding is closed by the independently approved241-case correction (R29). No production debrief code is installed.
 - **Recommended action:** identify a retained operation by spell plus operation ID; keep operation intent, actual captures, physical reporting and enemy acquisition separate. Historical price is unrecorded because the current operation records do not store it. Do not substitute the current economy price as history.
 - **Story rule:** a séance is later receipt of its retained historical claim and edge. It adds no new version, origin or human mutation. Claim-root identity and completeness of the two received intel rows are separate facts; missing or inconsistent references remain unresolved and visible.
 - **Orphan rule:** keep a raw held physical report even if its operation/trace history is missing. It proves retained held content only. A chapel visit does not prove ritual causation, and residue does not identify a caster.
@@ -353,8 +366,28 @@ The orchestration skill's role contract says, "You do not implement, deep-review
 
 ### R29 — A malformed alias must not change a ritual's story family
 
-- **Status:** independent magic-proposal review is Needs-fixes, zero Critical / one Important / zero Minor. A bounded correction and permanent regression are being authored in a separate isolated host. No affected reader is installed.
+- **Status:** the original Important finding is closed. The versioned241-case correction is independently Approved-for-base-reconciliation, zero Critical / Important / Minor. No affected reader is installed. [Correction approval](2026-09-13-magic-identity-proposal-approval.md).
 - **Finding:** `storyThreads` stores versions by internal claim ID. A malformed second dictionary entry sharing the exact retained séance root's ID can overwrite its version and move the real ritual into an unrelated family. The exact root, `magicThreads` and legacy `threadOf` still agree on the original family.
 - **Adopted correction:** enforce the exact retained dictionary identity when joining a story event. Preserve unresolved history and all 240 existing acceptance cases; add the real-ritual alias reproduction permanently. This corrects a false causal explanation without adding gameplay recording or inferring a new root.
 - **Evidence:** the independent 240-case suite, both compilers, scoped lint and mandatory firing pass. A separate adversarial probe measures one failure and one passing control. [Review record](2026-09-13-magic-identity-proposal-review.md).
-- **Boundary:** the correction needs independent re-review before final composition consumes it. Original proposal and review evidence remain frozen; unrelated prose and recording work continues.
+- **Independent result:** baseline240, causal RED240/1 and GREEN241; original controls2/2, author adjacency4/4 and extra all-event controls2/2. Both compilers,29-body lint and actual-path firing pass. Root verified445 review evidence entries and514 author entries.
+- **Boundary:** the approved correction can now be consumed by the complete composition proposal. Original proposal/review evidence remain frozen. Actual model installation and accumulated code review remain required; recording work continues.
+
+### R30 — Keep future operation records outside current terminal history
+
+- **Status:** Important proposal-review finding; bounded correction in progress, no debrief model installed.
+- **Finding:** current enemy evidence and physical evidence include rows acquired beyond the view clock; feature references include future digest results. The calendar and chronicle already enforce this boundary.
+- **Adopted correction:** exclude known-future rows from current operation sections or retain them in explicitly typed beyond-clock sections. Preserve unknown-time rows as unknown and keep operation/orphan history reachable without inventing dates.
+- **Evidence:** two independent rewound-world probes fail against the frozen 278-case proposal. All original assertions remain binding alongside these regressions. [Independent review](2026-09-13-composition-proposal-review.md).
+- **Boundary:** author a versioned correction with real causal RED/GREEN and independent review; preserve the original proposal. UI work may continue provisionally but final certification consumes the approved replacement.
+- **Correction checkpoint:** versioned313-case proposal preserves all278 prior cases, adds35 controls and passes the five original reviewer probes; causal RED284 passed/29 failed, GREEN313. Both compilers/34-body lint/law checks pass. Root verified576 evidence entries and the three exact changed bodies. Independent correction review is active; a current-feature/later-duplicate interaction is under adversarial examination, without a verdict yet.
+- **Correction review:** Needs-fixes, zero Critical/one Important/zero Minor. A later duplicate receipt incorrectly removes a uniquely supported current feature. A second bounded correction now owns only proposed threads.ts and additive tests; retain a current projection without future indexes and preserve the future receipt separately. All313 cases and the exact reviewer regression remain binding. [Review](2026-09-13-composition-contract-review.md).
+
+### R31 — Resolve retained ending evidence before calling it consistent
+
+- **Status:** closed within the313-case proposal by independent review. Full model installation and the remaining R30 correction still require their own approval.
+- **Finding:** won, exposed and caught metadata with matching kind/day but missing supporting records are labeled consistent. Three independent controls reproduce this.
+- **Adopted correction:** validate status-specific retained source identity; keep unresolvable or ambiguous payloads visible and mark them inconsistent. Preserve real ending fixtures and do not reconstruct missing history or rerun gameplay rules.
+- **Evidence:** the independent proposal suite passes 278 cases while the three additional malformed-payload cases fail. [Independent review](2026-09-13-composition-proposal-review.md).
+- **Boundary:** no recording/schema/gameplay change is licensed. The versioned correction preserves all existing assertions and needs independent reconciliation review before model or UI certification.
+- **Independent disposition:** closed within the313-case proposal. Real endings and all malformed/missing/ambiguous/future controls pass; retained source identities now resolve without rerunning gameplay. The complete model still needs R30's remaining correction, installation and separate code review. [Review](2026-09-13-composition-contract-review.md).

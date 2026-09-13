@@ -9,7 +9,16 @@ the full deterministic comparison pass. Independent accumulated code review is
 are committed through `3020688`; worker and controller each pass the full
 **2,028 tests / 128 files**, lint, both compilers and browser build. Independent
 accumulated 7A code review is **Approved with zero findings**, with the same gates
-passing independently. Task 5A1 causal recording is next.
+passing independently. Task5A1 causal recording is committed at `252a481`.
+Worker and controller pass2,045 tests/129 files and all six gates; all10 report
+blocks/230 deterministic lines remain equal. Independent5A1 code review is Approved
+with zero findings and the same gates/comparison passing. Root verified832 review
+evidence entries. R16 guard self-presence is committed at `36d090c`; worker and
+controller pass2,055 tests/130 files and all six gates with unchanged complete
+simulation reports. Independent R16 code review is Approved with zero findings and
+the same gates independently passing. Root verified75 review entries; R17 is next.
+[R16 approval](review/2026-09-13-r16-code-approval.md).
+[Recording approval](review/2026-09-13-recording-code-approval.md).
 
 This project-local handoff supersedes older shared AI memory. All writes remain
 inside Hearsay; no push is authorized by this resumption. The saved checkpoint and
@@ -62,17 +71,25 @@ frozen artifact identities are in the [6 September episode](episodes/2026-09-06-
 2. Task 7A is closed at committed `3020688`, with all applicable controller and
    independent gates passing. [Approval](review/2026-09-13-prose-code-approval.md).
    Preserve the exact [T4-A1/A2 amendment](plans/drafts/2026-09-05-task-4-base-reconciliation.md).
-3. Continue 5A1 recording with T5A-A1 under its actual-HEAD-bound brief, then separately
-   verified R16/R17 watch fixes,5A2 and full5B model completion. Prose78-case,
+3. Task5A1 is closed at `252a481`, and R16 is closed at `36d090c`.
+   Implement separately verified R17,5A2 and full5B model completion. Prose78-case,
    outcome-history239-case and ordinary feature-link147-case proposals have
    independent approvals; they are not production implementations.
 4. Physical/magic/story links, calendar/terminal model,6/7B UI and8 integration/
    final review remain. The198-case physical-model proposal is independently
    Approved-for-base-reconciliation, zero findings.
    [Proposal approval](review/2026-09-13-physical-links-proposal-approval.md).
-   The 240-case magic proposal review found one Important alias-identity defect;
-   a bounded versioned correction is being authored with a permanent regression.
-   Remaining pure composition is being authored in another isolated worktree.
+   The magic alias-identity defect is closed by the independently approved241-case
+   correction. [Approval](review/2026-09-13-magic-identity-proposal-approval.md).
+   Complete pure composition has278 passing cases but independent review found
+   two Important issues: future operation records and unresolved ending evidence.
+   The versioned correction passes 313 cases (278 preserved plus 35). Its review
+   closes ending validation but retains one mixed-time receipt finding. A new
+   bounded correction preserves 313 and the exact reviewer regression.
+   Task6/7B UI continues in a separate isolated checkout against the provisional
+   interface; final certification
+   must consume the independently approved correction.
+   [Latest composition review](review/2026-09-13-composition-contract-review.md).
    The completed premise check supports existing semantic attention readers plus
    calendar/terminal composition; player hypothesis cards remain ungraded notes.
    Plan 10 is outside this run. Adopted A7 explicitly assigns ritual purchase
@@ -82,7 +99,7 @@ One production writer; root owns Git index and scoped commits. Preserve current
 provenance/physical unions when reconciling older virtual overlays. Capture native
 bytes/exits before formatting; PowerShell7 and `python -X utf8`. Snapshots start
 inside owned excluded `node_modules`, never collectible scratch `.test.ts` paths.
-The current measured full-suite count is 2,028/128 at `3020688`. Existing successful gates need no repetition without a change
+The current measured full-suite count is 2,055/130 at `36d090c`. Existing successful gates need no repetition without a change
 or a stated checkpoint requirement.
 
 All deferred questions and PROVISIONAL local rulings, including R24/R25 receipt

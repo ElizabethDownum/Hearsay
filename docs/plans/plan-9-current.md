@@ -4,16 +4,32 @@ Updated: 2026-09-13. Controller: Codex. **Implementation resumed.** Ellie clarif
 that the 6 September stop applied only to that session. Continue the plan with
 non-blocking judgments/issues saved for later review. See [the current handoff](../handoff.md).
 Current committed implementation checkpoint:
-**3020688c883259ddd5f95195841804e5dc4e9237** (complete claim prose 7A1/7A2).
+**36d090cdb6da3be5814e72d4262efa4d67ac94ea** (R16 guard self-presence).
+Worker/controller full2,055 tests/130 files, lint, both compilers, build512.71/151.87gzip,
+soak andMC pass. All10 blocks/230 deterministic lines/four controls match the
+certified baseline. Nine complete predecessor/current worlds match after only the
+new metadata is stripped in the preceding5A1 proof. Independent5A1 code review is Approved with zero findings;
+the same six gates/comparison pass independently. Root verified832 review entries.
+R16 is independently Approved with zero findings and the same gates/comparison
+passing. Root verified75 review entries. R17 is the next separate unit.
+[R16 approval](../review/2026-09-13-r16-code-approval.md).
+[Recording approval](../review/2026-09-13-recording-code-approval.md).
+
+Completed prose source: **3020688c883259ddd5f95195841804e5dc4e9237** (7A1/7A2).
 Worker and controller full gates pass: 2,028 tests/128 files, lint, both compilers,
 and browser build (512.40 kB / 151.77 kB gzip, existing size warning).
 All 24 predicate definitions are unchanged. Independent 7A code review is
 **Approved with zero findings**, with the same gates and all 78 focused cases
 passing independently. [Approval](../review/2026-09-13-prose-code-approval.md).
-Task 7A is closed; actual causal recording 5A1 is next.
-Physical 198 proposal is approved. Magic 240 review found one Important claim-alias
-identity defect; a versioned bounded correction is being authored independently
-alongside the remaining pure composition. Adopted A7 retains ritual purchase
+Task7A and recording5A1 are closed with independent code approval through252a481.
+Physical198 and corrected magic241 proposals are independently approved with zero
+findings. Complete278-case pure composition review found two Important issues,
+future operation records and unresolved ending evidence. The313-case correction
+closes ending validation but needs one mixed-time receipt correction; all313 cases
+and the exact reviewer regression remain binding. Task6/7B UI
+authoring proceeds against the provisional frozen interface; final certification
+requires independent correction approval. [Latest review](../review/2026-09-13-composition-contract-review.md).
+Adopted A7 retains ritual purchase
 composers in Plan 10; they are outside Tasks 6/7B/8 and this execution.
 
 Task1's R15 correction and Task2 forensics now have independent approval. The
@@ -229,6 +245,8 @@ original report links, gate reconstruction and retained artifact paths.
    The complete draft/report have conditional independent plan approval. Apply
    drafts/2026-09-05-task-4-base-reconciliation.md (T4-A1/A2) on the actual Task 3
    predecessor, with the three unexecuted auditor regressions and serial unit order.
+   This sequence is now installed through `152f2a0` and independently approved,
+   including all six gates and the complete report comparison.
 5. **Task 7A prose foundation:** implement registry-exhaustive renderClaim and existing
    board reading lines before Task 6 consumes it. Register action vocabulary when
    compile-driven; debrief-specific vocabulary can finish with its UI (R10).
@@ -245,20 +263,28 @@ original report links, gate reconstruction and retained artifact paths.
    99 affected cases pass in memory; nine complete world pairs differ only by the
    proposed metadata. Native review passes 102 affected cases and nine world pairs.
    Apply the adopted T5A-A1 amendment to preserve Task 4 séance family membership;
-   its 17th actual-ritual regression awaits that predecessor. Actual reconciliation,
-   implementation and code review remain. Task 5B has 96 passing cases across eight
-   partial modules; the completed ninth ordinary feature-link proposal has 144
-   author cases (96+48). Independent review found one missing-receipt chronology
-   defect; the R25 correction preserves all144 plus three reviewer cases and now
-   has independent proposal approval, zerofindings. Native147/147 and bothcompilers/
-   lint/firing pass; production implementation and fullmagic integration remain.
-   Full magic links, calendar and terminal composition remain unfinished.
+   its17th actual-ritual regression is now installed. Task5A1 is independently
+   approved at `252a481`, with2,045 tests/129 files, all six gates, complete report
+   comparison and nine complete-world metadata-only pairs independently passing.
+   R16 self-presence is independently approved at `36d090c`. Execute the separate
+   R17 watch-stage correction, then its own six gates/review, then
+   approved Task5A2 private outcome recording and separate review.
+   Task5B's147-case receipt correction,198-case physical extension and241-case
+   magic/story identity correction have independent proposal approval. Complete
+   calendar/terminal composition passes278 cases but review found two Important
+   issues (R30/R31). The 313-case correction closes ending validation but needs a
+   bounded mixed-time receipt correction, preserving all 313 cases and the exact
+   reviewer regression. After approval and actual5A2 reconciliation, install the
+   complete model in five serial chunks with the scoped and accumulated gates,
+   then obtain separate installed-code review. No debrief model is installed yet.
 7. **Task 6 + Task 7B debrief UI:** terminal-only props-fed panels, existing panel
    import fence firing proof, running-world non-reachability, remaining terms/slots.
 8. **Task 8 integration/closeout:** legal two-council forger route; real interrogation
    mirror; terminal report-divergence lesson; final full-plan independent review.
    Stage vehicles and measure reachability; never modify quorum/physics to fit the
    original singular-council hand-simulation (R11).
+   Retain post-R17 probes and explicit dispositions for R18's cancellation, expiry
+   and interpreted-venue observations before final watch/debrief certification.
 
 ## Evidence and review
 

@@ -3,6 +3,27 @@
 
 ## 13 September physical proposal approval
 
+The [magic operation/story proposal](2026-09-13-task-5b-magic-threads.md) and
+[bounded identity correction](2026-09-13-task-5b-magic-identity.md), their author
+reports and constraints are now published as exact frozen copies. The original
+240-case alias finding is closed by [independent241-case correction approval](../../review/2026-09-13-magic-identity-proposal-approval.md),
+zero findings. The [complete278-case composition](2026-09-13-task-5b-composition.md)
+is frozen with its author report and constraints. Independent review found two
+Important issues, now under a separately versioned correction: future operation
+records and unresolved ending evidence. [Review](../../review/2026-09-13-composition-proposal-review.md).
+No debrief model is installed yet.
+
+The [313-case contract correction](2026-09-13-task-5b-contract.md),
+[author report](2026-09-13-task-5b-contract-author-report.md) and
+[constraints](task-5b-contract-constraints.md) are exact frozen copies under
+independent review. All278 old cases remain;35 controls are additive. The original
+five reviewer regressions pass, along with both compilers,34-body lint and law
+checks. Root verified576 evidence entries and three exact changed bodies. This is
+a proposal input awaiting approval, not an installed model or certified UI. Its
+[independent review](../../review/2026-09-13-composition-contract-review.md) closes
+ending validation but finds one mixed-time receipt defect. A new bounded correction
+preserves313 and the exact reviewer regression; this original proposal stays frozen.
+
 The [physical evidence/feature-link extension](2026-09-13-task-5b-physical-links.md),
 [author report](2026-09-13-task-5b-physical-links-author-report.md) and
 [constraints](task-5b-physical-links-constraints.md) are exact frozen copies.
@@ -12,9 +33,9 @@ compilers/lint/firing and4extra reviewer probes pass. R26's mixed-slot correctio
 retains the original receipt uncertainty/span boundaries. One reviewer-induced
 volatile cache exception is disclosed; semantic inputs and evidence remain intact.
 Task 4 actual code is independently approved at152f2a0 and complete7A at3020688.
-Magic240 review found one Important claim-alias identity defect; a separate author
-is preparing a bounded241 correction while remaining calendar/terminal composition
-proceeds. No production debrief model is installed. Earlier checkpoints follow.
+Magic241 now has independent proposal approval; remaining calendar/terminal
+composition has278 passing cases but needs the two corrections recorded above.
+No production debrief model is installed. Earlier checkpoints follow.
 
 ## Evening native review continuation
 
