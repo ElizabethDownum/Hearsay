@@ -117,6 +117,7 @@ function chooseMethod(mission: DirectiveMission, input: ReceivedBriefInput,
 
   const contradicted = guidance.some((row) => row.kind === 'expected-presence'
     && input.local.tick >= row.at && input.local.venue === row.venue
+    && row.person !== input.recipient.id
     && !input.local.observations.observations.some((observation) =>
       observation.kind === 'presence' && observation.actor === row.person && observation.venue === row.venue));
   const personPresent = (id: EntityId): boolean => input.local.circleMembers.includes(id);
