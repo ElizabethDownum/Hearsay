@@ -65,6 +65,9 @@ export const UI_GLYPHS: Record<string, string> = {
   salon: '❧',
   'walk-in': '⇥',
   scrying: '◉',
+  letter: '✉',
+  'forgery-quill': '✒',
+  seance: '✧',
 };
 
 /** Unicode-glyph fallback for the town-view map tokens (asset-slots.md, map.token.* rows). */

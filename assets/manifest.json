@@ -4,11 +4,9 @@
     "font.display": "fonts/Cinzel-Regular.woff2",
     "font.text": "fonts/EBGaramond-Regular.woff2",
     "font.ui": "fonts/Inter-Regular.woff2",
-
     "texture.paper.board": null,
     "frame.portrait.neutral": null,
     "portrait.npc.pool": null,
-
     "icon.ui.rumor": null,
     "icon.ui.coin": null,
     "icon.ui.courier": null,
@@ -16,9 +14,7 @@
     "icon.ui.salon": null,
     "icon.ui.walk-in": null,
     "icon.ui.scrying": null,
-
     "map.token.courier": null,
-
     "icon.venue.tavern": null,
     "icon.venue.market": null,
     "icon.venue.chapel": null,
@@ -31,6 +27,10 @@
     "icon.venue.home": null,
     "icon.venue.salon": null,
     "icon.venue.palazzo": null,
-    "icon.venue.press": null
+    "icon.venue.press": null,
+    "icon.ui.letter": null,
+    "icon.ui.forgery-quill": null,
+    "icon.ui.seance": null,
+    "texture.paper.debrief": null
   }
 }

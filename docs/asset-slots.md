@@ -82,3 +82,19 @@ No media is wired. The planned séance and debrief slots remain their own tasks.
 4. **Never block on assets.** A slot with no asset renders its fallback and the game ships that way
    if need be. Assets upgrade the look; they are never load-bearing.
 5. **License gate is absolute:** unlisted-in-LICENSES.md ⇒ unwired, no exceptions (Steam is the bar).
+
+## Plan 9 Task 7B terminal additions
+
+Registered null before use; no media is wired. The terminal composition root resolves
+these slots and passes the results to props-only panels. Primitive fallbacks always work.
+Existing icon.ui.scrying remains unchanged and is reused for retained scrying operations.
+
+| Slot | Fallback | Lawful terminal render site |
+| --- | --- | --- |
+| `icon.ui.letter` | `✉` glyph plus Artifact text | Artifact history heading |
+| `icon.ui.forgery-quill` | `✒` glyph plus artifact ID | Retained forged-document history |
+| `icon.ui.seance` | `✧` glyph plus Séance text | Retained séance operation heading |
+| `texture.paper.debrief` | Existing flat paper color and border | Terminal reading desk |
+
+These display slots add no purchase/composer control and imply no caster or ritual
+causation for a mere physical sighting. Those controls remain in Plan 10 under A7.

@@ -189,6 +189,24 @@ describe('Task 13 registry — exactly eight new nouns, and no copy that promise
    * Plan 9 Task 1 (artifacts) registers the three artifact verbs.
    */
   const LATER_PLAN_TERM_IDS = [
+    // Task 7B terminal vocabulary; preserve the original Task 13 growth assertion.
+    "terminal-debrief",
+    "artifact",
+    "forgery",
+    "seance",
+    "thread",
+    "timeline",
+    "overlay",
+    "phantom",
+    "lag",
+    "debrief-epigraph",
+    "unrecorded",
+    "ambiguous",
+    "reported-account",
+    "actual-attention",
+    "claim-change",
+    "evidence-arrival",
+    "orphan-history",
     'verb-forge', 'verb-plant', 'verb-show', 'verb-scry', 'scrying', 'magic',
     'scene-presence', 'arcane-residue', 'verb-seance', 'the-departed', 'night-visit',
   ];
