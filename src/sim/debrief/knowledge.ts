@@ -37,7 +37,12 @@ function reportedKey(observation: ReportedFieldObservation, via: string): string
     overheard: observation.overheard, speaker: observation.speaker, addressedTo: observation.addressedTo,
     authority: observation.authority, about: observation.about,
     family: 'family' in observation.about ? observation.about.family : null });
-  if (observation.kind === 'presence') return key({ ...base, kind: 'presence', actor: observation.actor });
+  if (observation.kind === 'presence') {
+    // ingestPlayerItem writes 'scene-presence' for a witnessed (night-visit) item; that row kind
+    // is never dated here, so a witnessed item must not mint an ordinary presence receipt.
+    if (observation.witness !== undefined) return null;
+    return key({ ...base, kind: 'presence', actor: observation.actor });
+  }
   return null;
 }
 

@@ -130,3 +130,48 @@ describe('the debrief calendar uses receipt time without changing board order', 
     expect(hashWorld(value)).toBe(before);
   });
 });
+
+/** The exact row ingestPlayerItem appends for a witness-free reported presence. */
+const boardPresence = (): IntelEntry => ({
+  ...blankIntel(), tick: 60, venue: 'square', via: 'ada',
+  kind: 'presence', overheard: true, actor: 'bez',
+});
+
+const presenceReport = (tick: number, messageId: string, witness?: string): NetworkSpeechRecord => ({
+  kind: 'network-speech', tick, venue: 'backroom', speaker: 'ada', addressedTo: 'you',
+  messageId, cause: null, heardBy: [{ id: 'you', addressed: true }],
+  spoken: {
+    kind: 'field-report', onwardTo: null,
+    items: [{ factRefs: [], observation: {
+      kind: 'presence', observedAt: 60, venue: 'square', actor: 'bez',
+      ...(witness === undefined ? {} : { witness }),
+    } }],
+  },
+});
+
+describe('a witnessed presence report never dates an ordinary presence row (R32)', () => {
+  it('with only the witness-free report, the board row dates to that report', () => {
+    const value = world();
+    value.intel.log.push(boardPresence());
+    value.chronicle.push(presenceReport(200, 'm2'));
+    expect(counterKnowledge(value)).toEqual([
+      { entryIndex: 0, learnedAt: 200, messageId: 'm2', timing: 'report' },
+    ]);
+  });
+
+  it('an earlier witnessed (night-visit) report cannot backdate the ordinary row', () => {
+    const value = world();
+    value.intel.log.push(boardPresence());
+    value.chronicle.push(presenceReport(100, 'm1', 'cyd'), presenceReport(200, 'm2'));
+    expect(counterKnowledge(value)).toEqual([
+      { entryIndex: 0, learnedAt: 200, messageId: 'm2', timing: 'report' },
+    ]);
+  });
+
+  it('a witnessed item corresponds to a scene-presence row, which this fold does not date', () => {
+    const value = world();
+    value.intel.log.push({ ...boardPresence(), kind: 'scene-presence' });
+    value.chronicle.push(presenceReport(100, 'm1', 'cyd'));
+    expect(counterKnowledge(value)).toEqual([]);
+  });
+});
