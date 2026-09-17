@@ -282,9 +282,16 @@ original report links, gate reconstruction and retained artifact paths.
    plus eight additions and all earlier reviewed bodies. After actual5A2
    reconciliation, install the
    complete model in five serial chunks with the scoped and accumulated gates,
-   then obtain separate installed-code review. No debrief model is installed yet.
+   then obtain separate installed-code review. Done: the complete model is
+   installed through `875daba` and independently approved 0C/0I/1M
+   (../review/2026-09-17-task-5b-code-approval.md); the Minor is carried as
+   bounded correction R32 (witnessed presence receipt).
 7. **Task 6 + Task 7B debrief UI:** terminal-only props-fed panels, existing panel
    import fence firing proof, running-world non-reachability, remaining terms/slots.
+   The 654-case contrast correction is independently approved 0C/0I/4M
+   (../review/2026-09-17-ui-contrast-correction-approval.md). Install the 18 targets
+   byte-exact in units 7b-registry, 6a-panels, 6b-gate with scoped and accumulated
+   gates, then installed-code review and the interactive browser gate.
 8. **Task 8 integration/closeout:** legal two-council forger route; real interrogation
    mirror; terminal report-divergence lesson; final full-plan independent review.
    Stage vehicles and measure reachability; never modify quorum/physics to fit the

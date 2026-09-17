@@ -1,6 +1,17 @@
-# Hearsay — resumed, 13 September 2026
+# Hearsay — resumed, 17 September 2026
 
-[Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+[Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+
+Latest, 17 September: the complete Task5B debrief model is installed through `875daba`
+(five serial byte-exact commits over docs-only 5e84e08) and independently Approved
+0C/0I/1M; root and reviewer pass 2,399 tests/143 files, all six gates and the equal
+10-block comparison. The Minor (witnessed presence receipt backdating an ordinary row)
+is bounded correction R32. The UI contrast correction is independently Approved 0C/0I/4M
+with the Important defect closed inside the desk; the live evidence board's 2.46:1 cell is
+a carried post-plan item. Next: install the 18 UI targets in three units, R18 proposal
+review and install, R32, Task8 forger route and canary, final whole-branch review. No
+push. Codex reviewers are quota-blocked until 20 September; reviews sit on native Claude
+workers.
 
 Ellie clarified on 13 September that the 6 September stop was “just for that one
 session”. Continue implementation according to the current plan, applying

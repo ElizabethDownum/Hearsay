@@ -1,6 +1,20 @@
-# Current review — 13 September 2026
+# Current review — 17 September 2026
 
-[Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+[Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+
+**17 September.** The complete Task5B debrief model is installed in five serial
+commits through `875daba` (25 new files, no existing file changed) and independently
+**Approved, 0 Critical / 0 Important / 1 Minor**. Root and reviewer each pass 2,399
+tests/143 files and all six gates; the 10-block/230-line comparison equals approved
+5A2 with four controls. The Minor is a witnessed presence receipt that can backdate an
+ordinary presence row (terminal reader only, no engine route shown); it is carried as
+bounded correction R32. The 654-case UI contrast correction is independently
+**Approved, 0/0/4 Minor**: the reviewed Important contrast defect closes at 14.35:1
+light / 12.27:1 dark inside the desk, markup byte-identical, all 649 inherited cases
+preserved. The live evidence board's own changed-value cell keeps 2.46:1 light and is
+carried as a post-plan accessibility item. Installation of the 18 UI targets proceeds
+in three units, then R18, R32, Task8 and the final review. Codex reviews are reseated
+on native Claude workers until the provider quota resets on 20 September.
 
 **Implementation resumed.** Ellie clarified that the 6 September stop applied only
 to that session. Continue the plan and save non-blocking judgments/issues here for
