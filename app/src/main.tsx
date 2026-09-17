@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './theme.css';
+import { debriefView } from '../../src/sim/debrief/index';
+import { DebriefEnding } from './panels/DebriefEnding';
+import { resolveSlot, UI_GLYPHS } from './assets';
 
 // ── Composition root: engine VALUE imports are legal ONLY here and in loop/** (the composition-root
 // fence). Everything below the panels boundary receives props; nothing there reaches the engine. ──
@@ -89,25 +92,7 @@ function codexDetailView(log: readonly IntelEntry[], codex: { npc: string; trait
 const pad = (n: number) => String(n).padStart(2, '0');
 const fmtTick = (t: number) => `day ${dayOf(t)} · ${pad(Math.floor(minuteOfDay(t) / 60))}:${pad(minuteOfDay(t) % 60)}`;
 
-// ── Ending screens (won/lost-clock/lost-exposed/lost-caught). Debrief is Plan 9 — the card says so. ─
-const ENDINGS: Record<string, { cls: string; term: string; line: string }> = {
-  won: { cls: 'ending-won', term: 'denounce', line: 'The council turned on the usurper. You won.' },
-  'lost-clock': { cls: 'ending-clock', term: 'coronation', line: 'The clock ran out; the crown landed.' },
-  'lost-exposed': { cls: 'ending-lost', term: 'unmasking', line: 'The enemy sketch converged on your people.' },
-  'lost-caught': { cls: 'ending-lost', term: 'arrest', line: 'A guard heard you speak the words yourself.' },
-};
-function EndingScreen({ status }: { status: string }) {
-  const e = ENDINGS[status]!;
-  return (
-    <div className={`ending ${e.cls}`}>
-      <h1><Term id={e.term} /></h1>
-      <p>{e.line}</p>
-      <p className="desk-note">The full debrief is Plan 9 — for now, the campaign has resolved.</p>
-    </div>
-  );
-}
-
-function App() {
+export function App() {
   const sessionRef = useRef(newSession(SEED));
   const clockRef = useRef(makeClock());
   const tagId = useRef(0);
@@ -153,6 +138,8 @@ function App() {
   // field is never hijacked. select-venue/npc/assist/verb are pointer-driven, absent from the map.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Terminal controls own their native activation keys; live shortcuts are inactive.
+      if (sessionRef.current.world.scenario && sessionRef.current.world.scenario.status !== 'running') return;
       const el = e.target as HTMLElement;
       if (el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return;
       const a = KEYMAP[e.key];
@@ -208,7 +195,20 @@ function App() {
   };
 
   const status = world.scenario?.status;
-  if (status && status !== 'running') return <EndingScreen status={status} />;
+  if (status && status !== 'running') {
+    // The sole hidden-model composition point. Nothing is folded or passed to live panels.
+    const debrief = debriefView(world);
+    if (debrief === null) throw new Error('Terminal debrief unavailable');
+    return <DebriefEnding view={debrief} names={claimNames(world)} art={{
+      paper: resolveSlot('texture.paper.debrief'),
+      icons: {
+        letter: { resolved: resolveSlot('icon.ui.letter'), fallback: UI_GLYPHS.letter! },
+        'forgery-quill': { resolved: resolveSlot('icon.ui.forgery-quill'), fallback: UI_GLYPHS['forgery-quill']! },
+        scrying: { resolved: resolveSlot('icon.ui.scrying'), fallback: UI_GLYPHS.scrying! },
+        seance: { resolved: resolveSlot('icon.ui.seance'), fallback: UI_GLYPHS.seance! },
+      },
+    }} />;
+  }
 
   // ── View models: every surface below is a pure fold the composition root computes ──
   const view = playerView(world);
