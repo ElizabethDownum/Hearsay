@@ -39,3 +39,6 @@ export type { RecruitmentHistoryRow } from '../../src/sim/network/recruitment';
 export type { NetworkIntelEntry } from '../../src/intel/entry';
 export type { InjectSpec } from '../../src/sim/actions';
 export type { LocalOffer, LocalActionIntent, NonLocalActionIntent } from './loop/session';
+
+// Task 6 terminal props; erased types only, covered by the existing barrel scan.
+export type { DebriefView } from '../../src/sim/debrief/index';
