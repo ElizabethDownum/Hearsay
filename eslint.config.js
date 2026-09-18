@@ -1,7 +1,8 @@
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['node_modules', 'dist', 'coverage'] },
+  // R35: `.superpowers` holds review evidence (reviewer `.mjs` probes etc.), never shipped code.
+  { ignores: ['node_modules', 'dist', 'coverage', '.superpowers'] },
   ...tseslint.configs.recommended,
   {
     files: [
