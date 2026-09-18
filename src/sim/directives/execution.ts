@@ -35,6 +35,31 @@ const priorityRank = { urgent: 2, important: 4, routine: 6 } as const;
  */
 const WATCH_ORDER_DAYS = 8;
 
+function watchInstalledFor(
+  world: WorldState,
+  record: DirectiveRecord,
+  application: Extract<DirectiveApplication, { kind: 'enemy-watch' }>,
+  tick: Tick,
+): boolean {
+  if (record.execution === null) return false;
+  const day = dayOf(tick);
+  const minute = tick % TICKS_PER_DAY;
+  const sourceRef = `order:watch:${application.district}:${record.recipient}`;
+  const effectiveStartDay = Math.max(application.startDay, dayOf(record.execution.changedAt));
+  return (world.scheduleOverrides[record.recipient] ?? []).some((row) =>
+    row.source === 'enemy'
+    && row.sourceRef === sourceRef
+    && row.fromDay === effectiveStartDay
+    && row.toDay === application.startDay + WATCH_ORDER_DAYS
+    && row.from === 960
+    && row.to === 1140
+    && row.venue === application.post.venue
+    && day >= row.fromDay
+    && day < row.toDay
+    && minute >= row.from
+    && minute < row.to);
+}
+
 function knownFactions(world: WorldState, npc: Npc): Record<EntityId, Npc['faction']> {
   const result: Record<EntityId, Npc['faction']> = { [npc.id]: npc.faction };
   for (const rival of npc.rivals) {
@@ -867,6 +892,7 @@ export function settleDirectiveApplications(world: WorldState, tick: Tick, rules
       && record.execution.state === 'attempted'
       && record.execution.changedAt < tick
       && tick % CONVERSATION_BEAT === 0
+      && watchInstalledFor(world, record, application, tick)
       && dayOf(tick) >= application.startDay
       && dayOf(tick) < application.startDay + WATCH_ORDER_DAYS
       && tick % TICKS_PER_DAY >= 960 && tick % TICKS_PER_DAY < 1140

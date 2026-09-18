@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { STANDARD_RULES as RULES } from '../../src/content/rules';
 import { applyEnemyDecision } from '../../src/sim/counterintel';
-import { settleDirectiveApplications } from '../../src/sim/directives/execution';
+import {
+  attemptDirective, markDirectiveDue, settleDirectiveApplications,
+} from '../../src/sim/directives/execution';
 import { realizeNetworkForward } from '../../src/sim/directives/transport';
 import { runUntil } from '../../src/sim/step';
 import { buildWorld } from '../../src/sim/world';
@@ -38,12 +40,18 @@ describe('a watch completion belongs to an attempted watch', () => {
 
   it('still records an attempted watch when the guard physically occupies the post', () => {
     const { world, record } = fixture();
-    record.execution = { state: 'attempted', changedAt: 2385, dueAt: null, waiting: null, workedDays: [] };
-    settleDirectiveApplications(world, 2400, RULES);
+    const due = record.decision!.timing.actAt!;
+    world.tick = due;
+    markDirectiveDue(world, record.id, due);
+    attemptDirective(world, record.id, { venue: 'square', members: ['ada', 'bez'] }, due, RULES);
+    world.tick = due + 15;
+    settleDirectiveApplications(world, world.tick, RULES);
+    if (record.execution === null) throw new Error('watch fixture');
     expect(record.execution.workedDays).toEqual([1]);
     const reports = world.network.directiveState!.messages.filter((row) => row.payload.kind === 'directive-report');
     expect(reports).toHaveLength(1);
-    settleDirectiveApplications(world, 2415, RULES);
+    world.tick = due + 30;
+    settleDirectiveApplications(world, world.tick, RULES);
     expect(world.network.directiveState!.messages.filter((row) => row.payload.kind === 'directive-report')).toHaveLength(1);
   });
 
