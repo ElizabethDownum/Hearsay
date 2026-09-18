@@ -1,6 +1,16 @@
 # Current review — 17 September 2026
 
-[Task6/7B + R32–R35 code approval](2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+[R18 code approval](2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+
+**17 September, night.** R18 is installed at `01c043c` and independently **Approved**
+at both stages: proposal 0 Critical / 0 Important / 4 Minor, installed code 0 / 0 / 1. The
+change is one pure helper and one added conjunct in `src/sim/directives/execution.ts` plus a
+four-case identity test and a real-path R17 precondition; RED/GREEN lineage reproduced by
+both reviewers. Root and reviewer each pass 2,480 tests/148 files and all six gates; the
+comparison equals cd0d441. Minors (R17 tick shift, same-start-day value identity shown
+planner-unreachable, frozen `changedAt`, validation-only config kept out, raw-hash capture
+legibility) are recorded in the approval, none charged. Browser gate, Task8 and the final
+whole-branch review follow.
 
 **17 September, later.** The 18 Task6/7B UI targets are installed in three commits
 (d20eba9, 59cd261, d68efad) and, with R32, R33, R34 and R35, independently **Approved,

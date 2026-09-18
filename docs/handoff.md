@@ -1,6 +1,17 @@
 # Hearsay — resumed, 17 September 2026
 
-[Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+[R18 code approval](review/2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+
+Latest, 17 September (night): the R18 watch-cancellation correction is installed at
+`01c043c` and independently **Approved** twice — the proposal (0C/0I/4M) and the installed
+code (0C/0I/1M). One pure predicate ANDed onto the attempted-watch guards: a watch accrues a
+night only while its own installed schedule row is still present, so cancellation cannot
+re-latch and a later same-guard/district watch supersedes the original. Root installed from
+the approved patch with RED (2 failed / 6 passed) then GREEN; root and reviewer each pass
+2,480 tests/148 files and all six gates, and the certified comparison equals the cd0d441
+baselines. The five Minors are recorded in the approval and carried. Next: the interactive
+browser gate (brief `.superpowers/sdd/task-6-7b-browser-gate-brief-2026-09-17.md`), Task8
+forger probe runner 006, final whole-branch review. No push; origin/main 2436a36.
 
 Latest, 17 September (later): all 18 Task6/7B UI targets are installed (d20eba9, 59cd261,
 d68efad), R32 (8f9b728), R34 (1ae3362) and R35 (cd0d441) are committed, and the installed
