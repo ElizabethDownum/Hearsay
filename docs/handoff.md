@@ -1,6 +1,18 @@
 # Hearsay — resumed, 17 September 2026
 
-[Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+[Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+
+Latest, 17 September (later): all 18 Task6/7B UI targets are installed (d20eba9, 59cd261,
+d68efad), R32 (8f9b728), R34 (1ae3362) and R35 (cd0d441) are committed, and the installed
+code plus all four corrections are independently **Approved 0C/0I/4M** at `cd0d441`. Root
+and reviewer each pass 2,476 tests/147 files, lint, both compilers and build; root's soak,
+Monte Carlo and certified comparison equal the approved 5B baseline (10 blocks/230 lines).
+R34 exempts exactly the five debrief panels from exactly the three terminal-payload prongs
+in the view law test; R35 excludes `.superpowers/**` from vitest and eslint. The R18
+watch-cancellation proposal review is dispatched on a native Claude worker under the
+refreshed brief (`.superpowers/sdd/r18-watch-correction-review-brief-2026-09-17b.md`,
+patch re-checked clean at cd0d441). Next: R18 install, browser gate, Task8, final review.
+No push; origin/main 2436a36. No local model this session (GPU in use).
 
 Latest, 17 September: the complete Task5B debrief model is installed through `875daba`
 (five serial byte-exact commits over docs-only 5e84e08) and independently Approved

@@ -1,6 +1,14 @@
 # Current review — 17 September 2026
 
-[Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+[Task6/7B + R32–R35 code approval](2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+
+**17 September, later.** The 18 Task6/7B UI targets are installed in three commits
+(d20eba9, 59cd261, d68efad) and, with R32, R33, R34 and R35, independently **Approved,
+0 Critical / 0 Important / 4 Minor** at `cd0d441`. Root and reviewer each pass 2,476
+tests/147 files and all six gates; the certified comparison equals approved 5B. The four
+Minors are recorded in the approval (union-level R34 exemption, an ID-fallback coverage gap,
+an unmemoized terminal fold, and a Plan10 asset-slot caveat); none is charged. R18 proposal
+review is in progress; browser gate, Task8 and the final whole-branch review follow.
 
 **17 September.** The complete Task5B debrief model is installed in five serial
 commits through `875daba` (25 new files, no existing file changed) and independently
