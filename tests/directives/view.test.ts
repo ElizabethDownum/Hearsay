@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import ts from 'typescript';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { buildWorld, enrollPlayer } from '../../src/sim/world';
@@ -781,6 +781,45 @@ function walk(dir: string): string[] {
 describe('hidden-name source scan — no app surface reaches behind its selectors', () => {
   const appFiles = walk(join(repoRoot, 'app/src')).filter((f) => /\.tsx?$/.test(f));
 
+  // R34 — the terminal-panel exemption. The five debrief panels are props-fed from the TERMINAL
+  // payload (src/sim/debrief), which names retained truth BY DESIGN: once a scenario is over, the
+  // debrief shows the enemy's sketch, the packet history and the retained beliefs. Three payload
+  // fields therefore collide with three hidden-name prongs, and for those five files ONLY those
+  // three prongs are relaxed. Every other prong — world/session aliases, the raw roster, the
+  // substrate, outcomes, decision, execution… — still applies to the panels, the exempt set is
+  // pinned by name so a sixth file cannot ride in, and the relaxation is proven non-vacuous below.
+  // The RUNTIME guarantee that a running panel never receives terminal truth is
+  // tests/app/debrief-gate.test.tsx; this scan only concedes what the payload contract names.
+  const TERMINAL_DEBRIEF_PANELS = [
+    'DebriefEnding.tsx', 'DebriefOverlay.tsx', 'DebriefReading.tsx', 'DebriefThreads.tsx', 'DebriefTimeline.tsx',
+  ];
+  const TERMINAL_PAYLOAD_PRONGS = new Set(['sketch', 'the message queue', 'beliefs']);
+  const isTerminalPanel = (file: string): boolean => {
+    const rel = file.replace(/\\/g, '/');
+    return TERMINAL_DEBRIEF_PANELS.some((name) => rel.endsWith(`app/src/panels/${name}`));
+  };
+  const liveAppFiles = appFiles.filter((f) => !isTerminalPanel(f));
+  const terminalPanels = appFiles.filter(isTerminalPanel);
+
+  it('R34: the terminal-panel exemption is exactly five files and exactly the three payload prongs', () => {
+    expect(terminalPanels.map((f) => basename(f)).sort()).toEqual([...TERMINAL_DEBRIEF_PANELS].sort());
+    expect(liveAppFiles.length + terminalPanels.length).toBe(appFiles.length);
+    const relaxed = new Set<string>();
+    for (const file of terminalPanels) {
+      const facts = factsFor(file);
+      for (const prong of FORBIDDEN_IN_APP) {
+        if (!prong.reports(facts)) continue;
+        expect(TERMINAL_PAYLOAD_PRONGS.has(prong.label),
+          `${basename(file)} names ${prong.label} — not a terminal payload field`).toBe(true);
+        relaxed.add(prong.label);
+      }
+      expect(facts.names.has('world'), `${basename(file)} names world`).toBe(false);
+      expect(facts.names.has('session'), `${basename(file)} names session`).toBe(false);
+    }
+    // Non-vacuous: the exemption is exercised, and by exactly the payload set — no more, no less.
+    expect([...relaxed].sort()).toEqual([...TERMINAL_PAYLOAD_PRONGS].sort());
+  });
+
   it('enumerates a real app surface including the new directive desk', () => {
     const rel = appFiles.map((f) => f.replace(/\\/g, '/'));
     expect(rel.some((f) => f.endsWith('app/src/panels/Directives.tsx'))).toBe(true);
@@ -796,7 +835,7 @@ describe('hidden-name source scan — no app surface reaches behind its selector
   });
 
   it.each(FORBIDDEN_IN_APP)('no app file names $label', ({ label, reports }) => {
-    for (const file of appFiles) {
+    for (const file of liveAppFiles) {
       expect(reports(factsFor(file)), `${file.replace(/\\/g, '/')} names ${label}`).toBe(false);
     }
   });
