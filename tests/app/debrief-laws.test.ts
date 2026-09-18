@@ -156,6 +156,15 @@ describe('terminal changed words and exact values retain actual theme contrast',
     const ratio = actualContrast(theme, surface);
     expect(ratio, theme+' '+surface+' actual contrast ratio '+ratio).toBeGreaterThanOrEqual(4.5);
   });
+  it('the narrow-viewport comparison table scrolls instead of breaking words mid-character', () => {
+    const source = read('app/src/theme.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    const narrow = /@media \(max-width: 600px\) \{(.*)\}/.exec(source)?.[1];
+    if (narrow === undefined) throw new Error('Actual narrow-viewport block missing');
+    expect(contrastDeclarations(contrastRules(source), ['.debrief-card'])['overflow-wrap']).toBe('anywhere');
+    const rules = contrastRules(narrow);
+    expect(contrastDeclarations(rules, ['.debrief-card .board-table'])).toMatchObject({ display: 'block', 'overflow-x': 'auto' });
+    for (const cell of ['th', 'td']) expect(contrastDeclarations(rules, ['.debrief-card .board-table '+cell])['overflow-wrap']).toBe('normal');
+  });
   it('the shared live-panel changed-value primitive keeps its original color treatment', () => {
     const shared = contrastDeclarations(contrastRules(read('app/src/theme.css')), ['.diff-cell']);
     expect(shared).toMatchObject({ 'background-color': 'var(--gilt)', color: 'var(--paper)', 'font-weight': '600' });

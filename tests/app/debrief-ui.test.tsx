@@ -35,10 +35,11 @@ const fixture = () => { const { world, claimId } = terminalStory(); const view =
   return { world, view, claimId, names: claimNames(world) }; };
 const html = (node: ReactNode) => renderToStaticMarkup(node);
 type Props = { children?: ReactNode; role?: string; id?: string; onClick?: () => void;
-  onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void; 'aria-selected'?: boolean; tabIndex?: number };
+  onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void; 'aria-selected'?: boolean; tabIndex?: number; autoFocus?: boolean };
 function elements(node: ReactNode): ReactElement<Props>[] {
   return Children.toArray(node).flatMap((child) => isValidElement<Props>(child) ? [child, ...elements(child.props.children)] : []);
 }
+const focusTargets = (tree: ReactNode) => elements(tree).filter((node) => node.props.autoFocus).map((node) => node.props.id ?? node.type);
 function control(view: DebriefView, names: Record<string, string>) {
   navigation.ready = false;
   return () => { navigation.active = true; try { return DebriefEnding({ view, names, art }); } finally { navigation.active = false; } };
@@ -73,8 +74,10 @@ describe('one real terminal campaign is readable across all three surfaces', () 
   it('the actual open and tab handlers expose each surface, preserve selection and close without a world mutation', () => {
     const { world, view, names } = fixture(); const before = hashWorld(world); const render = control(view, names);
     let tree = render(); expect(html(tree)).toContain('Open the'); expect(html(tree)).not.toContain('role="tabpanel"');
+    expect(focusTargets(tree)).toEqual([]); expect(html(tree)).not.toContain('autofocus'); // The first terminal render steals no focus.
     elements(tree).find((node) => node.type === 'button')!.props.onClick!(); tree = render();
     expect(html(tree)).toContain('what can happen, not what will happen');
+    expect(focusTargets(tree)).toEqual(['debrief-tab-threads']); // Opening moves focus into the desk at the selected tab, nowhere else.
     for (const key of ['timeline', 'overlay', 'threads']) {
       elements(tree).find((node) => node.props.id === 'debrief-tab-'+key)!.props.onClick!(); tree = render();
       expect(html(tree)).toContain('id="debrief-panel-'+key+'"');
@@ -85,8 +88,10 @@ describe('one real terminal campaign is readable across all three surfaces', () 
       expect(tablist.match(/tabindex="0"/g)).toHaveLength(1);
       expect(tablist).not.toContain('<span'); // No nested focusable tooltip defeats the roving tab stop.
     }
-    elements(tree).find((node) => node.type === 'button' && node.props.role !== 'tab')!.props.onClick!();
-    expect(html(render())).toContain('Open the'); expect(hashWorld(world)).toBe(before);
+    elements(tree).find((node) => node.type === 'button' && node.props.role !== 'tab')!.props.onClick!(); tree = render();
+    expect(html(tree)).toContain('Open the'); expect(hashWorld(world)).toBe(before);
+    expect(focusTargets(tree)).toEqual(['button']); // Back returns focus to the opening control.
+    expect(html(tree)).toMatch(/<button class="desk-btn" title="[^"]*" autofocus="">Open the/);
   });
 
   it('arrow, Home, End and Escape handlers provide real roving-tab actions with explicit accessible targets', () => {
@@ -106,8 +111,9 @@ describe('one real terminal campaign is readable across all three surfaces', () 
     key('Home', 'overlay'); expect(html(tree)).toContain('id="debrief-panel-threads"');
     key('ArrowLeft', 'threads'); expect(html(tree)).toContain('id="debrief-panel-overlay"');
     const event = { key: 'Escape', preventDefault: vi.fn(), stopPropagation: vi.fn() } as unknown as KeyboardEvent<HTMLButtonElement>;
-    elements(tree).find((node) => node.type === 'main')!.props.onKeyDown!(event);
-    expect(html(render())).toContain('Open the'); expect(event.stopPropagation).toHaveBeenCalledOnce();
+    elements(tree).find((node) => node.type === 'main')!.props.onKeyDown!(event); tree = render();
+    expect(html(tree)).toContain('Open the'); expect(event.stopPropagation).toHaveBeenCalledOnce();
+    expect(focusTargets(tree)).toEqual(['button']); // Escape also returns focus to the opening control.
   });
 });
 

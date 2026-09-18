@@ -17,16 +17,21 @@ const TABS = [{ key: 'threads', term: 'thread', label: 'Threads' },
   { key: 'timeline', term: 'timeline', label: 'Sketch timeline' },
   { key: 'overlay', term: 'overlay', label: 'Overlay' }] as const;
 type Tab = typeof TABS[number]['key'];
-type Navigation = { open: boolean; tab: Tab };
+/** `visited` records that the desk has been opened, so the ending card returns focus to its control
+ *  only after a close, never on the campaign's first terminal render. */
+type Navigation = { open: boolean; tab: Tab; visited: boolean };
 type NavigationAction = { kind: 'open' | 'close' } | { kind: 'tab'; tab: Tab };
 const navigate = (state: Navigation, action: NavigationAction): Navigation => action.kind === 'tab'
-  ? { open: true, tab: action.tab } : { ...state, open: action.kind === 'open' };
+  ? { open: true, tab: action.tab, visited: true }
+  : { ...state, open: action.kind === 'open', visited: state.visited || action.kind === 'open' };
 
-/** Props-only terminal flow: navigation changes presentation, never the session or its action log. */
+/** Props-only terminal flow: navigation changes presentation, never the session or its action log.
+ *  Focus follows each view replacement through mount-time `autoFocus`: opening lands on the selected
+ *  tab (the roving stop of the tablist), and Back or Escape lands on the control that opened the desk. */
 export function DebriefEnding({ view, names, art }: {
   view: DebriefView; names: Readonly<Record<string, string>>; art: DebriefArt;
 }) {
-  const [navigation, dispatch] = useReducer(navigate, { open: false, tab: 'threads' });
+  const [navigation, dispatch] = useReducer(navigate, { open: false, tab: 'threads', visited: false });
   const ending = ENDINGS[view.ending.status];
   const line = view.ending.resolutionState === 'consistent' ? ending.line
     : 'The campaign ended with this recorded status. Its cause is not proved by the retained history.';
@@ -41,7 +46,7 @@ export function DebriefEnding({ view, names, art }: {
   if (!navigation.open) return <div className={`ending ${ending.cls}`}>
     <h1><Term id={ending.term} /></h1><p>{line}</p>
     {view.ending.resolutionState !== 'consistent' && <p>Ending details are {view.ending.resolutionState}; the retained status is shown.</p>}
-    <button className="desk-btn" title={TERMS['terminal-debrief']!.short} onClick={() => dispatch({ kind: 'open' })}>
+    <button className="desk-btn" title={TERMS['terminal-debrief']!.short} autoFocus={navigation.visited} onClick={() => dispatch({ kind: 'open' })}>
       Open the {TERMS['terminal-debrief']!.label.toLowerCase()}</button>
   </div>;
   const paper: CSSProperties = art.paper.kind === 'fallback' ? {} : {
@@ -57,7 +62,7 @@ export function DebriefEnding({ view, names, art }: {
     <div className="tag-row" role="tablist" aria-label="Debrief surfaces">{TABS.map((tab, index) => <button
       key={tab.key} className="desk-btn" role="tab" id={`debrief-tab-${tab.key}`} aria-controls={`debrief-panel-${tab.key}`}
       aria-selected={navigation.tab === tab.key} tabIndex={navigation.tab === tab.key ? 0 : -1}
-      title={TERMS[tab.term]!.short}
+      autoFocus={navigation.tab === tab.key} title={TERMS[tab.term]!.short}
       onClick={() => dispatch({ kind: 'tab', tab: tab.key })} onKeyDown={(event) => moveTab(event, index)}>
       {tab.label}</button>)}</div>
     <div role="tabpanel" tabIndex={0} id={`debrief-panel-${navigation.tab}`} aria-labelledby={`debrief-tab-${navigation.tab}`}>

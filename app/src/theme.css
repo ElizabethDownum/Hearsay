@@ -321,4 +321,4 @@ hr {
 .debrief-desk :focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .debrief-icon { display: inline-block; margin-right: 6px; }
 .debrief-icon img { max-width: 1.25em; max-height: 1.25em; vertical-align: middle; }
-@media (max-width: 600px) { .debrief-desk { padding: 12px; } .debrief-card { padding: 8px; } .debrief-card .board-table { display: block; overflow-x: auto; } }
+@media (max-width: 600px) { .debrief-desk { padding: 12px; } .debrief-card { padding: 8px; } .debrief-card .board-table { display: block; overflow-x: auto; } .debrief-card .board-table th, .debrief-card .board-table td { overflow-wrap: normal; } }
