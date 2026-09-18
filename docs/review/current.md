@@ -1,6 +1,17 @@
-# Current review — 17 September 2026
+# Current review — 18 September 2026
 
-[R18 code approval](2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+[Browser gate approval + R36/R37](2026-09-18-browser-gate-approval.md). [R18 code approval](2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+
+**18 September, small hours.** The interactive browser gate is **closed as PASS**. Measured at
+`01c043c`: every enumerated relation conforms and the carried contrast Minor is discharged on the
+rendered desk (14.35 / 12.27). One material defect beyond the criteria, focus lost to `<body>` on
+every open/close transition, is fixed as R36 together with R37 for the narrow comparison table,
+installed at `f18afd3` (RED 3 failed / 23 passed, then GREEN; 2,481 tests/148 files; six gates;
+comparison equal). Independent review **Approved 0 / 0 / 3** (test hygiene only) and the browser
+re-measurement at `f18afd3` passes in all four viewport × theme combinations with a positive
+control reproducing the old table defect. Observations F3–F6 (fixture coverage of overlay status
+and icon glyphs, favicon 404, terminal Space guard) are recorded and carried. Task 8 runner 006
+passed 3/3. Task 8 authoring and the final whole-branch review follow.
 
 **17 September, night.** R18 is installed at `01c043c` and independently **Approved**
 at both stages: proposal 0 Critical / 0 Important / 4 Minor, installed code 0 / 0 / 1. The

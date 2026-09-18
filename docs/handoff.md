@@ -1,6 +1,19 @@
-# Hearsay — resumed, 17 September 2026
+# Hearsay — resumed, 18 September 2026
 
-[R18 code approval](review/2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+[Browser gate approval + R36/R37](review/2026-09-18-browser-gate-approval.md). [R18 code approval](review/2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+
+Latest, 18 September (small hours): the interactive browser gate is **closed as PASS**. The
+gate measured the installed debrief UI at `01c043c` over CDP (both viewports, both themes and the
+automatic path, real keyboard and pointer events) and discharged the carried contrast Minor by
+measurement (14.35 light / 12.27 dark inside the composed desk). It found one material defect:
+focus dropped to `<body>` on open, Back and Escape. Root fixed it as R36 (mount-time focus on the
+selected tab, return to the opening control) with R37 (the ≤600px comparison table now scrolls
+instead of breaking words), installed at `f18afd3` with RED then GREEN, 2,481 tests/148 files and
+all six gates, comparison equal to `01c043c`. An independent reviewer **Approved** the code
+(0C/0I/3M, test-side only) and re-measured the browser at `f18afd3`: both defects gone in every
+combination, with a positive control. Task 8 runner 006 passed 3/3 on the frozen probe host. Next:
+Task 8 authoring (forger arc + canary lesson), final whole-branch review. No push; origin/main
+2436a36.
 
 Latest, 17 September (night): the R18 watch-cancellation correction is installed at
 `01c043c` and independently **Approved** twice — the proposal (0C/0I/4M) and the installed
