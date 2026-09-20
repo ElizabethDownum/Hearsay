@@ -501,7 +501,11 @@ function startApplication(
     }
     case 'rendezvous': {
       const scheduledFrom = profile.timing.actAt ?? tick;
-      const scheduledUntil = scheduledFrom + CONVERSATION_BEAT;
+      // Two beats, never one (R38). This application runs DURING tick `scheduledFrom`, after that
+      // tick's frame froze, so the override below first moves the asset at `scheduledFrom + 1`. The
+      // player's verbs validate against the frozen frame on a beat, and the first beat whose frame
+      // can hold the asset is the second one. Attendance still latches live at the first.
+      const scheduledUntil = scheduledFrom + 2 * CONVERSATION_BEAT;
       const invitation = appendInvitation(world, {
         kind: 'rendezvous', principal: record.principal, inviter: record.principalId,
         counterparty: record.recipient, invitee: record.recipient, venue: application.venue,

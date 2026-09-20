@@ -62,7 +62,7 @@ function makeAsset(w: WorldState, id: EntityId, mice: 'money' | 'ideology' | nul
   w.npcs[id]!.edges.push({ to: 'you', kind: 'friend', trust });
 }
 
-const BEAT = CONVERSATION_BEAT; // 15 — the meet's one-beat pull lands exactly here from tick 0
+const BEAT = CONVERSATION_BEAT; // 15 — the first beat after tick 0; `stageSafehouse` places the asset here directly
 
 /** Debrief-focused setup: place the asset for one real safehouse beat without exercising meet. */
 function stageSafehouse(w: WorldState, asset: EntityId, tick: number): void {

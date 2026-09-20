@@ -115,7 +115,7 @@ export interface CourierAction {
 export interface MeetAction {
   tick: Tick;
   kind: 'meet';
-  /** One of YOUR assets — pulled to the safehouse for the next beat (a private 2-person circle). */
+  /** One of YOUR assets — pulled to the safehouse from the next beat, for two (a private 2-person circle). */
   asset: EntityId;
 }
 

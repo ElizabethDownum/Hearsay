@@ -3,7 +3,7 @@ import { buildWorld, enrollPlayer } from '../../src/sim/world';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { STANDARD_ECONOMY } from '../../src/content/economy';
 import {
-  applyGoTo, applyHost, applyMeet, applyTell, type InjectSpec,
+  applyGoTo, applyHost, applyInject, applyMeet, applyTell, type InjectSpec,
 } from '../../src/sim/actions';
 import { applyAction, runLogOn, type Action } from '../../src/sim/campaign';
 import { circlesAt, positionOf } from '../../src/sim/agents';
@@ -80,8 +80,8 @@ function stageOfferedCircle(w: WorldState, tick: number, members: readonly Entit
 // ─────────────────────────────────────────────────────────────────────────────
 // Rung 3 — the safehouse meet
 // ─────────────────────────────────────────────────────────────────────────────
-describe('meet — pull one asset to the safehouse for the next beat (rung 3)', () => {
-  it('queues locally, then writes the one-beat sourced override and fact only at actual attendance', () => {
+describe('meet — pull one asset to the safehouse from the next beat (rung 3)', () => {
+  it('queues locally, then writes the two-beat sourced override and fact only at actual attendance', () => {
     const w = world('meet-override', 'noble');
     makeAsset(w, 'ann');
     stageOfferedCircle(w, 0, ['ann']);
@@ -95,11 +95,13 @@ describe('meet — pull one asset to the safehouse for the next beat (rung 3)', 
 
     const own = w.scheduleOverrides['ann']!.filter((o) => o.source === 'player');
     expect(own).toHaveLength(1);
-    expect(own[0]!).toEqual({ fromDay: 0, toDay: 1, from: 15, to: 30, venue: 'safehouse',
+    expect(own[0]!).toEqual({ fromDay: 0, toDay: 1, from: 15, to: 45, venue: 'safehouse',
       source: 'player', sourceRef: `rendezvous:${directiveId}` });
-    // 15-aligned and exactly one beat long.
+    // 15-aligned and exactly two beats long (R38): the application installs the row DURING the tick of
+    // its first beat, after that tick's frame froze, so the second beat is the first one a player's
+    // frozen offer can see the asset in.
     expect(own[0]!.from % 15).toBe(0);
-    expect(own[0]!.to - own[0]!.from).toBe(15);
+    expect(own[0]!.to - own[0]!.from).toBe(30);
     // The visit is on the record — contact tracing's handle.
     expect(compartmentOf(w, 'player', 'ann')).toContainEqual({ tick: 15, kind: 'met-asset', ref: 'you' });
   });
@@ -113,16 +115,58 @@ describe('meet — pull one asset to the safehouse for the next beat (rung 3)', 
     applyMeet(w, 'ann', 0);
     step(w, RULES);
     applyGoTo(w, 'safehouse');
-    runUntil(w, 16, RULES);
 
-    // The meet beat (15): avatar (home = safehouse) + ann, and NOBODY else (private, no regulars).
-    const circle = circlesAt(w, 15).find((c) => c.members.includes('you'))!;
+    // Every question below is asked LIVE, with the world standing AT the tick it asks about (R38). An
+    // after-the-fact `circlesAt(w, 15)` from tick 16 reads the override table as it is THEN, and so
+    // reported a circle no frame at beat 15 ever contained.
+    runUntil(w, 15, RULES);
+    // The application beat (15), before it runs: the override does not exist yet — ann is still a regular.
+    expect(positionOf(w, w.npcs['ann']!, 15)).toBe('tavern');
+    expect(circlesAt(w, 15).find((c) => c.members.includes('you'))!.members).not.toContain('ann');
+
+    // The second beat (30): avatar (home = safehouse) + ann, and NOBODY else (private, no regulars).
+    runUntil(w, 30, RULES);
+    const circle = circlesAt(w, 30).find((c) => c.members.includes('you'))!;
     expect(circle.venue).toBe('safehouse');
     expect([...circle.members].sort()).toEqual(['ann', 'you']);
 
-    // The very next beat (30): the one-beat window is spent — ann is back at the tavern, off the avatar.
-    expect(positionOf(w, w.npcs['ann']!, 30)).toBe('tavern');
-    expect(circlesAt(w, 30).find((c) => c.members.includes('you'))!.members).not.toContain('ann');
+    // The beat after (45): the two-beat window is spent — ann is back at the tavern, off the avatar.
+    runUntil(w, 45, RULES);
+    expect(positionOf(w, w.npcs['ann']!, 45)).toBe('tavern');
+    expect(circlesAt(w, 45).find((c) => c.members.includes('you'))!.members).not.toContain('ann');
+  });
+
+  it('a meet makes a LIVE debrief possible through the real tick loop (R38)', () => {
+    const spec: InjectSpec = { subject: 'dot', predicate: 'stole', object: null, count: 3, severity: 3, place: null, attribution: SOMEONE };
+    const build = (): WorldState => {
+      const w = world('meet-debrief', 'noble');
+      makeAsset(w, 'ann');
+      applyInject(w, 'ann', spec); // something in her belief store to give up
+      stageOfferedCircle(w, 0, ['ann']);
+      return w;
+    };
+    const meetLog: Action[] = [
+      { tick: 0, kind: 'goTo', venue: 'tavern' },
+      { tick: 0, kind: 'meet', asset: 'ann' },
+      { tick: 1, kind: 'goTo', venue: 'safehouse' },
+    ];
+    // The debrief rides the same frozen offers a player's does: `runLogOn` validates it against the
+    // frame prepared for tick 30, never against a live or after-the-fact circle.
+    const w = runLogOn(build(), RULES, [...meetLog, { tick: 30, kind: 'debrief', asset: 'ann' }], 46);
+    const answers = w.intel.log.filter((row) => row.tick === 30 && row.via === 'ann' && row.mode === 'answer');
+    expect(answers).toHaveLength(1);
+    expect(answers[0]!.venue).toBe('safehouse');
+    expect(w.network.assets.find((a) => a.id === 'ann')!.strikes).toBe(1);
+    expect(compartmentOf(w, 'player', 'ann')).toContainEqual({ tick: 15, kind: 'met-asset', ref: 'you' });
+    expect(w.network.invitations!.find((row) => row.kind === 'rendezvous')!.status).toBe('attended');
+
+    // The window is still a window: by beat 45 she has gone, and the same verb refuses.
+    expect(() => runLogOn(build(), RULES, [...meetLog, { tick: 45, kind: 'debrief', asset: 'ann' }], 46))
+      .toThrow(/not with you at the safehouse this beat/);
+    // CONTROL: without the meet, the same debrief at the same beat refuses — the meet is what put her there.
+    expect(() => runLogOn(build(), RULES, [
+      { tick: 1, kind: 'goTo', venue: 'safehouse' }, { tick: 30, kind: 'debrief', asset: 'ann' },
+    ], 46)).toThrow(/not with you at the safehouse this beat/);
   });
 
   it('the meet override WINS over a standing player posting during its beat, and the posting resumes after', () => {
@@ -135,10 +179,11 @@ describe('meet — pull one asset to the safehouse for the next beat (rung 3)', 
     applyMeet(w, 'ann', 960); // plan the meet at 960 → next beat 975, inside the posting window
     step(w, RULES);
     applyGoTo(w, 'safehouse');
-    runUntil(w, 976, RULES);
-
-    expect(positionOf(w, w.npcs['ann']!, 975)).toBe('safehouse'); // the transient pull wins
-    expect(positionOf(w, w.npcs['ann']!, 990)).toBe('tavern');    // the posting resumes the next beat
+    // Asked live at each beat (R38), never after the fact.
+    runUntil(w, 990, RULES);
+    expect(positionOf(w, w.npcs['ann']!, 990)).toBe('safehouse'); // the transient pull wins
+    runUntil(w, 1005, RULES);
+    expect(positionOf(w, w.npcs['ann']!, 1005)).toBe('tavern');   // the posting resumes once the window is spent
   });
 
   it('refuses a non-asset and a headless world with zero residue', () => {
