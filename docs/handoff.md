@@ -1,6 +1,22 @@
 # Hearsay — resumed, 19 September 2026
 
-[R38 meet-window approval](review/2026-09-19-r38-meet-window-approval.md). [Plan 9 final review and certification](review/2026-09-19-plan-9-final-review.md). [Task 8 approval and install](review/2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](review/2026-09-18-browser-gate-approval.md). [R18 code approval](review/2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+[R39 rendezvous-carries approval](review/2026-09-20-r39-rendezvous-carries-approval.md). [R38 meet-window approval](review/2026-09-19-r38-meet-window-approval.md). [Plan 9 final review and certification](review/2026-09-19-plan-9-final-review.md). [Task 8 approval and install](review/2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](review/2026-09-18-browser-gate-approval.md). [R18 code approval](review/2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+
+Latest, 20 September: **the five defects R38 carried are fixed (R39), before Plan 10 as the
+owner asked.** Independently Approved at `7b6df80`. A sound-out or hosting meeting that ends at or
+crosses midnight now actually moves the guest (both schedule writers share one row builder). A
+preset `meet` no longer reports `refused` for a meeting that happened: the accepted rendezvous owns
+the record's ending, and the record settles the moment the two first stand in the room, so the
+report is handed over at the meeting (R39b, the first review's Important 1). `meet` refuses off the
+beat instead of silently never happening. Execution honours the rendezvous window the player
+authored. Spent rows leave the schedule when the invitation closes. 2,504 tests/150 files, all
+gates, comparison equal; two parallel full-suite runs timed out in unrelated tests while a game
+held the CPU, and the suite passes serially (all attempts retained and disclosed). **One decision
+is open for the owner:** a composed rendezvous window has no upper bound, so the planner's two
+number fields can pin an asset for weeks; root recommends a cap at issue as its own small unit.
+Root also corrected its own false claim, caught by the re-review, that postings already allow
+this. Pushed state: origin/main `0747460`; R39 and these docs are local, no push without the
+owner's word. Next: that decision, then Plan 10.
 
 Latest, 19 September (night): **`meet` now enables `debrief` (R38).** The one defect Plan 9's
 final review carried is fixed and independently Approved at `83d91e8`. A rendezvous holds the asset

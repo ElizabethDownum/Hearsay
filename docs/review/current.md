@@ -1,6 +1,18 @@
 # Current review — 19 September 2026
 
-[R38 meet-window approval](2026-09-19-r38-meet-window-approval.md). [Plan 9 final review and certification](2026-09-19-plan-9-final-review.md). [Task 8 approval and install](2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](2026-09-18-browser-gate-approval.md). [R18 code approval](2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+[R39 rendezvous-carries approval](2026-09-20-r39-rendezvous-carries-approval.md). [R38 meet-window approval](2026-09-19-r38-meet-window-approval.md). [Plan 9 final review and certification](2026-09-19-plan-9-final-review.md). [Task 8 approval and install](2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](2026-09-18-browser-gate-approval.md). [R18 code approval](2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+
+**20 September: R39, the five defects R38 carried are fixed before Plan 10.** Installed at
+`dbca0e1` + `7b6df80`, independently **Approved** (0 / 1 carried / 11). Sound-out and hosting
+meetings that end at or cross midnight now move the guest (one shared row builder); an attended
+preset `meet` reports `rendezvous attended`, not `refused`, and settles when the two first stand
+in the room, so the word is handed over at the meeting; `meet` refuses off the beat; execution
+honours the authored rendezvous window; spent rows leave when the invitation closes. The first
+review found the attended report unreachable at the meeting (fixed, R39b) and an unbounded
+composed window (**open, the owner's call**). The re-review also caught root justifying that carry
+with a false claim about postings; corrected in the record. 2,504 tests/150 files (serially: two
+parallel runs timed out in unrelated tests under the owner's game load, disclosed), all gates,
+comparison equal. [Record](2026-09-20-r39-rendezvous-carries-approval.md).
 
 **19 September, night: R38, `meet` can now enable `debrief`.** The unit the final review carried
 is installed at `950fb16` + `83d91e8` and independently **Approved** (0 / 0 / 1 carried). A
@@ -527,3 +539,20 @@ midnight (first review's Important 1). Installed `950fb16`, `83d91e8`;
 [approval](2026-09-19-r38-meet-window-approval.md). Not decided here, carried: whether execution
 honours the authored rendezvous window (the day planner's two levers), the same wrap arithmetic in
 `transport.ts` for sound-out meetings, and the preset meet's `refused` record.
+
+### R39 — an accepted rendezvous owns its record; the authored window is honoured
+
+Post-plan unit, the five carries of R38, fixed before Plan 10 on the owner's instruction.
+Decisions: (1) schedule rows for any tick interval come from one pure builder,
+`overrideRowsForWindow`, never from `% 1440` arithmetic; (2) an accepted rendezvous invitation owns
+its directive record's ending, so the brief's window expiries skip it; **R39b:** the record
+settles when attendance latches, as a posting does on first occupation, while the rows holding the
+asset end with the invitation; (3) `meet` is a face handoff and refuses off the beat; (4) execution
+keeps the authored window, clamped to when the asset acts and floored at two beats when it opens on
+that beat, recording `requested` beside `scheduled`; (5) spent rendezvous rows are pruned at the
+close. Installed `dbca0e1`, `7b6df80`;
+[approval](2026-09-20-r39-rendezvous-carries-approval.md). **Not decided, the owner's call:** a
+composed rendezvous window has no upper bound and can pin an asset for weeks (cap it at issue, tie
+it to the brief's `active` range, or release after attendance; root recommends the cap). Carried:
+the preset's and the planner's report clock, invitation-array scans, hosting and sound-out row
+pruning, outcome vocabulary.
