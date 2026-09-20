@@ -1,6 +1,21 @@
 # Hearsay — resumed, 19 September 2026
 
-[Plan 9 final review and certification](review/2026-09-19-plan-9-final-review.md). [Task 8 approval and install](review/2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](review/2026-09-18-browser-gate-approval.md). [R18 code approval](review/2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+[R38 meet-window approval](review/2026-09-19-r38-meet-window-approval.md). [Plan 9 final review and certification](review/2026-09-19-plan-9-final-review.md). [Task 8 approval and install](review/2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](review/2026-09-18-browser-gate-approval.md). [R18 code approval](review/2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+
+Latest, 19 September (night): **`meet` now enables `debrief` (R38).** The one defect Plan 9's
+final review carried is fixed and independently Approved at `83d91e8`. A rendezvous holds the asset
+for two beats instead of one: the pull lands a tick after the first beat's frame is frozen, and
+`debrief` only reads frozen beat frames, so the second beat is the one the player can act in. A new
+test drives go, meet, go, debrief through the real tick loop. The first review caught a regression
+root introduced: the wider window wrapped to minute 0 at the end of the day and killed a 23:30
+meet. The correction builds the schedule rows from the real interval and splits them across
+midnight; the re-review swept every beat and 7,200 minute starts with zero mismatches. 2,493
+tests/150 files, all six gates, comparison equal to `01c043c`. Carried, each its own unit: the same
+wrap arithmetic in `transport.ts` (a sound-out meeting ending at midnight silently misses); a
+preset `meet` whose directive record says `refused` although the meeting happened; off-beat meet
+planning that never happens; execution ignoring the authored rendezvous window (the day planner's
+levers are decorative); spent rendezvous rows never pruned. Next: checkpoint push when Ellie
+authorizes (origin/main 2436a36); then those carries or Plan 10, Ellie's call.
 
 Latest, 19 September (later): **Plan 9 is certified complete.** An independent reviewer who had
 touched nothing on the branch read all 77 commits since `2436a36` and returned Ready to certify

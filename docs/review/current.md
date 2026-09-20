@@ -1,6 +1,18 @@
 # Current review — 19 September 2026
 
-[Plan 9 final review and certification](2026-09-19-plan-9-final-review.md). [Task 8 approval and install](2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](2026-09-18-browser-gate-approval.md). [R18 code approval](2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+[R38 meet-window approval](2026-09-19-r38-meet-window-approval.md). [Plan 9 final review and certification](2026-09-19-plan-9-final-review.md). [Task 8 approval and install](2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](2026-09-18-browser-gate-approval.md). [R18 code approval](2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+
+**19 September, night: R38, `meet` can now enable `debrief`.** The unit the final review carried
+is installed at `950fb16` + `83d91e8` and independently **Approved** (0 / 0 / 1 carried). A
+rendezvous now holds the asset for two beats, because the pull lands one tick after the first
+beat's frame froze and `debrief` reads only frozen beat frames; a live debrief through the tick
+loop proves it. The first review returned Needs-fixes: the wider window wrapped to minute 0 at the
+end of the day, killing a 23:30 meet that used to work. The correction builds the rows from the
+real interval (one per day across midnight); the re-review swept all 96 beats and 7,200 minute
+starts with zero mismatches. 2,493 tests/150 files, all gates, comparison equal. Five pre-existing
+neighbours are carried, the sharpest being the same wrap arithmetic for sound-out meetings and a
+preset `meet` that reports `refused` for a meeting that happened.
+[Record](2026-09-19-r38-meet-window-approval.md).
 
 **19 September, later: Plan 9 certified.** The final whole-branch independent review of
 `2436a36..3de9892` returned **Ready to certify: Yes, 0 / 0 / 4**: every plan item traced to code,
@@ -503,3 +515,15 @@ receipt; Task 5B's carried Minor), approved in the [Task 6/7B approval](2026-09-
   `f18afd3`; [approval](2026-09-18-browser-gate-approval.md).
 - **R37 — narrow comparison tables scroll instead of breaking words.** Inside the ≤600px block,
   table cells restore `overflow-wrap: normal`. Installed `f18afd3`; same approval.
+
+### R38 — a meet holds the asset for two beats
+
+Post-plan unit carried by the Plan 9 final review. The rendezvous application runs during the tick
+of its first beat, after the frame froze; `debrief` validates on a beat against the frozen frame;
+one beat was therefore never enough. Decision: the window is two conversation beats; attendance
+latches at whichever beat both first stand in the room. **R38b:** override rows are built from the
+tick interval, closing at `TICKS_PER_DAY` rather than a wrapped 0 and splitting per day across
+midnight (first review's Important 1). Installed `950fb16`, `83d91e8`;
+[approval](2026-09-19-r38-meet-window-approval.md). Not decided here, carried: whether execution
+honours the authored rendezvous window (the day planner's two levers), the same wrap arithmetic in
+`transport.ts` for sound-out meetings, and the preset meet's `refused` record.
