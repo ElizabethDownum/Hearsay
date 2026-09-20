@@ -169,6 +169,41 @@ describe('meet — pull one asset to the safehouse from the next beat (rung 3)',
     ], 46)).toThrow(/not with you at the safehouse this beat/);
   });
 
+  // A schedule override is a (day range x minute-of-day range) row, never a tick interval, so a window
+  // that touches midnight needs its own arithmetic (R38b). 1395 -> first beat 1410: the window ends
+  // exactly at midnight, and a wrapped `to: 0` would match no minute. 1410 -> first beat 1425: the
+  // window straddles midnight, which no single row can say.
+  it.each([
+    ['whose window ends exactly at midnight', 1395,
+      [{ fromDay: 0, toDay: 1, from: 1410, to: 1440 }]],
+    ['whose window straddles midnight', 1410,
+      [{ fromDay: 0, toDay: 1, from: 1425, to: 1440 }, { fromDay: 1, toDay: 2, from: 0, to: 15 }]],
+  ])('a meet %s still pulls the asset, and the live debrief works (R38b)', (_label, plan, rows) => {
+    const spec: InjectSpec = { subject: 'dot', predicate: 'stole', object: null, count: 3, severity: 3, place: null, attribution: SOMEONE };
+    const first = plan + 15;
+    const second = plan + 30;
+    const w0 = world(`meet-midnight-${plan}`, 'noble');
+    makeAsset(w0, 'ann');
+    w0.tick = plan;
+    applyInject(w0, 'ann', spec);
+    stageOfferedCircle(w0, plan, ['ann']);
+    const w = runLogOn(w0, RULES, [
+      { tick: plan, kind: 'goTo', venue: 'tavern' },
+      { tick: plan, kind: 'meet', asset: 'ann' },
+      { tick: plan + 1, kind: 'goTo', venue: 'safehouse' },
+      { tick: second, kind: 'debrief', asset: 'ann' },
+    ], second + 16);
+
+    const own = w.scheduleOverrides['ann']!.filter((o) => o.source === 'player');
+    expect(own.map(({ fromDay, toDay, from, to }) => ({ fromDay, toDay, from, to }))).toEqual(rows);
+    expect(own.every((o) => o.venue === 'safehouse' && o.from < o.to)).toBe(true);
+    expect(compartmentOf(w, 'player', 'ann')).toContainEqual({ tick: first, kind: 'met-asset', ref: 'you' });
+    expect(w.network.invitations!.find((row) => row.kind === 'rendezvous')!.status).toBe('attended');
+    expect(w.intel.log.filter((row) => row.tick === second && row.via === 'ann' && row.mode === 'answer')).toHaveLength(1);
+    // Live at the end of the run (one beat past the window): she has gone home.
+    expect(positionOf(w, w.npcs['ann']!, w.tick)).toBe('tavern');
+  });
+
   it('the meet override WINS over a standing player posting during its beat, and the posting resumes after', () => {
     const w = world('meet-precedence', 'noble');
     makeAsset(w, 'ann');

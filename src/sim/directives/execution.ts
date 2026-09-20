@@ -504,7 +504,8 @@ function startApplication(
       // Two beats, never one (R38). This application runs DURING tick `scheduledFrom`, after that
       // tick's frame froze, so the override below first moves the asset at `scheduledFrom + 1`. The
       // player's verbs validate against the frozen frame on a beat, and the first beat whose frame
-      // can hold the asset is the second one. Attendance still latches live at the first.
+      // can hold the asset is the second one. Attendance latches live at whichever beat of the window
+      // both first stand in the room, so a player who arrives only for the second is still recorded.
       const scheduledUntil = scheduledFrom + 2 * CONVERSATION_BEAT;
       const invitation = appendInvitation(world, {
         kind: 'rendezvous', principal: record.principal, inviter: record.principalId,
@@ -514,11 +515,22 @@ function startApplication(
         offeredAt: record.received!.tick, respondedAt: tick, setupId: null,
         sourceDirectiveId: record.id, attendedAt: null, closedAt: null,
       });
-      world.scheduleOverrides[record.recipient] = [{
-        fromDay: dayOf(scheduledFrom), toDay: dayOf(scheduledUntil - 1) + 1,
-        from: scheduledFrom % TICKS_PER_DAY, to: scheduledUntil % TICKS_PER_DAY,
-        venue: application.venue, source: 'player', sourceRef: `rendezvous:${record.id}`,
-      }, ...(world.scheduleOverrides[record.recipient] ?? [])];
+      // An override is a (day range x minute-of-day range) row, never a tick interval (R38b): a window
+      // ending exactly at midnight closes at TICKS_PER_DAY, never a wrapped 0 that matches no minute,
+      // and a window straddling midnight takes one row per day.
+      const firstDay = dayOf(scheduledFrom);
+      const lastDay = dayOf(scheduledUntil - 1);
+      const pull = { venue: application.venue, source: 'player' as const, sourceRef: `rendezvous:${record.id}` };
+      const lastMinute = ((scheduledUntil - 1) % TICKS_PER_DAY) + 1;
+      world.scheduleOverrides[record.recipient] = [
+        ...(firstDay === lastDay
+          ? [{ fromDay: firstDay, toDay: firstDay + 1, from: scheduledFrom % TICKS_PER_DAY, to: lastMinute, ...pull }]
+          : [
+            { fromDay: firstDay, toDay: firstDay + 1, from: scheduledFrom % TICKS_PER_DAY, to: TICKS_PER_DAY, ...pull },
+            { fromDay: lastDay, toDay: lastDay + 1, from: 0, to: lastMinute, ...pull },
+          ]),
+        ...(world.scheduleOverrides[record.recipient] ?? []),
+      ];
       invitation.setupId = `rendezvous:${record.id}`;
       record.execution = { state: 'attempted', changedAt: tick, dueAt: null, waiting: null };
       return true;

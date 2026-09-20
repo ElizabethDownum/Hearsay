@@ -528,6 +528,8 @@ export function applyMeet(
     specificity: 'detailed', guidance: [], active: { from: nextBeat, until: nextBeat },
     report: 'outcome', reportBy: nextBeat, purpose: null,
   };
+  // The authored window below is validated but NOT read by execution, which schedules two beats from
+  // the beat it acts on (R38). Carried: make execution honour the authored window and author two here.
   applyDirectiveWithCause(
     world, asset, { outboundVia: [], reportVia: [] }, brief, tick,
     { kind: 'rendezvous', venue: 'safehouse', from: nextBeat, until: nextBeat + CONVERSATION_BEAT },
