@@ -190,9 +190,31 @@ describe('meet — pull one asset to the safehouse from the next beat (rung 3)',
       { tick: 1, kind: 'goTo', venue: 'safehouse' },
     ], 46);
     const record = w.network.directiveState!.records[0]!;
-    expect(record.execution).toMatchObject({ state: 'completed', changedAt: 45 });
-    expect(outcomesOf(w).map((row) => row.outcome)).toEqual(['rendezvous attended']);
+    // Settled when the two first stand in the room (R39b), as a posting is when it is first occupied:
+    // the window only says how long she waits. The invitation itself still closes with the window.
+    expect(record.execution).toMatchObject({ state: 'completed', changedAt: 15 });
+    expect(outcomesOf(w)).toMatchObject([{ tick: 15, outcome: 'rendezvous attended' }]);
     expect(w.network.invitations![0]!).toMatchObject({ status: 'attended', attendedAt: 15, closedAt: 45 });
+    // So the word that it happened is handed over AT the meeting, on its second beat, not after it.
+    expect(record.receivedReports.map((row) => ({ at: row.receivedAt, outcome: row.report.outcome })))
+      .toEqual([{ at: 30, outcome: 'rendezvous attended' }]);
+  });
+
+  it('a player who arrives only for the second beat settles the record then; she still waits out the window (R39b)', () => {
+    const w = runLogOn(meetWorld('meet-record-second-beat'), RULES, [
+      { tick: 0, kind: 'goTo', venue: 'tavern' },
+      { tick: 0, kind: 'meet', asset: 'ann' },
+      { tick: 16, kind: 'goTo', venue: 'safehouse' },
+    ], 31);
+    expect(w.network.directiveState!.records[0]!.execution).toMatchObject({ state: 'completed', changedAt: 30 });
+    expect(w.network.invitations![0]!).toMatchObject({ status: 'accepted', attendedAt: 30, closedAt: null });
+    // Completing the record releases nothing: the rows hold her until the invitation closes.
+    expect(w.scheduleOverrides['ann']!.some((row) => row.sourceRef?.startsWith('rendezvous:'))).toBe(true);
+    expect(positionOf(w, w.npcs['ann']!, 44)).toBe('safehouse');
+    runUntil(w, 46, RULES);
+    expect(w.network.invitations![0]!).toMatchObject({ status: 'attended', closedAt: 45 });
+    expect(w.scheduleOverrides['ann']).toBeUndefined();
+    expect(outcomesOf(w)).toMatchObject([{ tick: 30, outcome: 'rendezvous attended' }]);
   });
 
   it('a meet the player never turns up for aborts as missed when its window closes, not before (R39)', () => {

@@ -893,6 +893,17 @@ export function expireDirectiveActsBeforeCollection(
 
 /** Phase-5 latches for operations that complete only when the requested physical reality occurs. */
 export function settleDirectiveApplications(world: WorldState, tick: Tick, rules: Rules): void {
+  // A rendezvous that closed this tick is over, attended or missed: its rows leave the schedule with it
+  // (R39). Keyed to the invitation, not the record, which may have settled beats earlier.
+  for (const invitation of world.network.invitations ?? []) {
+    if (invitation.kind !== 'rendezvous' || invitation.closedAt !== tick
+      || invitation.sourceDirectiveId === null) continue;
+    const rows = world.scheduleOverrides[invitation.invitee] ?? [];
+    const kept = rows.filter((row) => row.sourceRef !== `rendezvous:${invitation.sourceDirectiveId}`);
+    if (kept.length === rows.length) continue;
+    if (kept.length === 0) delete world.scheduleOverrides[invitation.invitee];
+    else world.scheduleOverrides[invitation.invitee] = kept;
+  }
   for (const record of world.network.directiveState?.records ?? []) {
     if (!record.received || !record.execution || !record.decision
       || record.execution.state === 'completed' || record.execution.state === 'aborted') continue;
@@ -906,17 +917,13 @@ export function settleDirectiveApplications(world: WorldState, tick: Tick, rules
       }
     } else if (application.kind === 'rendezvous') {
       const invitation = world.network.invitations?.find((row) => row.sourceDirectiveId === record.id);
-      if (invitation?.status === 'attended') {
+      // Settled when the two first stand in the room (R39b), as the posting above is when first
+      // occupied: the window only says how long she waits, and word that the meeting happened can then
+      // be handed over at it. The invitation, and the rows holding her there, still end with the window.
+      if (invitation != null && invitation.attendedAt !== null) {
         completeWithApplicationReport(world, record, record.decision, tick, rules, 'rendezvous attended');
       } else if (invitation?.status === 'missed') {
         abortRecord(world, record, record.decision, tick, rules, 'rendezvous window missed');
-      }
-      // The meeting is over either way: its rows leave the schedule with it (R39).
-      const rows = world.scheduleOverrides[record.recipient] ?? [];
-      const kept = rows.filter((row) => row.sourceRef !== `rendezvous:${record.id}`);
-      if (invitation?.closedAt != null && kept.length < rows.length) {
-        if (kept.length === 0) delete world.scheduleOverrides[record.recipient];
-        else world.scheduleOverrides[record.recipient] = kept;
       }
     } else if (application.kind === 'enemy-watch'
       && record.execution.state === 'attempted'
