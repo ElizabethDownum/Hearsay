@@ -1,6 +1,20 @@
-# Hearsay — resumed, 18 September 2026
+# Hearsay — resumed, 19 September 2026
 
-[Browser gate approval + R36/R37](review/2026-09-18-browser-gate-approval.md). [R18 code approval](review/2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+[Task 8 approval and install](review/2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](review/2026-09-18-browser-gate-approval.md). [R18 code approval](review/2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+
+Latest, 19 September: Task 8, the Plan 9 integration proof, is installed at `67b74d0` as two new
+test files and nothing else. The forger arc wins by paper alone: forge, one direct council showing,
+a hand-over to a carrier, then the sim's own re-show to a second council member, two distinct
+turns at 0.97, a real win on day 1, no tell in the log; a control and a real interrogation mirror
+(exposure 0 to 1, causal) sit beside it. The canary lesson runs a seven-day campaign to a clock
+loss in which the enemy names a source, four real debriefs break him, and the same story returns
+8/5 from the loyal channel and doctored to 4/4 from the turned one; the installed debrief model and
+panels render that divergence with no mocks. An independent reviewer **Approved** the proposal
+(0C/0I/8M), reproduced both failing controls, and checked every player tell for guard earshot.
+Root installed the reviewed bytes: 2,490 tests/150 files, all six gates, comparison equal to
+`01c043c`. One finding is carried as its own unit: `meet` cannot enable `debrief` through the tick
+loop (the rendezvous window opens one tick too late). Next: final whole-branch review. No push;
+origin/main 2436a36.
 
 Latest, 18 September (small hours): the interactive browser gate is **closed as PASS**. The
 gate measured the installed debrief UI at `01c043c` over CDP (both viewports, both themes and the

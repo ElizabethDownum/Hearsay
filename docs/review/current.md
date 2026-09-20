@@ -1,6 +1,17 @@
-# Current review — 18 September 2026
+# Current review — 19 September 2026
 
-[Browser gate approval + R36/R37](2026-09-18-browser-gate-approval.md). [R18 code approval](2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+[Task 8 approval and install](2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](2026-09-18-browser-gate-approval.md). [R18 code approval](2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+
+**19 September.** Task 8 is installed at `67b74d0`: `tests/scenario/forger-arc.e2e.test.ts` and
+`tests/network/canary-lesson.e2e.test.tsx`, no production change. Independent proposal review
+**Approved 0 / 0 / 8**: R11 satisfied by measurement (two distinct council turns at 0.97 through a
+carrier and the sim's own re-show; all three player tells outside guard earshot; quorum read, never
+lowered; nothing inserted), both non-vacuity controls reproduced (1 failed / 2 passed; 3 failed /
+3 passed), the lesson rendered by the installed `DebriefThreads` and `DebriefEnding` without mocks.
+Root install: reviewed bytes, 2,490 tests/150 files, six gates, comparison equal; one retained
+timeout of a pre-existing ESLint-API case under load, green on re-run. Carried as a separate unit:
+`meet` cannot enable `debrief` (rendezvous window one beat wide, landing one tick late). The final
+whole-branch review follows.
 
 **18 September, small hours.** The interactive browser gate is **closed as PASS**. Measured at
 `01c043c`: every enumerated relation conforms and the carried contrast Minor is discharged on the
