@@ -1,5 +1,7 @@
 # Plan 9 — current execution plan
 
+**Certified complete 2026-09-19.** [Final review and certification](../review/2026-09-19-plan-9-final-review.md).
+
 [Task5A2 code approval](../review/2026-09-13-outcome-history-code-approval.md).
 
 Updated: 2026-09-13. Controller: Codex. **Implementation resumed.** Ellie clarified
@@ -298,6 +300,10 @@ original report links, gate reconstruction and retained artifact paths.
    original singular-council hand-simulation (R11).
    Retain post-R17 probes and explicit dispositions for R18's cancellation, expiry
    and interpreted-venue observations before final watch/debrief certification.
+   Done: both routes and the lesson are installed at `67b74d0` and independently approved
+   (../review/2026-09-19-task-8-code-approval.md); the final full-plan independent review
+   returned Ready to certify, 0C/0I/4M, and **Plan 9 is certified complete**
+   (../review/2026-09-19-plan-9-final-review.md). Carried post-plan: the `meet` rendezvous window.
 
 ## Evidence and review
 

@@ -1,6 +1,15 @@
 # Current review — 19 September 2026
 
-[Task 8 approval and install](2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](2026-09-18-browser-gate-approval.md). [R18 code approval](2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+[Plan 9 final review and certification](2026-09-19-plan-9-final-review.md). [Task 8 approval and install](2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](2026-09-18-browser-gate-approval.md). [R18 code approval](2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+
+**19 September, later: Plan 9 certified.** The final whole-branch independent review of
+`2436a36..3de9892` returned **Ready to certify: Yes, 0 / 0 / 4**: every plan item traced to code,
+tests and an approval; no carried Minor has become a real problem; no law weaker than at the base;
+2,490 tests/150 files and all gates reproduced in its own snapshot with the comparison equal. Its
+timeout Minor is repaired and its docket Minor closed in the certification commit; one Minor is
+not accepted on the evidence and one is recorded. `meet` cannot enable `debrief` is ruled
+pre-existing, outside every Plan 9 requirement, and a separate post-plan unit.
+[Record](2026-09-19-plan-9-final-review.md).
 
 **19 September.** Task 8 is installed at `67b74d0`: `tests/scenario/forger-arc.e2e.test.ts` and
 `tests/network/canary-lesson.e2e.test.tsx`, no production change. Independent proposal review
@@ -473,3 +482,24 @@ The orchestration skill's role contract says, "You do not implement, deep-review
 - **Issue:** independent UI proposal review measures inline changed text at1.54:1 in dark mode and exact changed cells at2.46:1 in light mode.
 - **Action:** a bounded correction must make both surfaces readable in both themes, preserve explicit Changed text and exact values, and add an actual-style regression.
 - **Status:** correction frozen with654 cases passing; identical-test oldCSS run652/2 reproduces both failures. Only terminal CSS andfive appended style assertions change, retaining47 other bodies/all649 prior cases. Root verified544 entries/365archivefiles. Independent correction review is active; later installed browser checks remain required. [Review](2026-09-13-ui-proposal-review.md).
+
+### R33–R37 — corrections installed during the debrief UI and its browser gate
+
+Recorded here after the fact (final review Minor N-2); each was decided, installed and independently
+reviewed at the time. The label **R32** names two things: the contrast decision above, and the
+code correction at `8f9b728` (a witnessed presence report never mints an ordinary presence
+receipt; Task 5B's carried Minor), approved in the [Task 6/7B approval](2026-09-17-task-6-7b-code-approval.md).
+
+- **R33 — effect capture in the terminal gate test.** The byte-exact gate body failed under the
+  repository vitest configuration; one disclosed test-only amendment captures the registered effect
+  so the real handler is exercised. Installed `d68efad`; [approval](2026-09-17-task-6-7b-code-approval.md).
+- **R34 — terminal panels may name what the ending reveals.** The app hidden-name scan exempts five
+  pinned debrief panels on three explicit payload prongs; every other panel stays under the scan.
+  Installed `1ae3362`; same approval (its union-level scope is that approval's Minor M-1).
+- **R35 — review artifacts are not source.** `.superpowers/**` is excluded from vitest collection
+  and from eslint; no rule is relaxed. Installed `cd0d441`; same approval.
+- **R36 — the debrief keeps keyboard focus.** Opening the desk focuses the selected tab; Back and
+  Escape return focus to the opening control; the first terminal render steals nothing. Installed
+  `f18afd3`; [approval](2026-09-18-browser-gate-approval.md).
+- **R37 — narrow comparison tables scroll instead of breaking words.** Inside the ≤600px block,
+  table cells restore `overflow-wrap: normal`. Installed `f18afd3`; same approval.

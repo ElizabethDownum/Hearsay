@@ -66,7 +66,7 @@ describe('the actual terminal boundary and unchanged broad panel fence', () => {
     }
     const actual = await eslint.lintText(read('app/src/panels/'+panel+'.tsx'), { filePath });
     expect(actual.flatMap((row) => row.messages)).toEqual([]);
-  });
+  }, 15000);
   it('the existing townview seam re-exports only erased types, including the complete debrief contract', () => {
     const valid = (source: string) => parse(source).statements.every((node) => ts.isExportDeclaration(node) && node.isTypeOnly);
     const source = read('app/src/townview.ts'); expect(source).toContain("export type { DebriefView } from '../../src/sim/debrief/index'");

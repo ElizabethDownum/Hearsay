@@ -1,6 +1,17 @@
 # Hearsay — resumed, 19 September 2026
 
-[Task 8 approval and install](review/2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](review/2026-09-18-browser-gate-approval.md). [R18 code approval](review/2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+[Plan 9 final review and certification](review/2026-09-19-plan-9-final-review.md). [Task 8 approval and install](review/2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](review/2026-09-18-browser-gate-approval.md). [R18 code approval](review/2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+
+Latest, 19 September (later): **Plan 9 is certified complete.** An independent reviewer who had
+touched nothing on the branch read all 77 commits since `2436a36` and returned Ready to certify
+with no Critical or Important finding and four Minors. It traced every plan item to code, tests and
+an approval, found no carried Minor that has become a problem and no weakened law, and reproduced
+2,490 tests/150 files and every gate in its own snapshot. Root repaired the one flaky timeout it
+charged (the ESLint-API case that failed once under load), added the missing R33–R37 docket
+entries, declined one Minor on the evidence and recorded the last. The `meet` defect is ruled
+pre-existing (18 July code, unchanged on this branch), outside every Plan 9 requirement, and a
+separate post-plan unit with three conditions attached. Next: checkpoint push when Ellie
+authorizes (origin/main 2436a36); then the `meet` rendezvous-window unit and Plan 10.
 
 Latest, 19 September: Task 8, the Plan 9 integration proof, is installed at `67b74d0` as two new
 test files and nothing else. The forger arc wins by paper alone: forge, one direct council showing,
