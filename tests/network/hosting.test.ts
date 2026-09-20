@@ -169,6 +169,138 @@ describe('meet — pull one asset to the safehouse from the next beat (rung 3)',
     ], 46)).toThrow(/not with you at the safehouse this beat/);
   });
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // R39 — the record, the authored window and the spent rows
+  // ───────────────────────────────────────────────────────────────────────────
+  const meetWorld = (seed: string): WorldState => {
+    const w = world(seed, 'noble');
+    makeAsset(w, 'ann');
+    applyInject(w, 'ann', { subject: 'dot', predicate: 'stole', object: null, count: 3, severity: 3, place: null, attribution: SOMEONE });
+    stageOfferedCircle(w, 0, ['ann']);
+    return w;
+  };
+  const outcomesOf = (w: WorldState): { tick: number; outcome: string; reason: string | null }[] =>
+    (w.network.directiveState!.records[0]!.outcomes ?? [])
+      .map((row) => ({ tick: row.tick, outcome: row.result.outcome, reason: row.result.reason ?? null }));
+
+  it('an attended meet completes its directive as attended, never as refused (R39)', () => {
+    const w = runLogOn(meetWorld('meet-record-attended'), RULES, [
+      { tick: 0, kind: 'goTo', venue: 'tavern' },
+      { tick: 0, kind: 'meet', asset: 'ann' },
+      { tick: 1, kind: 'goTo', venue: 'safehouse' },
+    ], 46);
+    const record = w.network.directiveState!.records[0]!;
+    expect(record.execution).toMatchObject({ state: 'completed', changedAt: 45 });
+    expect(outcomesOf(w).map((row) => row.outcome)).toEqual(['rendezvous attended']);
+    expect(w.network.invitations![0]!).toMatchObject({ status: 'attended', attendedAt: 15, closedAt: 45 });
+  });
+
+  it('a meet the player never turns up for aborts as missed when its window closes, not before (R39)', () => {
+    const w0 = meetWorld('meet-record-missed');
+    const w = runLogOn(w0, RULES, [
+      { tick: 0, kind: 'goTo', venue: 'tavern' },
+      { tick: 0, kind: 'meet', asset: 'ann' },
+    ], 31);
+    // The brief's active window ended at 15; the accepted rendezvous keeps the record open until it closes.
+    expect(w.network.directiveState!.records[0]!.execution).toMatchObject({ state: 'attempted' });
+    runUntil(w, 46, RULES);
+    expect(w.network.directiveState!.records[0]!.execution).toMatchObject({ state: 'aborted', changedAt: 45 });
+    expect(outcomesOf(w)).toEqual([{ tick: 45, outcome: 'refused', reason: 'rendezvous window missed' }]);
+    expect(w.network.invitations![0]!).toMatchObject({ status: 'missed', attendedAt: null, closedAt: 45 });
+  });
+
+  it('the spent rendezvous rows leave the schedule when the invitation closes; other rows stay (R39)', () => {
+    const w0 = meetWorld('meet-prune');
+    const standing = { fromDay: 0, toDay: null, from: 960, to: 1200, venue: 'tavern', source: 'player' as const };
+    w0.scheduleOverrides['ann'] = [standing];
+    const w = runLogOn(w0, RULES, [
+      { tick: 0, kind: 'goTo', venue: 'tavern' },
+      { tick: 0, kind: 'meet', asset: 'ann' },
+      { tick: 1, kind: 'goTo', venue: 'safehouse' },
+    ], 45);
+    expect(w.scheduleOverrides['ann']!.some((row) => row.sourceRef?.startsWith('rendezvous:'))).toBe(true);
+    runUntil(w, 46, RULES);
+    expect(w.scheduleOverrides['ann']).toEqual([standing]);
+
+    // With nothing else on her schedule the key itself goes, as it was before the meet.
+    const bare = runLogOn(meetWorld('meet-prune-bare'), RULES, [
+      { tick: 0, kind: 'goTo', venue: 'tavern' },
+      { tick: 0, kind: 'meet', asset: 'ann' },
+      { tick: 1, kind: 'goTo', venue: 'safehouse' },
+    ], 46);
+    expect(bare.scheduleOverrides['ann']).toBeUndefined();
+  });
+
+  it('a meet is a face handoff: off the beat it refuses with zero residue (R39)', () => {
+    const w = meetWorld('meet-offbeat');
+    w.tick = 7;
+    const before = hashWorld(w);
+    expect(() => applyMeet(w, 'ann', 7)).toThrow(/meet: a face handoff happens on conversation beats/);
+    expect(hashWorld(w)).toBe(before);
+  });
+
+  const composedRendezvous = (from: number, until: number): Action => ({
+    tick: 0, kind: 'directive', recipient: 'ann', handoff: { outboundVia: [], reportVia: [] },
+    brief: {
+      mission: { kind: 'learn', target: { kind: 'venue', id: 'safehouse' } },
+      priority: 'urgent', authority: 'relationship', discretion: 'quiet', specificity: 'detailed',
+      guidance: [], active: { from: 15, until: at(0, 5) }, report: 'outcome', reportBy: 15, purpose: null,
+    },
+    application: { kind: 'rendezvous', venue: 'safehouse', from, until },
+  });
+
+  it('execution honours the authored rendezvous window: a later start is kept, and one beat then suffices (R39)', () => {
+    const w = runLogOn(meetWorld('meet-authored-later'), RULES, [
+      { tick: 0, kind: 'goTo', venue: 'tavern' },
+      composedRendezvous(45, 60),
+      { tick: 1, kind: 'goTo', venue: 'safehouse' },
+      { tick: 45, kind: 'debrief', asset: 'ann' },
+    ], 46);
+    // Accepted at beat 15 for a window that opens at 45: the row exists two beats early, so the frame
+    // frozen for 45 already holds her and the single authored beat is a real, usable window.
+    expect(w.network.invitations![0]!).toMatchObject({
+      requested: { from: 45, until: 60 }, scheduled: { from: 45, until: 60 }, attendedAt: 45,
+    });
+    const own = w.scheduleOverrides['ann']!.filter((row) => row.sourceRef?.startsWith('rendezvous:'));
+    expect(own.map(({ fromDay, toDay, from, to }) => ({ fromDay, toDay, from, to })))
+      .toEqual([{ fromDay: 0, toDay: 1, from: 45, to: 60 }]);
+    expect(w.intel.log.filter((row) => row.tick === 45 && row.via === 'ann' && row.mode === 'answer')).toHaveLength(1);
+    runUntil(w, 61, RULES);
+    expect(outcomesOf(w).map((row) => row.outcome)).toEqual(['rendezvous attended']);
+  });
+
+  it('a window authored to open on the beat the asset acts is widened to the two-beat floor, and says so (R39)', () => {
+    const w = runLogOn(meetWorld('meet-authored-floor'), RULES, [
+      { tick: 0, kind: 'goTo', venue: 'tavern' },
+      composedRendezvous(15, 30),
+    ], 16);
+    expect(w.network.invitations![0]!).toMatchObject({
+      requested: { from: 15, until: 30 }, scheduled: { from: 15, until: 45 },
+    });
+  });
+
+  it('a longer authored window is kept whole (R39)', () => {
+    const w = runLogOn(meetWorld('meet-authored-long'), RULES, [
+      { tick: 0, kind: 'goTo', venue: 'tavern' },
+      composedRendezvous(15, 90),
+    ], 16);
+    expect(w.network.invitations![0]!).toMatchObject({
+      requested: { from: 15, until: 90 }, scheduled: { from: 15, until: 90 },
+    });
+  });
+
+  it('the preset authors the window it gets: requested equals scheduled (R39)', () => {
+    const w = runLogOn(meetWorld('meet-authored-preset'), RULES, [
+      { tick: 0, kind: 'goTo', venue: 'tavern' },
+      { tick: 0, kind: 'meet', asset: 'ann' },
+    ], 16);
+    expect(w.network.directiveState!.records[0]!.authored.brief.application)
+      .toEqual({ kind: 'rendezvous', venue: 'safehouse', from: 15, until: 45 });
+    expect(w.network.invitations![0]!).toMatchObject({
+      requested: { from: 15, until: 45 }, scheduled: { from: 15, until: 45 },
+    });
+  });
+
   // A schedule override is a (day range x minute-of-day range) row, never a tick interval, so a window
   // that touches midnight needs its own arithmetic (R38b). 1395 -> first beat 1410: the window ends
   // exactly at midnight, and a wrapped `to: 0` would match no minute. 1410 -> first beat 1425: the
@@ -192,11 +324,13 @@ describe('meet — pull one asset to the safehouse from the next beat (rung 3)',
       { tick: plan, kind: 'meet', asset: 'ann' },
       { tick: plan + 1, kind: 'goTo', venue: 'safehouse' },
       { tick: second, kind: 'debrief', asset: 'ann' },
-    ], second + 16);
+    ], second + 1);
 
+    // Read while the invitation is still open: the rows leave the schedule when it closes (R39).
     const own = w.scheduleOverrides['ann']!.filter((o) => o.source === 'player');
     expect(own.map(({ fromDay, toDay, from, to }) => ({ fromDay, toDay, from, to }))).toEqual(rows);
     expect(own.every((o) => o.venue === 'safehouse' && o.from < o.to)).toBe(true);
+    runUntil(w, second + 16, RULES);
     expect(compartmentOf(w, 'player', 'ann')).toContainEqual({ tick: first, kind: 'met-asset', ref: 'you' });
     expect(w.network.invitations!.find((row) => row.kind === 'rendezvous')!.status).toBe('attended');
     expect(w.intel.log.filter((row) => row.tick === second && row.via === 'ann' && row.mode === 'answer')).toHaveLength(1);

@@ -516,6 +516,10 @@ export function applyMeet(
   if (!world.network.assets.some((a) => a.id === asset)) {
     throw new Error(`meet: '${asset}' is not one of your assets`);
   }
+  // Off the beat the offer is never heard, so the meet silently never happened (R39). Refuse instead.
+  if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0) {
+    throw new Error('meet: a face handoff happens on conversation beats');
+  }
   const circle = localityFor(world, tick, offered)
     .find((candidate) => candidate.members.includes(world.playerId!));
   if (!circle || !circle.members.includes(asset)) {
@@ -528,11 +532,11 @@ export function applyMeet(
     specificity: 'detailed', guidance: [], active: { from: nextBeat, until: nextBeat },
     report: 'outcome', reportBy: nextBeat, purpose: null,
   };
-  // The authored window below is validated but NOT read by execution, which schedules two beats from
-  // the beat it acts on (R38). Carried: make execution honour the authored window and author two here.
+  // Execution honours the authored window (R39), so the preset authors the one it needs: two beats
+  // from the next, because the pull lands a tick after the first beat's frame froze (R38).
   applyDirectiveWithCause(
     world, asset, { outboundVia: [], reportVia: [] }, brief, tick,
-    { kind: 'rendezvous', venue: 'safehouse', from: nextBeat, until: nextBeat + CONVERSATION_BEAT },
+    { kind: 'rendezvous', venue: 'safehouse', from: nextBeat, until: nextBeat + 2 * CONVERSATION_BEAT },
     'meet', offered,
   );
 }

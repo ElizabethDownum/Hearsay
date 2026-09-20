@@ -972,7 +972,7 @@ describe('preset and fully composed custom applications reach the SAME typed exe
       ...CUSTOM_ENVELOPE,
       mission: { kind: 'learn', target: { kind: 'venue', id: 'safehouse' } },
       active: { from: 15, until: 15 }, reportBy: 15,
-    }, 0, { kind: 'rendezvous', venue: 'safehouse', from: 15, until: 30 });
+    }, 0, { kind: 'rendezvous', venue: 'safehouse', from: 15, until: 45 });
 
     expect(branchOf(custom)).toEqual(branchOf(preset));
   });

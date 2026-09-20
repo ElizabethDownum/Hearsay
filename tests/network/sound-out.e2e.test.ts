@@ -335,6 +335,26 @@ describe('sound-out meetings — an independent invitation, and attendance that 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// R39: the accepted sound-out meeting is scheduled from its real tick interval, so a meeting that ends
+// exactly at midnight, or straddles it, still moves the candidate (the row is day x minute-of-day).
+describe('sound-out meetings at the end of the day (R39)', () => {
+  it.each([
+    ['ending exactly at midnight', at(0, 23) + 30, at(0, 23) + 60],
+    ['straddling midnight', at(0, 23) + 45, at(0, 23) + 75],
+  ])('a meeting %s is attended', (_label, from, until) => {
+    const { world, brief } = stageSoundOut({
+      seed: `midnight-${from}`, meeting: { venue: 'safehouse' as VenueId, from, until },
+    });
+    runLogOn(world, RULES, issue(brief), 1);
+    runUntil(world, 241, RULES);
+    world.playerVenue = 'safehouse';
+    runUntil(world, until + 1, RULES);
+    const invitation = world.network.invitations!.at(-1)!;
+    expect(invitation).toMatchObject({ kind: 'sound-out', attendedAt: from, status: 'attended' });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // The two sound-out enforcement scans, as CALL-GRAPH closures. A token scan over one function body
 // is bypassed by a helper hop or a rename; these ask what the whole reachable closure can touch.
 

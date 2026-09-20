@@ -1,5 +1,5 @@
 import { dayOf, TICKS_PER_DAY, type Tick } from '../../core/time';
-import { positionOf, type Circle } from '../agents';
+import { overrideRowsForWindow, positionOf, type Circle } from '../agents';
 import { cloneSerializable } from '../hash';
 import { recordFact } from '../network/compartment';
 import { assetFor, isTurnedAgainst, principalActor } from '../network/roster';
@@ -500,35 +500,30 @@ function startApplication(
       return true;
     }
     case 'rendezvous': {
-      const scheduledFrom = profile.timing.actAt ?? tick;
-      // Two beats, never one (R38). This application runs DURING tick `scheduledFrom`, after that
-      // tick's frame froze, so the override below first moves the asset at `scheduledFrom + 1`. The
-      // player's verbs validate against the frozen frame on a beat, and the first beat whose frame
-      // can hold the asset is the second one. Attendance latches live at whichever beat of the window
-      // both first stand in the room, so a player who arrives only for the second is still recorded.
-      const scheduledUntil = scheduledFrom + 2 * CONVERSATION_BEAT;
+      // The authored window is honoured (R39), within what this tick can still deliver. It cannot open
+      // before the asset acts. And when it opens ON the beat she acts, it runs two beats, never one
+      // (R38): this application runs DURING that tick, after its frame froze, so the rows below first
+      // move her one tick later, and the first beat whose frozen frame can hold her is the second. A
+      // window that opens later has its rows in place beforehand, so one beat suffices. `requested`
+      // keeps what was authored; `scheduled` is what she actually keeps. Attendance latches live at
+      // whichever beat of the window both first stand in the room.
+      const actsAt = profile.timing.actAt ?? tick;
+      const scheduledFrom = Math.max(application.from, actsAt);
+      const scheduledUntil = Math.max(
+        application.until, scheduledFrom + (scheduledFrom === actsAt ? 2 : 1) * CONVERSATION_BEAT,
+      );
       const invitation = appendInvitation(world, {
         kind: 'rendezvous', principal: record.principal, inviter: record.principalId,
         counterparty: record.recipient, invitee: record.recipient, venue: application.venue,
-        requested: { from: scheduledFrom, until: scheduledUntil },
+        requested: { from: application.from, until: application.until },
         scheduled: { from: scheduledFrom, until: scheduledUntil }, status: 'accepted',
         offeredAt: record.received!.tick, respondedAt: tick, setupId: null,
         sourceDirectiveId: record.id, attendedAt: null, closedAt: null,
       });
-      // An override is a (day range x minute-of-day range) row, never a tick interval (R38b): a window
-      // ending exactly at midnight closes at TICKS_PER_DAY, never a wrapped 0 that matches no minute,
-      // and a window straddling midnight takes one row per day.
-      const firstDay = dayOf(scheduledFrom);
-      const lastDay = dayOf(scheduledUntil - 1);
-      const pull = { venue: application.venue, source: 'player' as const, sourceRef: `rendezvous:${record.id}` };
-      const lastMinute = ((scheduledUntil - 1) % TICKS_PER_DAY) + 1;
       world.scheduleOverrides[record.recipient] = [
-        ...(firstDay === lastDay
-          ? [{ fromDay: firstDay, toDay: firstDay + 1, from: scheduledFrom % TICKS_PER_DAY, to: lastMinute, ...pull }]
-          : [
-            { fromDay: firstDay, toDay: firstDay + 1, from: scheduledFrom % TICKS_PER_DAY, to: TICKS_PER_DAY, ...pull },
-            { fromDay: lastDay, toDay: lastDay + 1, from: 0, to: lastMinute, ...pull },
-          ]),
+        ...overrideRowsForWindow(scheduledFrom, scheduledUntil, {
+          venue: application.venue, source: 'player' as const, sourceRef: `rendezvous:${record.id}`,
+        }),
         ...(world.scheduleOverrides[record.recipient] ?? []),
       ];
       invitation.setupId = `rendezvous:${record.id}`;
@@ -834,11 +829,22 @@ export function recordDirectiveInquiryAnswer(
   return true;
 }
 
+/**
+ * An accepted rendezvous owns its record's ending (R39): the brief's active window is only the offer's
+ * shelf life, and the meeting it bought outlives it. The invitation closing settles the record as
+ * attended or missed; the window expiries below must not abort it first as `refused`.
+ */
+function awaitsRendezvous(world: WorldState, record: DirectiveRecord): boolean {
+  return world.network.invitations?.some((row) => row.kind === 'rendezvous'
+    && row.status === 'accepted' && row.sourceDirectiveId === record.id) ?? false;
+}
+
 /** Phase 5: same-tick answers have already run; exact inclusive deadlines now close silence. */
 export function expireDirectiveExecutions(world: WorldState, tick: Tick, rules: Rules): void {
   for (const record of world.network.directiveState?.records ?? []) {
     if (record.received === null || record.execution === null
-      || record.execution.state === 'completed' || record.execution.state === 'aborted') continue;
+      || record.execution.state === 'completed' || record.execution.state === 'aborted'
+      || awaitsRendezvous(world, record)) continue;
     const deadline = record.received.version.brief.active.until;
     if (tick < deadline) continue;
     const tasks = world.inquiries[record.recipient] ?? [];
@@ -878,7 +884,8 @@ export function expireDirectiveActsBeforeCollection(
     if (record.received === null || record.execution === null
       || record.execution.state === 'completed' || record.execution.state === 'aborted'
       || record.execution.state === 'awaiting-answer'
-      || tick <= record.received.version.brief.active.until) continue;
+      || tick <= record.received.version.brief.active.until
+      || awaitsRendezvous(world, record)) continue;
     const profile = record.decision!;
     abortRecord(world, record, profile, tick, rules, 'the active window expired before execution');
   }
@@ -903,6 +910,13 @@ export function settleDirectiveApplications(world: WorldState, tick: Tick, rules
         completeWithApplicationReport(world, record, record.decision, tick, rules, 'rendezvous attended');
       } else if (invitation?.status === 'missed') {
         abortRecord(world, record, record.decision, tick, rules, 'rendezvous window missed');
+      }
+      // The meeting is over either way: its rows leave the schedule with it (R39).
+      const rows = world.scheduleOverrides[record.recipient] ?? [];
+      const kept = rows.filter((row) => row.sourceRef !== `rendezvous:${record.id}`);
+      if (invitation?.closedAt != null && kept.length < rows.length) {
+        if (kept.length === 0) delete world.scheduleOverrides[record.recipient];
+        else world.scheduleOverrides[record.recipient] = kept;
       }
     } else if (application.kind === 'enemy-watch'
       && record.execution.state === 'attempted'

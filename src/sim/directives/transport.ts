@@ -1,5 +1,5 @@
 import { minuteOfDay, type Tick } from '../../core/time';
-import type { Circle } from '../agents';
+import { overrideRowsForWindow, type Circle } from '../agents';
 import { cloneSerializable } from '../hash';
 import { assetFor, isTurnedAgainst, principalActor } from '../network/roster';
 import type { Principal } from '../network/types';
@@ -525,16 +525,14 @@ function receiveFinal(
         invitation.status = 'accepted';
         invitation.scheduled = cloneSerializable(invitation.requested);
         if (invitation.kind === 'hosting' || invitation.kind === 'sound-out') {
-          const override = {
-            fromDay: Math.floor(invitation.requested.from / 1440),
-            toDay: Math.floor((invitation.requested.until - 1) / 1440) + 1,
-            from: invitation.requested.from % 1440,
-            to: invitation.requested.until % 1440,
-            venue: invitation.venue, source: 'player' as const,
-            sourceRef: `${invitation.kind}:${invitation.id}`,
-          };
+          // Rows from the real tick interval (R39): a meeting that ends at midnight, or straddles it,
+          // still moves the guest. One wrapped row matched no minute at all.
           world.scheduleOverrides[invitation.invitee] = [
-            override, ...(world.scheduleOverrides[invitation.invitee] ?? []),
+            ...overrideRowsForWindow(invitation.requested.from, invitation.requested.until, {
+              venue: invitation.venue, source: 'player' as const,
+              sourceRef: `${invitation.kind}:${invitation.id}`,
+            }),
+            ...(world.scheduleOverrides[invitation.invitee] ?? []),
           ];
         }
       } else if (spoken.response === 'defer') {

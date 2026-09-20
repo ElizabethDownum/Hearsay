@@ -1,5 +1,5 @@
 import { Rng } from '../core/rng';
-import { dayOf, dayOfWeek, minuteOfDay, REST_DAY, type Tick } from '../core/time';
+import { dayOf, dayOfWeek, minuteOfDay, REST_DAY, TICKS_PER_DAY, type Tick } from '../core/time';
 import type { EntityId, VenueId } from './rumors/claim';
 import type { Npc, ScheduleOverride, WorldState } from './types';
 
@@ -18,6 +18,31 @@ export function venueAt(npc: Npc, t: Tick, overrides: readonly ScheduleOverride[
     if (dayMatch && m >= entry.from && m < entry.to) return entry.venue;
   }
   return npc.home;
+}
+
+/**
+ * The override rows that hold someone at one venue for the tick interval `[from, until)` (R38b, R39).
+ * A row is a (day range x minute-of-day range) rectangle, never a tick interval, so an interval that
+ * reaches or crosses midnight needs one row per shape: the rest of the first day, any whole days
+ * between, and the start of the last. `to` closes at `TICKS_PER_DAY`, never at a wrapped 0. Pure: the
+ * caller owns the write.
+ */
+export function overrideRowsForWindow(
+  from: Tick, until: Tick, rest: Omit<ScheduleOverride, 'fromDay' | 'toDay' | 'from' | 'to'>,
+): ScheduleOverride[] {
+  if (until <= from) return [];
+  const firstDay = dayOf(from);
+  const lastDay = dayOf(until - 1);
+  const lastMinute = minuteOfDay(until - 1) + 1;
+  if (firstDay === lastDay) {
+    return [{ fromDay: firstDay, toDay: firstDay + 1, from: minuteOfDay(from), to: lastMinute, ...rest }];
+  }
+  return [
+    { fromDay: firstDay, toDay: firstDay + 1, from: minuteOfDay(from), to: TICKS_PER_DAY, ...rest },
+    ...(lastDay > firstDay + 1
+      ? [{ fromDay: firstDay + 1, toDay: lastDay, from: 0, to: TICKS_PER_DAY, ...rest }] : []),
+    { fromDay: lastDay, toDay: lastDay + 1, from: 0, to: lastMinute, ...rest },
+  ];
 }
 
 /**
