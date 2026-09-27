@@ -13,6 +13,8 @@ import { SOMEONE, type Claim } from '../../src/sim/rumors/claim';
 import type { TownFixture, WorldState } from '../../src/sim/types';
 import type { GeneratedTown } from '../../src/world/types';
 import { captureEvidence } from '../../src/sim/counterintel';
+import { finishTick, prepareTick } from '../../src/sim/phases';
+import type { ReportedClaim } from '../../src/sim/enemy/state';
 import { realizeNetworkForward } from '../../src/sim/directives/transport';
 
 /**
@@ -70,6 +72,23 @@ function seedIntel(world: WorldState, family: string, claimId: string, severity:
     ...blankIntel(), tick, venue: 'tavern', via: 'self', kind: 'utterance', overheard: false,
     speaker: 'buyer', addressedTo: 'you', mode: 'telling', claimId, family,
     reported: { subject: 'mallory', predicate: 'stole', object: null, count: 2, severity, place: null, attribution: SOMEONE },
+  });
+}
+
+/** R42: seed intel whose RECEIVED version differs from the underlying claim, as a transforming
+ *  channel (an exaggerator's retelling, a report's filtering) leaves it. The world holds count 2 /
+ *  severity 3 / place null; the player only ever heard count 4 / severity 4 / at the tavern. */
+const RECEIVED: ReportedClaim = {
+  subject: 'mallory', predicate: 'stole', object: null, count: 4, severity: 4, place: 'tavern', attribution: SOMEONE,
+};
+function seedTransformedIntel(world: WorldState, family: string, claimId: string): void {
+  world.claims[claimId] = {
+    id: claimId, family, parent: null, subject: 'mallory', predicate: 'stole',
+    object: null, count: 2, severity: 3, place: null, attribution: SOMEONE,
+  };
+  world.intel.log.push({
+    ...blankIntel(), tick: 0, venue: 'tavern', via: 'self', kind: 'utterance', overheard: false,
+    speaker: 'buyer', addressedTo: 'you', mode: 'telling', claimId, family, reported: { ...RECEIVED },
   });
 }
 
@@ -169,7 +188,7 @@ describe('applySell — dedupe (one sale per family per buyer, on network state)
   });
 });
 
-describe('applySell — the buyer\'s hop-zero ingest (the SAME family, never a re-mint)', () => {
+describe('applySell — the buyer\'s hop-zero ingest (the SAME family; the SAME claim when that is what you heard)', () => {
   it('the buyer\'s belief store gets the EXISTING claim, apparentSource = the avatar, ordinary hop-zero credence', () => {
     const w = sellWorld('sell-ingest');
     seedIntel(w, 'f-ingest', 'c-ingest', 4);
@@ -196,6 +215,74 @@ describe('applySell — the buyer\'s hop-zero ingest (the SAME family, never a r
     const retold = w.chronicle.find((c) => c.kind === 'telling' && c.speaker === 'buyer'
       && w.claims[c.claimId]?.family === 'f-sold');
     expect(retold).toBeDefined();
+  });
+});
+
+describe('applySell — you can only sell what reached you (R42, Astra I2)', () => {
+  it('a transformed received version is what is spoken and believed, never the unreceived original', () => {
+    const w = sellWorld('sell-received');
+    seedTransformedIntel(w, 'f-rx', 'c-rx');
+    const coin0 = w.coin;
+    applySell(w, 'buyer', 'f-rx', 0, RULES);
+    runUntil(w, 1, RULES);
+
+    expect(w.coin).toBe(coin0 + 4 * RULES.economy.brokerSaleBase); // priced on the received version
+    const sale = w.chronicle.find((c) => c.kind === 'telling' && c.speaker === 'you');
+    if (sale?.kind !== 'telling') throw new Error('the sale spoke no telling');
+    const spoken = w.claims[sale.claimId]!;
+    const believed = w.beliefs['buyer']!['f-rx']!.claim;
+    for (const claim of [spoken, believed]) {
+      expect(claim.id).not.toBe('c-rx');
+      expect(claim).toMatchObject({ ...RECEIVED, family: 'f-rx', parent: 'c-rx' });
+    }
+    expect(believed.id).toBe(spoken.id);
+    // The world's original is untouched: selling mints a version, it never rewrites history.
+    expect(w.claims['c-rx']).toMatchObject({ count: 2, severity: 3, place: null });
+  });
+});
+
+describe('applySell — a sale is hearsay to a mind that already holds the family (R42, Astra I3)', () => {
+  const held = (w: WorldState, family: string, credence: number) => {
+    const claim: Claim = {
+      id: `c-held-${family}`, family, parent: null, subject: 'mallory', predicate: 'stole',
+      object: null, count: 1, severity: 2, place: null, attribution: 'third',
+    };
+    w.claims[claim.id] = claim;
+    w.beliefs['buyer']![family] = {
+      claim, credence, heardFrom: 'third', heardAt: 0, firstHeardAt: 0, timesHeard: 1,
+      apparentSources: ['third'], discretion: false, counterSpun: false,
+    };
+    return claim;
+  };
+
+  it('a document-anchored belief (0.97) keeps its credence, its version and its history', () => {
+    const w = sellWorld('sell-anchor');
+    const claim = held(w, 'f-anc', 0.97);
+    seedIntel(w, 'f-anc', 'c-anc', 4);
+    const coin0 = w.coin;
+    applySell(w, 'buyer', 'f-anc', 0, RULES);
+    runUntil(w, 1, RULES);
+
+    const belief = w.beliefs['buyer']!['f-anc']!;
+    expect(belief.credence).toBe(0.97);
+    expect(belief.claim).toBe(claim);            // first version sticks
+    expect(belief.firstHeardAt).toBe(0);
+    expect(belief.heardFrom).toBe('third');
+    expect(belief.apparentSources).toEqual(['third', 'you']); // ordinary corroboration records you
+    expect(w.coin).toBe(coin0 + 4 * RULES.economy.brokerSaleBase); // the sale itself still happened
+    expect(w.network.sales).toContainEqual({ family: 'f-anc', buyer: 'buyer' });
+  });
+
+  it('a weaker held belief is corroborated by ordinary ingestion, not lifted to the fresh-sale weight', () => {
+    const w = sellWorld('sell-weak');
+    const claim = held(w, 'f-weak', 0.4);
+    seedIntel(w, 'f-weak', 'c-weak', 4);
+    applySell(w, 'buyer', 'f-weak', 0, RULES);
+    runUntil(w, 1, RULES);
+
+    const belief = w.beliefs['buyer']!['f-weak']!;
+    expect(belief.claim).toBe(claim);
+    expect(belief.credence).toBeCloseTo(0.55, 10); // one new apparent source: +0.15
   });
 });
 
@@ -248,7 +335,10 @@ describe('sell joins the Action union — save = seed + action log', () => {
     expect(() => applyAction(w, { tick: 0, kind: 'sell', buyer: 'buyer', family: 'f-route' }))
       .toThrow(/rules/);
     applyAction(w, { tick: 0, kind: 'sell', buyer: 'buyer', family: 'f-route' }, RULES);
-    expect(w.pendingSell).toEqual({ buyer: 'buyer', family: 'f-route', price: 3 * RULES.economy.brokerSaleBase, claimId: 'c-route' });
+    expect(w.pendingSell).toEqual({
+      buyer: 'buyer', family: 'f-route', price: 3 * RULES.economy.brokerSaleBase, claimId: 'c-route',
+      reported: { subject: 'mallory', predicate: 'stole', object: null, count: 2, severity: 3, place: null, attribution: SOMEONE },
+    });
   });
 
   it('an unknown kind still throws (the union default-throw is preserved)', () => {
@@ -256,16 +346,29 @@ describe('sell joins the Action union — save = seed + action log', () => {
     expect(() => applyAction(w, { tick: 0, kind: 'teleport' } as unknown as Action, RULES)).toThrow(/unknown action kind/);
   });
 
-  it('live == replay: a sell in the log regrows byte-identically', () => {
+  // R42 correction (Astra): this test used to run `runLogOn` twice, which proves determinism, not
+  // live == replay, over a fixture whose received version equalled the claim (masking I2). Now the
+  // live side is stepped frame by frame the way a session plays, and the version sold is transformed.
+  it('live == replay: a sell of a transformed version, stepped live, regrows byte-identically', () => {
     const build = (): WorldState => {
       const w = sellWorld('sell-replay');
-      seedIntel(w, 'f-replay', 'c-replay', 4);
+      seedTransformedIntel(w, 'f-replay', 'c-replay');
       return w;
     };
     const log: Action[] = [{ tick: 0, kind: 'sell', buyer: 'buyer', family: 'f-replay' }];
-    const a = runLogOn(build(), RULES, log, at(0, 3));
-    const b = runLogOn(build(), RULES, log, at(0, 3));
-    expect(hashWorld(a)).toBe(hashWorld(b));
-    expect(a.coin).toBe(b.coin);
+    const until = at(0, 3);
+    const live = build();
+    while (live.tick < until) {
+      const frame = prepareTick(live, RULES);
+      finishTick(live, RULES, frame, () => {
+        for (const action of log.filter((candidate) => candidate.tick === live.tick)) {
+          applyAction(live, action, RULES, frame);
+        }
+      });
+    }
+    const replay = runLogOn(build(), RULES, log, until);
+    expect(live.beliefs['buyer']!['f-replay']!.claim).toMatchObject({ ...RECEIVED, parent: 'c-replay' });
+    expect(hashWorld(replay)).toBe(hashWorld(live));
+    expect(replay.coin).toBe(live.coin);
   });
 });

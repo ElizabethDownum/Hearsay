@@ -265,10 +265,12 @@ function bestIntelVersion(world: WorldState, family: RumorId): IntelEntry | null
  * Effects are DEFERRED to the same tick's step() — the applyTell idiom: the sale's conversation
  * becomes an ordinary Utterance (speaker = avatar, mode 'telling'), so it rides the SAME capture /
  * caught-in-the-act physics as any other telling (selling info leaks it: your telling is
- * capturable like any tell). The claim is NOT re-minted — the buyer's belief store takes the
- * EXISTING claim behind the best intel version directly (applyInject's belief-entry idiom,
- * `apparentSources: [avatar]` so they now retell it by ordinary tellability), because it is the
- * SAME family entering their mind, never a fresh one.
+ * capturable like any tell). It is the SAME family entering their mind, never a fresh one.
+ *
+ * YOU CAN ONLY SELL WHAT REACHED YOU (R42, Astra I2): the sale speaks the best version's `reported`
+ * content, never the underlying world claim, which the channel may have transformed or filtered.
+ * When the two agree the existing claim is spoken as-is; otherwise the received version is minted as
+ * a child of it in the same family (see `resolvePlayerSpeech`).
  */
 export function applySell(
   world: WorldState, buyer: EntityId, family: RumorId, tick: Tick, rules: Rules,
@@ -289,7 +291,7 @@ export function applySell(
     throw new Error(`sell: '${family}' has already been sold to '${buyer}'`);
   }
   const price = best.reported!.severity * rules.economy.brokerSaleBase;
-  world.pendingSell = { buyer, family, price, claimId: best.claimId! };
+  world.pendingSell = { buyer, family, price, claimId: best.claimId!, reported: { ...best.reported! } };
 }
 
 /**

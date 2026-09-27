@@ -16,7 +16,7 @@ import { runTurncoatPass } from './network/turncoats';
 import { observationsFor, type Asking, type TickEvents, type Utterance } from './perception';
 import { reactToSelfRumor } from './reactions';
 import { ingest, realizeTelling, selectTelling, CONVERSATION_BEAT } from './rumors/propagation';
-import { mintClaim, type EntityId, type RumorId, type VenueId } from './rumors/claim';
+import { CLAIM_FIELDS, mintClaim, type EntityId, type RumorId, type VenueId } from './rumors/claim';
 import { scenarioNightly } from './scenario/referee';
 import { runVignettes } from './vignettes/engine';
 import type { Rules } from './rules';
@@ -413,14 +413,26 @@ function resolvePlayerSpeech(
 
   if (world.pendingSell) {
     if (offered) {
-      const { buyer, family, price, claimId } = world.pendingSell;
-      const claim = world.claims[claimId]!;
+      const { buyer, family, price, claimId, reported } = world.pendingSell;
+      // The player speaks the version that reached them (R42, Astra I2). The underlying claim is
+      // reused only when it says exactly that; otherwise the received version is a child of it.
+      const underlying = world.claims[claimId]!;
+      let claim = underlying;
+      if (!CLAIM_FIELDS.every((field) => underlying[field] === reported[field])) {
+        claim = mintClaim(world, { ...reported, family, parent: claimId });
+        world.claims[claim.id] = claim;
+      }
       world.coin += price;
       world.network.sales.push({ family, buyer });
-      world.beliefs[buyer]![family] = {
-        claim, credence: 0.85, heardFrom: world.playerId, heardAt: tick, firstHeardAt: tick,
-        timesHeard: 1, apparentSources: [world.playerId], discretion: false, counterSpun: false,
-      };
+      // Only a buyer new to the family takes the sale's hop-zero entry. A mind that already holds it
+      // hears the sale as ordinary hearsay through the utterance below: first version sticks and
+      // corroboration never lowers credence (R42, Astra I3; the P9-3 anchor law).
+      if (world.beliefs[buyer]![family] === undefined) {
+        world.beliefs[buyer]![family] = {
+          claim, credence: 0.85, heardFrom: world.playerId, heardAt: tick, firstHeardAt: tick,
+          timesHeard: 1, apparentSources: [world.playerId], discretion: false, counterSpun: false,
+        };
+      }
       utterances.push({
         tick, venue: offered.venue, circleMembers: [...offered.members].sort(),
         speaker: world.playerId, addressedTo: buyer, claim, mode: 'telling',

@@ -3,7 +3,7 @@ import type { InjectSpec } from './actions';
 import type { Artifact } from './artifacts';
 import type { Claim, ClaimId, EntityId, RumorId, VenueId } from './rumors/claim';
 import type { TraitId } from './rumors/traits';
-import type { EnemyState } from './enemy/state';
+import type { EnemyState, ReportedClaim } from './enemy/state';
 import type { InquiryKey } from './perception';
 import type { IntelState } from '../intel/entry';
 import type { ScenarioState } from './scenario/types';
@@ -230,7 +230,8 @@ export interface WorldState {
    * prices; step consumes it — the pendingTell handoff idiom, so the sale becomes an ordinary
    * Utterance and is capturable exactly like any telling). Null otherwise.
    */
-  pendingSell: { buyer: EntityId; family: RumorId; price: number; claimId: ClaimId } | null;
+  /** `reported` is the version the player actually received (R42): what the sale speaks. */
+  pendingSell: { buyer: EntityId; family: RumorId; price: number; claimId: ClaimId; reported: ReportedClaim } | null;
   /** The player's private knowledge substrate (informants, captured feed, board notes). */
   intel: IntelState;
   /**
