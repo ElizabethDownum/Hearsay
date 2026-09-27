@@ -1,7 +1,7 @@
 import { cloneSerializable } from '../hash';
 import type { Npc } from '../types';
 import { applyTraits, type TraitContext, type TraitDef, type TraitId } from '../rumors/traits';
-import { SOMEONE, type Claim, type EntityId } from '../rumors/claim';
+import { SOMEONE, type Claim, type ClaimId, type EntityId, type RumorId } from '../rumors/claim';
 import type { Principal } from '../network/types';
 import type { Rules } from '../rules';
 import type {
@@ -224,6 +224,8 @@ export function projectDirectiveReport(input: {
   report: DirectiveReportPayload; enemyAction: EnemyActionReport | null;
   factRefs: { asset: EntityId; factIndex: number }[]; speaker: ProjectionSpeaker;
   turnedAgainstAudience: boolean; perceivedScrutiny: number;
+  /** The family of an enclosed claim, so family-keyed transforms (attributor) key as in gossip. */
+  familyOf: (claimId: ClaimId) => RumorId;
 }, rules: Rules): { report: DirectiveReportPayload; enemyAction: EnemyActionReport | null;
   factRefs: { asset: EntityId; factIndex: number }[] } {
   const candor = candorFor(input.turnedAgainstAudience, input.perceivedScrutiny, input.speaker.traits);
@@ -245,6 +247,19 @@ export function projectDirectiveReport(input: {
   if (owns(delta, 'count') && report.evidence && delta.count !== null
     && delta.count !== undefined && delta.count < report.evidence.length) {
     report.evidence = report.evidence.slice(0, Math.max(0, delta.count));
+  }
+  // R44: an enclosed claim is retold in the relay's own mouth, the same chain and candor as the
+  // envelope. The association id is kept; only the reported content moves.
+  if (report.evidence) {
+    const ctx = contextFor(input.speaker);
+    report.evidence = report.evidence.map((item) => {
+      if (item.kind !== 'claim') return item;
+      const whole: Claim = { id: item.claimId, family: input.familyOf(item.claimId), parent: null,
+        ...item.reported };
+      const told = { ...whole, ...applyTraits(chain, whole, ctx) };
+      const { subject, predicate, object, count, severity, place, attribution } = told;
+      return { ...item, reported: { subject, predicate, object, count, severity, place, attribution } };
+    });
   }
   return {
     report,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { projectBrief, projectDirectiveReport } from '../../src/sim/directives/mutation';
+import { applyTraits } from '../../src/sim/rumors/traits';
 import type {
   BriefVersion, DirectiveBrief, DirectiveReportPayload, EnemyActionReport,
 } from '../../src/sim/directives/types';
@@ -232,13 +233,14 @@ describe('projectDirectiveReport', () => {
   const project = (traits: string[], turnedAgainstAudience = false, perceivedScrutiny = 0,
     value: DirectiveReportPayload = report) => projectDirectiveReport({
       report: value, enemyAction, factRefs, speaker: speaker(traits),
-      turnedAgainstAudience, perceivedScrutiny,
+      turnedAgainstAudience, perceivedScrutiny, familyOf: (id) => `family-of-${id}`,
     }, STANDARD_RULES);
 
   it('projects attribution and severity/count through the report claim seam without inventing evidence', () => {
     const attributed = projectDirectiveReport({
       report: { ...report, source: null }, enemyAction, factRefs,
       speaker: speaker(['attributor']), turnedAgainstAudience: false, perceivedScrutiny: 0,
+      familyOf: (id) => id,
     }, STANDARD_RULES);
     expect(attributed.report.source).toBe('rival');
     expect(attributed.factRefs).toEqual([]);
@@ -272,5 +274,59 @@ describe('projectDirectiveReport', () => {
     expect(project(['literalist'], true, 0.5).factRefs).toEqual([]);
     expect(project(['literalist'], true, 0).factRefs).toEqual([]);
     expect(project(['literalist'], false, 0, { ...report, source: null }).factRefs).toEqual([]);
+  });
+
+  // R44 (Astra I10): a claim enclosed in a relayed report passes through the relay's mouth like any
+  // retelling: the same registered transforms, candor included. Before, only the synthetic envelope
+  // (count / uncertainty / source) was projected and the enclosed claims rode through untouched.
+  describe('enclosed claims are retold through the relay (R44)', () => {
+    const enclosed = {
+      subject: 'target', predicate: 'stole', object: null, count: 2, severity: 3 as const,
+      place: null, attribution: 'target',
+    };
+    const withClaim: DirectiveReportPayload = {
+      ...report, evidence: [{ kind: 'claim', claimId: 'c7', reported: { ...enclosed } },
+        { kind: 'observation', text: 'seen' }],
+    };
+    const claimOf = (projected: ReturnType<typeof project>) => {
+      const item = projected.report.evidence!.find((entry) => entry.kind === 'claim');
+      if (item?.kind !== 'claim') throw new Error('the enclosed claim was dropped');
+      return item;
+    };
+    // The speaker's own trait context, as the relay projection builds it (independent re-derivation).
+    const contextOf = (who: ReturnType<typeof speaker>) => ({
+      ownerId: who.id, faction: who.faction, rivals: who.rivals,
+      factionOf: (id: string) => (who.knownFactions as Record<string, 'none' | 'crown' | 'guild'>)[id] ?? null,
+    });
+    const traitsOf = (traits: string[], claim = enclosed) => {
+      const chain = traits.flatMap((id) => STANDARD_RULES.traits[id] ? [STANDARD_RULES.traits[id]!] : []);
+      const whole = { id: 'c7', family: 'family-of-c7', parent: null, ...claim };
+      const { subject, predicate, object, count, severity, place, attribution } =
+        { ...whole, ...applyTraits(chain, whole, contextOf(speaker(traits))) };
+      return { subject, predicate, object, count, severity, place, attribution };
+    };
+
+    it('an exaggerator relay inflates the enclosed claim exactly as its ordinary retelling would', () => {
+      const item = claimOf(project(['exaggerator'], false, 0, withClaim));
+      expect(item.claimId).toBe('c7');                       // association identity preserved
+      expect(item.reported).toEqual(traitsOf(['exaggerator']));
+      expect(item.reported).not.toEqual(enclosed);            // non-vacuous: the transform bites
+    });
+
+    it('a literalist relay passes it verbatim', () => {
+      expect(claimOf(project(['literalist'], false, 0, withClaim)).reported).toEqual(enclosed);
+    });
+
+    it('doctored candor minimizes the enclosed claim too', () => {
+      const item = claimOf(project(['literalist'], true, 0, withClaim));
+      expect(item.reported).toEqual(traitsOf(['literalist', 'minimizer']));
+      expect(item.reported).not.toEqual(enclosed);
+    });
+
+    it('the attributor keys its rival on the enclosed claim\'s real family', () => {
+      const item = claimOf(project(['attributor'], false, 0, { ...withClaim,
+        evidence: [{ kind: 'claim', claimId: 'c7', reported: { ...enclosed, attribution: 'someone' } }] }));
+      expect(item.reported).toEqual(traitsOf(['attributor'], { ...enclosed, attribution: 'someone' }));
+    });
   });
 });

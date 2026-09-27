@@ -133,7 +133,7 @@ function projectCarriedSpeech(
       enemyAction: payload.enemyAction, factRefs: payload.factRefs,
       speaker: projectionSpeaker(world, message.holder),
       turnedAgainstAudience: isTurnedAgainst(world, message.principal, message.holder),
-      perceivedScrutiny: scrutiny }, rules);
+      perceivedScrutiny: scrutiny, familyOf: (id) => world.claims[id]?.family ?? id }, rules);
     payload.report = projected.report;
     payload.enemyAction = projected.enemyAction;
     payload.factRefs = projected.factRefs;

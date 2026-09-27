@@ -275,7 +275,8 @@ function projectReportedObservation(
       } else if (spoken.kind === 'directive-report') {
         const projection = projectDirectiveReport({ report: spoken.report,
           enemyAction: spoken.enemyAction, factRefs: spoken.factRefs,
-          speaker, turnedAgainstAudience: turned, perceivedScrutiny: scrutiny }, rules);
+          speaker, turnedAgainstAudience: turned, perceivedScrutiny: scrutiny,
+          familyOf: (id) => world.claims[id]?.family ?? id }, rules);
         spoken.report = projection.report;
         spoken.enemyAction = projection.enemyAction;
         spoken.factRefs = projection.factRefs;
