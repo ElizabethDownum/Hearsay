@@ -284,6 +284,26 @@ describe('I-1 — one speech choice per requested-beat offer', () => {
 });
 
 describe('requested-beat local offer', () => {
+  it('an empty day-zero safehouse offer can be let pass; time and travel resume (R41, Astra I1)', () => {
+    const session = newSession(SEED);
+    expect(session.world.playerVenue).toBe('safehouse');
+    const elsewhere = Object.keys(session.world.venues).sort()
+      .find((id) => id !== 'safehouse' && canEnter(session.world, id))!;
+    const before = session.save();
+    expect(session.requestLocalInteraction().refused).toBe(false);
+    expect(session.advance(1).stopped).toBe('local-offer');
+    expect(session.localOffer()!.circleMembers).toEqual([]);
+    // Nothing can be chosen, so without a pass the session is stuck here.
+    expect(session.advance(100)).toEqual({ advanced: 0, stopped: 'local-offer' });
+    expect(session.submit({ kind: 'goTo', venue: elsewhere }).refused).toBe(true);
+    session.cancelLocalInteraction();
+    expect(session.save()).toEqual(before);
+    expect(session.submit({ kind: 'goTo', venue: elsewhere }).refused).toBeFalsy();
+    expect(session.advance(100)).toEqual({ advanced: 100, stopped: 'complete' });
+    expect(session.world.playerVenue).toBe(elsewhere);
+    expect(hashWorld(loadSession(session.save(), session.world.tick).world)).toBe(hashWorld(session.world));
+  });
+
   it('request at minute 7 records only the requested beat and is save-inert', () => {
     const session = newSession(SEED);
     session.advance(7);

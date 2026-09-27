@@ -111,7 +111,7 @@ const plannerView: PlayerView = {
 
 /** The T13 planner props that are not about the local moment. Spread, then override. */
 const plannerBase = {
-  paused: true, coin: 200, economy: ECON, onVerb: noop, onRequestLocal: noop,
+  paused: true, coin: 200, economy: ECON, onVerb: noop, onRequestLocal: noop, onCancelLocal: noop,
   localPending: false, onLocal: noop,
   net: { assets: [], drops: [] } as NetworkView,
   board: boardView([], 1, STANDARD_RULES),
@@ -142,6 +142,41 @@ describe('DayPlanner — requested local moment', () => {
     expect(page).toContain('aria-label="local moment"');
     expect(page).toContain('ada');
     expect(page).toContain('bez');
+  });
+
+  // R41 (Astra I1): a requested or offered moment blocks time and travel until something consumes it.
+  // An empty circle offers nothing to choose, so without a way to let the moment pass the campaign
+  // is stranded at that tick. The pass control lives in the planner body (not the offer surface) so
+  // it covers both "requested, not yet reached" and "offered".
+  it('a pending moment can always be let pass, and the control calls onCancelLocal (R41)', () => {
+    let cancels = 0;
+    const onCancelLocal = () => { cancels += 1; };
+    const pass = (tree: ReturnType<typeof DayPlanner>) => {
+      const found: { props: { 'aria-label'?: string; disabled?: boolean; onClick?: () => void } }[] = [];
+      const walk = (node: unknown): void => {
+        if (Array.isArray(node)) { node.forEach(walk); return; }
+        if (node === null || typeof node !== 'object' || !('props' in node)) return;
+        const el = node as { props: { 'aria-label'?: string; children?: unknown } };
+        if (el.props['aria-label'] === 'let the moment pass') found.push(el as never);
+        walk(el.props.children);
+      };
+      walk(tree);
+      expect(found).toHaveLength(1);
+      return found[0]!;
+    };
+    const empty: LocalOffer = { tick: 0, venue: 'safehouse', circleMembers: [], token: 't#0' };
+    for (const [offer, localPending] of [[empty, true], [null, true]] as const) {
+      const button = pass(DayPlanner({ ...plannerBase, view: plannerView, offer, localPending, onCancelLocal }));
+      expect(button.props.disabled).toBe(false);
+      button.props.onClick!();
+    }
+    expect(cancels).toBe(2);
+    // Nothing pending: nothing to let pass.
+    expect(pass(DayPlanner({ ...plannerBase, view: plannerView, offer: null, onCancelLocal })).props.disabled)
+      .toBe(true);
+    expect(isDisabled(html(createElement(DayPlanner, {
+      ...plannerBase, view: plannerView, offer: empty, localPending: true, onCancelLocal,
+    })), 'let the moment pass')).toBe(false);
   });
 });
 
@@ -425,6 +460,7 @@ function deskProps(world: WorldState, over: Record<string, unknown> = {}) {
     economy: ECON,
     onVerb: noop,
     onRequestLocal: noop,
+    onCancelLocal: noop,
     onLocal: noop,
     localPending: true,
     net: networkView(world),

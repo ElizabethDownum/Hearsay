@@ -94,7 +94,7 @@ describe('received claim prose on the existing panels', () => {
     const view = playerView(world);
     const labels = claimNames(world);
     return html(createElement(DayPlanner, { view, paused: true, coin: world.coin, economy: RULES.economy,
-      onVerb: noop, onRequestLocal: noop, localPending: false, onLocal: noop,
+      onVerb: noop, onRequestLocal: noop, onCancelLocal: noop, localPending: false, onLocal: noop,
       nameOf: (id: string) => labels[id] ?? id, net: networkView(world), board: boardView(entries, 0, RULES),
       offer: { tick: view.tick, venue: view.avatar.venue!, circleMembers: view.avatar.circleMembers, token: 'test-offer' },
     }));

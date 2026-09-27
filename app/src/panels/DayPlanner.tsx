@@ -311,6 +311,9 @@ export interface DayPlannerProps {
   economy: EconomyDef;
   onVerb(intent: NonLocalActionIntent): void;
   onRequestLocal(): void;
+  /** Let a requested or offered moment pass unused. Without it an empty circle strands the player:
+   *  a pending moment blocks time and travel, and nobody is there to act on (R41). */
+  onCancelLocal(): void;
   localPending: boolean;
   /** The session's frozen offer, or null. The local surface renders ONLY when this is non-null. */
   offer: LocalOffer | null;
@@ -320,7 +323,7 @@ export interface DayPlannerProps {
 }
 
 export function DayPlanner(props: DayPlannerProps) {
-  const { view, paused, coin, economy, onVerb, onRequestLocal, localPending, offer } = props;
+  const { view, paused, coin, economy, onVerb, onRequestLocal, onCancelLocal, localPending, offer } = props;
   const off = !paused;
   const venues = [...view.map.venues].sort((a, b) => a.id.localeCompare(b.id));
   const canGo = (venue: { id: string; access: string }): boolean =>
@@ -348,6 +351,10 @@ export function DayPlanner(props: DayPlannerProps) {
       <button className="desk-btn" aria-label="request local interaction"
         disabled={off || localPending} onClick={onRequestLocal}>
         request local interaction
+      </button>
+      <button className="desk-btn" aria-label="let the moment pass"
+        disabled={!localPending} onClick={onCancelLocal}>
+        let the moment pass
       </button>
       {offer === null
         ? <p className="desk-note">No moment offered. Request one, then unpause to reach its beat.</p>

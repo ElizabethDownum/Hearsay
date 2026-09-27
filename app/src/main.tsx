@@ -93,7 +93,9 @@ const pad = (n: number) => String(n).padStart(2, '0');
 const fmtTick = (t: number) => `day ${dayOf(t)} · ${pad(Math.floor(minuteOfDay(t) / 60))}:${pad(minuteOfDay(t) % 60)}`;
 
 export function App() {
-  const sessionRef = useRef(newSession(SEED));
+  // Lazy: a `useRef(newSession(SEED))` argument is evaluated on every render and discarded (R41 M4).
+  const [initialSession] = useState(() => newSession(SEED));
+  const sessionRef = useRef(initialSession);
   const clockRef = useRef(makeClock());
   const tagId = useRef(0);
   const [, force] = useReducer((x: number) => x + 1, 0);
@@ -176,6 +178,14 @@ export function App() {
     const result = session.requestLocalInteraction();
     setLocalRequested(!result.refused);
     if (!result.refused) setToast(`Local moment requested for ${fmtTick(result.requestedFor)} — unpause to reach it`);
+    force();
+  };
+  // Letting the moment pass leaves the save untouched (offers are never logged); the beat then plays
+  // as an ordinary tick.
+  const passLocal = () => {
+    session.cancelLocalInteraction();
+    setLocalRequested(false);
+    setToast('You let the moment pass');
     force();
   };
   // The ONLY way a local act leaves this shell: composed against the token the session froze, so the
@@ -296,7 +306,7 @@ export function App() {
             <DayPlanner
               view={view} nameOf={nameOf} paused={speed === 0}
               coin={world.coin} economy={STANDARD_RULES.economy} onVerb={submitVerb}
-              onRequestLocal={requestLocal}
+              onRequestLocal={requestLocal} onCancelLocal={passLocal}
               offer={localOffer} net={net} board={board} onLocal={chooseLocal}
               localPending={localRequested || localOffer !== null} />
           )}
