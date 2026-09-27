@@ -11,6 +11,7 @@ import { hashWorld } from '../../src/sim/hash';
 import { scheduleSetup } from '../../src/sim/phases';
 import { CONVERSATION_BEAT } from '../../src/sim/rumors/propagation';
 import { SOMEONE, type EntityId } from '../../src/sim/rumors/claim';
+import { blankIntel } from '../../src/sim/fieldwork';
 import type { DirectiveBrief } from '../../src/sim/directives/types';
 import type { WorldState } from '../../src/sim/types';
 
@@ -178,6 +179,54 @@ describe('submit + advance reproduces runLogOn exactly — live ≡ replay', () 
     expect(session.world.tick).toBe(at(2, 0));
     expect(session.save().log.map((action) => action.kind)).toEqual(['goTo', 'tag', 'tell']);
     expect(hashWorld(loadSession(session.save(), at(2, 0)).world)).toBe(hashWorld(session.world));
+  });
+});
+
+/**
+ * R42 review M4: a sale through the app's own session path (offer, choose, advance) regrows from its
+ * log byte-identically. The intel it sells is a TRANSFORMED received version, so the sale mints a
+ * child claim mid-step; staging is world-level, so replay runs on an identically staged twin.
+ */
+function stageSaleRoom(world: WorldState): EntityId {
+  const guardIds = new Set(world.enemy.observers.map((observer) => observer.id));
+  const buyer = Object.keys(world.npcs).filter((id) => id !== world.playerId && !guardIds.has(id)).sort()[0]!;
+  world.venues['sale-room'] = { id: 'sale-room', district: 'd0', access: 'public' };
+  world.scheduleOverrides[buyer] = [{ fromDay: 0, toDay: 1, from: 0, to: 1440, venue: 'sale-room', source: 'vignette' }];
+  world.claims['c-for-sale'] = {
+    id: 'c-for-sale', family: 'f-for-sale', parent: null, subject: 'mallory', predicate: 'stole',
+    object: null, count: 2, severity: 3, place: null, attribution: SOMEONE,
+  };
+  world.intel.log.push({
+    ...blankIntel(), tick: 0, venue: 'sale-room', via: 'self', kind: 'utterance', overheard: false,
+    speaker: buyer, addressedTo: 'you', mode: 'telling', claimId: 'c-for-sale', family: 'f-for-sale',
+    reported: { subject: 'mallory', predicate: 'stole', object: null, count: 4, severity: 4, place: null, attribution: SOMEONE },
+  });
+  return buyer;
+}
+
+describe('a sale through the session path is live == replay (R42 review M4)', () => {
+  it('offer, sell, advance hashes equal to the log replayed on a staged twin', () => {
+    const session = newSession(SEED);
+    const buyer = stageSaleRoom(session.world);
+    session.submit({ kind: 'goTo', venue: 'sale-room' });
+    session.advance(7);
+    expect(session.requestLocalInteraction()).toEqual({ requestedFor: 15, refused: false });
+    expect(session.advance(20).stopped).toBe('local-offer');
+    const offer = session.localOffer()!;
+    expect(offer.circleMembers).toEqual([buyer]);
+    session.chooseLocal(offer.token, { kind: 'sell', family: 'f-for-sale', buyer });
+    session.advance(1);
+    const sale = session.world.chronicle.find((event) => event.kind === 'telling' && event.speaker === 'you');
+    if (sale?.kind !== 'telling') throw new Error('the sale spoke no telling');
+    expect(session.world.claims[sale.claimId]).toMatchObject({ parent: 'c-for-sale', count: 4, severity: 4 });
+    expect(session.world.beliefs[buyer]!['f-for-sale']).toMatchObject({ credence: 0.85, timesHeard: 1 });
+    session.advance(60);
+
+    const twin = newSession(SEED);
+    stageSaleRoom(twin.world);
+    runLogOn(twin.world, STANDARD_RULES, session.save().log, session.world.tick);
+    expect(session.save().log.map((action) => action.kind)).toEqual(['goTo', 'sell']);
+    expect(hashWorld(twin.world)).toBe(hashWorld(session.world));
   });
 });
 

@@ -201,7 +201,22 @@ describe('applySell — the buyer\'s hop-zero ingest (the SAME family; the SAME 
     expect(belief!.heardFrom).toBe('you');           // the avatar's own id
     expect(belief!.apparentSources).toEqual(['you']); // apparentSource = the avatar
     expect(belief!.credence).toBe(0.85);              // applyInject's hop-zero credence
+    expect(belief!.timesHeard).toBe(1);               // R42-1: one sale is heard once
     expect(belief!.discretion).toBe(false);
+  });
+
+  it('R42-1: a sold story naming its source is heard once, from that source, at the sale weight', () => {
+    const w = sellWorld('sell-named');
+    seedIntel(w, 'f-named', 'c-named', 4);
+    w.claims['c-named'] = { ...w.claims['c-named']!, attribution: 'mallory' };
+    w.intel.log.at(-1)!.reported = { ...w.intel.log.at(-1)!.reported!, attribution: 'mallory' };
+    applySell(w, 'buyer', 'f-named', 0, RULES);
+    runUntil(w, 1, RULES);
+
+    const belief = w.beliefs['buyer']!['f-named']!;
+    expect(belief.timesHeard).toBe(1);
+    expect(belief.apparentSources).toEqual(['mallory']); // the hearsay rule: the claim's own source
+    expect(belief.credence).toBe(0.85);                  // not corroborated by its own echo (0.95)
   });
 
   it('the sold story propagates: the buyer retells it on the very next beat by ordinary tellability', () => {
@@ -273,16 +288,35 @@ describe('applySell — a sale is hearsay to a mind that already holds the famil
     expect(w.network.sales).toContainEqual({ family: 'f-anc', buyer: 'buyer' });
   });
 
-  it('a weaker held belief is corroborated by ordinary ingestion, not lifted to the fresh-sale weight', () => {
+  // R42-1: the sale's persuasion is a FLOOR, not a replacement. Knowing a little of a story never
+  // leaves a buyer less persuaded than knowing nothing (Plan 8 Task 10: the buyer now retells it).
+  it('a weaker held belief keeps its version and history but is lifted to the sale weight', () => {
     const w = sellWorld('sell-weak');
-    const claim = held(w, 'f-weak', 0.4);
+    const claim = held(w, 'f-weak', 0.3);
     seedIntel(w, 'f-weak', 'c-weak', 4);
     applySell(w, 'buyer', 'f-weak', 0, RULES);
     runUntil(w, 1, RULES);
 
     const belief = w.beliefs['buyer']!['f-weak']!;
     expect(belief.claim).toBe(claim);
-    expect(belief.credence).toBeCloseTo(0.55, 10); // one new apparent source: +0.15
+    expect(belief.heardFrom).toBe('third');
+    expect(belief.apparentSources).toEqual(['third', 'you']);
+    expect(belief.timesHeard).toBe(2);
+    expect(belief.credence).toBe(0.85);
+  });
+
+  it('a holder who first heard it from the player is still persuaded by paying for it', () => {
+    const w = sellWorld('sell-repeat');
+    const claim = held(w, 'f-rep', 0.3);
+    w.beliefs['buyer']!['f-rep']!.apparentSources = ['you'];
+    seedIntel(w, 'f-rep', 'c-rep', 4);
+    applySell(w, 'buyer', 'f-rep', 0, RULES);
+    runUntil(w, 1, RULES);
+
+    const belief = w.beliefs['buyer']!['f-rep']!;
+    expect(belief.claim).toBe(claim);
+    expect(belief.apparentSources).toEqual(['you']); // a repeat origin corroborates nothing...
+    expect(belief.credence).toBe(0.85);              // ...but the sale's floor still applies
   });
 });
 

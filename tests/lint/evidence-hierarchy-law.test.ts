@@ -1617,6 +1617,8 @@ describe('R12 — credence provenance and same-target retention', () => {
     expect(live.records.filter((row) => row.verdict === 'retained')
       .map((row) => ({ file: row.file, within: row.within })).sort((a, b) => a.file.localeCompare(b.file)))
       .toEqual([
+        // R42-1: a sale's persuasion floor, max(held, 0.85), applied after the buyer's ordinary ingest.
+        { file: 'src/sim/phases.ts', within: 'recordAndIngest' },
         { file: 'src/sim/reactions.ts', within: 'reactToSelfRumor' },
         { file: 'src/sim/rumors/propagation.ts', within: 'ingest' },
       ]);

@@ -391,9 +391,15 @@ function consumePrior(world: WorldState, prior: ScheduledSetup[]): void {
   else delete world.scheduledSetup;
 }
 
+/** A sale's persuasion, applied after the buyer has heard the sale like any telling (R42-1). */
+interface SaleLift { buyer: EntityId; family: RumorId }
+
+/** The weight a paid telling carries: at least applyInject's hop-zero credence. */
+const SALE_CREDENCE = 0.85;
+
 function resolvePlayerSpeech(
   world: WorldState, rules: Rules, tick: Tick, offeredCircles: Circle[],
-  utterances: Utterance[], askings: Asking[],
+  utterances: Utterance[], askings: Asking[], saleLifts: SaleLift[],
 ): EntityId[] {
   if (minuteOfDay(tick) % CONVERSATION_BEAT !== 0 || world.playerId === null) return [];
   const offered = offeredCircles.find((circle) => circle.members.includes(world.playerId!));
@@ -424,15 +430,11 @@ function resolvePlayerSpeech(
       }
       world.coin += price;
       world.network.sales.push({ family, buyer });
-      // Only a buyer new to the family takes the sale's hop-zero entry. A mind that already holds it
-      // hears the sale as ordinary hearsay through the utterance below: first version sticks and
-      // corroboration never lowers credence (R42, Astra I3; the P9-3 anchor law).
-      if (world.beliefs[buyer]![family] === undefined) {
-        world.beliefs[buyer]![family] = {
-          claim, credence: 0.85, heardFrom: world.playerId, heardAt: tick, firstHeardAt: tick,
-          timesHeard: 1, apparentSources: [world.playerId], discretion: false, counterSpun: false,
-        };
-      }
+      // The buyer hears the sale ONCE, as ordinary hearsay through the utterance below (first version
+      // sticks, the apparent source is the claim's own, corroboration never lowers credence: R42,
+      // Astra I3; the P9-3 anchor law). The sale's persuasion is then a floor on what they hold, so a
+      // bought story is retellable whether or not they had heard it (R42-1).
+      saleLifts.push({ buyer, family });
       utterances.push({
         tick, venue: offered.venue, circleMembers: [...offered.members].sort(),
         speaker: world.playerId, addressedTo: buyer, claim, mode: 'telling',
@@ -499,7 +501,7 @@ function resolveNpcSpeech(
 
 function recordAndIngest(
   world: WorldState, rules: Rules, events: TickEvents, utterances: Utterance[], askings: Asking[],
-  networkSpeeches: NetworkSpeech[],
+  networkSpeeches: NetworkSpeech[], saleLifts: readonly SaleLift[],
 ): void {
   for (const utterance of utterances) {
     world.chronicle.push({
@@ -582,6 +584,10 @@ function recordAndIngest(
       }
     }
   }
+  for (const { buyer, family } of saleLifts) {
+    const belief = world.beliefs[buyer]![family];
+    if (belief) belief.credence = Math.max(belief.credence, SALE_CREDENCE);
+  }
 }
 
 function resolveEnvironment(world: WorldState, rules: Rules, tick: Tick): void {
@@ -636,9 +642,10 @@ function finishTickInternal(
   const utterances: Utterance[] = [];
   const askings: Asking[] = [];
   const networkSpeeches: NetworkSpeech[] = [];
+  const saleLifts: SaleLift[] = [];
   networkSpeeches.push(...deliverNetworkMessages(world, frame, rules, 'player'));
   const directSpeakers = resolvePlayerSpeech(
-    world, rules, frame.tick, frame.circles, utterances, askings,
+    world, rules, frame.tick, frame.circles, utterances, askings, saleLifts,
   );
 
   const positions = playerPhase === undefined ? preflightPositions : positionsAt(world, frame.tick);
@@ -653,7 +660,7 @@ function finishTickInternal(
   const events: TickEvents = { tick: frame.tick, positions, utterances, askings };
   if (networkSpeeches.length > 0) events.networkSpeeches = networkSpeeches;
   if (world.magic !== undefined && world.magic.traces.length > 0) events.residues = residueEvents(world);
-  recordAndIngest(world, rules, events, utterances, askings, networkSpeeches);
+  recordAndIngest(world, rules, events, utterances, askings, networkSpeeches, saleLifts);
   // THE BEAT TAIL (Plan 9): a planted letter is found and a convinced holder passes the sight of it
   // on. Physical acts on phase 4's simultaneous tier, resolved at its TAIL — after every word of the
   // beat is recorded and ingested, before phase 5's environment pass. `resolveArtifacts` documents
