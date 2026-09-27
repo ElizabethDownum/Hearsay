@@ -195,12 +195,12 @@ must absorb A5, B-series, P9-1..5 "Plan 10+" doors and every carry below; the pr
 | Astra I6 unreachable interrogation; two over-claiming enemy tests | 4 |
 | Office/compel +2 evaluator balance watch; Plan 11 (h) late-attempt watch `fromDay` seam | 5 |
 | R39 Minors 1/8 (preset and planner report clock) | 5 (evaluator touch) |
-| Save version + tick + pending offer | 7 |
+| Save version + tick + pending offer; a saved log holding a now-refused action throws on load (R40 review M-1) | 7 |
 | `.diff-cell` 2.46:1; F5 favicon; F6 Space guard; (n) usability watches; R39 Minor 7 vocabulary | 8 |
 | R39 Minors 2/3/9; Plan 11 (a), (i), (o) build size; suite flakiness | 9 |
 | Task 8 M-2, M-6; N-4 unused `FORGERY_LEAD_DAYS` export; Plan 11 (t), (u), (v), (l), (m) | 12 (housekeeping, or whenever those files are next touched) |
 | P9-5(d) watched-holder / contact-tracing cascade (backlog #4) | post-v1 unless Ellie promotes it |
-| Sound-out `meeting` window uncapped (R40 scope note; see its review) | pending R40 review |
+| Sound-out `meeting` window uncapped, pins a non-asset (R40 review, accepted) | R49 |
 
 ## Premise audit summary (2026-09-27)
 
@@ -214,11 +214,13 @@ backlog stale. Unverifiable as stated: the p95 band (harness measures no p95).
 
 ## Resume order
 
-1. Collect the R40 independent review → approval doc → push on Ellie's word.
+1. ~~Collect the R40 independent review~~ Approved after a test-only correction
+   (`docs/review/2026-09-27-r40-rendezvous-cap-approval.md`); push on Ellie's word.
 2. ~~Collect the Astra full review~~ Done: 0 C / 13 I / 4 M, all confirmed; triage in
    `docs/review/2026-09-27-astra-full-review.md`.
 3. Fix units R41–R48, serial, each TDD + six gates + comparator + independent review:
    R41 I1 empty-offer trap + M4; R42 I2/I3 sale transmits received claim through ingestion + sell
    test; R43 I9 courier price + M1/M2; R44 I10 relay traits; R45 I8 late hesitation follow-up;
-   R46 I7 watch identity; R47 I11/I12 Codex and evening-report arrival time; R48 M3 lint fence.
+   R46 I7 watch identity; R47 I11/I12 Codex and evening-report arrival time; R48 M3 lint fence;
+   R49 sound-out meeting window caps (R40 review carry).
 4. Task 1, with a fresh premise re-verification in its brief.
