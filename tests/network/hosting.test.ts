@@ -350,6 +350,35 @@ describe('meet — pull one asset to the safehouse from the next beat (rung 3)',
     });
   });
 
+  // R40 review I-1: every case above issues at tick 0, where "measured from issue" and "measured from
+  // zero" agree. Issued on day 2, a lead-capped window must still be judged against the issuing tick.
+  it.each([
+    ['opening exactly at the lead cap is accepted', RENDEZVOUS_MAX_LEAD, false],
+    ['opening one beat past it is refused', RENDEZVOUS_MAX_LEAD + 15, true],
+    ['opening one beat after issue is accepted', 15, false],
+  ])('issued on day 2, a window %s: the lead runs from the issuing tick (R40)', (_label, lead, refused) => {
+    const issued = at(2, 0);
+    const w = meetWorld('meet-cap-day2');
+    runUntil(w, issued, RULES);
+    applyAction(w, { tick: issued, kind: 'goTo', venue: 'tavern' }, RULES);
+    // Same seed for every case, and the handoff is possible: only the window's lead varies.
+    expect(circlesAt(w, issued).find((circle) => circle.members.includes(w.playerId!))!.members).toContain('ann');
+    const base = composedRendezvous(issued + lead, issued + lead + 30);
+    if (base.kind !== 'directive') throw new Error('composedRendezvous builds a directive');
+    const action: Action = {
+      ...base, tick: issued,
+      brief: { ...base.brief, active: { from: issued + 15, until: issued + at(0, 5) }, reportBy: issued + 15 },
+    };
+    const before = hashWorld(w);
+    if (refused) {
+      expect(() => applyAction(w, action, RULES)).toThrow(/rendezvous window must open within a day of issue/);
+      expect(hashWorld(w)).toBe(before);
+    } else {
+      applyAction(w, action, RULES);
+      expect(w.network.directiveState!.records).toHaveLength(1);
+    }
+  });
+
   it('the preset authors the window it gets: requested equals scheduled (R39)', () => {
     const w = runLogOn(meetWorld('meet-authored-preset'), RULES, [
       { tick: 0, kind: 'goTo', venue: 'tavern' },

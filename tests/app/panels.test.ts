@@ -945,29 +945,39 @@ describe('the composer greys its own submit on routes and times the engine must 
    * RENDEZVOUS_MAX_SPAN or opening more than RENDEZVOUS_MAX_LEAD after issue; the panels fence keeps
    * the composer's copy inline, so this sweep binds it: the composer greys exactly the windows the
    * engine's own constants refuse, measured from the beat the draft is offered on.
+   *
+   * R40 review I-1: the sweep first ran only at tick 0, where "from the offered beat" and "from zero"
+   * coincide, and it derived its reference tick from the composer's own `offer ?? view` choice. It now
+   * also runs at an explicit day-2 offered beat while the view stays at 0, so a copy measuring from
+   * zero, or from the view tick, fails here.
    */
   it('the composer greys exactly the rendezvous windows the engine caps refuse (R40)', () => {
-    const tick = sources().offer?.tick ?? sources().view.tick;
     const SPAN_NOTE = 'the rendezvous window can run at most four hours';
     const LEAD_NOTE = 'the rendezvous must open within a day';
-    expect(tick % 15).toBe(0);  // offered on a beat, so every swept window below is beat aligned
-    let refusedSpan = 0; let refusedLead = 0; let clear = 0;
-    for (const lead of [15, RENDEZVOUS_MAX_LEAD - 15, RENDEZVOUS_MAX_LEAD, RENDEZVOUS_MAX_LEAD + 15]) {
-      for (const span of [15, RENDEZVOUS_MAX_SPAN - 15, RENDEZVOUS_MAX_SPAN, RENDEZVOUS_MAX_SPAN + 15]) {
-        const from = tick + lead;
-        const mission = rendezvous(from, from + span);
-        const notes = directiveIssues({ ...base(), mission } as DirectiveDraft, sources());
-        const overSpan = span > RENDEZVOUS_MAX_SPAN;
-        const overLead = from - tick > RENDEZVOUS_MAX_LEAD;
-        expect(notes.includes(SPAN_NOTE), `span ${span} from ${from}`).toBe(overSpan);
-        expect(notes.includes(LEAD_NOTE), `lead ${from - tick} span ${span}`).toBe(overLead);
-        if (overSpan) refusedSpan++;
-        if (overLead) refusedLead++;
-        if (!overSpan && !overLead) { clear++; expect(notes).toEqual([]); }
+    expect(sources().offer!.tick).toBe(0);
+    expect(sources().view.tick).toBe(0);
+    for (const offered of [0, at(2, 0)]) {
+      const src = { ...sources(), offer: { ...sources().offer!, tick: offered } };
+      let refusedSpan = 0; let refusedLead = 0; let clear = 0;
+      for (const lead of [15, RENDEZVOUS_MAX_LEAD - 15, RENDEZVOUS_MAX_LEAD, RENDEZVOUS_MAX_LEAD + 15]) {
+        for (const span of [15, RENDEZVOUS_MAX_SPAN - 15, RENDEZVOUS_MAX_SPAN, RENDEZVOUS_MAX_SPAN + 15]) {
+          const from = offered + lead;
+          const draft = offered === 0 ? base() : {
+            ...base(), activeFrom: offered + 15, activeUntil: offered + TICKS_PER_DAY, reportBy: offered + 15,
+          };
+          const notes = directiveIssues({ ...draft, mission: rendezvous(from, from + span) } as DirectiveDraft, src);
+          const overSpan = span > RENDEZVOUS_MAX_SPAN;
+          const overLead = lead > RENDEZVOUS_MAX_LEAD;
+          expect(notes.includes(SPAN_NOTE), `offered ${offered} span ${span} from ${from}`).toBe(overSpan);
+          expect(notes.includes(LEAD_NOTE), `offered ${offered} lead ${lead} span ${span}`).toBe(overLead);
+          if (overSpan) refusedSpan++;
+          if (overLead) refusedLead++;
+          if (!overSpan && !overLead) { clear++; expect(notes, `offered ${offered} lead ${lead}`).toEqual([]); }
+        }
       }
+      // Non-vacuity: the sweep crosses both caps and leaves real windows clear.
+      expect([refusedSpan > 0, refusedLead > 0, clear > 0]).toEqual([true, true, true]);
     }
-    // Non-vacuity: the sweep crosses both caps and leaves real windows clear.
-    expect([refusedSpan > 0, refusedLead > 0, clear > 0]).toEqual([true, true, true]);
   });
 
   it('an active window that has already closed is reported against the offered beat', () => {
