@@ -79,6 +79,9 @@ today emits none of them (`app/src/panels/DayPlanner.tsx:341-711`).
 - Price display from `economy`; the render-verification idiom (markup-level, no jsdom).
 - The browser gate's unmeasured surfaces (F3/F4: artifact section, overlay glyphs) get measured
   here, since these composers finally produce the data to render them.
+- Astra I5: dossier trait / edge / hint facts are unreadable in every live view; surface them.
+- Astra I13: no app path authors Codex hypotheses or Counter-Sketch cards; add the authoring
+  surfaces (both engine APIs exist).
 
 ### Task 2: Substory pass (original Task 2, with corrections)
 
@@ -90,6 +93,8 @@ and hooks exist). Corrections:
 - Confirm `mint-claim`'s direct witnessed-belief write (`vignettes/engine.ts:81-101`) against the
   speech-only law before adding consequences; record the ruling.
 - `broken-betrothal` never fires in current probes (0 over 5 seeds × 6 days): diagnose while here.
+- Astra planning note: standard generation creates no lover/debtor edges, so relationship-gated
+  substories lack ordinary prerequisites. Decide whether gen supplies them or the defs change.
 
 ### Task 3: The honest bot fleet and outcome battery (original Task 1, rebuilt)
 
@@ -108,8 +113,9 @@ Every foundation of the original moved:
   remote verb; `assignInformant` and `courier` are directive-shaped and may be refused or deferred;
   debrief needs `meet`; the fabricator uses `forge` and `shape spread` as well as couriers.
 - Battery output adds day-of-win distributions (decision 2) and directive refusal rates.
-- **Live ≡ replay for bot runs**: a bot's saved log must replay to the identical world (the Astra
-  review reports a divergence here; its fix is a precondition).
+- **Live ≡ replay for bot runs**: a bot's saved log must replay to the identical world. Astra I4
+  (confirmed): `runBotCampaignOn` keeps ticking past an ending and logs a day's actions before
+  executing them. The new runner must stop at the terminal and log only executed actions.
 
 ### Task 4 (new): Enemy reachability — make exposure a real threat
 
@@ -117,6 +123,13 @@ Precondition for balance (decision 3). Measure with the honest fleet why the ene
 against the player (pressure 0 / 100 nights): is the avatar never observed, are observations
 filtered away, are the digest's heuristics unreachable at v1 density? Report the causal chain with
 tables, then propose levers (from the bounded list) for Ellie. No retune lands without her ruling.
+- Astra I6 (confirmed) is a leading candidate: in generated towns the interrogation venue is the
+  first sorted invitational venue (`back-room-d*`, no regulars; `src/sim/enemy/digest.ts:502-505`)
+  and nothing summons the target, so questioning cannot happen. How a target is lawfully brought
+  in is a design ruling for Ellie; measure first, then propose.
+- Correct the two over-claiming tests Astra named: `tests/sim/enemy-pressure.test.ts:233`
+  (perturbs nothing) and `tests/sim/enemy-schedule-application.test.ts:98` (never reaches
+  questioning).
 
 ### Task 5: Balance pass (original Task 3)
 
@@ -176,7 +189,10 @@ must absorb A5, B-series, P9-1..5 "Plan 10+" doors and every carry below; the pr
 | F3/F4 unmeasured artifact / overlay render | 1 |
 | Plan 11 (k) `directiveIssues` ↔ engine parity (first-hop and R40 caps are pinned; the rest is not) | 1 |
 | `watched-district` wording; mint-claim law check; broken-betrothal never fires | 2 |
-| Bot live ≡ replay (pending Astra confirmation) | 3 |
+| Astra I5, I13 (dossier facts unreadable; no Codex/Counter-Sketch authoring) | 1 |
+| Astra: no lover/debtor edges in standard gen | 2 |
+| Astra I4 bot runner past terminal / live ≡ replay | 3 |
+| Astra I6 unreachable interrogation; two over-claiming enemy tests | 4 |
 | Office/compel +2 evaluator balance watch; Plan 11 (h) late-attempt watch `fromDay` seam | 5 |
 | R39 Minors 1/8 (preset and planner report clock) | 5 (evaluator touch) |
 | Save version + tick + pending offer | 7 |
@@ -199,6 +215,10 @@ backlog stale. Unverifiable as stated: the p95 band (harness measures no p95).
 ## Resume order
 
 1. Collect the R40 independent review → approval doc → push on Ellie's word.
-2. Collect the Astra full review; verify each Critical/Important finding before accepting it; turn
-   confirmed findings into R41+ units and schedule them per decision 5.
-3. Task 1, with a fresh premise re-verification in its brief.
+2. ~~Collect the Astra full review~~ Done: 0 C / 13 I / 4 M, all confirmed; triage in
+   `docs/review/2026-09-27-astra-full-review.md`.
+3. Fix units R41–R48, serial, each TDD + six gates + comparator + independent review:
+   R41 I1 empty-offer trap + M4; R42 I2/I3 sale transmits received claim through ingestion + sell
+   test; R43 I9 courier price + M1/M2; R44 I10 relay traits; R45 I8 late hesitation follow-up;
+   R46 I7 watch identity; R47 I11/I12 Codex and evening-report arrival time; R48 M3 lint fence.
+4. Task 1, with a fresh premise re-verification in its brief.
