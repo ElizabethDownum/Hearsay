@@ -42,6 +42,8 @@ import { Term } from './Term';
  */
 const SOMEONE = 'someone';
 const BEAT = 15;
+const RENDEZVOUS_MAX_SPAN = 16 * BEAT;
+const RENDEZVOUS_MAX_LEAD = TICKS_PER_DAY;
 const MICE = ['money', 'ideology', 'coercion', 'ego'] as const;
 const PREDICATES = Object.keys(TERMS)
   .filter((key) => key.startsWith('predicate-'))
@@ -282,6 +284,12 @@ export function directiveIssues(draft: DirectiveDraft, sources: ComposerSources)
   const mission = draft.mission;
   if (mission.application === 'rendezvous') {
     notes.push(...windowNotes('rendezvous', mission.from, mission.until));
+    // The engine's caps at issue (R40, RENDEZVOUS_MAX_SPAN / _LEAD in src/sim/actions.ts), inline by
+    // the panels fence and bound to those constants by the parity pin in tests/app/panels.test.ts.
+    if (mission.until - mission.from > RENDEZVOUS_MAX_SPAN) {
+      notes.push('the rendezvous window can run at most four hours');
+    }
+    if (mission.from - tick > RENDEZVOUS_MAX_LEAD) notes.push('the rendezvous must open within a day');
   }
   if (mission.application === 'standard' && mission.mission === 'sound-out') {
     if (mission.target === draft.recipient) notes.push('an asset cannot be asked to sound themselves out');

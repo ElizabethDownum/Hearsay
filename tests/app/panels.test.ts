@@ -18,6 +18,7 @@ import { computeLayout } from '../../app/src/town/layout';
 import { VERB_TERM } from '../../app/src/input/actions';
 import { newSession, type LocalOffer } from '../../app/src/loop/session';
 import { firstHandoffHop } from '../../src/sim/directives/types';
+import { RENDEZVOUS_MAX_LEAD, RENDEZVOUS_MAX_SPAN } from '../../src/sim/actions';
 import { TERMS } from '../../src/content/terms';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { webView, type WebView } from '../../src/intel/web';
@@ -901,6 +902,36 @@ describe('the composer greys its own submit on routes and times the engine must 
       circle.has(firstHandoffHop({ outboundVia, reportVia: [] }, recipient)))).toBe(true);
     expect(arrangements.some(({ recipient, outboundVia }) =>
       !circle.has(firstHandoffHop({ outboundVia, reportVia: [] }, recipient)))).toBe(true);
+  });
+
+  /**
+   * THE RENDEZVOUS CAP PARITY PIN (R40). The engine refuses a composed rendezvous longer than
+   * RENDEZVOUS_MAX_SPAN or opening more than RENDEZVOUS_MAX_LEAD after issue; the panels fence keeps
+   * the composer's copy inline, so this sweep binds it: the composer greys exactly the windows the
+   * engine's own constants refuse, measured from the beat the draft is offered on.
+   */
+  it('the composer greys exactly the rendezvous windows the engine caps refuse (R40)', () => {
+    const tick = sources().offer?.tick ?? sources().view.tick;
+    const SPAN_NOTE = 'the rendezvous window can run at most four hours';
+    const LEAD_NOTE = 'the rendezvous must open within a day';
+    expect(tick % 15).toBe(0);  // offered on a beat, so every swept window below is beat aligned
+    let refusedSpan = 0; let refusedLead = 0; let clear = 0;
+    for (const lead of [15, RENDEZVOUS_MAX_LEAD - 15, RENDEZVOUS_MAX_LEAD, RENDEZVOUS_MAX_LEAD + 15]) {
+      for (const span of [15, RENDEZVOUS_MAX_SPAN - 15, RENDEZVOUS_MAX_SPAN, RENDEZVOUS_MAX_SPAN + 15]) {
+        const from = tick + lead;
+        const mission = rendezvous(from, from + span);
+        const notes = directiveIssues({ ...base(), mission } as DirectiveDraft, sources());
+        const overSpan = span > RENDEZVOUS_MAX_SPAN;
+        const overLead = from - tick > RENDEZVOUS_MAX_LEAD;
+        expect(notes.includes(SPAN_NOTE), `span ${span} from ${from}`).toBe(overSpan);
+        expect(notes.includes(LEAD_NOTE), `lead ${from - tick} span ${span}`).toBe(overLead);
+        if (overSpan) refusedSpan++;
+        if (overLead) refusedLead++;
+        if (!overSpan && !overLead) { clear++; expect(notes).toEqual([]); }
+      }
+    }
+    // Non-vacuity: the sweep crosses both caps and leaves real windows clear.
+    expect([refusedSpan > 0, refusedLead > 0, clear > 0]).toEqual([true, true, true]);
   });
 
   it('an active window that has already closed is reported against the offered beat', () => {

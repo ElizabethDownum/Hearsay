@@ -68,6 +68,17 @@ export function offeredVenueFor(world: WorldState, offered: OfferedCircles): Ven
     ?? world.playerVenue;
 }
 
+/**
+ * The caps on a composed rendezvous window, checked at issue (R40). Since R39 execution honours the
+ * authored window, so without them the day planner could pin an asset away from the town for weeks,
+ * or hold the record of a far-future meeting `attempted` throughout. Four hours matches the longest
+ * physical commitment a brief can already make (a posting's 16:00-20:00); the lead is measured from
+ * the tick the directive is issued. The composer mirrors both inline (the panels fence), bound by
+ * the parity pin in tests/app/panels.test.ts.
+ */
+export const RENDEZVOUS_MAX_SPAN = 16 * CONVERSATION_BEAT;
+export const RENDEZVOUS_MAX_LEAD = TICKS_PER_DAY;
+
 /** Author one player-side outcome brief. Delivery is a separate physical phase. */
 export function applyDirective(
   world: WorldState,
@@ -127,6 +138,12 @@ function applyDirectiveWithCause(
       || application.from % CONVERSATION_BEAT !== 0
       || application.until % CONVERSATION_BEAT !== 0) {
       throw new Error('directive: rendezvous window must be nonempty and beat aligned');
+    }
+    if (application.until - application.from > RENDEZVOUS_MAX_SPAN) {
+      throw new Error('directive: rendezvous window may run at most four hours');
+    }
+    if (application.from - tick > RENDEZVOUS_MAX_LEAD) {
+      throw new Error('directive: rendezvous window must open within a day of issue');
     }
     if (brief.mission.kind !== 'learn' || brief.mission.target.kind !== 'venue'
       || brief.mission.target.id !== application.venue) {

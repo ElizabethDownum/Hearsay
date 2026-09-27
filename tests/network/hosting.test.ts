@@ -4,6 +4,7 @@ import { STANDARD_RULES } from '../../src/content/rules';
 import { STANDARD_ECONOMY } from '../../src/content/economy';
 import {
   applyGoTo, applyHost, applyInject, applyMeet, applyTell, type InjectSpec,
+  RENDEZVOUS_MAX_LEAD, RENDEZVOUS_MAX_SPAN,
 } from '../../src/sim/actions';
 import { applyAction, runLogOn, type Action } from '../../src/sim/campaign';
 import { circlesAt, positionOf } from '../../src/sim/agents';
@@ -308,6 +309,44 @@ describe('meet — pull one asset to the safehouse from the next beat (rung 3)',
     ], 16);
     expect(w.network.invitations![0]!).toMatchObject({
       requested: { from: 15, until: 90 }, scheduled: { from: 15, until: 90 },
+    });
+  });
+
+  // R40: since R39 honours the authored window, an unbounded one could pin an asset for weeks, or hold
+  // the record of a far-future meeting `attempted` throughout. The window is capped at issue: at most
+  // RENDEZVOUS_MAX_SPAN long, opening no later than RENDEZVOUS_MAX_LEAD after the tick it is issued.
+  const issueComposed = (w: WorldState, from: number, until: number): void => {
+    applyAction(w, { tick: 0, kind: 'goTo', venue: 'tavern' }, RULES);
+    applyAction(w, composedRendezvous(from, until), RULES);
+  };
+
+  it('the caps are the ones the owner chose: four hours long, opening within a day (R40)', () => {
+    expect(RENDEZVOUS_MAX_SPAN).toBe(16 * 15);
+    expect(RENDEZVOUS_MAX_LEAD).toBe(at(1, 0));
+  });
+
+  it.each([
+    ['a window one beat longer than the span cap', 15, 15 + RENDEZVOUS_MAX_SPAN + 15,
+      /directive: rendezvous window may run at most four hours/],
+    ['a window opening one beat past the lead cap', RENDEZVOUS_MAX_LEAD + 15, RENDEZVOUS_MAX_LEAD + 45,
+      /directive: rendezvous window must open within a day of issue/],
+  ])('%s is refused at issue with zero residue (R40)', (_label, from, until, message) => {
+    const w = meetWorld(`meet-capped-${from}-${until}`);
+    applyAction(w, { tick: 0, kind: 'goTo', venue: 'tavern' }, RULES);
+    const before = hashWorld(w);
+    expect(() => applyAction(w, composedRendezvous(from, until), RULES)).toThrow(message);
+    expect(hashWorld(w)).toBe(before);
+  });
+
+  it.each([
+    ['exactly the span cap', 15, 15 + RENDEZVOUS_MAX_SPAN],
+    ['opening exactly at the lead cap', RENDEZVOUS_MAX_LEAD, RENDEZVOUS_MAX_LEAD + 30],
+  ])('a window of %s is accepted and scheduled as authored (R40)', (_label, from, until) => {
+    const w = meetWorld(`meet-cap-edge-${from}-${until}`);
+    issueComposed(w, from, until);
+    runUntil(w, 16, RULES);
+    expect(w.network.invitations![0]!).toMatchObject({
+      requested: { from, until }, scheduled: { from, until },
     });
   });
 
