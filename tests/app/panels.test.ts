@@ -1069,7 +1069,7 @@ describe('preset and fully composed custom applications reach the SAME typed exe
         payload: { family: null, parent: null, claim: spec },
         audience: { kind: 'person', id: 'cyn' } },
       active: { from: 15, until: 3 * TICKS_PER_DAY }, reportBy: 3 * TICKS_PER_DAY,
-    }, 0, { kind: 'courier', target: 'cyn' });
+    }, 0, { kind: 'courier', target: 'cyn' }, undefined, STANDARD_RULES);
 
     expect(branchOf(custom)).toEqual(branchOf(preset));
   });
@@ -1108,8 +1108,9 @@ describe('preset and fully composed custom applications reach the SAME typed exe
     const record = ensureDirectiveState(world).records.at(-1)!;
     expect(record.received, 'the relay has not handed it over yet').toBeNull();
     expect(world.intel.informants.find((i) => i.id === 'dov')!.assignedVenue).toBeNull();
-    // The player-facing surfaces show the AUTHORED mark and nothing operational.
-    expect(networkView(world).assets.find((a) => a.id === 'dov')!.requestedVenue).toBeNull();
+    // The player-facing surfaces show the AUTHORED mark and nothing operational. (Before R43 this
+    // pinned `requestedVenue` null: a composed posting recorded no authored mark at all, Astra M1.)
+    expect(networkView(world).assets.find((a) => a.id === 'dov')!.requestedVenue).toBe('market');
     expect(directiveView(world).rows.at(-1)!.recipient).toBe('dov');
   });
 });

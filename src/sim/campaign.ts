@@ -274,7 +274,7 @@ export function applyAction(
     case 'directive':
       applyDirective(
         world, action.recipient, action.handoff, action.brief, action.tick, action.application,
-        frame?.circles,
+        frame?.circles, rules,
       );
       break;
     case 'scry':

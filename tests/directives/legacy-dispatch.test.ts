@@ -122,7 +122,8 @@ describe('typed directive applications retire remote command dispatch', () => {
   ] as const)('runs a custom relayed %s through the typed application without first-hop effects',
     (kind, brief, application) => {
       const world = playerWorld();
-      applyDirective(world, 'ada', { outboundVia: ['bez'], reportVia: ['bez'] }, brief, 0, application);
+      applyDirective(world, 'ada', { outboundVia: ['bez'], reportVia: ['bez'] }, brief, 0, application,
+        undefined, STANDARD_RULES);
       const record = world.network.directiveState!.records[0]!;
       const authoredNonMission = (({ priority, authority, discretion, specificity, guidance,
         active, report, reportBy, purpose }) => ({ priority, authority, discretion, specificity,

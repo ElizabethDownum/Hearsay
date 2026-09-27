@@ -79,7 +79,8 @@ export function offeredVenueFor(world: WorldState, offered: OfferedCircles): Ven
 export const RENDEZVOUS_MAX_SPAN = 16 * CONVERSATION_BEAT;
 export const RENDEZVOUS_MAX_LEAD = TICKS_PER_DAY;
 
-/** Author one player-side outcome brief. Delivery is a separate physical phase. */
+/** Author one player-side outcome brief. Delivery is a separate physical phase. `rules` is required
+ *  only by a priced application (a courier run, R43); an unpriced brief may omit it. */
 export function applyDirective(
   world: WorldState,
   recipient: EntityId,
@@ -88,8 +89,9 @@ export function applyDirective(
   tick: Tick,
   application: PlayerDirectiveApplication = { kind: 'standard' },
   offered?: readonly Circle[],
+  rules?: Rules,
 ): void {
-  applyDirectiveWithCause(world, recipient, handoff, brief, tick, application, 'directive', offered);
+  applyDirectiveWithCause(world, recipient, handoff, brief, tick, application, 'directive', offered, rules);
 }
 
 function applyDirectiveWithCause(
@@ -101,6 +103,7 @@ function applyDirectiveWithCause(
   application: PlayerDirectiveApplication,
   causeAction: NonNullable<NetworkSpeech['cause']>['action'],
   offered?: readonly Circle[],
+  rules?: Rules,
 ): void {
   const principalId = world.playerId;
   if (principalId === null) throw new Error('directive: no player is enrolled');
@@ -179,11 +182,23 @@ function applyDirectiveWithCause(
     throw new Error(`directive: first handoff '${firstHop}' is not in the offered circle`);
   }
 
+  // The courier price is charged by common issuance, so the preset and a composed courier are the same
+  // priced act (R43, Astra I9). Validated here, before any state allocation; debited once, below.
+  let courierCost = 0;
+  if (application.kind === 'courier') {
+    if (!rules) throw new Error('directive: a courier application requires rules (economy prices)');
+    courierCost = rules.economy.courierRun;
+    if (!canAfford(world, courierCost)) {
+      throw new Error(`directive: the treasury cannot cover this courier run (${courierCost} needed, ${world.coin} held)`);
+    }
+  }
+
   const carried = cloneSerializable(brief);
   delete carried.application;
   if (application.kind !== 'standard') carried.application = cloneSerializable(application);
   let correlation: Parameters<typeof issueDirectiveRecord>[1]['correlation'];
   if (application.kind === 'courier') {
+    debitCoin(world, courierCost);
     const planId = appendCourierPlan(world, {
       asset: recipient, target: application.target,
       from: latestPlayerKnownVenue(world, recipient),
@@ -197,6 +212,12 @@ function applyDirectiveWithCause(
     ...(correlation ? { correlation } : {}), tick,
     cause: { kind: 'player-action', action: causeAction, tick },
   });
+  // The player's own planning mark, recorded for every posting however it was authored (R43, Astra
+  // M1): the authored term, independent of hidden acceptance or execution.
+  if (application.kind === 'posting') {
+    const requested = world.intel.requestedPosts ?? (world.intel.requestedPosts = []);
+    requested.push({ informant: recipient, venue: application.venue, authoredAt: tick });
+  }
 }
 
 /** Player tells a rumor to one NPC. Hop zero — the town owns the rest. */
@@ -488,16 +509,17 @@ export function applyCourier(
   };
 
   // --- Effects (all validation passed) ---
-  debitCoin(world, cost);
   if (viaDrop === null) {
     // A face handoff is a meeting: the courier's compartment records having met the avatar (ONE
     // direction — the avatar keeps no compartment). This is the `met-asset` that the drop path lacks.
     recordPlayerKnownFact(world, asset, { kind: 'met-asset', ref: world.playerId });
+    // Common issuance charges the run (R43): the affordability check above already passed.
     applyDirectiveWithCause(
       world, asset, { outboundVia: [], reportVia: [] }, brief, tick,
-      { kind: 'courier', target }, 'courier', offered,
+      { kind: 'courier', target }, 'courier', offered, rules,
     );
   } else {
+    debitCoin(world, cost);
     const drop = world.network.drops.find((d) => d.id === viaDrop)!;
     if (!drop.knownBy.includes(asset)) {
       drop.knownBy.push(asset);
@@ -819,8 +841,6 @@ export function applyAssignInformant(
     world, informant, { outboundVia: [], reportVia: [] }, brief, tick,
     { kind: 'posting', venue }, 'assignInformant', offered,
   );
-  const requested = world.intel.requestedPosts ?? (world.intel.requestedPosts = []);
-  requested.push({ informant, venue, authoredAt: tick });
 }
 
 /** Add/remove a trait hypothesis in the Codex. Propose is idempotent per (npc, trait). */

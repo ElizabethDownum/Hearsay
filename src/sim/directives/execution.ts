@@ -367,7 +367,13 @@ function opportunityFor(
       }
       return null;
     }
-    return adaptivePerson(circle, record.recipient) === null ? null : { method, adapted: false };
+    // A venue audience is the named room (R43, Astra M2): literal execution tells there or not at
+    // all; an adaptive asset may work the room it is in, and says so — the observe-venue shape.
+    if (adaptivePerson(circle, record.recipient) === null) return null;
+    if (circle.venue === method.audience.id) return { method, adapted: false };
+    return profile.initiative === 'adaptive'
+      ? { method: { ...method, audience: { kind: 'venue', id: circle.venue } }, adapted: true }
+      : null;
   }
   if (method.kind === 'approach' || method.kind === 'invite-meeting') {
     // A sounding-out asset works its REAL target: the approach is a named conversation, so no
