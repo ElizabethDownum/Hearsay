@@ -48,6 +48,8 @@ export interface Session {
   submit(intent: NonLocalActionIntent): SubmitResult;
   requestLocalInteraction(): RequestLocalResult;
   cancelLocalInteraction(): void;
+  /** A local moment is requested, offered, or chosen and its beat has not played (R41-1). */
+  localPending(): boolean;
   localOffer(): LocalOffer | null;
   chooseLocal(token: string, intent: LocalActionIntent): SubmitResult;
   speechQueuedForBeat(now: Tick): boolean;
@@ -172,6 +174,9 @@ function makeSession(seed: string, world: WorldState, log: Action[]): Session {
     cancelLocalInteraction(): void {
       requestedFor = null;
       pendingOffer = null;
+    },
+    localPending(): boolean {
+      return pendingTick() !== null;
     },
     localOffer(): LocalOffer | null {
       if (!pendingOffer) return null;

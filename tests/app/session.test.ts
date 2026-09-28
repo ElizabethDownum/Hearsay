@@ -353,6 +353,43 @@ describe('requested-beat local offer', () => {
     expect(hashWorld(loadSession(session.save(), session.world.tick).world)).toBe(hashWorld(session.world));
   });
 
+  // R41-1 (R41 review M-2): the pass control is enabled for a REQUESTED moment too, so a moment that
+  // has not been reached yet must be cancellable: the beat then plays as an ordinary tick.
+  it('a requested moment not yet reached can be let pass; the beat plays as ordinary', () => {
+    const session = newSession(SEED);
+    session.advance(3);
+    const before = session.save();
+    expect(session.requestLocalInteraction()).toEqual({ requestedFor: 15, refused: false });
+    expect(session.localPending()).toBe(true);
+    session.advance(5);
+    session.cancelLocalInteraction();
+    expect(session.localPending()).toBe(false);
+    expect(session.save()).toEqual(before);
+    expect(session.advance(40)).toEqual({ advanced: 40, stopped: 'complete' });
+    expect(session.localOffer()).toBeNull();
+    expect(hashWorld(loadSession(session.save(), session.world.tick).world)).toBe(hashWorld(session.world));
+  });
+
+  // R41-1 (R41 review M-3): letting the moment pass after choosing withdraws the choice. It was never
+  // logged, so nothing leaks; a fresh request re-offers the same beat under a new token, and I-1 (one
+  // act per offer) still holds for that offer.
+  it('passing after a choice withdraws it unlogged; a re-request re-offers the same beat', () => {
+    const { session, offer, members } = requestStagedOffer(1);
+    session.chooseLocal(offer.token, { kind: 'ask', to: members[0]!, about: { subject: members[0]! } });
+    expect(session.localPending()).toBe(true);
+    session.cancelLocalInteraction();
+    expect(session.localPending()).toBe(false);
+    expect(session.requestLocalInteraction()).toEqual({ requestedFor: offer.tick, refused: false });
+    expect(session.advance(1).stopped).toBe('local-offer');
+    const again = session.localOffer()!;
+    expect(again.tick).toBe(offer.tick);
+    expect(again.token).not.toBe(offer.token);
+    session.cancelLocalInteraction();
+    session.advance(1);
+    expect(session.save().log.some((action) => action.kind === 'ask')).toBe(false);
+    expect(session.world.chronicle.some((event) => event.kind === 'asking' && event.speaker === 'you')).toBe(false);
+  });
+
   it('request at minute 7 records only the requested beat and is save-inert', () => {
     const session = newSession(SEED);
     session.advance(7);

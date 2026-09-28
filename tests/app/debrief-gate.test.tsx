@@ -27,6 +27,7 @@ vi.mock(gate.session, async () => {
     const forbidden = () => { throw new Error('Rendering must not execute a session command'); };
     return { seed, world: gate.world, log: [], submit: forbidden, requestLocalInteraction: forbidden,
       cancelLocalInteraction: forbidden, chooseLocal: forbidden, advance: forbidden, localOffer: () => null,
+      localPending: () => false,
       speechQueuedForBeat: () => false, save: () => ({ seed, log: [] }) };
   } };
 });

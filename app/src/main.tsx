@@ -96,7 +96,8 @@ export function App() {
   // Lazy: a `useRef(newSession(SEED))` argument is evaluated on every render and discarded (R41 M4).
   const [initialSession] = useState(() => newSession(SEED));
   const sessionRef = useRef(initialSession);
-  const clockRef = useRef(makeClock());
+  const [initialClock] = useState(makeClock);
+  const clockRef = useRef(initialClock);
   const tagId = useRef(0);
   const [, force] = useReducer((x: number) => x + 1, 0);
   const [panel, setPanel] = useState<PanelKind | null>('planner');
@@ -106,7 +107,6 @@ export function App() {
   const [webNpc, setWebNpc] = useState<string | null>(null);
   const [ledgerVia, setLedgerVia] = useState<string>('self');
   const [toast, setToast] = useState<string>('');
-  const [localRequested, setLocalRequested] = useState(false);
 
   const session = sessionRef.current;
   const world = session.world;
@@ -176,15 +176,13 @@ export function App() {
   const removeTag = (id: string) => submitVerb({ kind: 'tag', op: 'remove', id, target: null, text: null });
   const requestLocal = () => {
     const result = session.requestLocalInteraction();
-    setLocalRequested(!result.refused);
     if (!result.refused) setToast(`Local moment requested for ${fmtTick(result.requestedFor)} — unpause to reach it`);
     force();
   };
   // Letting the moment pass leaves the save untouched (offers are never logged); the beat then plays
-  // as an ordinary tick.
+  // as an ordinary tick. Before the beat plays it also withdraws an act already chosen for it.
   const passLocal = () => {
     session.cancelLocalInteraction();
-    setLocalRequested(false);
     setToast('You let the moment pass');
     force();
   };
@@ -196,7 +194,6 @@ export function App() {
     if (!offer) return;
     try {
       const { queuedFor } = session.chooseLocal(offer.token, intent);
-      setLocalRequested(false);
       setToast(`${TERMS[VERB_TERM[intent.kind]]!.label} chosen for ${fmtTick(queuedFor)} — unpause to play the beat`);
     } catch (err) {
       setToast(err instanceof Error ? err.message : String(err));
@@ -308,7 +305,7 @@ export function App() {
               coin={world.coin} economy={STANDARD_RULES.economy} onVerb={submitVerb}
               onRequestLocal={requestLocal} onCancelLocal={passLocal}
               offer={localOffer} net={net} board={board} onLocal={chooseLocal}
-              localPending={localRequested || localOffer !== null} />
+              localPending={session.localPending()} />
           )}
           {panel === 'network' && <Network view={net} history={approaches} />}
           {panel === 'directives' && <Directives view={directives} nameOf={nameOf} />}
