@@ -218,7 +218,13 @@ backlog stale. Unverifiable as stated: the p95 band (harness measures no p95).
    (`docs/review/2026-09-27-r40-rendezvous-cap-approval.md`); push on Ellie's word.
 2. ~~Collect the Astra full review~~ Done: 0 C / 13 I / 4 M, all confirmed; triage in
    `docs/review/2026-09-27-astra-full-review.md`.
-3. Fix units R41–R48, serial, each TDD + six gates + comparator + independent review:
+3. **In progress (27 Sep).** R41 `48667d4`, R42 `ef43e1a`, R43 `d0c9d59` and R44 `9c319d2` are
+   committed, and so are the review corrections R42-1 `3056644` and R41-1 `a002dd9`. The R41-1 and
+   R42-1 re-checks were stopped; re-dispatch them. R43-1 is owed (composer courier price and gate;
+   the ideology refusal is preset-only). R44-1 is at RED in the working tree (partisan uses the
+   gossip context; field-report caller and `familyOf` pins; see
+   `.superpowers/sdd/r44-1-implementation-validation/RESUME.md`). Approval docs for R41-R44 are owed.
+   Original unit list, each serial, TDD, six gates, comparator and an independent review:
    R41 I1 empty-offer trap + M4; R42 I2/I3 sale transmits received claim through ingestion + sell
    test; R43 I9 courier price + M1/M2; R44 I10 relay traits; R45 I8 late hesitation follow-up;
    R46 I7 watch identity; R47 I11/I12 Codex and evening-report arrival time; R48 M3 lint fence;

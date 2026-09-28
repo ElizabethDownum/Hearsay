@@ -2,6 +2,34 @@
 
 [R39 rendezvous-carries approval](review/2026-09-20-r39-rendezvous-carries-approval.md). [R38 meet-window approval](review/2026-09-19-r38-meet-window-approval.md). [Plan 9 final review and certification](review/2026-09-19-plan-9-final-review.md). [Task 8 approval and install](review/2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](review/2026-09-18-browser-gate-approval.md). [R18 code approval](review/2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
 
+Latest, 27 September: **R40 capped the rendezvous window; Astra's full review was triaged into
+fix units R41-R49; R41-R44 and two corrections are committed.** The owner chose "cap at issue":
+[R40 approval](review/2026-09-27-r40-rendezvous-cap-approval.md), Approved after a test-only
+correction. The Codex Astra full review found 0 Critical, 13 Important and 4 Minor, all confirmed
+([triage](review/2026-09-27-astra-full-review.md)); the owner's Plan 10 rulings were "measure
+first", "precondition task" and "before the bot fleet". The fixes, each TDD with six gates and the
+soak/MC comparator unchanged:
+- R41 `48667d4`: an empty offer can be let pass.
+- R42 `ef43e1a`: a sale speaks the version that reached you.
+- R43 `d0c9d59`: composed directives equal their presets.
+- R44 `9c319d2`: relayed reports retell their enclosed claims.
+
+Independent reviews:
+- R42 Approved 0/0/4. R42-1 `3056644` fixes two of the Minors: a sale is heard once, and its
+  persuasion is a floor, max(held, 0.85).
+- R41 Needs fixes 0/1/3. R41-1 `a002dd9` drops the shell latch for `Session.localPending()` and
+  tests the App wiring.
+- R43 Needs fixes 0/2/2: the composer doesn't show or gate the courier price, and the ideology
+  refusal is preset-only. R43-1 not started.
+- R44 Needs fixes 0/2/3: the partisan relay diverges from its gossip, and the field-report caller
+  and `familyOf` are untested. R44-1 is at RED (below).
+
+The re-checks of R41-1 and R42-1 were stopped mid-run when the session paused; re-dispatch them.
+Approval docs for R41-R44 are owed. **The working tree holds R44-1's uncommitted RED tests**; the
+resume note is `.superpowers/sdd/r44-1-implementation-validation/RESUME.md` (two hash-collision
+guards to fix first, then apply `claimContext`). Origin/main is `58a9214`, with 11 commits local
+and no push authorized. Next: R44-1, R43-1, the re-checks, then R45-R49, then Plan 10 Task 1.
+
 Latest, 20 September: **the five defects R38 carried are fixed (R39), before Plan 10 as the
 owner asked.** Independently Approved at `7b6df80`. A sound-out or hosting meeting that ends at or
 crosses midnight now actually moves the guest (both schedule writers share one row builder). A
