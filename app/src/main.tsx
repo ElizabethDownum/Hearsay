@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './theme.css';
 import { debriefView } from '../../src/sim/debrief/index';
+import { learnedAtByEntry } from '../../src/sim/debrief/knowledge';
 import { DebriefEnding } from './panels/DebriefEnding';
 import { resolveSlot, UI_GLYPHS } from './assets';
 
@@ -310,7 +311,7 @@ export function App() {
           {panel === 'network' && <Network view={net} history={approaches} />}
           {panel === 'directives' && <Directives view={directives} nameOf={nameOf} />}
           {panel === 'treasury' && <Treasury coin={world.coin} stipendDay={stipendDay} economy={STANDARD_RULES.economy} />}
-          {panel === 'report' && <EveningReport report={eveningReport(log, view.scenario?.day ?? dayOf(world.tick))} onOpenBoard={() => setPanel('board')} />}
+          {panel === 'report' && <EveningReport report={eveningReport(log, view.scenario?.day ?? dayOf(world.tick), learnedAtByEntry(world))} onOpenBoard={() => setPanel('board')} />}
           {panel === 'terms' && <TermsCodex />}
         </div>
       </div>

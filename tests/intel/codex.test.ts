@@ -32,6 +32,44 @@ function utt(over: Partial<IntelEntry> & { family: string; reported: ReportedCla
   return entry({ kind: 'utterance', claimId: 'c0', speaker: 'mira', addressedTo: 'gale', ...over });
 }
 
+describe('corroborations pair by when things happened, not by where a report landed in the log (R47, Astra I11)', () => {
+  // The same two observations, but the receive reached the board late (an informant's report), so
+  // it sits AFTER the tell the player witnessed directly. The receive (tick 15) cannot have caused
+  // the tell (tick 0): no pair, so no minimizer corroboration against a literalist.
+  const receive = utt({ tick: 15, family: 'r1', speaker: 'mira', addressedTo: 'gale', via: 'self', reported: rc({ count: 4, severity: 4 }) });
+  const tell = utt({ tick: 0, family: 'r1', speaker: 'gale', addressedTo: 'mira', via: 'otto', reported: rc({ count: 2, severity: 3 }) });
+
+  it('a receive observed AFTER the tell is never its cause, whatever the log order', () => {
+    expect(corroborations([receive, tell], 'gale', 'minimizer', R)).toEqual([]);
+    expect(corroborations([tell, receive], 'gale', 'minimizer', R)).toEqual([]);
+    expect(suggestTraits([receive, tell], 'r1', R)).not.toContain('minimizer');
+  });
+
+  it('a late-arriving receive that DID precede the tell still pairs, keeping the original entry indexes', () => {
+    const early = { ...receive, tick: 0 };
+    const later = { ...tell, tick: 15 };
+    const hits = corroborations([later, early], 'gale', 'minimizer', R);   // the receive landed late on the board
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toMatchObject({ family: 'r1', receivedIndex: 1, toldIndex: 0 });
+  });
+
+  it('the LATEST preceding receive by tick is the one paired, not the latest in the log', () => {
+    const first = utt({ tick: 0, family: 'r1', speaker: 'mira', addressedTo: 'gale', reported: rc({ count: 8, severity: 5 }) });
+    const second = utt({ tick: 10, family: 'r1', speaker: 'otto', addressedTo: 'gale', reported: rc({ count: 4, severity: 4 }) });
+    const told = utt({ tick: 20, family: 'r1', speaker: 'gale', addressedTo: 'mira', reported: rc({ count: 2, severity: 3 }) });
+    const hits = corroborations([second, told, first], 'gale', 'minimizer', R);   // `first` reported late
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toMatchObject({ receivedIndex: 0, toldIndex: 1 });
+    expect(hits[0]!.changes).toEqual([{ field: 'count', from: 4, to: 2 }, { field: 'severity', from: 4, to: 3 }]);
+  });
+
+  it('same tick: a receive logged before the tell still counts as its cause (the beat is one moment)', () => {
+    const sameBeat = [{ ...receive, tick: 30 }, { ...tell, tick: 30 }];
+    expect(corroborations(sameBeat, 'gale', 'minimizer', R)).toHaveLength(1);
+    expect(corroborations([sameBeat[1]!, sameBeat[0]!], 'gale', 'minimizer', R)).toEqual([]);
+  });
+});
+
 describe('corroborations — observed receive→emit pairs matched by fingerprint', () => {
   it('an addressed receive then a doubled emit corroborates exaggerator (hits === 1)', () => {
     const log: IntelEntry[] = [

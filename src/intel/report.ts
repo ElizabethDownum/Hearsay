@@ -19,15 +19,25 @@ function isClaimful(e: IntelEntry): e is IntelEntry & { family: RumorId } {
 
 /**
  * The evening rumor report: what's new today, who brought word (grouped by channel), and every
- * authority-flagged asking or watch-presence sighting captured today. Day-scoped by tick — a
- * family only counts as "new" the day its FIRST claimful hearing (log-wide, not just today) falls.
+ * authority-flagged asking or watch-presence sighting captured today. Day-scoped by the tick the
+ * entry REACHED the player — a family only counts as "new" the day its FIRST claimful hearing
+ * (log-wide, not just today) reached them.
+ *
+ * `IntelEntry.tick` is observation time, which an informant's report preserves (R47, Astra I12);
+ * a day-0 observation handed over on day 1 belongs to day 1's report. The caller passes the
+ * acquisition tick per entry (`learnedAt[i]`, the debrief's receipt clock); `null`, or no array
+ * at all, falls back to the entry's own tick, so a fold over the log alone reads as before.
  */
-export function eveningReport(log: readonly IntelEntry[], day: number): EveningReport {
+export function eveningReport(
+  log: readonly IntelEntry[], day: number, learnedAt?: readonly (Tick | null)[],
+): EveningReport {
+  const reachedAt = (e: IntelEntry, i: number): Tick => learnedAt?.[i] ?? e.tick;
   const firstTick = new Map<RumorId, Tick>();
-  log.forEach((e) => {
+  log.forEach((e, i) => {
     if (!isClaimful(e)) return;
     const seen = firstTick.get(e.family);
-    if (seen === undefined || e.tick < seen) firstTick.set(e.family, e.tick);
+    const reached = reachedAt(e, i);
+    if (seen === undefined || reached < seen) firstTick.set(e.family, reached);
   });
   const newFamilies = [...firstTick.entries()]
     .filter(([, tick]) => dayOf(tick) === day)
@@ -38,7 +48,7 @@ export function eveningReport(log: readonly IntelEntry[], day: number): EveningR
   const magicBySpell = new Map<string, number[]>();
   const authoritySightings: number[] = [];
   log.forEach((e, i) => {
-    if (dayOf(e.tick) !== day) return;
+    if (dayOf(reachedAt(e, i)) !== day) return;
     const target = e.provenance === undefined ? entriesByViaMap : magicBySpell;
     const key = e.provenance === undefined ? e.via : e.provenance.spell;
     const bucket = target.get(key);

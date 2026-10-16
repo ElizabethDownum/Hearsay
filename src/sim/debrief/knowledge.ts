@@ -88,6 +88,18 @@ export function counterKnowledge(world: WorldState): CounterKnowledge[] {
   return knowledge;
 }
 
+/**
+ * The acquisition clock, one slot per board row (R47, Astra I12): the tick each entry reached the
+ * player, by the same receipt history the debrief uses. Rows the debrief does not classify (kinds
+ * it skips) and informant rows with no recorded receipt are `null`, so a consumer falls back to
+ * the row's own observation tick rather than inventing a date.
+ */
+export function learnedAtByEntry(world: WorldState): (Tick | null)[] {
+  const learned: (Tick | null)[] = world.intel.log.map(() => null);
+  for (const row of counterKnowledge(world)) learned[row.entryIndex] = row.learnedAt;
+  return learned;
+}
+
 /** Retain the real board's append order; counterSignals depends on earlier askings. */
 export function counterLogThrough(world: WorldState, through: Tick): IntelEntry[] {
   const knowledge = counterKnowledge(world);

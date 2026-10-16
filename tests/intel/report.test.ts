@@ -31,6 +31,39 @@ function utt(over: Partial<IntelEntry> & { family: string; reported: ReportedCla
   });
 }
 
+describe('eveningReport counts a story on the day it REACHED the player (R47, Astra I12)', () => {
+  // Two day-0 observations that an informant only handed over on day 1, and one the avatar heard
+  // directly on day 1. The report is still a fold over the log alone: the acquisition ticks come in
+  // beside it, one per entry, and an entry with no known acquisition keeps its observation tick.
+  const log: IntelEntry[] = [
+    utt({ tick: at(0, 8), family: 'r1', reported: rc(), via: 'gale' }),                 // idx0 observed day 0, reached day 1
+    utt({ tick: at(0, 9), family: 'r1', reported: rc({ count: 4 }), via: 'gale' }),     // idx1 observed day 0, reached day 1
+    utt({ tick: at(1, 8), family: 'r2', reported: rc({ subject: 'mira' }), via: 'self' }),   // idx2 heard directly day 1
+  ];
+  const learnedAt = [at(1, 7), at(1, 7), null];
+
+  it('the day the report arrived is the day the stories are new, and the day its rows are counted', () => {
+    const day1 = eveningReport(log, 1, learnedAt);
+    expect(day1.newFamilies).toEqual(['r1', 'r2']);
+    expect(day1.entriesByVia).toEqual({ gale: [0, 1], self: [2] });
+    const day0 = eveningReport(log, 0, learnedAt);
+    expect(day0.newFamilies).toEqual([]);
+    expect(day0.entriesByVia).toEqual({});
+  });
+
+  it('without acquisition ticks the fold reads observation time, as before', () => {
+    expect(eveningReport(log, 0).newFamilies).toEqual(['r1']);
+    expect(eveningReport(log, 0).entriesByVia).toEqual({ gale: [0, 1] });
+    expect(eveningReport(log, 1).newFamilies).toEqual(['r2']);
+  });
+
+  it('a family first observed on day 0 but first REACHED on day 1 is new on day 1 even if re-heard later', () => {
+    const reheard = [...log, utt({ tick: at(2, 8), family: 'r1', reported: rc({ count: 9 }), via: 'self' })];
+    expect(eveningReport(reheard, 1, [...learnedAt, null]).newFamilies).toEqual(['r1', 'r2']);
+    expect(eveningReport(reheard, 2, [...learnedAt, null]).newFamilies).toEqual([]);
+  });
+});
+
 describe('eveningReport — day-scoped, new-vs-old family split, authority/presence sightings', () => {
   const log: IntelEntry[] = [
     utt({ tick: at(0, 8), family: 'r1', reported: rc(), via: 'self' }),                          // idx0 day0, r1 first heard

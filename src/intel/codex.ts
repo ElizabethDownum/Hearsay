@@ -35,11 +35,17 @@ function physicalTellingKey(e: IntelEntry): string {
 
 /**
  * The Obra Dinn trick, mechanically: fold over claimful utterances, and for every telling BY an
- * npc pair it with the LATEST telling ADDRESSED TO that same npc before it in the same family
- * (they demonstrably received that version, then emitted this one). One pair per tell — no
+ * npc pair it with the LATEST telling ADDRESSED TO that same npc before it IN TIME in the same
+ * family (they demonstrably received that version, then emitted this one). One pair per tell — no
  * combinatorial double-count. Pairs whose reported content is byte-identical (empty changes) are
  * dropped: a faithful retell is evidence of no trait. Reads ONLY the log — never world/beliefs/
  * ground-truth — so the deduction stands on what the player observed, nothing they couldn't have.
+ *
+ * "Before" is the observation tick, not the array position (R47, Astra I11): an informant's report
+ * appends OLDER observations after NEWER ones the avatar heard directly, so array order would make a
+ * later reception the cause of an earlier telling and corroborate a trait the npc never showed.
+ * Within one tick the beat is a single moment and the log's order within it is the only order there
+ * is, so a receive logged before the tell at the same tick still pairs. Indexes stay the log's own.
  */
 function observedPairs(
   log: readonly IntelEntry[], npcFilter: EntityId | null, familyFilter: RumorId | null,
@@ -51,18 +57,21 @@ function observedPairs(
     if (npcFilter !== null && npc !== npcFilter) return;
     if (familyFilter !== null && tell.family !== familyFilter) return;
 
-    // Latest addressed-receive strictly before this tell, same family, addressed to this npc.
+    // Latest addressed-receive before this tell by tick (ties: earlier in the log, strictly before
+    // the tell's own row), same family, addressed to this npc.
     let receivedIndex = -1;
     let before: ReportedClaim | null = null;
-    for (let j = toldIndex - 1; j >= 0; j--) {
-      const rec = log[j]!;
-      if (isClaimful(rec) && rec.family === tell.family && rec.addressedTo === npc
-        && (!isMagic(rec) || rec.speaker !== null)) {
-        receivedIndex = j;
-        before = rec.reported;
-        break;
+    log.forEach((rec, j) => {
+      if (!isClaimful(rec) || rec.family !== tell.family || rec.addressedTo !== npc) return;
+      if (isMagic(rec) && rec.speaker === null) return;
+      if (rec.tick > tell.tick || (rec.tick === tell.tick && j >= toldIndex)) return;
+      if (receivedIndex !== -1) {
+        const current = log[receivedIndex]!;
+        if (rec.tick < current.tick || (rec.tick === current.tick && j < receivedIndex)) return;
       }
-    }
+      receivedIndex = j;
+      before = rec.reported;
+    });
     if (before === null) return;
 
     const changes = diffReported(before, tell.reported);
