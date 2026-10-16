@@ -155,11 +155,90 @@ describe('late receipts find their own episode (R46)', () => {
     ]);
   });
 
-  it('a first-episode stand-down removes only the first episode\'s post', () => {
-    const { world, first, second } = twoEpisodes(true);
-    settleEnemyOrderReport(world, second, spoken(worked(second, 'beta', 3, 3)));
-    settleEnemyOrderReport(world, first, spoken(cancelled(first, 1, 4000)));
+  /**
+   * R46-1 (R46 review M1): in production a stand-down is reported through the CANCEL order's own
+   * record (`cancel:watch:<district>:<guard>`), never through the watch record, so the row is found
+   * by the spoken action's district and start day. The cases below issue the real tail-drop order.
+   */
+  function twoEpisodesBothPosted(): { world: WorldState; first: DirectiveRecord; second: DirectiveRecord } {
+    const staged = twoEpisodes(true);
+    settleEnemyOrderReport(staged.world, staged.second, spoken(worked(staged.second, 'beta', 3, 3)));
+    return staged;
+  }
+
+  function cancelOrder(world: WorldState, lead: string, subject: string, startDay: number): DirectiveRecord {
+    const n = world.network.directiveState!.records.length;
+    applyEnemyDecision(world, decision(4, { tailDrops: [{
+      leadFeatureId: lead, subject, district: 'd0', watchStartDay: startDay, untilDay: 6,
+    }] }));
+    const cancel = world.network.directiveState!.records[n]!;
+    expect(cancel.authored.brief.application?.kind).toBe('cancel-watch');
+    return cancel;
+  }
+
+  it('a first-episode stand-down, reported through its cancel order, removes only the first episode\'s post', () => {
+    const { world } = twoEpisodesBothPosted();
+    const cancel = cancelOrder(world, 'sf-alpha', 'alpha', 1);
+    settleEnemyOrderReport(world, cancel, spoken(cancelled(cancel, 1, 6000)));
     expect(ledger(world).map((row) => [row.scheduleStartDay, row.posts.length])).toEqual([[1, 0], [3, 1]]);
     expect(world.enemy.watchedDistricts).toEqual(['d0']);   // the second episode still stands the district
+  });
+
+  it('a second-episode stand-down, reported through its cancel order, removes only the second episode\'s post', () => {
+    const { world } = twoEpisodesBothPosted();
+    const cancel = cancelOrder(world, 'sf-beta', 'beta', 3);
+    settleEnemyOrderReport(world, cancel, spoken(cancelled(cancel, 3, 6000)));
+    expect(ledger(world).map((row) => [row.scheduleStartDay, row.posts.length])).toEqual([[1, 1], [3, 0]]);
+    expect(world.enemy.watchedDistricts).toEqual(['d0']);   // the first episode still stands the district
+  });
+
+  // A stand-down that happens to be correlated to the WATCH record (the key matches both episodes)
+  // still names its episode by start day; the by-key lookup must not pick the first row in array order.
+  it('a stand-down correlated to the watch key itself still lands on the episode it names', () => {
+    const { world, second } = twoEpisodesBothPosted();
+    settleEnemyOrderReport(world, second, spoken(cancelled(second, 3, 6000)));
+    expect(ledger(world).map((row) => [row.scheduleStartDay, row.posts.length])).toEqual([[1, 1], [3, 0]]);
+  });
+});
+
+describe('an episode is the district AND the start day (R46-1, R46 review M2)', () => {
+  const IDS2 = ['boss', 'g0', 'g1', 'alpha', 'beta'] as const;
+  const FIXTURE2: TownFixture = {
+    venues: [{ id: 'square', district: 'd0', access: 'public' }, { id: 'market', district: 'd1', access: 'public' }],
+    npcs: IDS2.map((id) => ({
+      id, name: id, home: id === 'g1' ? 'market' : 'square', occupation: id.startsWith('g') ? 'guard' : 'grocer',
+      faction: 'none', traits: ['literalist'], rivals: [], schedule: [],
+      edges: IDS2.filter((other) => other !== id).map((to) => ({ to, kind: 'friend' as const, trust: 0.8 })),
+    })),
+  };
+
+  // Two districts watched on the same night share a start day (the digest issues both for day + 1),
+  // so a row keyed by start day alone would merge d1's receipt into d0's row.
+  it('same-night watches in two districts keep separate rows', () => {
+    const world = buildWorld(FIXTURE2, 'two-districts', RULES);
+    world.network.spymaster = 'boss';
+    world.enemy.map = buildTownMap(FIXTURE2);
+    applyEnemyDecision(world, decision(0, { watches: [
+      { district: 'd0', posts: [{ guard: 'g0', venue: 'square' }], startDay: 1, subject: 'alpha', about: { subject: 'alpha' }, leadFeatureId: 'sf-a' },
+      { district: 'd1', posts: [{ guard: 'g1', venue: 'market' }], startDay: 1, subject: 'beta', about: { subject: 'beta' }, leadFeatureId: 'sf-b' },
+    ] }));
+    const records = world.network.directiveState!.records;
+    const recordFor = (district: string) => records.find((row) =>
+      row.authored.brief.application?.kind === 'enemy-watch' && row.authored.brief.application.district === district)!;
+    const workedIn = (record: DirectiveRecord, district: string, guard: string, venue: string, subject: string) => {
+      const action: EnemyActionReport = {
+        kind: 'watch-worked', subject, about: { subject }, district, scheduleStartDay: 1,
+        guard, venue, workedDay: 1, occurredAt: 2580,
+      };
+      return { kind: 'directive-report', directiveId: record.id, factRefs: [], enemyAction: action, onwardTo: null,
+        report: { outcome: 'watch worked', reason: 'stood', evidence: [], source: guard, uncertainty: 'low' } } as
+        Extract<SpokenNetworkPayload, { kind: 'directive-report' }>;
+    };
+    settleEnemyOrderReport(world, recordFor('d0'), workedIn(recordFor('d0'), 'd0', 'g0', 'square', 'alpha'));
+    settleEnemyOrderReport(world, recordFor('d1'), workedIn(recordFor('d1'), 'd1', 'g1', 'market', 'beta'));
+    expect(ledger(world).map((row) => [row.orderKey, row.subject, row.scheduleStartDay, row.posts.length])).toEqual([
+      ['watch:d0', 'alpha', 1, 1], ['watch:d1', 'beta', 1, 1],
+    ]);
+    expect(world.enemy.watchedDistricts).toEqual(['d0', 'd1']);
   });
 });
