@@ -153,7 +153,12 @@ export function settleEnemyOrderReport(
     return;
   }
   if (action.kind === 'watch-worked') {
-    let row = world.enemy.actionLedger?.find((candidate) => candidate.orderKey === correlation.orderKey);
+    // A watch EPISODE is the district plus the schedule start day the order carried (R46, Astra I7):
+    // the same identity a tail drop uses to name the posts it stands down. Keyed by district alone,
+    // a later watch appended its nights to the stood-down watch's row and inherited that watch's
+    // subject, lead and start day; a late night from the earlier episode still finds its own row.
+    let row = world.enemy.actionLedger?.find((candidate) => candidate.orderKey === correlation.orderKey
+      && candidate.scheduleStartDay === action.scheduleStartDay);
     if (!row) {
       const rows = world.enemy.actionLedger ?? (world.enemy.actionLedger = []);
       row = {
