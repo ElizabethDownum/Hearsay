@@ -432,8 +432,9 @@ function resolvePlayerSpeech(
       world.network.sales.push({ family, buyer });
       // The buyer hears the sale ONCE, as ordinary hearsay through the utterance below (first version
       // sticks, the apparent source is the claim's own, corroboration never lowers credence: R42,
-      // Astra I3; the P9-3 anchor law). The sale's persuasion is then a floor on what they hold, so a
-      // bought story is retellable whether or not they had heard it (R42-1).
+      // Astra I3; the P9-3 anchor law). The sale's persuasion is then a floor on what they hold, at
+      // least 0.85, and the paid telling is fresh news at this tick, so a bought story is retellable
+      // whether or not they had heard it, and however long ago (R42-1, R42-2).
       saleLifts.push({ buyer, family });
       utterances.push({
         tick, venue: offered.venue, circleMembers: [...offered.members].sort(),
@@ -579,14 +580,20 @@ function recordAndIngest(
       ingest(world, hearerId, {
         tick: observation.tick, speaker: observation.speaker, claim: observation.claim,
       }, !observation.overheard, rules);
+      // The sale's floor lands right after the buyer's own hearing of it, before any reaction, so a
+      // buyer who is the story's subject reacts to what they now hold (R42-2). A repeat origin
+      // corroborates nothing, but a paid telling revives the story: freshness restarts at the sale.
+      if (saleLifts.some((lift) => lift.buyer === hearerId && lift.family === observation.claim.family)) {
+        const belief = world.beliefs[hearerId]![observation.claim.family];
+        if (belief) {
+          belief.credence = Math.max(belief.credence, SALE_CREDENCE);
+          belief.heardAt = observation.tick;
+        }
+      }
       if (observation.claim.subject === hearerId) {
         reactToSelfRumor(world, hearerId, observation.claim.family, observation.tick, rules);
       }
     }
-  }
-  for (const { buyer, family } of saleLifts) {
-    const belief = world.beliefs[buyer]![family];
-    if (belief) belief.credence = Math.max(belief.credence, SALE_CREDENCE);
   }
 }
 

@@ -320,6 +320,94 @@ describe('applySell — a sale is hearsay to a mind that already holds the famil
   });
 });
 
+describe('applySell — the sale floor is a fresh telling (R42-1 re-check m1, m2, n1)', () => {
+  /** A damaging story about `subject`, from `third`, held by the buyer at `credence` since tick 0. */
+  const heldFromThird = (w: WorldState, family: string, subject: string, credence: number) => {
+    const claim: Claim = {
+      id: `c-held-${family}`, family, parent: null, subject, predicate: 'stole',
+      object: null, count: 1, severity: 2, place: null, attribution: 'third',
+    };
+    w.claims[claim.id] = claim;
+    w.beliefs['buyer']![family] = {
+      claim, credence, heardFrom: 'third', heardAt: 0, firstHeardAt: 0, timesHeard: 1,
+      apparentSources: ['third'], discretion: false, counterSpun: false,
+    };
+    return claim;
+  };
+
+  // m1: ordinary corroboration refreshes the freshness clock only for a NEW apparent source, so a
+  // sold story naming a source the buyer had already credited was floored to 0.85 and still never
+  // retold once it was three days old. A paid telling is a telling at that tick: the floor refreshes
+  // `heardAt`, as the pre-R42 hop-zero entry did.
+  it('a stale holder whose sale source repeats is revived: heardAt is the sale tick and the buyer retells', () => {
+    const w = sellWorld('sell-stale');
+    const claim = heldFromThird(w, 'f-stale', 'mallory', 0.3);
+    seedIntel(w, 'f-stale', 'c-stale', 4);
+    w.claims['c-stale'] = { ...w.claims['c-stale']!, attribution: 'third' };
+    w.intel.log.at(-1)!.reported = { ...w.intel.log.at(-1)!.reported!, attribution: 'third' };
+    const sale = at(4, 0);
+    runUntil(w, sale, RULES);
+    expect(w.beliefs['buyer']!['f-stale']!.heardAt).toBe(0); // three days stale: freshness 0
+    applySell(w, 'buyer', 'f-stale', sale, RULES);
+    runUntil(w, sale + 1, RULES);
+
+    const belief = w.beliefs['buyer']!['f-stale']!;
+    expect(belief.claim).toBe(claim);                 // first version sticks
+    expect(belief.apparentSources).toEqual(['third']); // a repeat origin corroborates nothing...
+    expect(belief.credence).toBe(0.85);               // ...the floor applies...
+    expect(belief.heardAt).toBe(sale);                // ...and the paid telling is fresh news
+    expect(belief.firstHeardAt).toBe(0);
+
+    runUntil(w, sale + CONVERSATION_BEAT * 2, RULES);
+    const retold = w.chronicle.find((c) => c.kind === 'telling' && c.speaker === 'buyer'
+      && w.claims[c.claimId]?.family === 'f-stale');
+    expect(retold).toBeDefined();
+  });
+
+  // m2: the buyer who is the story's subject reacts to what they hold AFTER the sale's persuasion,
+  // not to the pre-floor corroboration. A weakly held damaging self-rumor sold to its subject is a
+  // corroborated, BELIEVED self-rumor, and the subject counter-spins it as they would any other.
+  it('a buyer who is the subject reacts to the floored credence: a weakly held self-rumor is counter-spun', () => {
+    const w = sellWorld('sell-self');
+    heldFromThird(w, 'f-self', 'buyer', 0.3);
+    w.claims['c-self'] = {
+      id: 'c-self', family: 'f-self', parent: null, subject: 'buyer', predicate: 'stole',
+      object: null, count: 2, severity: 4, place: null, attribution: SOMEONE,
+    };
+    w.intel.log.push({
+      ...blankIntel(), tick: 0, venue: 'tavern', via: 'self', kind: 'utterance', overheard: false,
+      speaker: 'third', addressedTo: 'you', mode: 'telling', claimId: 'c-self', family: 'f-self',
+      reported: { subject: 'buyer', predicate: 'stole', object: null, count: 2, severity: 4, place: null, attribution: SOMEONE },
+    });
+    const families0 = Object.keys(w.beliefs['buyer']!).length;
+    applySell(w, 'buyer', 'f-self', 0, RULES);
+    runUntil(w, 1, RULES);
+
+    const belief = w.beliefs['buyer']!['f-self']!;
+    expect(belief.credence).toBe(0.85);
+    expect(belief.timesHeard).toBe(2);
+    expect(belief.counterSpun).toBe(true);                        // reacted to the floored belief
+    expect(Object.keys(w.beliefs['buyer']!).length).toBe(families0 + 1); // the counter-story exists
+  });
+
+  // n1: the floor is a floor. A fresh buyer who trusts the avatar and dislikes the subject lands
+  // ABOVE 0.85 by ordinary hearsay physics, and the sale keeps it; 0.85 is "at least", not "exactly".
+  it('a fresh trusting buyer who dislikes the subject lands above the floor and keeps it', () => {
+    const w = sellWorld('sell-trusting');
+    // The avatar exists only after enrolment, so the trust edge is attached the way an informant's is.
+    w.npcs['buyer']!.edges.push({ to: 'you', kind: 'friend', trust: 0.75 });
+    w.npcs['buyer']!.rivals.push('mallory');
+    seedIntel(w, 'f-trust', 'c-trust', 4);
+    applySell(w, 'buyer', 'f-trust', 0, RULES);
+    runUntil(w, 1, RULES);
+
+    const belief = w.beliefs['buyer']!['f-trust']!;
+    expect(belief.timesHeard).toBe(1);
+    expect(belief.credence).toBeCloseTo((0.35 + 0.45 * 0.75) * 1.3, 10); // 0.89375
+    expect(belief.credence).toBeGreaterThan(0.85);
+  });
+});
+
 describe('applySell — selling within guard earshot is caught (the existing capture path)', () => {
   it('the sale is an Utterance like any telling — a guard in circle captures it, and the campaign ends caught', () => {
     const w = sellWorld('sell-caught');
