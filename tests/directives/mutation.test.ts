@@ -230,17 +230,24 @@ describe('projectDirectiveReport', () => {
     scheduleStartDay: 1, guard: 'guard', venue: 'square', workedDay: 2, occurredAt: 30,
   };
   const factRefs = [{ asset: 'relay', factIndex: 1 }, { asset: 'issuer', factIndex: 2 }];
+  // R44-1: the relay's ordinary gossip context (traitContextOf): it knows any townsperson's faction,
+  // not only its rivals', and its own grudge list.
+  const gossip = {
+    ownerId: 'relay', faction: 'none' as const, rivals: ['r1', 'r2', 'r3', 'r4'],
+    factionOf: (id: string) => ({ relay: 'none', target: 'guild', outsider: 'crown' } as
+      Record<string, 'none' | 'crown' | 'guild'>)[id] ?? null,
+  };
   const project = (traits: string[], turnedAgainstAudience = false, perceivedScrutiny = 0,
     value: DirectiveReportPayload = report) => projectDirectiveReport({
       report: value, enemyAction, factRefs, speaker: speaker(traits),
-      turnedAgainstAudience, perceivedScrutiny, familyOf: (id) => `family-of-${id}`,
+      turnedAgainstAudience, perceivedScrutiny, familyOf: (id) => `family-of-${id}`, claimContext: gossip,
     }, STANDARD_RULES);
 
   it('projects attribution and severity/count through the report claim seam without inventing evidence', () => {
     const attributed = projectDirectiveReport({
       report: { ...report, source: null }, enemyAction, factRefs,
       speaker: speaker(['attributor']), turnedAgainstAudience: false, perceivedScrutiny: 0,
-      familyOf: (id) => id,
+      familyOf: (id) => id, claimContext: gossip,
     }, STANDARD_RULES);
     expect(attributed.report.source).toBe('rival');
     expect(attributed.factRefs).toEqual([]);
@@ -281,7 +288,7 @@ describe('projectDirectiveReport', () => {
   // (count / uncertainty / source) was projected and the enclosed claims rode through untouched.
   describe('enclosed claims are retold through the relay (R44)', () => {
     const enclosed = {
-      subject: 'target', predicate: 'stole', object: null, count: 2, severity: 3 as const,
+      subject: 'target', predicate: 'stole', object: null, count: 2 as number | null, severity: 3 as const,
       place: null, attribution: 'target',
     };
     const withClaim: DirectiveReportPayload = {
@@ -293,18 +300,17 @@ describe('projectDirectiveReport', () => {
       if (item?.kind !== 'claim') throw new Error('the enclosed claim was dropped');
       return item;
     };
-    // The speaker's own trait context, as the relay projection builds it (independent re-derivation).
-    const contextOf = (who: ReturnType<typeof speaker>) => ({
-      ownerId: who.id, faction: who.faction, rivals: who.rivals,
-      factionOf: (id: string) => (who.knownFactions as Record<string, 'none' | 'crown' | 'guild'>)[id] ?? null,
-    });
-    const traitsOf = (traits: string[], claim = enclosed) => {
+    // What the relay's ordinary gossip would say (independent re-derivation from the same context).
+    const traitsOf = (traits: string[], claim = enclosed, family = 'family-of-c7') => {
       const chain = traits.flatMap((id) => STANDARD_RULES.traits[id] ? [STANDARD_RULES.traits[id]!] : []);
-      const whole = { id: 'c7', family: 'family-of-c7', parent: null, ...claim };
+      const whole = { id: 'c7', family, parent: null, ...claim };
       const { subject, predicate, object, count, severity, place, attribution } =
-        { ...whole, ...applyTraits(chain, whole, contextOf(speaker(traits))) };
+        { ...whole, ...applyTraits(chain, whole, gossip) };
       return { subject, predicate, object, count, severity, place, attribution };
     };
+    const about = (claim: typeof enclosed): DirectiveReportPayload => ({
+      ...report, evidence: [{ kind: 'claim', claimId: 'c7', reported: { ...claim } }],
+    });
 
     it('an exaggerator relay inflates the enclosed claim exactly as its ordinary retelling would', () => {
       const item = claimOf(project(['exaggerator'], false, 0, withClaim));
@@ -323,10 +329,28 @@ describe('projectDirectiveReport', () => {
       expect(item.reported).not.toEqual(enclosed);
     });
 
-    it('the attributor keys its rival on the enclosed claim\'s real family', () => {
-      const item = claimOf(project(['attributor'], false, 0, { ...withClaim,
-        evidence: [{ kind: 'claim', claimId: 'c7', reported: { ...enclosed, attribution: 'someone' } }] }));
-      expect(item.reported).toEqual(traitsOf(['attributor'], { ...enclosed, attribution: 'someone' }));
+    it('the objectifier keys its grudge on the enclosed claim\'s real family, not its id (R44-1)', () => {
+      const item = claimOf(project(['objectifier'], false, 0, about(enclosed)));
+      expect(item.reported).toEqual(traitsOf(['objectifier']));
+      // Non-vacuous: with four rivals the id would pick a different name (three collide).
+      expect(traitsOf(['objectifier'], enclosed, 'c7').object).not.toBe(item.reported.object);
+    });
+
+    it('the partisan reads factions as its gossip does, beyond its rivals (R44-1)', () => {
+      const outsider = { ...enclosed, subject: 'outsider' };
+      const item = claimOf(project(['partisan'], false, 0, about(outsider)));
+      expect(item.reported).toEqual(traitsOf(['partisan'], outsider));
+      expect(item.reported.severity).not.toBe(outsider.severity);
+    });
+
+    it('perceived scrutiny silences conspicuous traits on the enclosed claim too', () => {
+      const countless = { ...enclosed, count: null };
+      expect(claimOf(project(['numberer'], false, 0, about(countless))).reported.count).toBe(3);
+      expect(claimOf(project(['numberer'], false, 0.4, about(countless))).reported).toEqual(countless);
+    });
+
+    it('omissive candor filters but does not minimize the enclosed claim', () => {
+      expect(claimOf(project(['literalist'], true, 0.4, about(enclosed))).reported).toEqual(enclosed);
     });
   });
 });

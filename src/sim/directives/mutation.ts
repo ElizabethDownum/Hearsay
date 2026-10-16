@@ -226,6 +226,11 @@ export function projectDirectiveReport(input: {
   turnedAgainstAudience: boolean; perceivedScrutiny: number;
   /** The family of an enclosed claim, so family-keyed transforms (attributor) key as in gossip. */
   familyOf: (claimId: ClaimId) => RumorId;
+  /**
+   * The speaker's ordinary gossip context (`traitContextOf`) for enclosed claims (R44-1). The
+   * envelope keeps the speaker's restricted brief view; a claim is retold as their gossip retells it.
+   */
+  claimContext: TraitContext;
 }, rules: Rules): { report: DirectiveReportPayload; enemyAction: EnemyActionReport | null;
   factRefs: { asset: EntityId; factIndex: number }[] } {
   const candor = candorFor(input.turnedAgainstAudience, input.perceivedScrutiny, input.speaker.traits);
@@ -251,7 +256,7 @@ export function projectDirectiveReport(input: {
   // R44: an enclosed claim is retold in the relay's own mouth, the same chain and candor as the
   // envelope. The association id is kept; only the reported content moves.
   if (report.evidence) {
-    const ctx = contextFor(input.speaker);
+    const ctx = input.claimContext;
     report.evidence = report.evidence.map((item) => {
       if (item.kind !== 'claim') return item;
       const whole: Claim = { id: item.claimId, family: input.familyOf(item.claimId), parent: null,

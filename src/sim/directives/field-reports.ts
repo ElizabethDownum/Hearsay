@@ -5,6 +5,7 @@ import type { EvidenceEntry, PhysicalReceipt } from '../enemy/state';
 import { reportThrough } from '../reporting';
 import type { Rules } from '../rules';
 import type { EntityId } from '../rumors/claim';
+import { traitContextOf } from '../rumors/traits';
 import type { WorldState } from '../types';
 import type { Observation } from '../perception';
 import type { Principal } from '../network/types';
@@ -276,7 +277,8 @@ function projectReportedObservation(
         const projection = projectDirectiveReport({ report: spoken.report,
           enemyAction: spoken.enemyAction, factRefs: spoken.factRefs,
           speaker, turnedAgainstAudience: turned, perceivedScrutiny: scrutiny,
-          familyOf: (id) => world.claims[id]?.family ?? id }, rules);
+          familyOf: (id) => world.claims[id]?.family ?? id,
+          claimContext: traitContextOf(npc, world) }, rules);
         spoken.report = projection.report;
         spoken.enemyAction = projection.enemyAction;
         spoken.factRefs = projection.factRefs;

@@ -6,6 +6,7 @@ import type { Principal } from '../network/types';
 import type { PreparedTick, NpcAutonomousIntent } from '../phases';
 import { CONVERSATION_BEAT } from '../rumors/propagation';
 import { SOMEONE, type EntityId } from '../rumors/claim';
+import { traitContextOf } from '../rumors/traits';
 import type { Rules } from '../rules';
 import type { WorldState } from '../types';
 import { trustBetween } from '../world';
@@ -133,7 +134,8 @@ function projectCarriedSpeech(
       enemyAction: payload.enemyAction, factRefs: payload.factRefs,
       speaker: projectionSpeaker(world, message.holder),
       turnedAgainstAudience: isTurnedAgainst(world, message.principal, message.holder),
-      perceivedScrutiny: scrutiny, familyOf: (id) => world.claims[id]?.family ?? id }, rules);
+      perceivedScrutiny: scrutiny, familyOf: (id) => world.claims[id]?.family ?? id,
+      claimContext: traitContextOf(world.npcs[message.holder]!, world) }, rules);
     payload.report = projected.report;
     payload.enemyAction = projected.enemyAction;
     payload.factRefs = projected.factRefs;

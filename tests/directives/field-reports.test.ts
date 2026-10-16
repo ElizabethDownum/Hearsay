@@ -15,6 +15,7 @@ import { enemyDigest } from '../../src/sim/enemy/digest';
 import { cloneSerializable, stableStringify } from '../../src/sim/hash';
 import { ensureDirectiveState } from '../../src/sim/directives/state';
 import type { Claim } from '../../src/sim/rumors/claim';
+import { applyTraits, traitContextOf } from '../../src/sim/rumors/traits';
 import type { WorldState } from '../../src/sim/types';
 import { collectCircleIntents } from '../../src/sim/phases';
 
@@ -191,6 +192,45 @@ describe('remote observations wait for physical field reports', () => {
         kind: 'utterance', reported: { predicate: 'is-having-an-affair-with' },
       } }],
     });
+  });
+
+  // R44-1 (R44 review I2): a directive report the asset heard is retold in its field report through
+  // its own gossip traits, keyed on the enclosed claim's real family.
+  it('a directive report retold in a field report passes its enclosed claim through the teller', () => {
+    const value = world(['ada', 'bez']);
+    value.npcs.ada!.traits = ['objectifier'];
+    value.npcs.ada!.rivals = ['r1', 'r2', 'r3', 'r4'];   // four: the id and family picks differ
+    const claim: Claim = { ...CLAIM, count: 2, severity: 3 };
+    value.claims[claim.id] = claim;
+    const { subject, predicate, object, count, severity, place, attribution } = claim;
+    holdFieldObservation(value, 'player', 'ada', {
+      kind: 'raw', observation: {
+        kind: 'network-speech', tick: 0, venue: 'square', speaker: 'bez', addressedTo: 'ada',
+        messageId: 'm-heard', overheard: false,
+        spoken: { kind: 'directive-report', directiveId: 'd-heard', enemyAction: null, factRefs: [],
+          onwardTo: null, report: { outcome: null, reason: null, source: null, uncertainty: null,
+            evidence: [{ kind: 'claim', claimId: claim.id,
+              reported: { subject, predicate, object, count, severity, place, attribution } }] } },
+      },
+    }, null, ['you'], null, []);
+    queueUnqueuedFieldReports(value);
+    const message = value.network.directiveState!.messages[0]!;
+    const spoken = realizeNetworkForward(
+      value, message.id, { venue: 'backroom', members: ['ada', 'you'] }, 15, STANDARD_RULES,
+    )!.spoken;
+    if (spoken.kind !== 'field-report') throw new Error('expected a field report');
+    const observation = spoken.items[0]!.observation;
+    if (observation.kind !== 'network-speech' || observation.spoken.kind !== 'directive-report') {
+      throw new Error('expected the retold directive report');
+    }
+    const item = observation.spoken.report.evidence![0]!;
+    if (item.kind !== 'claim') throw new Error('expected the enclosed claim');
+    const ctx = traitContextOf(value.npcs.ada!, value);
+    const gossip = { ...claim, ...applyTraits([STANDARD_RULES.traits.objectifier!], claim, ctx) };
+    expect(item.reported.object).not.toBeNull();
+    expect(item.reported.object).toBe(gossip.object);
+    const byId = { ...claim, family: claim.id };
+    expect(STANDARD_RULES.traits.objectifier!.transform(byId, ctx).object).not.toBe(gossip.object);
   });
 
   it('omitted atoms still close every bound source id at final receipt', () => {
