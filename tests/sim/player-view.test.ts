@@ -8,6 +8,9 @@ import { at } from '../../src/core/time';
 import { stableStringify } from '../../src/sim/hash';
 import type { ScenarioState } from '../../src/sim/scenario/types';
 import { applyForge, applyPlant } from '../../src/sim/artifacts';
+import { applyAction } from '../../src/sim/campaign';
+import { isSacredVenue } from '../../src/sim/night-visit';
+import { seanceWorld } from './helpers/seance-town';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { dayOf } from '../../src/core/time';
 
@@ -146,6 +149,27 @@ describe('playerView — the epistemic selector: only avatar-local presence is l
     expect(dayOf(at(1, 0)) >= 1).toBe(true);
     applyPlant(world, 'a0', 'square', null, at(1, 0), [{ venue: 'square', members: ['you'] }]);
     expect(playerView(world).documents.map((row) => row.id)).toEqual(['a1']);
+  });
+
+  // Plan 10 Task 1D: whether a departed witness is known to call is a setup fact of the town (set
+  // beside the dossier in `worldFromTown`), whether the departed has spoken is the player's own
+  // spend, and which venues are consecrated is street knowledge. The witness's name, secret and
+  // relationship are NOT the player's until the séance delivers them.
+  it('seance lists the public facts only: a witness is known, has spoken, and which venues are sacred', () => {
+    const plain = buildWorld(miniTown(), 'pv-seance-plain', STANDARD_RULES);
+    enrollPlayer(plain, { home: 'square' });
+    expect(playerView(plain).seance).toEqual({
+      departedKnown: false, spoken: false,
+      sacredVenues: Object.keys(plain.venues).filter(isSacredVenue).sort(),
+    });
+    const world = seanceWorld();
+    expect(playerView(world).seance).toEqual({ departedKnown: true, spoken: false, sacredVenues: ['cathedral', 'chapel-d0'] });
+    const text = JSON.stringify(playerView(world));
+    for (const secret of [world.departed!.name, world.departed!.secretId, world.departed!.claimId, world.departed!.id]) {
+      expect(text, `the view must not carry '${secret}'`).not.toContain(secret);
+    }
+    applyAction(world, { kind: 'seance', tick: world.tick }, STANDARD_RULES);
+    expect(playerView(world).seance).toMatchObject({ departedKnown: true, spoken: true });
   });
 
   it('never touches scenario verdict internals, enemy.sketch, or the adjudicator-only functions', () => {

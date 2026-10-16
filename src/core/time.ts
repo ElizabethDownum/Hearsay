@@ -2,6 +2,8 @@
 export type Tick = number;
 
 export const TICKS_PER_DAY = 1440;
+/** Night ends at 04:00: night visits and the séance (`src/sim/night-visit.ts`) need a minute before it. */
+export const NIGHT_END_MINUTE = 4 * 60;
 export const DAYS_PER_WEEK = 7;
 /** Day-of-week index of the weekly rest day (mass, no work shifts). */
 export const REST_DAY = 6;

@@ -6,6 +6,7 @@ import type { Rules } from './rules';
 import type { IntelEntry, WorldState } from './types';
 import type { InjectSpec } from './actions';
 import { FORGERY_LEAD_DAYS } from './artifacts';
+import { isSacredVenue } from './night-visit';
 import type { Claim, EntityId, VenueId } from './rumors/claim';
 import type { Mice } from './network/types';
 import type { TownMap } from './enemy/state';
@@ -176,6 +177,14 @@ export interface PlayerView {
    * became of it is the chronicle's business. Empty in a world that never forged.
    */
   documents: { id: string; spec: InjectSpec; forgedTick: Tick; usableFromDay: number }[];
+  /**
+   * The séance's public facts (Plan 10 Task 1D): whether a departed witness is known to call (a
+   * setup fact of the town, set beside the dossier in `worldFromTown`), whether the departed has
+   * already spoken (the player's own once-per-campaign spend), and which venues are consecrated
+   * (street knowledge). The witness's name, secret and relationship are NOT listed: the séance
+   * delivers them as intel.
+   */
+  seance: { departedKnown: boolean; spoken: boolean; sacredVenues: VenueId[] };
 }
 
 /** Street knowledge never goes missing: a world whose enemy roster was never wired still owes
@@ -242,6 +251,11 @@ export function playerView(world: WorldState): PlayerView {
         id: artifact.id, spec: artifact.spec, forgedTick: artifact.forgedTick,
         usableFromDay: dayOf(artifact.forgedTick) + FORGERY_LEAD_DAYS,
       })),
+    seance: {
+      departedKnown: world.departed !== undefined,
+      spoken: world.seanceUsed !== undefined,
+      sacredVenues: Object.keys(world.venues).filter(isSacredVenue).sort(),
+    },
   };
 }
 

@@ -25,6 +25,8 @@ import { webView, type WebView } from '../../src/intel/web';
 import { boardView } from '../../src/intel/board';
 import { at, dayOf, TICKS_PER_DAY } from '../../src/core/time';
 import { applyScry } from '../../src/sim/magic';
+import { applySeance } from '../../src/sim/seance';
+import { seanceWorld } from '../sim/helpers/seance-town';
 import {
   applyAssignInformant, applyCourier, applyDirective, applyMeet, venueOpensFor,
 } from '../../src/sim/actions';
@@ -111,6 +113,7 @@ const plannerView: PlayerView = {
   station: 'noble',
   scenario: null,
   documents: [],
+  seance: { departedKnown: true, spoken: false, sacredVenues: [] },
 };
 
 /** The T13 planner props that are not about the local moment. Spread, then override. */
@@ -132,7 +135,7 @@ describe('DayPlanner — requested local moment', () => {
     expect(page).toContain('aria-label="request local interaction"');
     expect(page).not.toContain('aria-label="local moment"');
     for (const label of ['submit tell', 'submit ask', 'submit sell', 'submit recruit',
-      'submit debrief', 'submit host', 'submit directive', 'submit show', 'submit plant',
+      'submit debrief', 'submit host', 'submit directive', 'submit show', 'submit plant', 'submit seance',
       'preset posting', 'preset courier', 'preset rendezvous']) {
       expect(page, `an offer-less planner must not render "${label}"`).not.toContain(`aria-label="${label}"`);
     }
@@ -467,6 +470,79 @@ describe('DayPlanner — scry composer (Plan 10 Task 1C)', () => {
   });
 });
 
+// ── Plan 10 Task 1D: the séance — once, in a chapel, before dawn, inside the offered moment ──────
+
+describe('DayPlanner — séance composer (Plan 10 Task 1D)', () => {
+  const KNOWN: PlayerView['seance'] = { departedKnown: true, spoken: false, sacredVenues: ['v1'] };
+  const seancePage = (seance: PlayerView['seance'], tick: number, venue = 'v1', over: Partial<typeof plannerBase> = {}) =>
+    html(createElement(DayPlanner, { ...plannerBase, view: { ...plannerView, tick, seance },
+      offer: { tick, venue, circleMembers: ['ada'], token: `s#${tick}` }, ...over }));
+
+  it('no departed witness known: the moment says so and offers no séance', () => {
+    const page = seancePage({ ...KNOWN, departedKnown: false }, at(0, 1));
+    expect(page).toContain('aria-label="local moment"');
+    expect(page).not.toContain('aria-label="submit seance"');
+    expect(page).toContain('is known to call');
+  });
+
+  it('the departed has already spoken: the moment says so and offers no séance', () => {
+    const page = seancePage({ ...KNOWN, spoken: true }, at(0, 1));
+    expect(page).not.toContain('aria-label="submit seance"');
+    expect(page).toContain('has already spoken');
+  });
+
+  it('a chapel before 04:00 with the price in hand: live, priced, once', () => {
+    const page = seancePage(KNOWN, at(0, 1));
+    expect(isDisabled(page, 'submit seance')).toBe(false);
+    expect(page).toContain(`${ECON.seance} coin, once`);
+    expect(page).not.toContain('requires a');
+    expect(page).not.toContain('cannot cover this');
+  });
+
+  it("elsewhere: greyed with the engine's words", () => {
+    const page = seancePage({ ...KNOWN, sacredVenues: ['chapel-d0'] }, at(0, 1));
+    expect(isDisabled(page, 'submit seance')).toBe(true);
+    expect(page).toContain('requires a chapel or cathedral');
+  });
+
+  it('at 04:00 greyed with the engine\'s words; at 03:45 live', () => {
+    const dawn = seancePage(KNOWN, at(0, 4));
+    expect(isDisabled(dawn, 'submit seance')).toBe(true);
+    expect(dawn).toContain('requires a time before 04:00');
+    expect(isDisabled(seancePage(KNOWN, at(0, 3, 45)), 'submit seance')).toBe(false);
+  });
+
+  it('greys exactly when the treasury cannot cover the séance, and says so', () => {
+    const short = seancePage(KNOWN, at(0, 1), 'v1', { coin: ECON.seance - 1 });
+    expect(isDisabled(short, 'submit seance')).toBe(true);
+    expect(short).toContain(`cannot cover this (${ECON.seance} needed)`);
+    expect(isDisabled(seancePage(KNOWN, at(0, 1), 'v1', { coin: ECON.seance }), 'submit seance')).toBe(false);
+  });
+
+  // Parity (Plan 11 carry (k)): three mirrors (venue, hour, price), each measured at the offered
+  // beat and venue, against applySeance on the séance stage at every combination that matters.
+  it('the venue, hour and price mirrors agree with applySeance across venues, beats and coin', () => {
+    const world = seanceWorld();
+    const ticks = [at(0, 0), at(0, 3, 45), at(0, 4), at(0, 12), at(1, 0, 15)];
+    for (const venue of ['chapel-d0', 'cathedral', 'square']) {
+      for (const tick of ticks) {
+        for (const coin of [ECON.seance - 1, ECON.seance]) {
+          const probe = cloneSerializable(world);
+          probe.tick = tick;
+          probe.coin = coin;
+          let refused = false;
+          try { applySeance(probe, tick, STANDARD_RULES, [{ venue, members: ['you'] }]); } catch { refused = true; }
+          expect(refused, `engine at ${venue} ${tick} coin ${coin}`)
+            .toBe(venue === 'square' || tick % TICKS_PER_DAY >= at(0, 4) || coin < ECON.seance);
+          const page = seancePage(playerView({ ...world, tick, coin }).seance, tick, venue, { coin });
+          expect(isDisabled(page, 'submit seance'), `composer at ${venue} ${tick} coin ${coin}`).toBe(refused);
+          if (!refused) expect(probe.seanceUsed).toEqual({ operation: 'seance:' + world.departed!.id, tick });
+        }
+      }
+    }
+  });
+});
+
 // ── Task 11: the Treasury panel — coin, next stipend, the whole price list through <Term> ────────
 
 describe('Treasury — coin and a visible price list, every row named', () => {
@@ -575,6 +651,7 @@ describe('DayPlanner — canGo offers exactly the doors venueOpensFor opens (O8 
     avatar: { id: 'you', venue: 'safehouse', circleMembers: [] },
     informants: [],
     documents: [],
+    seance: { departedKnown: false, spoken: false, sacredVenues: [] },
     occupantsByVenue: {},
     map: { venues: testVenues, directory: [] },
     station,

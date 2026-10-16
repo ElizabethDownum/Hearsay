@@ -142,4 +142,26 @@ describe("the planner's verbs are wired to the session App owns (Plan 10 Task 1A
     expect(session.world.coin).toBe(before - STANDARD_RULES.economy.scrying);
     expect(session.world.chronicle.some((row) => row.kind === 'scry' && row.operation === 's0' && row.venue === venue)).toBe(true);
   });
+
+  // Plan 10 Task 1D: walk to a chapel at the start of play (travel is immediate), request a moment,
+  // and on its beat (before 04:00) call the departed through the planner's own `onLocal`.
+  it("onLocal({ kind: 'seance' }) calls the departed in a chapel before dawn, through the session", async () => {
+    const { session, props } = await mount();
+    expect(session.world.departed, 'the app seed must carry a departed witness').toBeDefined();
+    const chapel = Object.keys(session.world.venues).filter((id) => /^chapel-/.test(id)).sort()[0]!;
+    props.onVerb({ kind: 'goTo', venue: chapel });
+    expect(session.advance(1).advanced).toBe(1);
+    const before = session.world.coin;
+    expect(before).toBeGreaterThanOrEqual(STANDARD_RULES.economy.seance);
+    props.onRequestLocal();
+    expect(session.advance(15).stopped).toBe('local-offer');
+    const offer = session.localOffer()!;
+    expect(offer.venue).toBe(chapel);
+    expect(offer.tick).toBeLessThan(4 * 60);
+    props.onLocal({ kind: 'seance' });
+    expect(session.advance(1).advanced).toBe(1);
+    expect(session.world.seanceUsed).toEqual({ operation: 'seance:' + session.world.departed!.id, tick: offer.tick });
+    expect(session.world.coin).toBe(before - STANDARD_RULES.economy.seance);
+    expect(session.world.chronicle.some((row) => row.kind === 'seance' && row.tick === offer.tick && row.venue === chapel)).toBe(true);
+  });
 });

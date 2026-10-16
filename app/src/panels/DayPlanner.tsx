@@ -2,7 +2,7 @@ import { renderClaim, type NameOf } from '../../../src/content/render';
 import { ClaimReading } from './ClaimReading';
 import { useState } from 'react';
 import { TERMS } from '../../../src/content/terms';
-import { dayOf, TICKS_PER_DAY } from '../../../src/core/time';
+import { dayOf, minuteOfDay, NIGHT_END_MINUTE, TICKS_PER_DAY } from '../../../src/core/time';
 import type {
   AdvisoryGuidance, DirectiveAuthority, DirectiveDiscretion, DirectiveMission, DirectivePriority,
   DirectiveSpecificity, EconomyDef, InjectSpec, LocalActionIntent, LocalOffer, Mice, NetworkView,
@@ -505,6 +505,7 @@ function LocalMoment(props: DayPlannerProps & { offer: LocalOffer }) {
       <AskComposer circle={circle} people={directoryIds(view)} families={families} familyLabels={familyLabels} onLocal={onLocal} />
       <SellComposer circle={circle} families={families} familyLabels={familyLabels} onLocal={onLocal} />
       <PaperComposer circle={circle} offer={offer} documents={view.documents} nameOf={nameOf} onLocal={onLocal} />
+      <SeanceComposer offer={offer} seance={view.seance} coin={coin} economy={economy} onLocal={onLocal} />
       <RecruitComposer
         candidates={circle.filter((id) => !roster.has(id))} families={families} familyLabels={familyLabels}
         coin={coin} economy={economy} onLocal={onLocal} />
@@ -667,6 +668,46 @@ function PaperComposer({
         <button className="desk-btn" aria-label="submit plant" disabled={!dry}
           onClick={() => onLocal(plant)}>plant</button>
         {!dry && <span className="desk-note">&#39;{paper.id}&#39; was forged today — a forgery needs a day before it can be used</span>}
+      </div>
+    </>
+  );
+}
+
+/**
+ * The séance (Plan 10 Task 1D): once per campaign, in a chapel or cathedral, before 04:00, for the
+ * economy's price. Nothing is composed: the act is the act. When no departed witness is known or
+ * the departed has already spoken there is nothing to offer, and the moment says so. Otherwise the
+ * three mirrors (the offered venue consecrated, the offered beat before dawn, the price) grey the
+ * one button with the engine's own words; the rest (the avatar in the circle, the retained
+ * testimony) is the frozen offer's and the engine's business.
+ */
+function SeanceComposer({
+  offer, seance, coin, economy, onLocal,
+}: {
+  offer: LocalOffer; seance: PlayerView['seance']; coin: number; economy: EconomyDef;
+  onLocal(i: LocalActionIntent): void;
+}) {
+  const heading = <h3><Term id="verb-seance" /></h3>;
+  if (!seance.departedKnown) {
+    return <>{heading}<p className="desk-note">No <Term id="the-departed" /> is known to call.</p></>;
+  }
+  if (seance.spoken) {
+    return <>{heading}<p className="desk-note">The <Term id="the-departed" /> has already spoken.</p></>;
+  }
+  const sacred = seance.sacredVenues.includes(offer.venue);
+  const night = minuteOfDay(offer.tick) < NIGHT_END_MINUTE;
+  const cost = economy.seance;
+  const affordable = coin >= cost;
+  return (
+    <>
+      {heading}
+      <div className="tag-row">
+        <span className="desk-note">{cost} coin, once</span>
+        <button className="desk-btn" aria-label="submit seance" disabled={!sacred || !night || !affordable}
+          onClick={() => onLocal({ kind: 'seance' })}>hold a séance</button>
+        {!sacred && <span className="desk-note">a séance requires a chapel or cathedral</span>}
+        {!night && <span className="desk-note">a séance requires a time before 04:00</span>}
+        {!affordable && <span className="desk-note">the <Term id="treasury" /> cannot cover this ({cost} needed)</span>}
       </div>
     </>
   );

@@ -1,4 +1,4 @@
-import { minuteOfDay, type Tick } from '../core/time';
+import { minuteOfDay, NIGHT_END_MINUTE, type Tick } from '../core/time';
 import type { PhysicalReceipt } from './enemy/state';
 import type { ReportedFieldObservation } from './directives/types';
 import type { WorldState } from './types';
@@ -6,7 +6,7 @@ import type { WorldState } from './types';
 export const isSacredVenue = (venue: string): boolean =>
   venue === 'cathedral' || venue === 'chapel' || /^chapel-.+/.test(venue);
 export const isNightVisitTime = (tick: Tick): boolean =>
-  Number.isFinite(tick) && Number.isInteger(tick) && tick >= 0 && minuteOfDay(tick) < 240;
+  Number.isFinite(tick) && Number.isInteger(tick) && tick >= 0 && minuteOfDay(tick) < NIGHT_END_MINUTE;
 
 export type ReportedNightVisit = Extract<ReportedFieldObservation, { kind: 'presence' }>
   & { witness: string };

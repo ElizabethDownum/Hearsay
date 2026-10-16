@@ -231,3 +231,17 @@ describe('DayPlanner — the scry button submits a scry verb (Plan 10 Task 1C)',
     ]);
   });
 });
+
+describe('DayPlanner — the séance button submits a seance verb (Plan 10 Task 1D)', () => {
+  it('pressing submit seance sends { kind: seance } and nothing else', () => {
+    const { chosen, props } = fixture();
+    const offer: LocalOffer = { tick: at(1, 2), venue: props.view.avatar.venue!, circleMembers: ['ada'], token: 't#2' };
+    const view = { ...props.view, tick: offer.tick, seance: { departedKnown: true, spoken: false, sacredVenues: [offer.venue] } };
+    const moment = named(DayPlanner({ ...props, view, offer, localPending: true }), 'LocalMoment');
+    expect(moment, 'a LocalMoment element in the planner tree').toBeDefined();
+    const composer = named(expand(moment!), 'SeanceComposer');
+    expect(composer, 'a SeanceComposer element in the moment').toBeDefined();
+    press(expand(composer!), 'submit seance');
+    expect(chosen).toEqual([{ kind: 'seance' }]);
+  });
+});
