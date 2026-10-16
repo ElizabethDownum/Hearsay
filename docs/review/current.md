@@ -1,6 +1,34 @@
-# Current review — 19 September 2026
+# Current review — 16 October 2026
 
-[R39 rendezvous-carries approval](2026-09-20-r39-rendezvous-carries-approval.md). [R38 meet-window approval](2026-09-19-r38-meet-window-approval.md). [Plan 9 final review and certification](2026-09-19-plan-9-final-review.md). [Task 8 approval and install](2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](2026-09-18-browser-gate-approval.md). [R18 code approval](2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+[R49 meeting-window cap approval](2026-10-16-r49-meeting-window-cap-approval.md). [R48 import-fence spellings approval](2026-10-16-r48-import-fence-spellings-approval.md). [R47 Codex arrival approval](2026-10-16-r47-codex-arrival-approval.md). [R46 watch-episodes approval](2026-10-16-r46-watch-episodes-approval.md). [R45 late-hesitation approval](2026-10-16-r45-late-hesitation-approval.md). [R44 relayed-claims approval](2026-10-16-r44-relayed-claims-approval.md). [R43 composed-directives approval](2026-10-16-r43-composed-directives-approval.md). [R42 sale-version approval](2026-10-16-r42-sale-version-approval.md). [R41 let-pass approval](2026-10-16-r41-let-pass-approval.md). [Astra full review and triage](2026-09-27-astra-full-review.md). [R40 rendezvous-cap approval](2026-09-27-r40-rendezvous-cap-approval.md). [R39 rendezvous-carries approval](2026-09-20-r39-rendezvous-carries-approval.md). [R38 meet-window approval](2026-09-19-r38-meet-window-approval.md). [Plan 9 final review and certification](2026-09-19-plan-9-final-review.md). [Task 8 approval and install](2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](2026-09-18-browser-gate-approval.md). [R18 code approval](2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
+
+**16 October: the nine Astra fix units are installed and independently reviewed.** R45 to R49
+were committed today on top of the 27 September batch, each TDD with the six gates and the
+soak/MC comparator unchanged, and every unit R41 to R49 now has an approval record. Verdicts on
+the units as shipped: R41 Needs fixes 0/1/3, R42 Approved 0/0/4, R43 Needs fixes 0/2/2, R44 Needs
+fixes 0/2/3, R45 Approved 0/0/3, R46 Approved 0/0/2, R47 Needs fixes 0/1/4, R48 Approved 0/0/1,
+R49 Approved 0/0/0. Every Important and every actionable Minor is closed by a correction unit
+(R41-1/R41-2, R42-1/R42-2, R43-1/R43-2, R44-1/R44-2, R45-1, R46-1, R47-1, R48-1), each with a
+mutant table proving the new pins bite; the R41-1, R42-1, R43-1 and R44-1 re-checks are Approved,
+and the re-checks of today's corrections are recorded in the approvals as they return. The one
+Important of the day: R47's "the beat is one moment" rule paired a telling with a receive at its
+own tick, which cannot have caused it (a beat's speech is chosen before the beat's hearing);
+R47-1 makes the pairing strictly earlier and pins the tie rule. Carried, not fixed: the terminal
+debrief credits a channel's distortion to the player (R42 M3), a worked receipt that arrives after
+its own stand-down re-adds the post (R46 P6, Plan 10 Task 4), the replay hazard of a now-refused
+window (R40, Plan 10 Task 7), and dating informant presence and residue rows in the acquisition
+clock (R47 M1). 2,598 tests / 159 files at `8fc4d3a`. Next: Plan 10 Task 1.
+
+**27 September: R40 caps the rendezvous window; Astra's full review is triaged into R41 to R49.**
+The owner chose "cap at issue" for R39's open question: a composed rendezvous runs at most four
+hours and opens within a day, mirrored in the composer under the panels fence; installed
+`6ff4bd0` + `368af16` and **Approved** after a test-only correction
+([record](2026-09-27-r40-rendezvous-cap-approval.md)). In parallel, the first whole-codebase
+independent review (Codex Astra at `58a9214`) returned 0 Critical / 13 Important / 4 Minor; root
+re-ran all thirteen probes and accepted every finding
+([triage](2026-09-27-astra-full-review.md)). The owner's rulings for Plan 10: measure first, a
+precondition task, before the bot fleet. R41 to R44 were installed the same day; R45 to R49
+followed on 16 October (above).
 
 **20 September: R39, the five defects R38 carried are fixed before Plan 10.** Installed at
 `dbca0e1` + `7b6df80`, independently **Approved** (0 / 1 carried / 11). Sound-out and hosting
@@ -556,3 +584,120 @@ composed rendezvous window has no upper bound and can pin an asset for weeks (ca
 it to the brief's `active` range, or release after attendance; root recommends the cap). Carried:
 the preset's and the planner's report clock, invitation-array scans, hosting and sound-out row
 pruning, outcome vocabulary.
+
+### R40 — the composed rendezvous window is capped at issue
+
+The owner's call on R39's open question, 2026-09-27: cap at issue. Decisions: (1) a composed
+rendezvous window runs at most 16 beats (4 h) and opens at most one day after the issuing tick
+(`RENDEZVOUS_MAX_SPAN`, `RENDEZVOUS_MAX_LEAD` in `src/sim/actions.ts`), strict `>`, checked before
+any allocation; (2) the composer mirrors both inline under the panels fence, bound by a parity
+sweep in `tests/app/panels.test.ts` at tick 0 and at a day-2 offered beat (review I-1). Installed
+`6ff4bd0`, `368af16`; [approval](2026-09-27-r40-rendezvous-cap-approval.md). Carried: a saved log
+holding a now-refused window throws on replay (Plan 10 Task 7, save versioning); the sound-out
+meeting window (R49, below).
+
+### R41 — a pending local moment can be let pass
+
+Astra I1 and M4. Decisions: (1) the day planner carries a "let the moment pass" control, enabled
+whenever a moment is requested, offered or chosen and its beat has not played; the session's own
+`localPending()` is the only source of that fact, so the shell cannot disagree with the session
+(R41-1 removed the shell latch); (2) offers are never logged, so passing touches no save and the
+beat plays as an ordinary tick; (3) passing after a choice withdraws it unlogged, and a re-request
+re-offers the same beat under a new token (review M2, pinned rather than disabled); (4) the
+session and the clock are built once (lazy initialisers); (5) the offered, unchosen state is pinned
+as pending at the composition root, and the root is pinned by its text to pass the session's own
+answer alone (R41-2, re-check M1 and M2). Installed `48667d4`, `a002dd9`, `7e7f6f6`;
+[approval](2026-10-16-r41-let-pass-approval.md).
+
+### R42 — a sale speaks what reached you, and its persuasion is a floor
+
+Astra I2 and I3. Decisions: (1) a sale transmits the received version the player priced; when it
+differs from the underlying claim it is minted as a child of the same family; (2) a buyer hears
+the sale exactly once, through ordinary ingest (first version sticks, apparent source by the
+hearsay rule), and after ingest the sale applies a floor, credence = max(held, 0.85): a 0.97
+anchor keeps its version and history, a fresh buyer lands at least at 0.85, a weak holder is lifted
+rather than left below the retell threshold (R42-1, review M1 and M2); (3) the floor is declared
+in the evidence-hierarchy law's retention inventory; (4) a paid telling is fresh news: the floor
+also restarts the story's freshness at the sale tick, and it lands right after the buyer's own
+hearing, before the subject's reaction (R42-2, re-check m1 and m2). Installed `ef43e1a`,
+`3056644`, `8c72516`; [approval](2026-10-16-r42-sale-version-approval.md). Carried: the terminal
+debrief credits the channel's distortion to the player (review M3); content-identical sibling
+children per sale (nit).
+
+### R43 — composed directives are the same act as their presets
+
+Astra I9, M1, M2. Decisions: (1) every courier application is priced and debited once at common
+issuance, validated before any allocation; a courier without `rules` throws; (2) the composer
+shows the price and greys submit on the same public fact the preset greys on (R43-1, review I-1);
+(3) the ideology refusal is one pure validator shared by the preset (both handoffs) and common
+issuance, before the price check, so a refused composed courier is uncharged; the composer cannot
+judge factions, so that refusal is the engine's and consumes the moment (R43-1, review I-2); (4)
+every posting records its authored mark; (5) literal execution of a venue-audience telling
+requires the named venue, adaptive execution may work the room it is in and is marked. Installed
+`d0c9d59`, `ff2f7dd`; [approval](2026-10-16-r43-composed-directives-approval.md). Test-only
+follow-up accepted: the dead-drop ideology refusal pin (re-check M-1).
+
+### R44 — relayed directive reports retell their enclosed claims
+
+Astra I10. Decisions: (1) each claim enclosed in a relayed report passes through the relay's
+expressed trait chain and candor, keyed on the claim's real family, with the association claim id
+kept; (2) the claim context is the relay's ORDINARY gossip context (`traitContextOf`), which knows
+every townsperson's faction, while the envelope keeps the restricted brief view (R44-1, review
+I1); (3) **no ego overlay on enclosed claims**: gossip has none, so neither does the retold claim;
+the recorded consequence is that an ego asset's field report inflates overheard utterances but not
+the claims enclosed in an overheard report (re-check m3). Installed `9c319d2`, `c52c465`;
+[approval](2026-10-16-r44-relayed-claims-approval.md). Test-only follow-ups accepted: a partisan
+field-report case and a same-faction partisan unit case (re-check m1, m2).
+
+### R45 — an overdue hesitation still produces the later answer
+
+Astra I8. Decision: a hesitation whose day mark has already passed when the recruiter receives it
+is overdue, not lost: the decision is marked due at the deadline the candidate kept and the
+candidate answers at the first beat they stand in a circle, the answer travelling physically as
+ever; the deadline is left as the truth; an in-time hesitation is scheduled exactly as before; a
+hand-over on the deadline tick itself is overdue (the tick's setups were already listed), pinned
+with zero residue (R45-1, review M1, M2). Installed `7d9ff28`, `c648d7b`;
+[approval](2026-10-16-r45-late-hesitation-approval.md).
+
+### R46 — a watch episode is the district plus its start day
+
+Astra I7. Decision: the enemy's action ledger keys a watch row by (orderKey, scheduleStartDay),
+the identity a tail drop already uses to stand posts down; `orderKey` itself is unchanged, so
+pending-order reservations, correlations and sourceRefs still read `watch:<district>`. A late
+night from an earlier episode finds its own row; a stand-down removes only its episode's post, and
+both of its lookups name the episode (R46-1, review M1); the identity is pinned on both halves,
+two districts watched the same night staying apart (review M2). Installed `087bdd3`, `bcc5fe1`;
+[approval](2026-10-16-r46-watch-episodes-approval.md). Carried: a worked receipt arriving after
+its own episode's stand-down re-adds the post (review P6; Plan 10 Task 4).
+
+### R47 — the Codex pairs by observation time; the evening report files by arrival
+
+Astra I11, I12. Decisions: (1) a corroboration pairs a telling with the latest receive by TICK
+strictly before it (same tick: logged before it), never by array position; the Codex is still a
+fold over the log alone; (2) the evening report takes an optional per-entry acquisition tick;
+the sim-side clock is `learnedAtByEntry(world)`, derived from the debrief's own receipt history
+(`counterKnowledge`), and the composition root hands it to the fold beside the log, so the fold
+never sees `WorldState`; an unrecorded row falls back to its observation tick; (3) a receive at
+the telling's own tick is never its cause, because a beat's speech is chosen before the beat's
+hearing, and ties between same-tick receives go to the row the player saw first (R47-1, review
+I1, M4); the receives are indexed once per call, and the composition root is pinned by an
+App-level test (M2, M3). Installed `580c65f`, `8fc4d3a`;
+[approval](2026-10-16-r47-codex-arrival-approval.md). Carried: dating informant-delivered presence
+and residue rows in the acquisition clock, if they become reachable (review M1).
+
+### R48 — the intel and enemy import fences fire on the `.js` spelling
+
+Astra M3. Decision: the no-omniscience fences list both spellings of every banned module in both
+forms; a lint-law test proves both spellings fire for a real intel file and a real enemy file and
+that the panels fence remains the positive control; behind the pattern list, a resolver-backed
+scan proves that nothing under either fenced subtree RESOLVES to a WorldState module in any
+spelling, at any depth, static or dynamic (R48-1, review M-1). Installed `424b718`, `2c5646b`;
+[approval](2026-10-16-r48-import-fence-spellings-approval.md).
+
+### R49 — the sound-out meeting window is capped like a rendezvous
+
+R40 review carry. Decision: the meeting a sound-out asks for carries the rendezvous caps (at most
+four hours, opening within a day of the issuing tick), checked at issue with zero residue, because
+on acceptance the window pins the INVITEE, who is not the player's asset; the composer mirrors
+both notes inline, bound by a second parity sweep. Installed `5ac5058`;
+[approval](2026-10-16-r49-meeting-window-cap-approval.md).

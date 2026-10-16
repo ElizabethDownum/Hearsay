@@ -1,6 +1,22 @@
-# Hearsay — resumed, 19 September 2026
+# Hearsay — resumed, 16 October 2026
 
-[R39 rendezvous-carries approval](review/2026-09-20-r39-rendezvous-carries-approval.md). [R38 meet-window approval](review/2026-09-19-r38-meet-window-approval.md). [Plan 9 final review and certification](review/2026-09-19-plan-9-final-review.md). [Task 8 approval and install](review/2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](review/2026-09-18-browser-gate-approval.md). [R18 code approval](review/2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+[Current docket](review/current.md). [R49](review/2026-10-16-r49-meeting-window-cap-approval.md), [R48](review/2026-10-16-r48-import-fence-spellings-approval.md), [R47](review/2026-10-16-r47-codex-arrival-approval.md), [R46](review/2026-10-16-r46-watch-episodes-approval.md), [R45](review/2026-10-16-r45-late-hesitation-approval.md), [R44](review/2026-10-16-r44-relayed-claims-approval.md), [R43](review/2026-10-16-r43-composed-directives-approval.md), [R42](review/2026-10-16-r42-sale-version-approval.md), [R41](review/2026-10-16-r41-let-pass-approval.md) approvals. [Astra triage](review/2026-09-27-astra-full-review.md). [R40 approval](review/2026-09-27-r40-rendezvous-cap-approval.md). [R39 rendezvous-carries approval](review/2026-09-20-r39-rendezvous-carries-approval.md). [R38 meet-window approval](review/2026-09-19-r38-meet-window-approval.md). [Plan 9 final review and certification](review/2026-09-19-plan-9-final-review.md). [Task 8 approval and install](review/2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](review/2026-09-18-browser-gate-approval.md). [R18 code approval](review/2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
+
+Latest, 16 October: **all nine Astra fix units are installed, reviewed and corrected; Plan 10
+Task 1 is next.** R45 to R49 were committed today (late hesitation `7d9ff28`, watch episodes
+`087bdd3`, Codex/evening-report arrival `580c65f`, import-fence spellings `424b718`, sound-out
+meeting caps `5ac5058`), each TDD with the six gates and the soak/MC comparator unchanged. Every
+unit R41 to R49 was independently reviewed by a native Opus worker and has an approval record
+(links above; the docket's 16 October lead paragraph lists the verdicts). Corrections today:
+R43-2/R44-2 `bb95f0a`, R42-2 `8c72516` (a paid telling is fresh news), R41-2 `7e7f6f6`, R46-1
+`bcc5fe1` (a stand-down names its episode on both lookups), R45-1 `c648d7b`, R48-1 `2c5646b` (the
+no-omniscience law bound by module resolution, not spelling), R47-1 `8fc4d3a` (a same-tick receive
+is never the cause; ties to the first-logged row; receives indexed once). The R41-1, R42-1,
+R43-1 and R44-1 re-checks are Approved; the re-checks of today's corrections (R41-2/R42-2,
+R45-1/R46-1, R47-1/R48-1) are recorded in the approval docs as they return, and the running
+ledger is `.superpowers/sdd/progress.md`. Carried: R42 M3, R46 P6 (Task 4), R40/R49 replay (Task
+7), R47 M1. Origin/main is `cec2cd6`; everything since is local and **no push is authorized**.
+Next: Plan 10 Task 1, with a fresh premise re-verification in its brief.
 
 Latest, 27 September: **R40 capped the rendezvous window; Astra's full review was triaged into
 fix units R41-R49; R41-R44 and two corrections are committed.** The owner chose "cap at issue":
