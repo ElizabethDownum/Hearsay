@@ -42,9 +42,14 @@ export default tseslint.config(
       // this subtree.
       'no-restricted-imports': ['error', { patterns: [
         {
+          // Both spellings of every banned module (R48, Astra M3): `ignore`-style groups match the
+          // specifier literally, so the TypeScript `.js` spelling (resolved to the same `.ts`) slipped
+          // through an extensionless-only list. tests/lint/import-fence-spellings.test.ts pins both.
           group: [
             '../types', '../world', '../step', '../agents', '../campaign',
+            '../types.js', '../world.js', '../step.js', '../agents.js', '../campaign.js',
             '**/sim/types', '**/sim/world', '**/sim/step', '**/sim/agents', '**/sim/campaign',
+            '**/sim/types.js', '**/sim/world.js', '**/sim/step.js', '**/sim/agents.js', '**/sim/campaign.js',
           ],
           message: 'No-omniscience law: the enemy consumes evidence + TownMap + Rules, never WorldState.',
         },
@@ -68,9 +73,12 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': ['error', { patterns: [
         {
+          // Both spellings, as in the enemy block (R48, Astra M3).
           group: [
             '../sim/types', '../sim/world', '../sim/step', '../sim/agents', '../sim/campaign',
+            '../sim/types.js', '../sim/world.js', '../sim/step.js', '../sim/agents.js', '../sim/campaign.js',
             '**/sim/types', '**/sim/world', '**/sim/step', '**/sim/agents', '**/sim/campaign',
+            '**/sim/types.js', '**/sim/world.js', '**/sim/step.js', '**/sim/agents.js', '**/sim/campaign.js',
           ],
           message: 'Intel is board-side: it consumes captured feeds + Rules, never WorldState.',
         },
