@@ -261,14 +261,19 @@ describe('a hesitation that reaches the recruiter after the candidate\'s day has
    * time" for the beat after she has left, so the words wait in her hands. She returns for the
    * whole of day 2, long after her day to decide (openedAt + a day = 1455) ran out in transit.
    */
-  function stageLateHesitation(seed: string): { world: WorldState; brief: DirectiveBrief } {
+  function stageLateHesitation(
+    seed: string, back: { day: number; from: number } = { day: 2, from: 0 },
+  ): { world: WorldState; brief: DirectiveBrief } {
     const staged = stageSoundOut({ seed, targetTrust: 0.3, visits: [[15, 30]] });
     staged.world.scheduleOverrides['cass'] = [
-      { fromDay: 2, toDay: 3, from: 0, to: 1440, venue: 'square', source: 'player', sourceRef: 'test:return' },
+      { fromDay: back.day, toDay: back.day + 1, from: back.from, to: 1440, venue: 'square', source: 'player', sourceRef: 'test:return' },
       ...(staged.world.scheduleOverrides['cass'] ?? []),
     ];
     return staged;
   }
+
+  const pendingDecisions = (world: WorldState) =>
+    (world.scheduledSetup ?? []).filter((row) => row.kind === 'recruitment-response');
 
   function answers(world: WorldState): { tick: number; response: string; venue: string }[] {
     return world.chronicle
@@ -283,9 +288,15 @@ describe('a hesitation that reaches the recruiter after the candidate\'s day has
   it('the overdue decision is still made, and the later answer is still spoken in person', () => {
     const { world, brief } = stageLateHesitation('late-hesitation');
     runLogOn(world, RULES, issue(brief), 1);
+    runUntil(world, at(2, 0) + 1, RULES);           // the held hesitation has just been handed over
+    const approach = world.network.directiveState!.recruitmentApproaches[0]!;
+    // R45-1 (R45 review M2): overdue means marked due at the deadline it kept, with NO setup
+    // scheduled for a tick that has already run; a dead row would sit in the save for ever.
+    expect(approach.status).toBe('waiting');
+    expect(approach.decisionDueAt).toBe(approach.resolveAt);
+    expect(pendingDecisions(world)).toEqual([]);
     runUntil(world, at(3, 0), RULES);
 
-    const approach = world.network.directiveState!.recruitmentApproaches[0]!;
     expect(approach.openedAt).toBe(15);
     expect(approach.resolveAt).toBe(at(1, 0) + 15);    // the deadline stays the truth: a day from the approach
     const spoken = answers(world);
@@ -296,10 +307,33 @@ describe('a hesitation that reaches the recruiter after the candidate\'s day has
     expect(spoken[1]!.tick).toBe(at(2, 0) + 15);     // the beat after she handed over the held words
     expect(approach.status).toBe('closed');
     expect(approach.decisionDueAt).toBeNull();
+    expect(pendingDecisions(world)).toEqual([]);
     const record = soundOutRecord(world);
     expect(record.execution!.state).toBe('completed');
     const outcomes = record.receivedReports.map((row) => row.report.outcome ?? '');
     expect(outcomes.some((outcome) => /^(willing|unwilling)$/.test(outcome))).toBe(true);
+  });
+
+  // R45-1 (R45 review M1): a hand-over on the deadline tick itself. The tick's setups were listed
+  // before delivery, so a setup due NOW would never run: the boundary belongs to the overdue path.
+  it('a hesitation handed over exactly on the deadline tick is overdue, not scheduled for a tick already listed', () => {
+    const { world, brief } = stageLateHesitation('boundary-hesitation', { day: 1, from: 15 });
+    runLogOn(world, RULES, issue(brief), 1);
+    const deadline = at(1, 0) + 15;
+    runUntil(world, deadline + 1, RULES);
+    const approach = world.network.directiveState!.recruitmentApproaches[0]!;
+    expect(approach.resolveAt).toBe(deadline);
+    expect(answers(world)[0]).toEqual({ tick: deadline, response: 'hesitate', venue: 'square' });
+    expect(approach.decisionDueAt).toBe(deadline);
+    expect(pendingDecisions(world)).toEqual([]);
+
+    runUntil(world, deadline + 30, RULES);
+    const spoken = answers(world);
+    expect(spoken).toHaveLength(2);
+    expect(spoken[1]).toMatchObject({ tick: deadline + 15, venue: 'square' });
+    expect(spoken[1]!.response).not.toBe('hesitate');
+    expect(approach.status).toBe('closed');
+    expect(pendingDecisions(world)).toEqual([]);
   });
 
   it('a hesitation that arrives in time still schedules the decision for the day mark, unchanged', () => {
