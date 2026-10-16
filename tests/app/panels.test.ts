@@ -255,7 +255,7 @@ describe('Network — the roster surface renders player-known bookkeeping only',
 // ── Plan 10 Task 1A: the forge composer — a priced, solitary, non-local verb ─────────────────────
 
 describe('DayPlanner — forge composer (Plan 10 Task 1A)', () => {
-  const forgePage = (over: Partial<typeof plannerBase> = {}) =>
+  const forgePage = (over: Partial<typeof plannerBase & { offer: LocalOffer | null }> = {}) =>
     html(createElement(DayPlanner, { ...plannerBase, view: plannerView, offer: null, ...over }));
 
   it('renders without an offer (forging is frameless), names its price, and submits as a verb', () => {
@@ -266,11 +266,20 @@ describe('DayPlanner — forge composer (Plan 10 Task 1A)', () => {
       expect(page, field).toContain(`aria-label="forge ${field}"`);
     }
     expect(isDisabled(page, 'submit forge')).toBe(false);
-    expect(page).not.toContain('aria-label="forge subject" disabled=""');
     const running = forgePage({ paused: false });
     expect(isDisabled(running, 'submit forge')).toBe(true);                           // the sim is running
-    expect(running).toContain('aria-label="forge subject" disabled=""');               // and so are the fields
+    for (const field of ['subject', 'predicate', 'object', 'count', 'severity', 'place', 'attribution']) {
+      const greyed = new RegExp(`aria-label="forge ${field}"[^>]*\\bdisabled=""`);     // and so is every field
+      expect(page, `${field} live while paused`).not.toMatch(greyed);
+      expect(running, `${field} greyed while running`).toMatch(greyed);
+    }
     expect(isDisabled(forgePage({ localPending: true }), 'submit forge')).toBe(true); // a moment is pending
+  });
+
+  it('renders with an offer too (forging needs no moment), greyed while that moment is pending', () => {
+    const page = forgePage({ offer: { tick: 0, venue: 'v1', circleMembers: ['ada'], token: 't#0' }, localPending: true });
+    expect(page).toContain('aria-label="submit forge"');
+    expect(isDisabled(page, 'submit forge')).toBe(true);
   });
 
   it('greys exactly when the treasury cannot cover the forgery, and says so', () => {
@@ -283,7 +292,9 @@ describe('DayPlanner — forge composer (Plan 10 Task 1A)', () => {
   });
 
   // Parity (Plan 11 carry (k)): the composer's only mirror is the price, and it must agree with the
-  // engine's refusal at every coin level around the price — never greyer, never looser.
+  // engine's refusal at every coin level around the price — never greyer, never looser, PER
+  // SUBMISSION: spend already queued on the same tick is not in the view's coin, so several
+  // presses while paused queue several forges and the engine refuses the excess (T1A review M4).
   it('the price mirror agrees with applyForge at coin = price - 1, price, price + 1', () => {
     for (const coin of [ECON.forgery - 1, ECON.forgery, ECON.forgery + 1]) {
       const session = newSession(`forge-parity-${coin}`);
