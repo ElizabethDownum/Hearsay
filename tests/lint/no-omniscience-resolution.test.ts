@@ -49,6 +49,11 @@ function specifiers(file: string, source: string): string[] {
     } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)
       && ts.isStringLiteral(node.moduleReference.expression)) {
       found.push(node.moduleReference.expression.text);
+    } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)
+      && ts.isStringLiteral(node.argument.literal)) {
+      // `type W = import('../sim/types.js').WorldState` (R48-2, R48-1 re-check): a type-position
+      // import the lint fence never sees, which still binds the fenced module's shape.
+      found.push(node.argument.literal.text);
     }
     ts.forEachChild(node, visit);
   };
@@ -90,6 +95,7 @@ describe('no-omniscience law: nothing under the fenced subtrees RESOLVES to a Wo
       ['src/sim/enemy/x.ts', "export { step } from '../enemy/../step.js';", 'src/sim/step.ts'],
       ['src/intel/x.ts', "import { x } from '../sim/./agents.js';", 'src/sim/agents.ts'],
       ['src/intel/deep/x.ts', "const m = import('../../sim/campaign');", 'src/sim/campaign.ts'],
+      ['src/intel/x.ts', "export type W = import('../sim/types.js').WorldState;", 'src/sim/types.ts'],
     ];
     for (const [file, source, target] of cases) {
       const hits = reaches(path.resolve(ROOT, file), source, options);
