@@ -303,6 +303,11 @@ export function directiveIssues(draft: DirectiveDraft, sources: ComposerSources)
     if (mission.target === draft.recipient) notes.push('an asset cannot be asked to sound themselves out');
     if (mission.meeting !== null) {
       notes.push(...windowNotes('meeting', mission.meeting.from, mission.meeting.until));
+      // The rendezvous caps bound the asked-for meeting too (R49); same constants, same parity pin.
+      if (mission.meeting.until - mission.meeting.from > RENDEZVOUS_MAX_SPAN) {
+        notes.push('the meeting window can run at most four hours');
+      }
+      if (mission.meeting.from - tick > RENDEZVOUS_MAX_LEAD) notes.push('the meeting must open within a day');
     }
   }
   if (missionOf(mission) === null) notes.push('no delivered story to send');

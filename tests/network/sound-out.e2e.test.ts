@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { at } from '../../src/core/time';
 import { STANDARD_RULES } from '../../src/content/rules';
-import { applyDirective } from '../../src/sim/actions';
+import { applyDirective, RENDEZVOUS_MAX_LEAD, RENDEZVOUS_MAX_SPAN } from '../../src/sim/actions';
 import { runLogOn, type Action } from '../../src/sim/campaign';
 import { runUntil } from '../../src/sim/step';
 import { hashWorld, stableStringify } from '../../src/sim/hash';
@@ -419,6 +419,63 @@ describe('sound-out meetings at the end of the day (R39)', () => {
     runUntil(world, until + 1, RULES);
     const invitation = world.network.invitations!.at(-1)!;
     expect(invitation).toMatchObject({ kind: 'sound-out', attendedAt: from, status: 'attended' });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R49 (R40 review carry): the sound-out `meeting` window has the rendezvous window's shape, and on
+// acceptance it pins the INVITEE, who is not the player's asset, for the whole window. The same two
+// caps apply at issue, measured from the issuing tick, with zero residue on refusal.
+describe('the sound-out meeting window is capped like a rendezvous (R49)', () => {
+  const HANDOFF = { outboundVia: [] as string[], reportVia: [] as string[] };
+  const withMeeting = (brief: DirectiveBrief, from: number, until: number): DirectiveBrief => ({
+    ...brief, mission: { ...brief.mission as Extract<DirectiveBrief['mission'], { kind: 'sound-out' }>,
+      meeting: { venue: 'safehouse' as VenueId, from, until } },
+  });
+
+  it.each([
+    ['one beat longer than the span cap', 15, 15 + RENDEZVOUS_MAX_SPAN + 15,
+      /directive: sound-out meeting window may run at most four hours/],
+    ['opening one beat past the lead cap', RENDEZVOUS_MAX_LEAD + 15, RENDEZVOUS_MAX_LEAD + 45,
+      /directive: sound-out meeting window must open within a day of issue/],
+  ])('a meeting window %s is refused at issue with zero residue', (_label, from, until, message) => {
+    const { world, brief } = stageSoundOut({ seed: `meeting-capped-${from}` });
+    const before = hashWorld(world);
+    expect(() => applyDirective(world, 'dane', HANDOFF, withMeeting(brief, from, until), 0)).toThrow(message);
+    expect(hashWorld(world)).toBe(before);
+  });
+
+  it.each([
+    ['exactly the span cap', 15, 15 + RENDEZVOUS_MAX_SPAN],
+    ['opening exactly at the lead cap', RENDEZVOUS_MAX_LEAD, RENDEZVOUS_MAX_LEAD + 30],
+  ])('a meeting window of %s is accepted and kept as authored', (_label, from, until) => {
+    const { world, brief } = stageSoundOut({ seed: `meeting-cap-edge-${from}` });
+    applyDirective(world, 'dane', HANDOFF, withMeeting(brief, from, until), 0);
+    const record = world.network.directiveState!.records[0]!;
+    expect(record.authored.brief.mission).toMatchObject({ kind: 'sound-out', meeting: { from, until } });
+  });
+
+  it.each([
+    ['opening exactly at the lead cap is accepted', RENDEZVOUS_MAX_LEAD, false],
+    ['opening one beat past it is refused', RENDEZVOUS_MAX_LEAD + 15, true],
+    ['opening one beat after issue is accepted', 15, false],
+  ])('issued on day 2, a meeting window %s: the lead runs from the issuing tick', (_label, lead, refused) => {
+    const issued = at(2, 0);
+    const { world, brief } = stageSoundOut({ seed: 'meeting-cap-day2' });
+    runUntil(world, issued, RULES);
+    const authored: DirectiveBrief = {
+      ...withMeeting(brief, issued + lead, issued + lead + 30),
+      active: { from: issued, until: at(5, 0) }, reportBy: issued,
+    };
+    const before = hashWorld(world);
+    if (refused) {
+      expect(() => applyDirective(world, 'dane', HANDOFF, authored, issued))
+        .toThrow(/sound-out meeting window must open within a day of issue/);
+      expect(hashWorld(world)).toBe(before);
+    } else {
+      applyDirective(world, 'dane', HANDOFF, authored, issued);
+      expect(world.network.directiveState!.records).toHaveLength(1);
+    }
   });
 });
 

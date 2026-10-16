@@ -73,8 +73,8 @@ export function offeredVenueFor(world: WorldState, offered: OfferedCircles): Ven
  * authored window, so without them the day planner could pin an asset away from the town for weeks,
  * or hold the record of a far-future meeting `attempted` throughout. Four hours matches the longest
  * physical commitment a brief can already make (a posting's 16:00-20:00); the lead is measured from
- * the tick the directive is issued. The composer mirrors both inline (the panels fence), bound by
- * the parity pin in tests/app/panels.test.ts.
+ * the tick the directive is issued. The same caps bound the meeting a sound-out asks for (R49). The
+ * composer mirrors both inline (the panels fence), bound by the parity pins in tests/app/panels.test.ts.
  */
 export const RENDEZVOUS_MAX_SPAN = 16 * CONVERSATION_BEAT;
 export const RENDEZVOUS_MAX_LEAD = TICKS_PER_DAY;
@@ -137,9 +137,19 @@ function applyDirectiveWithCause(
       throw new Error('directive: an asset cannot sound itself out');
     }
     const meeting = brief.mission.meeting;
-    if (meeting !== null && (meeting.from >= meeting.until
-      || meeting.from % CONVERSATION_BEAT !== 0 || meeting.until % CONVERSATION_BEAT !== 0)) {
-      throw new Error('directive: sound-out meeting window must be nonempty and beat aligned');
+    if (meeting !== null) {
+      if (meeting.from >= meeting.until
+        || meeting.from % CONVERSATION_BEAT !== 0 || meeting.until % CONVERSATION_BEAT !== 0) {
+        throw new Error('directive: sound-out meeting window must be nonempty and beat aligned');
+      }
+      // The rendezvous caps apply to the meeting a sound-out asks for (R49, R40 review carry): on
+      // acceptance the window pins the INVITEE, who is not the player's asset, for its whole span.
+      if (meeting.until - meeting.from > RENDEZVOUS_MAX_SPAN) {
+        throw new Error('directive: sound-out meeting window may run at most four hours');
+      }
+      if (meeting.from - tick > RENDEZVOUS_MAX_LEAD) {
+        throw new Error('directive: sound-out meeting window must open within a day of issue');
+      }
     }
   }
   if (brief.active.from > brief.active.until) throw new Error('directive: active range is reversed');

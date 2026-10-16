@@ -1000,6 +1000,38 @@ describe('the composer greys its own submit on routes and times the engine must 
     }
   });
 
+  /**
+   * THE MEETING CAP PARITY PIN (R49). The sound-out meeting window carries the same two caps as a
+   * composed rendezvous (RENDEZVOUS_MAX_SPAN / _LEAD, measured from the issuing tick); the composer's
+   * copy is inline by the panels fence, so the same sweep binds it, at tick 0 and at a day-2 beat.
+   */
+  it('the composer greys exactly the sound-out meeting windows the engine caps refuse (R49)', () => {
+    const SPAN_NOTE = 'the meeting window can run at most four hours';
+    const LEAD_NOTE = 'the meeting must open within a day';
+    for (const offered of [0, at(2, 0)]) {
+      const src = { ...sources(), offer: { ...sources().offer!, tick: offered } };
+      let refusedSpan = 0; let refusedLead = 0; let clear = 0;
+      for (const lead of [15, RENDEZVOUS_MAX_LEAD - 15, RENDEZVOUS_MAX_LEAD, RENDEZVOUS_MAX_LEAD + 15]) {
+        for (const span of [15, RENDEZVOUS_MAX_SPAN - 15, RENDEZVOUS_MAX_SPAN, RENDEZVOUS_MAX_SPAN + 15]) {
+          const from = offered + lead;
+          const draft = offered === 0 ? base() : {
+            ...base(), activeFrom: offered + 15, activeUntil: offered + TICKS_PER_DAY, reportBy: offered + 15,
+          };
+          const mission = soundOut('eve', { venue: 'market', from, until: from + span });
+          const notes = directiveIssues({ ...draft, mission } as DirectiveDraft, src);
+          const overSpan = span > RENDEZVOUS_MAX_SPAN;
+          const overLead = lead > RENDEZVOUS_MAX_LEAD;
+          expect(notes.includes(SPAN_NOTE), `offered ${offered} span ${span} from ${from}`).toBe(overSpan);
+          expect(notes.includes(LEAD_NOTE), `offered ${offered} lead ${lead} span ${span}`).toBe(overLead);
+          if (overSpan) refusedSpan++;
+          if (overLead) refusedLead++;
+          if (!overSpan && !overLead) { clear++; expect(notes, `offered ${offered} lead ${lead}`).toEqual([]); }
+        }
+      }
+      expect([refusedSpan > 0, refusedLead > 0, clear > 0]).toEqual([true, true, true]);
+    }
+  });
+
   it('an active window that has already closed is reported against the offered beat', () => {
     const late = {
       ...deskProps(world),
