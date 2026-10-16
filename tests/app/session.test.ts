@@ -353,7 +353,7 @@ describe('requested-beat local offer', () => {
     expect(hashWorld(loadSession(session.save(), session.world.tick).world)).toBe(hashWorld(session.world));
   });
 
-  // R41-1 (R41 review M-2): the pass control is enabled for a REQUESTED moment too, so a moment that
+  // R41-1 (R41 review M1): the pass control is enabled for a REQUESTED moment too, so a moment that
   // has not been reached yet must be cancellable: the beat then plays as an ordinary tick.
   it('a requested moment not yet reached can be let pass; the beat plays as ordinary', () => {
     const session = newSession(SEED);
@@ -370,7 +370,7 @@ describe('requested-beat local offer', () => {
     expect(hashWorld(loadSession(session.save(), session.world.tick).world)).toBe(hashWorld(session.world));
   });
 
-  // R41-1 (R41 review M-3): letting the moment pass after choosing withdraws the choice. It was never
+  // R41-1 (R41 review M2): letting the moment pass after choosing withdraws the choice. It was never
   // logged, so nothing leaks; a fresh request re-offers the same beat under a new token, and I-1 (one
   // act per offer) still holds for that offer.
   it('passing after a choice withdraws it unlogged; a re-request re-offers the same beat', () => {

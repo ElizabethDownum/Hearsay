@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { Session } from '../../app/src/loop/session';
@@ -61,5 +62,28 @@ describe('the pass control is wired to the session App owns (R41-1)', () => {
       session.cancelLocalInteraction();
     });
     expect(cancelled.props.localPending).toBe(false);
+  });
+
+  // R41-2 (R41-1 re-check M1): the OFFERED, not-yet-chosen state is the one R41 was about (the empty
+  // day-zero safehouse circle). A pending-ness that only counted requests or choices would disable
+  // the pass control exactly there and strand the player again.
+  it('an offered moment with nothing chosen is pending, so the pass control is enabled', async () => {
+    const offered = await mount((session) => {
+      session.requestLocalInteraction();
+      session.advance(1);
+    });
+    expect(offered.session.localOffer()).not.toBeNull();
+    expect(offered.session.localOffer()!.circleMembers).toEqual([]);
+    expect(offered.props.localPending).toBe(true);
+    expect(offered.props.offer).not.toBeNull();
+  });
+
+  // R41-2 (R41-1 re-check M2): a server render cannot see state set after it, so a re-introduced
+  // shell latch OR-ed onto the session's answer would pass every mounted case above. The composition
+  // root is therefore also pinned by its text: the planner's pending-ness is the session's call alone.
+  it('the composition root passes the session\'s own answer and keeps no latch of its own', () => {
+    const src = readFileSync(new URL('../../app/src/main.tsx', import.meta.url), 'utf8');
+    expect(src).toMatch(/localPending=\{session\.localPending\(\)\}/);
+    expect(src).not.toMatch(/localRequested|localPending=\{[^}]*(\|\||&&)/);
   });
 });
