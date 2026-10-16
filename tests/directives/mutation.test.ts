@@ -343,6 +343,16 @@ describe('projectDirectiveReport', () => {
       expect(item.reported.severity).not.toBe(outsider.severity);
     });
 
+    it('the partisan softens its OWN side and sharpens the other, by the claim context\'s faction (R44-1 review m2)', () => {
+      const guild = { ...gossip, faction: 'guild' as const };    // the relay shares the target's faction
+      const own = projectDirectiveReport({
+        report: about(enclosed), enemyAction, factRefs, speaker: speaker(['partisan']),
+        turnedAgainstAudience: false, perceivedScrutiny: 0, familyOf: (id) => `family-of-${id}`, claimContext: guild,
+      }, STANDARD_RULES);
+      expect(claimOf(own).reported.severity).toBe(enclosed.severity - 1);
+      expect(claimOf(project(['partisan'], false, 0, about(enclosed))).reported.severity).toBe(enclosed.severity + 1);
+    });
+
     it('perceived scrutiny silences conspicuous traits on the enclosed claim too', () => {
       const countless = { ...enclosed, count: null };
       expect(claimOf(project(['numberer'], false, 0, about(countless))).reported.count).toBe(3);

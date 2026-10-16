@@ -233,6 +233,48 @@ describe('remote observations wait for physical field reports', () => {
     expect(STANDARD_RULES.traits.objectifier!.transform(byId, ctx).object).not.toBe(gossip.object);
   });
 
+  // R44-1 review m1: the field-report caller hands the enclosed claim the reporter's ORDINARY context,
+  // which knows every townsperson's faction. A partisan reporter with no rivals sharpens a claim about
+  // a subject on the other side; a context restricted to the reporter and its rivals would know no
+  // faction for cyn and pass the claim through unchanged.
+  it('a partisan field report reads the enclosed subject\'s faction beyond its rivals', () => {
+    const value = world(['ada', 'bez', 'cyn']);
+    value.npcs.ada!.traits = ['partisan'];
+    value.npcs.ada!.rivals = [];
+    value.npcs.ada!.faction = 'guild';
+    value.npcs.cyn!.faction = 'crown';
+    const claim: Claim = { ...CLAIM, count: 2, severity: 3 };
+    value.claims[claim.id] = claim;
+    const { subject, predicate, object, count, severity, place, attribution } = claim;
+    holdFieldObservation(value, 'player', 'ada', {
+      kind: 'raw', observation: {
+        kind: 'network-speech', tick: 0, venue: 'square', speaker: 'bez', addressedTo: 'ada',
+        messageId: 'm-heard', overheard: false,
+        spoken: { kind: 'directive-report', directiveId: 'd-heard', enemyAction: null, factRefs: [],
+          onwardTo: null, report: { outcome: null, reason: null, source: null, uncertainty: null,
+            evidence: [{ kind: 'claim', claimId: claim.id,
+              reported: { subject, predicate, object, count, severity, place, attribution } }] } },
+      },
+    }, null, ['you'], null, []);
+    queueUnqueuedFieldReports(value);
+    const message = value.network.directiveState!.messages[0]!;
+    const spoken = realizeNetworkForward(
+      value, message.id, { venue: 'backroom', members: ['ada', 'you'] }, 15, STANDARD_RULES,
+    )!.spoken;
+    if (spoken.kind !== 'field-report') throw new Error('expected a field report');
+    const observation = spoken.items[0]!.observation;
+    if (observation.kind !== 'network-speech' || observation.spoken.kind !== 'directive-report') {
+      throw new Error('expected the retold directive report');
+    }
+    const item = observation.spoken.report.evidence![0]!;
+    if (item.kind !== 'claim') throw new Error('expected the enclosed claim');
+    expect(item.reported.severity).toBe(4);                 // the other side's sin, sharpened
+    // Non-vacuous: restricted to the reporter and its (empty) rivals, the partisan would not apply.
+    const restricted = { ...traitContextOf(value.npcs.ada!, value), factionOf: (id: string) => (id === 'ada' ? 'guild' as const : null) };
+    expect(STANDARD_RULES.traits.partisan!.appliesTo(claim, restricted)).toBe(false);
+    expect(STANDARD_RULES.traits.partisan!.appliesTo(claim, traitContextOf(value.npcs.ada!, value))).toBe(true);
+  });
+
   it('omitted atoms still close every bound source id at final receipt', () => {
     const value = world();
     value.network.assets[0]!.turned = true;

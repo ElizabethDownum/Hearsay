@@ -214,6 +214,29 @@ describe('courier ideology refusal — they will not smear their own faction', (
     expect(hashWorld(world)).toBe(before); // validate-before-mutate: no coin move, no queue, no fact
   });
 
+  // R43-1 review M-1: the dead-drop handoff refuses on the same law, with zero residue; a `money`
+  // asset through the same drop carries and pays, so the refusal is the ideology's, not the drop's.
+  it('REFUSES through a dead drop too (zero residue), while a money asset carries and pays', () => {
+    const ownSide: InjectSpec = { subject: 'rafe', predicate: 'stole', object: null, count: 1, severity: 3, place: null, attribution: SOMEONE };
+    for (const [mice, refused] of [['ideology', true], ['money', false]] as const) {
+      const world = testWorld(`courier-ideology-drop-${mice}`);
+      makeAsset(world, 'mara', mice);
+      applySetDrop(world, 'drop-1', 'market', RULES);
+      runUntil(world, t, RULES);                       // the carrier is present to learn the cache
+      const coin = world.coin;
+      const before = hashWorld(world);
+      if (refused) {
+        expect(() => applyCourier(world, 'mara', ownSide, 'rafe', 'drop-1', t, RULES)).toThrow(/ideology|own faction/);
+        expect(hashWorld(world)).toBe(before);
+        expect(world.network.dropPayloads ?? []).toHaveLength(0);
+      } else {
+        applyCourier(world, 'mara', ownSide, 'rafe', 'drop-1', t, RULES);
+        expect(world.coin).toBe(coin - RULES.economy.courierRun);
+        expect(world.network.dropPayloads).toHaveLength(1);
+      }
+    }
+  });
+
   it('CARRIES a damaging claim about ANOTHER faction, and a flattering claim about its own', () => {
     const world = testWorld('courier-ideology-ok');
     makeAsset(world, 'mara', 'ideology');
