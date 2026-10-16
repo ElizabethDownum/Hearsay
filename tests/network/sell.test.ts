@@ -364,6 +364,30 @@ describe('applySell — the sale floor is a fresh telling (R42-1 re-check m1, m2
     expect(retold).toBeDefined();
   });
 
+  // R42-3 (R42-2 re-check m1): the floor is the BUYER's persuasion. R42-2 moved it into the
+  // per-hearer loop, where "buyer only" is a single clause; without it every circle member who
+  // hears the sale would be floored to 0.85 and have their clock refreshed. A bystander who held
+  // the story stale keeps it stale; a bystander hearing it fresh merely overhears.
+  it('the sale floors the buyer only: a stale bystander keeps their belief and clock, a fresh one merely overhears', () => {
+    const w = sellWorld('sell-bystander');
+    const claim = heldFromThird(w, 'f-aside', 'mallory', 0.3);
+    w.beliefs['watchman']![claim.family] = { ...w.beliefs['buyer']![claim.family]! };
+    seedIntel(w, 'f-aside', 'c-aside', 4);
+    w.claims['c-aside'] = { ...w.claims['c-aside']!, attribution: 'third' };
+    w.intel.log.at(-1)!.reported = { ...w.intel.log.at(-1)!.reported!, attribution: 'third' };
+    const sale = at(1, 0);
+    runUntil(w, sale, RULES);
+    expect(w.beliefs['third']?.[claim.family]).toBeUndefined();
+    applySell(w, 'buyer', 'f-aside', sale, RULES);
+    runUntil(w, sale + 1, RULES);
+
+    expect(w.beliefs['buyer']![claim.family]).toMatchObject({ credence: 0.85, heardAt: sale });
+    expect(w.beliefs['watchman']![claim.family]).toMatchObject({ credence: 0.3, heardAt: 0 }); // not his sale
+    const fresh = w.beliefs['third']![claim.family]!;
+    expect(fresh.heardAt).toBe(sale);                 // overheard in the circle...
+    expect(fresh.credence).toBeLessThan(0.85);        // ...at hearsay weight, not the buyer's price
+  });
+
   // m2: the buyer who is the story's subject reacts to what they hold AFTER the sale's persuasion,
   // not to the pre-floor corroboration. A weakly held damaging self-rumor sold to its subject is a
   // corroborated, BELIEVED self-rumor, and the subject counter-spins it as they would any other.
