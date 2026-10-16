@@ -378,6 +378,8 @@ export function DayPlanner(props: DayPlannerProps) {
         coin={coin} economy={economy} off={off || localPending} onVerb={onVerb} />
       <ForgeComposer people={directoryIds(view)} venues={venueIds(view)}
         coin={coin} economy={economy} off={off || localPending} onVerb={onVerb} />
+      <ScryComposer venues={venueIds(view)} tick={view.tick}
+        coin={coin} economy={economy} off={off || localPending} onVerb={onVerb} />
     </section>
   );
 }
@@ -411,6 +413,69 @@ function DropComposer({
             <span className="desk-note">{cost} coin</span>
             <button className="desk-btn" aria-label="submit drop" disabled={off || !affordable || id === ''}
               onClick={() => onVerb({ kind: 'setDrop', id, venue: selected })}>set drop</button>
+            {!affordable && <span className="desk-note">the <Term id="treasury" /> cannot cover this ({cost} needed)</span>}
+          </div>}
+    </>
+  );
+}
+
+/** The engine's window grain and ceiling for a scry (`applyScry`): 15-minute steps, an hour at most. */
+const SCRY_STEP = 15;
+const SCRY_MAX_MINUTES = 60;
+const SCRY_LENGTHS = [15, 30, 45, 60];
+const clockOf = (minute: number): string =>
+  `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+
+/**
+ * Scry (Plan 10 Task 1C): buy tomorrow's view of one venue, a frameless desk verb priced from the
+ * economy. The engine takes next day only, a 15-aligned window of at most an hour inside the day;
+ * the composer offers nothing else: the day is the view clock's tomorrow, the length is one of four
+ * steps, and the start list is cut where the chosen length would cross midnight, so every window
+ * it can submit is one the engine accepts. The one greying mirror is the price.
+ */
+function ScryComposer({
+  venues, tick, coin, economy, off, onVerb,
+}: {
+  venues: string[];
+  tick: number;
+  coin: number;
+  economy: EconomyDef;
+  off: boolean;
+  onVerb(intent: NonLocalActionIntent): void;
+}) {
+  const [venue, setVenue] = useState('');
+  const [start, setStart] = useState('');
+  const [length, setLength] = useState('');
+  const day = dayOf(tick) + 1;
+  const minutes = SCRY_LENGTHS.includes(Number(length)) ? Number(length) : SCRY_MAX_MINUTES;
+  const starts: number[] = [];
+  for (let minute = 0; minute + minutes <= TICKS_PER_DAY; minute += SCRY_STEP) starts.push(minute);
+  const from = starts.includes(Number(start)) && start !== '' ? Number(start) : starts[0]!;
+  const where = venue || venues[0] || '';
+  const cost = economy.scrying;
+  const affordable = coin >= cost;
+  return (
+    <>
+      <h3><Term id="verb-scry" /></h3>
+      {venues.length === 0
+        ? <p className="desk-note">No known venue to <Term id="scrying" /> on.</p>
+        : <div className="tag-row">
+            <span className="desk-note">tomorrow, day {day}</span>
+            <label>at <select className="desk-btn" aria-label="scry venue" disabled={off} value={where}
+              onChange={(event) => setVenue(event.target.value)}>
+              {venues.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select></label>
+            <label>from <select className="desk-btn" aria-label="scry start" disabled={off} value={String(from)}
+              onChange={(event) => setStart(event.target.value)}>
+              {starts.map((minute) => <option key={minute} value={String(minute)}>{clockOf(minute)}</option>)}
+            </select></label>
+            <label>for <select className="desk-btn" aria-label="scry length" disabled={off} value={String(minutes)}
+              onChange={(event) => setLength(event.target.value)}>
+              {SCRY_LENGTHS.map((item) => <option key={item} value={String(item)}>{item} min</option>)}
+            </select></label>
+            <span className="desk-note">{cost} coin</span>
+            <button className="desk-btn" aria-label="submit scry" disabled={off || !affordable}
+              onClick={() => onVerb({ kind: 'scry', venue: where, day, from, to: from + minutes })}>scry</button>
             {!affordable && <span className="desk-note">the <Term id="treasury" /> cannot cover this ({cost} needed)</span>}
           </div>}
     </>

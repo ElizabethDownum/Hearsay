@@ -3,12 +3,13 @@ import { Children, isValidElement, type ReactElement, type ReactNode } from 'rea
 import { DayPlanner, type DayPlannerProps } from '../../app/src/panels/DayPlanner';
 import type { LocalActionIntent, LocalOffer, NonLocalActionIntent } from '../../app/src/loop/session';
 import { newSession } from '../../app/src/loop/session';
+import { at } from '../../src/core/time';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { TERMS } from '../../src/content/terms';
 import { playerView, networkView } from '../../src/sim/fieldwork';
 import { boardView } from '../../src/intel/board';
 
-// Plan 10 Task 1A/1B. A server render shows a composer's button but cannot press it, so the
+// Plan 10 Task 1A/1B/1C. A server render shows a composer's button but cannot press it, so the
 // submitted intent (the verb's kind and the payload it builds) would go unpinned. This file calls
 // the planner's composers as plain functions under a pass-through `useState` (the debrief-ui
 // idiom), walks their element trees to the real buttons and invokes their real `onClick`.
@@ -90,5 +91,17 @@ describe('DayPlanner — the paper buttons submit show and plant (Plan 10 Task 1
       { kind: 'show', artifact: 'a0', to: 'ada' },
       { kind: 'plant', artifact: 'a0', venue: offer.venue, to: null },
     ]);
+  });
+});
+
+describe('DayPlanner — the scry button submits a scry verb (Plan 10 Task 1C)', () => {
+  it('pressing submit scry sends tomorrow, the first venue, and the first hour of the day', () => {
+    const { submitted, props } = fixture();
+    const view = { ...props.view, tick: at(2, 9, 30) };
+    const composer = named(DayPlanner({ ...props, view }), 'ScryComposer');
+    expect(composer, 'a ScryComposer element in the planner tree').toBeDefined();
+    labelled(expand(composer!), 'submit scry')!.props.onClick!();
+    const venue = props.view.map.venues.map((row) => row.id).sort((a, b) => a.localeCompare(b))[0];
+    expect(submitted).toEqual([{ kind: 'scry', venue, day: 3, from: 0, to: 60 }]);
   });
 });

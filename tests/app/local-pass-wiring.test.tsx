@@ -6,6 +6,7 @@ import type { Session } from '../../app/src/loop/session';
 import type { DayPlannerProps } from '../../app/src/panels/DayPlanner';
 import { artifactsOf } from '../../src/sim/artifacts';
 import { STANDARD_RULES } from '../../src/content/rules';
+import { dayOf } from '../../src/core/time';
 
 /**
  * R41-1 (R41 review I-1): the composition root, not just the panel and the session separately. The
@@ -126,5 +127,19 @@ describe("the planner's verbs are wired to the session App owns (Plan 10 Task 1A
     expect(session.advance(1).advanced).toBe(1);
     expect(artifactsOf(session.world)).toMatchObject([{ id: 'a0', heldBy: null, plantedAt: offer.venue }]);
     expect(session.world.chronicle.some((row) => row.kind === 'artifact' && row.act === 'plant' && row.tick === offer.tick)).toBe(true);
+  });
+
+  // Plan 10 Task 1C: a scry submitted through the planner's own `onVerb` buys tomorrow's window at
+  // the chosen venue: one operation recorded, the price debited, the purchase in the chronicle.
+  it("onVerb({ kind: 'scry' }) buys tomorrow's window through the session: one operation, the price debited", async () => {
+    const { session, props } = await mount();
+    const before = session.world.coin;
+    const venue = Object.keys(session.world.venues).sort()[0]!;
+    const day = dayOf(session.world.tick) + 1;
+    props.onVerb({ kind: 'scry', venue, day, from: 600, to: 660 });
+    expect(session.advance(1).advanced).toBe(1);
+    expect(session.world.magic?.scries).toEqual([{ id: 's0', venue, day, from: 600, to: 660 }]);
+    expect(session.world.coin).toBe(before - STANDARD_RULES.economy.scrying);
+    expect(session.world.chronicle.some((row) => row.kind === 'scry' && row.operation === 's0' && row.venue === venue)).toBe(true);
   });
 });

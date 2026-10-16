@@ -23,7 +23,8 @@ import { TERMS } from '../../src/content/terms';
 import { STANDARD_RULES } from '../../src/content/rules';
 import { webView, type WebView } from '../../src/intel/web';
 import { boardView } from '../../src/intel/board';
-import { at, TICKS_PER_DAY } from '../../src/core/time';
+import { at, dayOf, TICKS_PER_DAY } from '../../src/core/time';
+import { applyScry } from '../../src/sim/magic';
 import {
   applyAssignInformant, applyCourier, applyDirective, applyMeet, venueOpensFor,
 } from '../../src/sim/actions';
@@ -278,7 +279,7 @@ describe('DayPlanner — forge composer (Plan 10 Task 1A)', () => {
     expect(short).toContain(`cannot cover this (${ECON.forgery} needed)`);
     const exact = forgePage({ coin: ECON.forgery });
     expect(isDisabled(exact, 'submit forge')).toBe(false);
-    expect(exact).not.toContain('cannot cover this');
+    expect(exact).not.toContain(`cannot cover this (${ECON.forgery} needed)`); // the scry note may stand
   });
 
   // Parity (Plan 11 carry (k)): the composer's only mirror is the price, and it must agree with the
@@ -367,6 +368,90 @@ describe('DayPlanner — paper composer (Plan 10 Task 1B)', () => {
       expect(plantRefused, `engine plant at ${tick}`).toBe(showRefused);
       expect(isDisabled(page, 'submit show'), `composer show at ${tick}`).toBe(showRefused);
       expect(isDisabled(page, 'submit plant'), `composer plant at ${tick}`).toBe(plantRefused);
+    }
+  });
+});
+
+// ── Plan 10 Task 1C: scry — buy tomorrow's window at a venue, a priced non-local verb ───────────
+
+describe('DayPlanner — scry composer (Plan 10 Task 1C)', () => {
+  const scryPage = (over: Partial<typeof plannerBase & { view: PlayerView }> = {}) =>
+    html(createElement(DayPlanner, { ...plannerBase, view: plannerView, offer: null, ...over }));
+  const starts = (page: string) => optionsOf(page, 'scry start').map(Number);
+
+  it('renders without an offer, names its price and tomorrow, and offers every known venue', () => {
+    const page = scryPage();
+    expect(page).toContain('aria-label="submit scry"');
+    expect(page).toContain(`${ECON.scrying} coin`);
+    expect(page).toContain(`day ${dayOf(plannerView.tick) + 1}`);
+    expect(optionsOf(page, 'scry venue')).toEqual(['v1']);
+    expect(optionsOf(page, 'scry length')).toEqual(['15', '30', '45', '60']);
+    expect(isDisabled(page, 'submit scry')).toBe(false);
+    expect(page).not.toContain('aria-label="scry venue" disabled=""');
+    const running = scryPage({ paused: false });
+    expect(isDisabled(running, 'submit scry')).toBe(true);                           // the sim is running
+    expect(running).toContain('aria-label="scry venue" disabled=""');                // and so are the fields
+    expect(isDisabled(scryPage({ localPending: true }), 'submit scry')).toBe(true); // a moment is pending
+    // Tomorrow follows the view's clock: at 23:45 of day 3 the window is bought for day 4.
+    expect(scryPage({ view: { ...plannerView, tick: at(3, 23, 45) } })).toContain('day 4');
+  });
+
+  it('the start list runs in 15-minute steps and stops where the default hour would cross midnight', () => {
+    const page = scryPage();
+    const list = starts(page);
+    expect(list).toHaveLength(93);
+    expect(list.every((minute, index) => minute === index * 15)).toBe(true);
+    expect(list.at(-1)).toBe(TICKS_PER_DAY - 60);
+    expect(page).toContain('>23:00<');      // shown as a clock, submitted as minutes
+    expect(page).not.toContain('>23:15<');
+  });
+
+  it('greys exactly when the treasury cannot cover the scrying, and says so', () => {
+    const short = scryPage({ coin: ECON.scrying - 1 });
+    expect(isDisabled(short, 'submit scry')).toBe(true);
+    expect(short).toContain(`cannot cover this (${ECON.scrying} needed)`);
+    const exact = scryPage({ coin: ECON.scrying });
+    expect(isDisabled(exact, 'submit scry')).toBe(false);
+    expect(exact).not.toContain(`cannot cover this (${ECON.scrying} needed)`);
+  });
+
+  // Parity (Plan 11 carry (k)): the price mirror must agree with the engine's refusal at every coin
+  // level around the price, with a window the engine otherwise accepts.
+  it('the price mirror agrees with applyScry at coin = price - 1, price, price + 1', () => {
+    for (const coin of [ECON.scrying - 1, ECON.scrying, ECON.scrying + 1]) {
+      const session = newSession(`scry-parity-${coin}`);
+      session.world.coin = coin;
+      const venue = Object.keys(session.world.venues).sort()[0]!;
+      const action = { kind: 'scry' as const, tick: session.world.tick, venue,
+        day: dayOf(session.world.tick) + 1, from: 0, to: 60 };
+      let refused = false;
+      try { applyScry(session.world, action, STANDARD_RULES); } catch { refused = true; }
+      expect(refused, `engine at coin ${coin}`).toBe(coin < ECON.scrying);
+      expect(isDisabled(scryPage({ coin }), 'submit scry'), `composer at coin ${coin}`).toBe(refused);
+      if (!refused) expect(session.world.magic?.scries).toHaveLength(1);
+    }
+  });
+
+  // Parity on the window: the composer never offers a window the engine refuses. Every start it
+  // lists, with the default hour, is accepted at the composer's own "tomorrow"; the first start it
+  // withholds (23:15, whose hour would cross midnight) is refused; and the venue list is the map's.
+  it('every offered start with the default hour is a window applyScry accepts; the withheld 23:15 is refused', () => {
+    const world = deskWorld('scry-parity');
+    world.tick = at(2, 9, 30);
+    const view = playerView(world);
+    const page = scryPage({ view });
+    const offered = starts(page);
+    expect(offered).toHaveLength(93);
+    expect(optionsOf(page, 'scry venue')).toEqual(Object.keys(world.venues).sort());
+    for (const from of [...offered, TICKS_PER_DAY - 45]) {
+      const probe = cloneSerializable(world);
+      let refused = false;
+      try {
+        applyScry(probe, { kind: 'scry', tick: probe.tick, venue: 'square', day: dayOf(probe.tick) + 1,
+          from, to: from + 60 }, STANDARD_RULES);
+      } catch { refused = true; }
+      expect(refused, `engine at start ${from}`).toBe(!offered.includes(from));
+      if (!refused) expect(probe.magic?.scries[0]).toEqual({ id: 's0', venue: 'square', day: 3, from, to: from + 60 });
     }
   });
 });
