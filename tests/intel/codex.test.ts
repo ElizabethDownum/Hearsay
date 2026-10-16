@@ -63,10 +63,27 @@ describe('corroborations pair by when things happened, not by where a report lan
     expect(hits[0]!.changes).toEqual([{ field: 'count', from: 4, to: 2 }, { field: 'severity', from: 4, to: 3 }]);
   });
 
-  it('same tick: a receive logged before the tell still counts as its cause (the beat is one moment)', () => {
+  // R47-1 (R47 review I1): every utterance in a beat is chosen from beliefs held BEFORE the beat
+  // (speech is collected and logged, and only then do hearers ingest), so a receive at the tell's
+  // own tick cannot have caused it, whichever row the log holds first.
+  it('same tick: a receive in the same beat is never the cause, whatever the log order', () => {
     const sameBeat = [{ ...receive, tick: 30 }, { ...tell, tick: 30 }];
-    expect(corroborations(sameBeat, 'gale', 'minimizer', R)).toHaveLength(1);
+    expect(corroborations(sameBeat, 'gale', 'minimizer', R)).toEqual([]);
     expect(corroborations([sameBeat[1]!, sameBeat[0]!], 'gale', 'minimizer', R)).toEqual([]);
+    expect(suggestTraits(sameBeat, 'r1', R)).not.toContain('minimizer');
+  });
+
+  // R47-1 (R47 review M4): two receives at the same earlier tick tie on time; the row logged FIRST
+  // is the pair, the copy the player saw first (the avatar's own hearing precedes an informant's
+  // later copy of the same physical receive, whose content that informant may have filtered).
+  it('ties between same-tick receives go to the row logged first', () => {
+    const direct = utt({ tick: 10, family: 'r1', speaker: 'mira', addressedTo: 'gale', via: 'self', reported: rc({ count: 2, severity: 3 }) });
+    const copy = utt({ tick: 10, family: 'r1', speaker: 'mira', addressedTo: 'gale', via: 'otto', reported: rc({ count: 4, severity: 4 }) });
+    const told = utt({ tick: 20, family: 'r1', speaker: 'gale', addressedTo: 'mira', via: 'self', reported: rc({ count: 2, severity: 3 }) });
+    expect(corroborations([direct, told, copy], 'gale', 'minimizer', R)).toEqual([]);   // faithful against the direct row
+    const hits = corroborations([copy, told, direct], 'gale', 'minimizer', R);        // the filtered copy was logged first
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toMatchObject({ receivedIndex: 0, toldIndex: 1 });
   });
 });
 

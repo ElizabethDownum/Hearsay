@@ -44,39 +44,44 @@ function physicalTellingKey(e: IntelEntry): string {
  * "Before" is the observation tick, not the array position (R47, Astra I11): an informant's report
  * appends OLDER observations after NEWER ones the avatar heard directly, so array order would make a
  * later reception the cause of an earlier telling and corroborate a trait the npc never showed.
- * Within one tick the beat is a single moment and the log's order within it is the only order there
- * is, so a receive logged before the tell at the same tick still pairs. Indexes stay the log's own.
+ * STRICTLY before (R47-1, R47 review I1): every utterance in a beat is chosen from beliefs held
+ * before the beat (speech is collected and logged, then hearers ingest), so a receive at the tell's
+ * own tick cannot have caused it, whichever row the log holds first. Two receives at the same
+ * earlier tick tie on time; the row logged first is the pair, the copy the player saw first (the
+ * avatar's own hearing precedes an informant's later copy of the same physical receive). The
+ * receives are indexed once per call by family and addressee (R47 review M2: `boardView` runs this
+ * every frame). Indexes stay the log's own.
  */
 function observedPairs(
   log: readonly IntelEntry[], npcFilter: EntityId | null, familyFilter: RumorId | null,
 ): ObservedPair[] {
   const pairs: ObservedPair[] = [];
+  // Every addressed claimful receive, in log order, keyed by (family, addressee).
+  const receives = new Map<string, { index: number; tick: number; reported: ReportedClaim }[]>();
+  log.forEach((rec, index) => {
+    if (!isClaimful(rec) || rec.addressedTo === null || (isMagic(rec) && rec.speaker === null)) return;
+    const key = JSON.stringify([rec.family, rec.addressedTo]);
+    const bucket = receives.get(key) ?? [];
+    bucket.push({ index, tick: rec.tick, reported: rec.reported });
+    receives.set(key, bucket);
+  });
   log.forEach((tell, toldIndex) => {
     if (!isClaimful(tell) || tell.speaker === null || (isMagic(tell) && tell.addressedTo === null)) return;
     const npc = tell.speaker;
     if (npcFilter !== null && npc !== npcFilter) return;
     if (familyFilter !== null && tell.family !== familyFilter) return;
 
-    // Latest addressed-receive before this tell by tick (ties: earlier in the log, strictly before
-    // the tell's own row), same family, addressed to this npc.
-    let receivedIndex = -1;
-    let before: ReportedClaim | null = null;
-    log.forEach((rec, j) => {
-      if (!isClaimful(rec) || rec.family !== tell.family || rec.addressedTo !== npc) return;
-      if (isMagic(rec) && rec.speaker === null) return;
-      if (rec.tick > tell.tick || (rec.tick === tell.tick && j >= toldIndex)) return;
-      if (receivedIndex !== -1) {
-        const current = log[receivedIndex]!;
-        if (rec.tick < current.tick || (rec.tick === current.tick && j < receivedIndex)) return;
-      }
-      receivedIndex = j;
-      before = rec.reported;
-    });
-    if (before === null) return;
+    // Latest addressed-receive STRICTLY before this tell by tick; ties go to the row logged first.
+    let latest: { index: number; tick: number; reported: ReportedClaim } | null = null;
+    for (const rec of receives.get(JSON.stringify([tell.family, npc])) ?? []) {
+      if (rec.tick >= tell.tick) continue;
+      if (latest === null || rec.tick > latest.tick) latest = rec;
+    }
+    if (latest === null) return;
 
-    const changes = diffReported(before, tell.reported);
+    const changes = diffReported(latest.reported, tell.reported);
     if (changes.length === 0) return;   // an empty-diff pair corroborates nothing
-    pairs.push({ family: tell.family, npc, receivedIndex, toldIndex, before, changes });
+    pairs.push({ family: tell.family, npc, receivedIndex: latest.index, toldIndex, before: latest.reported, changes });
   });
   const magicTellings = new Set(log.filter((e) => isClaimful(e) && isMagic(e)).map(physicalTellingKey));
   if (magicTellings.size === 0) return pairs;

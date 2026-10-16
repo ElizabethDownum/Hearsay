@@ -92,7 +92,11 @@ export function counterKnowledge(world: WorldState): CounterKnowledge[] {
  * The acquisition clock, one slot per board row (R47, Astra I12): the tick each entry reached the
  * player, by the same receipt history the debrief uses. Rows the debrief does not classify (kinds
  * it skips) and informant rows with no recorded receipt are `null`, so a consumer falls back to
- * the row's own observation tick rather than inventing a date.
+ * the row's own observation tick rather than inventing a date. Today that is the one place an
+ * `unrecorded` receipt still dates by observation (R47 review M1): an informant's presence or
+ * residue row carries no receipt here, so the evening report files it under the day it was SEEN,
+ * which is never later than its true arrival. Dating those rows is owed when they become reachable
+ * in play.
  */
 export function learnedAtByEntry(world: WorldState): (Tick | null)[] {
   const learned: (Tick | null)[] = world.intel.log.map(() => null);
