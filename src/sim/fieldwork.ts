@@ -4,6 +4,8 @@ import { observationsFor, type Observation, type TickEvents } from './perception
 import { CONVERSATION_BEAT } from './rumors/propagation';
 import type { Rules } from './rules';
 import type { IntelEntry, WorldState } from './types';
+import type { InjectSpec } from './actions';
+import { FORGERY_LEAD_DAYS } from './artifacts';
 import type { Claim, EntityId, VenueId } from './rumors/claim';
 import type { Mice } from './network/types';
 import type { TownMap } from './enemy/state';
@@ -167,6 +169,13 @@ export interface PlayerView {
    */
   station: 'noble' | 'lowlife' | null;
   scenario: { status: ScenarioStatus; day: number; daysTotal: number } | null;
+  /**
+   * The forged papers in the avatar's OWN hands (Plan 10 Task 1B): the fixed text, when each was
+   * written and the first day it may be shown or planted (the ink dries overnight:
+   * `FORGERY_LEAD_DAYS`). A planted or handed-over paper is no longer the player's to list; what
+   * became of it is the chronicle's business. Empty in a world that never forged.
+   */
+  documents: { id: string; spec: InjectSpec; forgedTick: Tick; usableFromDay: number }[];
 }
 
 /** Street knowledge never goes missing: a world whose enemy roster was never wired still owes
@@ -227,6 +236,12 @@ export function playerView(world: WorldState): PlayerView {
     scenario: world.scenario
       ? { status: world.scenario.status, day: dayOf(tick), daysTotal: world.scenario.days }
       : null,
+    documents: (world.artifacts ?? [])
+      .filter((artifact) => playerId !== null && artifact.heldBy === playerId)
+      .map((artifact) => ({
+        id: artifact.id, spec: artifact.spec, forgedTick: artifact.forgedTick,
+        usableFromDay: dayOf(artifact.forgedTick) + FORGERY_LEAD_DAYS,
+      })),
   };
 }
 

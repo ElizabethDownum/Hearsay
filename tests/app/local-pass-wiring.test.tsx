@@ -106,4 +106,25 @@ describe("the planner's verbs are wired to the session App owns (Plan 10 Task 1A
     expect(held[0]).toMatchObject({ spec, author: 'player', heldBy: session.world.playerId, plantedAt: null });
     expect(session.world.coin).toBe(before - STANDARD_RULES.economy.forgery);
   });
+
+  // Plan 10 Task 1B: a paper forged on day 0 is planted at the offered venue on a day-1 beat through
+  // the planner's own `onLocal`; the beat plays on the next advance and the paper waits there.
+  it('onLocal({ kind: \'plant\' }) plants a dry paper where the moment stands, through the session', async () => {
+    const { session, props } = await mount();
+    const spec = { subject: 'someone', predicate: 'stole', object: null, count: null, severity: 3 as const,
+      place: null, attribution: 'someone' };
+    props.onVerb({ kind: 'forge', spec });
+    while (session.world.tick < 1440) {
+      const result = session.advance(1440 - session.world.tick);
+      if (result.stopped === 'terminal') throw new Error('campaign ended before day 1');
+    }
+    expect(artifactsOf(session.world)).toMatchObject([{ id: 'a0', heldBy: session.world.playerId, plantedAt: null }]);
+    props.onRequestLocal();
+    expect(session.advance(15).stopped).toBe('local-offer');
+    const offer = session.localOffer()!;
+    props.onLocal({ kind: 'plant', artifact: 'a0', venue: offer.venue, to: null });
+    expect(session.advance(1).advanced).toBe(1);
+    expect(artifactsOf(session.world)).toMatchObject([{ id: 'a0', heldBy: null, plantedAt: offer.venue }]);
+    expect(session.world.chronicle.some((row) => row.kind === 'artifact' && row.act === 'plant' && row.tick === offer.tick)).toBe(true);
+  });
 });

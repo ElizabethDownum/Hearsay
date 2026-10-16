@@ -29,7 +29,8 @@ import {
 } from '../../src/sim/actions';
 import { buildTownMap, buildWorld, enrollPlayer } from '../../src/sim/world';
 import { blankIntel, playerView, networkView, courierRouteView } from '../../src/sim/fieldwork';
-import { applyForge, artifactsOf } from '../../src/sim/artifacts';
+import { applyForge, applyPlant, applyShow, artifactsOf } from '../../src/sim/artifacts';
+import { cloneSerializable } from '../../src/sim/hash';
 import { directiveView } from '../../src/sim/directives/view';
 import { applicationOf } from '../../src/sim/directives/types';
 import { ensureDirectiveState } from '../../src/sim/directives/state';
@@ -108,6 +109,7 @@ const plannerView: PlayerView = {
   },
   station: 'noble',
   scenario: null,
+  documents: [],
 };
 
 /** The T13 planner props that are not about the local moment. Spread, then override. */
@@ -129,7 +131,7 @@ describe('DayPlanner — requested local moment', () => {
     expect(page).toContain('aria-label="request local interaction"');
     expect(page).not.toContain('aria-label="local moment"');
     for (const label of ['submit tell', 'submit ask', 'submit sell', 'submit recruit',
-      'submit debrief', 'submit host', 'submit directive',
+      'submit debrief', 'submit host', 'submit directive', 'submit show', 'submit plant',
       'preset posting', 'preset courier', 'preset rendezvous']) {
       expect(page, `an offer-less planner must not render "${label}"`).not.toContain(`aria-label="${label}"`);
     }
@@ -296,6 +298,79 @@ describe('DayPlanner — forge composer (Plan 10 Task 1A)', () => {
   });
 });
 
+// ── Plan 10 Task 1B: show and plant — paper in hand, inside the offered moment ───────────────────
+
+describe('DayPlanner — paper composer (Plan 10 Task 1B)', () => {
+  const SPEC = { subject: 'ada', predicate: 'stole', object: null, count: 2, severity: 4 as const,
+    place: null, attribution: 'someone' };
+  const dry = { id: 'a0', spec: SPEC, forgedTick: 0, usableFromDay: 1 };
+  const wet = { id: 'a1', spec: { ...SPEC, severity: 1 as const }, forgedTick: at(1, 0), usableFromDay: 2 };
+  const offer = (tick: number, circle: string[] = ['ada', 'bez']): LocalOffer =>
+    ({ tick, venue: 'v1', circleMembers: circle, token: `t#${tick}` });
+  const paperPage = (documents: PlayerView['documents'], tick: number, circle?: string[]) =>
+    html(createElement(DayPlanner, { ...plannerBase, view: { ...plannerView, tick, documents }, offer: offer(tick, circle) }));
+
+  it('holding nothing: the moment says so and offers neither verb', () => {
+    const page = paperPage([], at(1, 0));
+    expect(page).toContain('aria-label="local moment"');
+    expect(page).not.toContain('aria-label="submit show"');
+    expect(page).not.toContain('aria-label="submit plant"');
+    expect(page).toContain('You hold no');
+  });
+
+  it('holding a dry paper: the picker names it, show takes a circle-mate, plant takes here or a circle-mate', () => {
+    const page = paperPage([dry], at(1, 0));
+    expect(optionsOf(page, 'paper document')).toEqual(['a0']);
+    expect(optionsOf(page, 'show audience')).toEqual(['ada', 'bez']);
+    expect(optionsOf(page, 'plant target')).toEqual(['venue:v1', 'ada', 'bez']);
+    expect(isDisabled(page, 'submit show')).toBe(false);
+    expect(isDisabled(page, 'submit plant')).toBe(false);
+    expect(page).not.toContain('needs a day');
+  });
+
+  it('a paper forged today greys both verbs with the engine\'s own words; the next day frees it', () => {
+    const today = paperPage([wet], at(1, 0, 30));
+    expect(isDisabled(today, 'submit show')).toBe(true);
+    expect(isDisabled(today, 'submit plant')).toBe(true);
+    expect(today).toContain('a forgery needs a day before it can be used');
+    const tomorrow = paperPage([wet], at(2, 0));
+    expect(isDisabled(tomorrow, 'submit show')).toBe(false);
+    expect(isDisabled(tomorrow, 'submit plant')).toBe(false);
+  });
+
+  it('an empty circle: show has no audience and greys; plant can still leave the paper here', () => {
+    const page = paperPage([dry], at(1, 0), []);
+    expect(isDisabled(page, 'submit show')).toBe(true);
+    expect(optionsOf(page, 'plant target')).toEqual(['venue:v1']);
+    expect(isDisabled(page, 'submit plant')).toBe(false);
+  });
+
+  // Parity (Plan 11 carry (k)): the composer's one time mirror is "forged before today". For a paper
+  // forged at 10:00 of day 1, across day 1 and the first beats of day 2 the engine's refusal of
+  // a show (and of a venue plant) must agree with the composer's greying.
+  it('the drying mirror agrees with applyShow and applyPlant on the day it was forged and the day after', () => {
+    const world = deskWorld('paper-parity');
+    world.tick = at(1, 10);
+    applyForge(world, SPEC, world.tick, STANDARD_RULES);        // 10:00, day 1
+    const held = artifactsOf(world)[0]!;
+    const circle = [{ venue: 'square', members: ['you', 'ada'] }];
+    for (const tick of [at(1, 0, 15), at(1, 12), at(1, 23, 45), at(2, 0), at(2, 0, 15)]) {
+      const view = playerView({ ...world, tick });
+      expect(view.documents).toHaveLength(1);
+      const page = html(createElement(DayPlanner, { ...plannerBase, view, offer:
+        { tick, venue: 'square', circleMembers: ['ada'], token: `p#${tick}` } }));
+      let showRefused = false;
+      try { applyShow(cloneSerializable(world), held.id, 'ada', tick, circle); } catch { showRefused = true; }
+      let plantRefused = false;
+      try { applyPlant(cloneSerializable(world), held.id, 'square', null, tick, circle); } catch { plantRefused = true; }
+      expect(showRefused, `engine show at ${tick}`).toBe(tick < at(2, 0));
+      expect(plantRefused, `engine plant at ${tick}`).toBe(showRefused);
+      expect(isDisabled(page, 'submit show'), `composer show at ${tick}`).toBe(showRefused);
+      expect(isDisabled(page, 'submit plant'), `composer plant at ${tick}`).toBe(plantRefused);
+    }
+  });
+});
+
 // ── Task 11: the Treasury panel — coin, next stipend, the whole price list through <Term> ────────
 
 describe('Treasury — coin and a visible price list, every row named', () => {
@@ -403,6 +478,7 @@ describe('DayPlanner — canGo offers exactly the doors venueOpensFor opens (O8 
     tick: 0,
     avatar: { id: 'you', venue: 'safehouse', circleMembers: [] },
     informants: [],
+    documents: [],
     occupantsByVenue: {},
     map: { venues: testVenues, directory: [] },
     station,

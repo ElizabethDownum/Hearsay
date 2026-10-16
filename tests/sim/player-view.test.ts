@@ -7,6 +7,9 @@ import { circlesAt } from '../../src/sim/agents';
 import { at } from '../../src/core/time';
 import { stableStringify } from '../../src/sim/hash';
 import type { ScenarioState } from '../../src/sim/scenario/types';
+import { applyForge, applyPlant } from '../../src/sim/artifacts';
+import { STANDARD_RULES } from '../../src/content/rules';
+import { dayOf } from '../../src/core/time';
 
 describe('playerView — the epistemic selector: only avatar-local presence is live', () => {
   // (a) coverage law
@@ -123,6 +126,28 @@ describe('playerView — the epistemic selector: only avatar-local presence is l
   // call exposureStatus/councilTurns. A static source guard against regression — scoped to the
   // function's own body (Function.prototype.toString), not the whole module, so it stays a
   // precise probe on playerView itself even as fieldwork.ts grows other exports.
+  // Plan 10 Task 1B: the documents in the avatar's own hands are the player's to know — the fixed
+  // text, when each was forged and the first day it may be used — and nothing else: a planted or
+  // handed-over paper leaves the list, and a world that never forged lists nothing.
+  it('documents lists the papers the avatar holds, with the first day each can be used', () => {
+    const world = buildWorld(miniTown(), 'pv-docs', STANDARD_RULES);
+    enrollPlayer(world, { home: 'square' });
+    expect(playerView(world).documents).toEqual([]);
+    const spec = { subject: 'ada', predicate: 'stole', object: null, count: 2, severity: 4 as const,
+      place: null, attribution: 'someone' };
+    world.tick = at(0, 10);
+    applyForge(world, spec, world.tick, STANDARD_RULES);
+    world.tick = at(1, 0);
+    applyForge(world, { ...spec, severity: 2 }, world.tick, STANDARD_RULES);
+    expect(playerView(world).documents).toEqual([
+      { id: 'a0', spec, forgedTick: at(0, 10), usableFromDay: 1 },
+      { id: 'a1', spec: { ...spec, severity: 2 }, forgedTick: at(1, 0), usableFromDay: 2 },
+    ]);
+    expect(dayOf(at(1, 0)) >= 1).toBe(true);
+    applyPlant(world, 'a0', 'square', null, at(1, 0), [{ venue: 'square', members: ['you'] }]);
+    expect(playerView(world).documents.map((row) => row.id)).toEqual(['a1']);
+  });
+
   it('never touches scenario verdict internals, enemy.sketch, or the adjudicator-only functions', () => {
     const src = playerView.toString();
     for (const banned of [

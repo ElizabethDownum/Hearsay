@@ -2,7 +2,7 @@ import { renderClaim, type NameOf } from '../../../src/content/render';
 import { ClaimReading } from './ClaimReading';
 import { useState } from 'react';
 import { TERMS } from '../../../src/content/terms';
-import { TICKS_PER_DAY } from '../../../src/core/time';
+import { dayOf, TICKS_PER_DAY } from '../../../src/core/time';
 import type {
   AdvisoryGuidance, DirectiveAuthority, DirectiveDiscretion, DirectiveMission, DirectivePriority,
   DirectiveSpecificity, EconomyDef, InjectSpec, LocalActionIntent, LocalOffer, Mice, NetworkView,
@@ -439,6 +439,7 @@ function LocalMoment(props: DayPlannerProps & { offer: LocalOffer }) {
       <TellComposer circle={circle} people={directoryIds(view)} venues={venueIds(view)} onLocal={onLocal} />
       <AskComposer circle={circle} people={directoryIds(view)} families={families} familyLabels={familyLabels} onLocal={onLocal} />
       <SellComposer circle={circle} families={families} familyLabels={familyLabels} onLocal={onLocal} />
+      <PaperComposer circle={circle} offer={offer} documents={view.documents} nameOf={nameOf} onLocal={onLocal} />
       <RecruitComposer
         candidates={circle.filter((id) => !roster.has(id))} families={families} familyLabels={familyLabels}
         coin={coin} economy={economy} onLocal={onLocal} />
@@ -551,6 +552,56 @@ function ForgeComposer({
         <button className="desk-btn" aria-label="submit forge" disabled={off || !affordable}
           onClick={() => onVerb({ kind: 'forge', spec: claimSpecOf(draft) })}>forge</button>
         {!affordable && <span className="desk-note">the <Term id="treasury" /> cannot cover this ({cost} needed)</span>}
+      </div>
+    </>
+  );
+}
+
+/**
+ * Show and plant (Plan 10 Task 1B): paper in hand, inside the offered moment. The picker lists the
+ * papers the avatar holds; `show` holds one up to a circle-mate and keeps it, `plant` leaves it at
+ * the venue the moment stands in or hands it to a circle-mate (exactly one, as the engine demands).
+ * The composer's time mirror is the engine's drying rule, measured at the OFFERED beat the act will
+ * play on: a paper forged today greys both verbs with the engine's own words. Everything else (the
+ * circle, the venue) is taken from the frozen offer, so there is nothing further to mirror.
+ */
+function PaperComposer({
+  circle, offer, documents, nameOf, onLocal,
+}: {
+  circle: string[]; offer: LocalOffer; documents: PlayerView['documents']; nameOf: NameOf;
+  onLocal(i: LocalActionIntent): void;
+}) {
+  const [picked, setPicked] = useState('');
+  const [audience, setAudience] = useState('');
+  const [target, setTarget] = useState('');
+  const heading = <h3><Term id="verb-show" /> · <Term id="verb-plant" /></h3>;
+  if (documents.length === 0) {
+    return <>{heading}<p className="desk-note">You hold no <Term id="forgery" /> to show or plant.</p></>;
+  }
+  const paper = documents.find((row) => row.id === picked) ?? documents[0]!;
+  const dry = dayOf(offer.tick) >= paper.usableFromDay;
+  const to = audience || circle[0] || '';
+  const here = `venue:${offer.venue}`;
+  const plantAt = target || here;
+  const plant = plantAt === here
+    ? { kind: 'plant' as const, artifact: paper.id, venue: offer.venue, to: null }
+    : { kind: 'plant' as const, artifact: paper.id, venue: null, to: plantAt };
+  return (
+    <>
+      {heading}
+      <div className="tag-row">
+        <label>paper <select className="desk-btn" aria-label="paper document" value={paper.id} onChange={(e) => setPicked(e.target.value)}>
+          {documents.map((row) => <option key={row.id} value={row.id}>{row.id} — {renderClaim(row.spec, nameOf)}</option>)}</select></label>
+        <label>show to <select className="desk-btn" aria-label="show audience" value={to} onChange={(e) => setAudience(e.target.value)}>
+          {circle.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
+        <button className="desk-btn" aria-label="submit show" disabled={!dry || circle.length === 0}
+          onClick={() => onLocal({ kind: 'show', artifact: paper.id, to })}>show</button>
+        <label>plant <select className="desk-btn" aria-label="plant target" value={plantAt} onChange={(e) => setTarget(e.target.value)}>
+          <option value={here}>here, at {offer.venue}</option>
+          {circle.map((id) => <option key={id} value={id}>into {id}&#39;s hands</option>)}</select></label>
+        <button className="desk-btn" aria-label="submit plant" disabled={!dry}
+          onClick={() => onLocal(plant)}>plant</button>
+        {!dry && <span className="desk-note">&#39;{paper.id}&#39; was forged today — a forgery needs a day before it can be used</span>}
       </div>
     </>
   );
