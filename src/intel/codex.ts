@@ -56,10 +56,14 @@ function observedPairs(
   log: readonly IntelEntry[], npcFilter: EntityId | null, familyFilter: RumorId | null,
 ): ObservedPair[] {
   const pairs: ObservedPair[] = [];
-  // Every addressed claimful receive, in log order, keyed by (family, addressee).
+  // Every addressed claimful receive, in log order, keyed by (family, addressee). A tell is only
+  // ever paired with a receive of ITS family, so under a family filter only that family is indexed
+  // (R47-2, R47-1 re-check A): the board calls this once per family, and indexing the whole log
+  // each time made it O(families x rows) again.
   const receives = new Map<string, { index: number; tick: number; reported: ReportedClaim }[]>();
   log.forEach((rec, index) => {
     if (!isClaimful(rec) || rec.addressedTo === null || (isMagic(rec) && rec.speaker === null)) return;
+    if (familyFilter !== null && rec.family !== familyFilter) return;
     const key = JSON.stringify([rec.family, rec.addressedTo]);
     const bucket = receives.get(key) ?? [];
     bucket.push({ index, tick: rec.tick, reported: rec.reported });

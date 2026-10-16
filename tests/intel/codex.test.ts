@@ -138,6 +138,25 @@ describe('corroborations — observed receive→emit pairs matched by fingerprin
   });
 });
 
+describe('suggestTraits — a family filter changes the work, never the answer (R47-2, R47-1 re-check A)', () => {
+  // Two families interleaved on the same pair of mouths. Family r1 holds an exaggeration (a count 2 /
+  // sev 3 receive retold as count 4 / sev 4); family r2 holds a faithful retelling. The answer for r1
+  // on the mixed log must be the answer on r1's rows alone, and r2's must stay clean: no row of the
+  // other family may be indexed as a cause, however the index is built.
+  const r1receive = utt({ tick: 10, family: 'r1', speaker: 'mira', addressedTo: 'gale', reported: rc({ count: 2, severity: 3 }) });
+  const r2receive = utt({ tick: 12, family: 'r2', speaker: 'mira', addressedTo: 'gale', reported: rc({ predicate: 'poisoned', count: 1, severity: 5 }) });
+  const r1tell = utt({ tick: 20, family: 'r1', speaker: 'gale', addressedTo: 'mira', reported: rc({ count: 4, severity: 4 }) });
+  const r2tell = utt({ tick: 22, family: 'r2', speaker: 'gale', addressedTo: 'mira', reported: rc({ predicate: 'poisoned', count: 1, severity: 5 }) });
+  const mixed = [r1receive, r2receive, r1tell, r2tell];
+  it('each family answers as it would alone', () => {
+    const alone = (family: string) => suggestTraits(mixed.filter((row) => row.family === family), family, R);
+    expect(alone('r1')).toEqual(['exaggerator', 'partisan']);          // non-vacuous: r1 has a hit
+    expect(suggestTraits(mixed, 'r1', R)).toEqual(alone('r1'));
+    expect(suggestTraits(mixed, 'r2', R)).toEqual(alone('r2'));
+    expect(suggestTraits(mixed, 'r2', R)).toEqual([]);
+  });
+});
+
 describe('corroborations — fingerprint overlap is the deduction game, not a bug', () => {
   it('a sev-only +1 on a factionRelevant predicate with count null corroborates BOTH exaggerator and partisan', () => {
     // count null so exaggerator fires only on its severity branch; stole is factionRelevant.

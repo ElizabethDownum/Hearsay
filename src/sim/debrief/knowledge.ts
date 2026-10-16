@@ -90,13 +90,14 @@ export function counterKnowledge(world: WorldState): CounterKnowledge[] {
 
 /**
  * The acquisition clock, one slot per board row (R47, Astra I12): the tick each entry reached the
- * player, by the same receipt history the debrief uses. Rows the debrief does not classify (kinds
- * it skips) and informant rows with no recorded receipt are `null`, so a consumer falls back to
- * the row's own observation tick rather than inventing a date. Today that is the one place an
- * `unrecorded` receipt still dates by observation (R47 review M1): an informant's presence or
- * residue row carries no receipt here, so the evening report files it under the day it was SEEN,
- * which is never later than its true arrival. Dating those rows is owed when they become reachable
- * in play.
+ * player, by the same receipt history the debrief uses. Rows the debrief does not classify are
+ * `null`, so a consumer falls back to the row's own observation tick rather than inventing a date.
+ * Today those are the `scene-presence` and `arcane-residue` kinds, which `counterKnowledge` skips
+ * entirely (R47 review M1, R47-1 re-check B): an informant CAN deliver one (a guard's field report
+ * of a night visit does, in `tests/sim/night-visits.test.ts`), and the evening report then files
+ * it under the day it was SEEN, which is never later than its true arrival. That is the one place
+ * the `CounterKnowledge.timing` rule ("a receipt never backdates into a calendar") is bypassed:
+ * the calendar drops the `null`, the report dates by observation. Dating those rows is owed.
  */
 export function learnedAtByEntry(world: WorldState): (Tick | null)[] {
   const learned: (Tick | null)[] = world.intel.log.map(() => null);
