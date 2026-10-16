@@ -29,6 +29,7 @@ import {
 } from '../../src/sim/actions';
 import { buildTownMap, buildWorld, enrollPlayer } from '../../src/sim/world';
 import { blankIntel, playerView, networkView, courierRouteView } from '../../src/sim/fieldwork';
+import { applyForge, artifactsOf } from '../../src/sim/artifacts';
 import { directiveView } from '../../src/sim/directives/view';
 import { applicationOf } from '../../src/sim/directives/types';
 import { ensureDirectiveState } from '../../src/sim/directives/state';
@@ -245,6 +246,53 @@ describe('Network — the roster surface renders player-known bookkeeping only',
     const page = html(createElement(Network, { view: { assets: [], drops: [] }, history }));
     expect(page).toContain('asks for time');
     expect(page).toContain('gale'); // the delivering channel is lawful provenance
+  });
+});
+
+// ── Plan 10 Task 1A: the forge composer — a priced, solitary, non-local verb ─────────────────────
+
+describe('DayPlanner — forge composer (Plan 10 Task 1A)', () => {
+  const forgePage = (over: Partial<typeof plannerBase> = {}) =>
+    html(createElement(DayPlanner, { ...plannerBase, view: plannerView, offer: null, ...over }));
+
+  it('renders without an offer (forging is frameless), names its price, and submits as a verb', () => {
+    const page = forgePage();
+    expect(page).toContain('aria-label="submit forge"');
+    expect(page).toContain(`${ECON.forgery} coin`);
+    for (const field of ['subject', 'predicate', 'object', 'count', 'severity', 'place', 'attribution']) {
+      expect(page, field).toContain(`aria-label="forge ${field}"`);
+    }
+    expect(isDisabled(page, 'submit forge')).toBe(false);
+    expect(page).not.toContain('aria-label="forge subject" disabled=""');
+    const running = forgePage({ paused: false });
+    expect(isDisabled(running, 'submit forge')).toBe(true);                           // the sim is running
+    expect(running).toContain('aria-label="forge subject" disabled=""');               // and so are the fields
+    expect(isDisabled(forgePage({ localPending: true }), 'submit forge')).toBe(true); // a moment is pending
+  });
+
+  it('greys exactly when the treasury cannot cover the forgery, and says so', () => {
+    const short = forgePage({ coin: ECON.forgery - 1 });
+    expect(isDisabled(short, 'submit forge')).toBe(true);
+    expect(short).toContain(`cannot cover this (${ECON.forgery} needed)`);
+    const exact = forgePage({ coin: ECON.forgery });
+    expect(isDisabled(exact, 'submit forge')).toBe(false);
+    expect(exact).not.toContain('cannot cover this');
+  });
+
+  // Parity (Plan 11 carry (k)): the composer's only mirror is the price, and it must agree with the
+  // engine's refusal at every coin level around the price — never greyer, never looser.
+  it('the price mirror agrees with applyForge at coin = price - 1, price, price + 1', () => {
+    for (const coin of [ECON.forgery - 1, ECON.forgery, ECON.forgery + 1]) {
+      const session = newSession(`forge-parity-${coin}`);
+      session.world.coin = coin;
+      const spec = { subject: 'someone', predicate: 'stole', object: null, count: null, severity: 3 as const,
+        place: null, attribution: 'someone' };
+      let refused = false;
+      try { applyForge(session.world, spec, session.world.tick, STANDARD_RULES); } catch { refused = true; }
+      expect(refused, `engine at coin ${coin}`).toBe(coin < ECON.forgery);
+      expect(isDisabled(forgePage({ coin }), 'submit forge'), `composer at coin ${coin}`).toBe(refused);
+      if (!refused) expect(artifactsOf(session.world)).toHaveLength(1);
+    }
   });
 });
 

@@ -4,6 +4,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { Session } from '../../app/src/loop/session';
 import type { DayPlannerProps } from '../../app/src/panels/DayPlanner';
+import { artifactsOf } from '../../src/sim/artifacts';
+import { STANDARD_RULES } from '../../src/content/rules';
 
 /**
  * R41-1 (R41 review I-1): the composition root, not just the panel and the session separately. The
@@ -85,5 +87,23 @@ describe('the pass control is wired to the session App owns (R41-1)', () => {
     const src = readFileSync(new URL('../../app/src/main.tsx', import.meta.url), 'utf8');
     expect(src).toMatch(/localPending=\{session\.localPending\(\)\}/);
     expect(src).not.toMatch(/localRequested|localPending=\{[^}]*(\|\||&&)/);
+  });
+});
+
+// Plan 10 Task 1A: the planner's non-local verbs reach the engine through the session App owns. A
+// forge submitted through the planner's own `onVerb` is queued for the current tick, fires on the
+// next advance, debits the treasury by the economy's price and leaves one held, unplanted document.
+describe("the planner's verbs are wired to the session App owns (Plan 10 Task 1A)", () => {
+  it("onVerb({ kind: 'forge' }) forges through the session: one artifact, the price debited", async () => {
+    const { session, props } = await mount();
+    const before = session.world.coin;
+    const spec = { subject: 'someone', predicate: 'stole', object: null, count: 2, severity: 4 as const,
+      place: null, attribution: 'someone' };
+    props.onVerb({ kind: 'forge', spec });
+    expect(session.advance(1).advanced).toBe(1);
+    const held = artifactsOf(session.world);
+    expect(held).toHaveLength(1);
+    expect(held[0]).toMatchObject({ spec, author: 'player', heldBy: session.world.playerId, plantedAt: null });
+    expect(session.world.coin).toBe(before - STANDARD_RULES.economy.forgery);
   });
 });

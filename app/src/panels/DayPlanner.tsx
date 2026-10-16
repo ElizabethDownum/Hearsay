@@ -376,6 +376,8 @@ export function DayPlanner(props: DayPlannerProps) {
       <DropComposer
         venues={venues.filter((venue) => venue.access === 'public').map((venue) => venue.id)}
         coin={coin} economy={economy} off={off || localPending} onVerb={onVerb} />
+      <ForgeComposer people={directoryIds(view)} venues={venueIds(view)}
+        coin={coin} economy={economy} off={off || localPending} onVerb={onVerb} />
     </section>
   );
 }
@@ -451,47 +453,104 @@ function LocalMoment(props: DayPlannerProps & { offer: LocalOffer }) {
   );
 }
 
+// ── A claim under composition: the seven fields a told or forged InjectSpec is built from ─────────
+
+interface ClaimDraft {
+  subject: string; predicate: string; object: string; count: string; severity: string;
+  place: string; attribution: string;
+}
+
+const blankClaimDraft = (): ClaimDraft => ({
+  subject: SOMEONE, predicate: PREDICATES[0]!.id, object: '', count: '', severity: '3',
+  place: '', attribution: SOMEONE,
+});
+
+const claimSpecOf = (draft: ClaimDraft): InjectSpec => ({
+  subject: draft.subject, predicate: draft.predicate, object: draft.object || null,
+  count: draft.count === '' ? null : Number(draft.count),
+  severity: Number(draft.severity) as 1 | 2 | 3 | 4 | 5,
+  place: draft.place || null, attribution: draft.attribution,
+});
+
+/**
+ * The claim fields shared by the tell and forge composers (Plan 10 Task 1A). `prefix` names the
+ * verb in every aria-label ("tell subject", "forge subject") so the two forms stay distinguishable
+ * on a page that shows both; `off` greys the fields with the verb's own button.
+ */
+function ClaimFields({
+  prefix, draft, people, venues, off, onChange,
+}: {
+  prefix: string; draft: ClaimDraft; people: string[]; venues: string[]; off?: boolean;
+  onChange(draft: ClaimDraft): void;
+}) {
+  const set = (key: keyof ClaimDraft) => (e: { target: { value: string } }) =>
+    onChange({ ...draft, [key]: e.target.value });
+  const withSomeone = [SOMEONE, ...people];
+  return (
+    <>
+      <label><Term id="subject" /> <select className="desk-btn" aria-label={`${prefix} subject`} disabled={off} value={draft.subject} onChange={set('subject')}>
+        {withSomeone.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
+      <label><Term id="predicate" /> <select className="desk-btn" aria-label={`${prefix} predicate`} disabled={off} value={draft.predicate} onChange={set('predicate')}>
+        {PREDICATES.map((p) => <option key={p.id} value={p.id}>{TERMS[p.termId]!.label}</option>)}</select></label>
+      <label><Term id="object" /> <select className="desk-btn" aria-label={`${prefix} object`} disabled={off} value={draft.object} onChange={set('object')}>
+        <option value="">—</option>{withSomeone.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
+      <label><Term id="count" /> <input className="desk-btn" style={{ width: 44 }} type="number"
+        aria-label={`${prefix} count`} disabled={off} value={draft.count} onChange={set('count')} /></label>
+      <label><Term id="severity" /> <select className="desk-btn" aria-label={`${prefix} severity`} disabled={off} value={draft.severity} onChange={set('severity')}>
+        {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
+      <label><Term id="place" /> <select className="desk-btn" aria-label={`${prefix} place`} disabled={off} value={draft.place} onChange={set('place')}>
+        <option value="">—</option>{venues.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
+      <label><Term id="attribution" /> <select className="desk-btn" aria-label={`${prefix} attribution`} disabled={off} value={draft.attribution} onChange={set('attribution')}>
+        {withSomeone.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
+    </>
+  );
+}
+
 function TellComposer({
   circle, people, venues, onLocal,
 }: { circle: string[]; people: string[]; venues: string[]; onLocal(i: LocalActionIntent): void }) {
   const [to, setTo] = useState('');
-  const [spec, setSpec] = useState({
-    subject: SOMEONE, predicate: PREDICATES[0]!.id, object: '', count: '', severity: '3',
-    place: '', attribution: SOMEONE,
-  });
-  const set = (key: keyof typeof spec) => (e: { target: { value: string } }) =>
-    setSpec({ ...spec, [key]: e.target.value });
+  const [draft, setDraft] = useState<ClaimDraft>(blankClaimDraft);
   const target = to || circle[0] || '';
-  const withSomeone = [SOMEONE, ...people];
   if (circle.length === 0) return <p className="desk-note">No one in earshot to <Term id="verb-tell" />.</p>;
-  const built: InjectSpec = {
-    subject: spec.subject, predicate: spec.predicate, object: spec.object || null,
-    count: spec.count === '' ? null : Number(spec.count),
-    severity: Number(spec.severity) as 1 | 2 | 3 | 4 | 5,
-    place: spec.place || null, attribution: spec.attribution,
-  };
   return (
     <>
       <h3><Term id="verb-tell" /></h3>
       <div className="tag-row">
-        <label><Term id="subject" /> <select className="desk-btn" aria-label="tell subject" value={spec.subject} onChange={set('subject')}>
-          {withSomeone.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
-        <label><Term id="predicate" /> <select className="desk-btn" aria-label="tell predicate" value={spec.predicate} onChange={set('predicate')}>
-          {PREDICATES.map((p) => <option key={p.id} value={p.id}>{TERMS[p.termId]!.label}</option>)}</select></label>
-        <label><Term id="object" /> <select className="desk-btn" aria-label="tell object" value={spec.object} onChange={set('object')}>
-          <option value="">—</option>{withSomeone.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
-        <label><Term id="count" /> <input className="desk-btn" style={{ width: 44 }} type="number"
-          aria-label="tell count" value={spec.count} onChange={set('count')} /></label>
-        <label><Term id="severity" /> <select className="desk-btn" aria-label="tell severity" value={spec.severity} onChange={set('severity')}>
-          {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
-        <label><Term id="place" /> <select className="desk-btn" aria-label="tell place" value={spec.place} onChange={set('place')}>
-          <option value="">—</option>{venues.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
-        <label><Term id="attribution" /> <select className="desk-btn" aria-label="tell attribution" value={spec.attribution} onChange={set('attribution')}>
-          {withSomeone.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
+        <ClaimFields prefix="tell" draft={draft} people={people} venues={venues} onChange={setDraft} />
         <label>to <select className="desk-btn" aria-label="tell addressee" value={target} onChange={(e) => setTo(e.target.value)}>
           {circle.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
         <button className="desk-btn" aria-label="submit tell"
-          onClick={() => onLocal({ kind: 'tell', to: target, spec: built })}>tell</button>
+          onClick={() => onLocal({ kind: 'tell', to: target, spec: claimSpecOf(draft) })}>tell</button>
+      </div>
+    </>
+  );
+}
+
+/**
+ * The forge composer (Plan 10 Task 1A). Forging is a desk verb: no circle, no venue, no moment; it
+ * needs only the treasury. The price is the composer's one mirror of the engine's refusal
+ * (`applyForge` refuses exactly when `coin < economy.forgery`), stated beside the button and
+ * repeated as the engine's own note when it is the reason the button is grey.
+ */
+function ForgeComposer({
+  people, venues, coin, economy, off, onVerb,
+}: {
+  people: string[]; venues: string[]; coin: number; economy: EconomyDef; off: boolean;
+  onVerb(intent: NonLocalActionIntent): void;
+}) {
+  const [draft, setDraft] = useState<ClaimDraft>(blankClaimDraft);
+  const cost = economy.forgery;
+  const affordable = coin >= cost;
+  return (
+    <>
+      <h3><Term id="verb-forge" /></h3>
+      <div className="tag-row">
+        <ClaimFields prefix="forge" draft={draft} people={people} venues={venues} off={off} onChange={setDraft} />
+        <span className="desk-note">{cost} coin</span>
+        <button className="desk-btn" aria-label="submit forge" disabled={off || !affordable}
+          onClick={() => onVerb({ kind: 'forge', spec: claimSpecOf(draft) })}>forge</button>
+        {!affordable && <span className="desk-note">the <Term id="treasury" /> cannot cover this ({cost} needed)</span>}
       </div>
     </>
   );
