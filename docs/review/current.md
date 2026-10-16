@@ -2,6 +2,13 @@
 
 [R49 meeting-window cap approval](2026-10-16-r49-meeting-window-cap-approval.md). [R48 import-fence spellings approval](2026-10-16-r48-import-fence-spellings-approval.md). [R47 Codex arrival approval](2026-10-16-r47-codex-arrival-approval.md). [R46 watch-episodes approval](2026-10-16-r46-watch-episodes-approval.md). [R45 late-hesitation approval](2026-10-16-r45-late-hesitation-approval.md). [R44 relayed-claims approval](2026-10-16-r44-relayed-claims-approval.md). [R43 composed-directives approval](2026-10-16-r43-composed-directives-approval.md). [R42 sale-version approval](2026-10-16-r42-sale-version-approval.md). [R41 let-pass approval](2026-10-16-r41-let-pass-approval.md). [Astra full review and triage](2026-09-27-astra-full-review.md). [R40 rendezvous-cap approval](2026-09-27-r40-rendezvous-cap-approval.md). [R39 rendezvous-carries approval](2026-09-20-r39-rendezvous-carries-approval.md). [R38 meet-window approval](2026-09-19-r38-meet-window-approval.md). [Plan 9 final review and certification](2026-09-19-plan-9-final-review.md). [Task 8 approval and install](2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](2026-09-18-browser-gate-approval.md). [R18 code approval](2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](2026-09-13-outcome-history-code-approval.md).
 
+**16 October, evening: Plan 10 Task 1 units 1A to 1D installed.** Verdicts: T1A Needs fixes
+0/1/4, closed by T1A-2 `5d1d9e3` ([record](2026-10-16-t1a-forge-composer-approval.md)); T1B Approved
+0/0/4 (record owed; T1B-2 owed); T1C Needs fixes 0/1/1 (record owed; T1C-2 owed: start lists at
+15/45, clamp instead of the 00:00 snap); T1D `4008960` review not yet dispatched. Reports sit in
+`node_modules/hearsay-t1{a,b,c}-review-20261016/REVIEW.md` (gitignored). 2,647 tests / 160 files
+at `4008960`.
+
 **16 October: the nine Astra fix units are installed and independently reviewed.** R45 to R49
 were committed today on top of the 27 September batch, each TDD with the six gates and the
 soak/MC comparator unchanged, and every unit R41 to R49 now has an approval record. Verdicts on

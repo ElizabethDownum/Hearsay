@@ -9,8 +9,8 @@ for ever and the later answer was never given.
 The unit was independently reviewed by a native Claude Opus worker who wrote none of it:
 - review of `7d9ff28`: **Approved**, 0 Critical / 0 Important / 3 Minor (test coverage and the
   commit message, not behaviour);
-- the Minors are closed by the test-only R45-1 `c648d7b`, which the combined R45-1/R46-1
-  re-check covers.
+- the Minors are closed by the test-only R45-1 `c648d7b`; the combined R45-1/R46-1 re-check:
+  **Approved**, 0 / 0 / 0.
 
 Root wrote and executed both commits.
 
@@ -67,6 +67,16 @@ Report: `node_modules/hearsay-r45-review-20261016/REVIEW.md` (gitignored), probe
 - Mutants: `<` for `<=`, mark due at the receipt tick, mark and schedule, each killed
   (`.superpowers/sdd/r45-1-implementation-validation/11-mutants.txt`).
 - Gates: 2,593 tests / 157 files, lint, typecheck, build, soak, MC; comparator equal.
+
+## Re-check: Approved, 0 / 0 / 0
+
+Report: `node_modules/hearsay-r45-1-r46-1-review-20261016/REVIEW.md` (gitignored). A temporary
+trace on `scheduleRecruitmentDecision` showed the three tests on their three branches: late
+`{due 1455, tick 2880}` (`<`), boundary `{due 1455, tick 1455}` (`===`), in-time
+`{due 1470, tick 120}` (future), so the M1 claim holds. Mutants `<` for `<=`, mark at the receipt
+tick, mark and schedule, and always-overdue each killed by the named assertion. The pre-fix code
+at `ff2f7dd` scheduled nothing, confirming the M3 record. Full suite serial 2,593 / 157; lint and
+both typechecks clean. Not re-run: build, soak, MC, comparator.
 
 ## Carried
 

@@ -2,6 +2,22 @@
 
 [Current docket](review/current.md). [R49](review/2026-10-16-r49-meeting-window-cap-approval.md), [R48](review/2026-10-16-r48-import-fence-spellings-approval.md), [R47](review/2026-10-16-r47-codex-arrival-approval.md), [R46](review/2026-10-16-r46-watch-episodes-approval.md), [R45](review/2026-10-16-r45-late-hesitation-approval.md), [R44](review/2026-10-16-r44-relayed-claims-approval.md), [R43](review/2026-10-16-r43-composed-directives-approval.md), [R42](review/2026-10-16-r42-sale-version-approval.md), [R41](review/2026-10-16-r41-let-pass-approval.md) approvals. [Astra triage](review/2026-09-27-astra-full-review.md). [R40 approval](review/2026-09-27-r40-rendezvous-cap-approval.md). [R39 rendezvous-carries approval](review/2026-09-20-r39-rendezvous-carries-approval.md). [R38 meet-window approval](review/2026-09-19-r38-meet-window-approval.md). [Plan 9 final review and certification](review/2026-09-19-plan-9-final-review.md). [Task 8 approval and install](review/2026-09-19-task-8-code-approval.md). [Browser gate approval + R36/R37](review/2026-09-18-browser-gate-approval.md). [R18 code approval](review/2026-09-17-r18-code-approval.md). [Task6/7B + R32–R35 code approval](review/2026-09-17-task-6-7b-code-approval.md). [Task5B code approval](review/2026-09-17-task-5b-code-approval.md). [UI contrast correction approval](review/2026-09-17-ui-contrast-correction-approval.md). [Task5A2 code approval](review/2026-09-13-outcome-history-code-approval.md).
 
+Latest, 16 October (evening): **Plan 10 Task 1 units 1A to 1D are installed; 1E to 1G remain.**
+Brief: `plans/plan-10-task-1-brief.md`. Units: 1A forge composer `9de33a3` (review Needs fixes
+0/1/4, closed by the test-only T1A-2 `5d1d9e3`, [record](review/2026-10-16-t1a-forge-composer-approval.md));
+1B show/plant from the offered moment `74e288a` (review Approved 0/0/4; M1 closed by T1A-2; M2
+midnight drying case and M3 test hygiene owed as T1B-2; approval record owed); 1C scry composer
+`e76e879` (review Needs fixes 0/1/1; I-1 mostly closed by T1A-2; lists at 15/45 and the M-1 clamp
+owed as T1C-2; approval record owed); 1D séance from the offered moment `4008960` (RED 9/152, twelve
+mutants killed, gates 2,647 tests / 160 files, comparator equal; **review not yet dispatched**).
+Also today R47-2 `3361833` and R48-2 `e4ebc98` closed the R47-1/R48-1 re-check Minors, and R42-3
+`612937a` the R42-2 Minor. Decisions for Ellie: whether `applyForge` should accept any spec (blank
+one-click document, missing object, negative counts); whether the player's safehouse should be in
+the scry venue list; whether priced composers should see spend already queued on the same tick.
+The running ledger is `.superpowers/sdd/progress.md`. HEAD `4008960`, 25 commits over origin/main
+`cec2cd6`; **no push is authorized**. Next: 1D review dispatch, T1C-2, T1B-2, then 1E codex/cards,
+1F dossier facts, 1G.
+
 Latest, 16 October: **all nine Astra fix units are installed, reviewed and corrected; Plan 10
 Task 1 is next.** R45 to R49 were committed today (late hesitation `7d9ff28`, watch episodes
 `087bdd3`, Codex/evening-report arrival `580c65f`, import-fence spellings `424b718`, sound-out

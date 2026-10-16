@@ -11,7 +11,9 @@ never "new" on the evening it reached the player.
 The unit was independently reviewed by a native Claude Opus worker who wrote none of it:
 - review of `580c65f`: **Needs fixes**, 0 Critical / 1 Important / 4 Minor;
 - the Important and three of the Minors are closed by R47-1 `8fc4d3a`; the fourth Minor (M1)
-  is recorded in the code and carried; the combined R47-1/R48-1 re-check covers the correction.
+  is recorded in the code and carried;
+- the combined R47-1/R48-1 re-check of `8fc4d3a`: **Approved**, 0 / 0 / 2 for R47-1; both
+  Minors are closed by R47-2 `3361833` (below).
 
 Root wrote and executed both commits.
 
@@ -94,7 +96,47 @@ Report: `node_modules/hearsay-r47-review-20261016/REVIEW.md` (gitignored), probe
   pin); GREEN intel + app + debrief 910 / 37.
 - Gates: 2,598 tests / 159 files, lint, typecheck, build, soak, MC; comparator equal.
 
+## Re-check of R47-1: Approved, 0 / 0 / 2
+
+Report: `node_modules/hearsay-r47-1-r48-1-review-20261016/REVIEW.md` (gitignored), probes under
+`.superpowers/rr/` beside it. I1, M3 and M4 are closed as claimed: the literalist same-tick probe
+gives no hit at `8fc4d3a` and still reproduces at `580c65f`; a reference implementation of "latest
+strictly earlier receive, ties to the first-logged row" matches every hit across 37,800
+comparisons; the differential against `580c65f` (11,200 comparisons, 121 differing) is wholly
+explained by dropped same-tick pairs, strictly-earlier replacements and tie changes. The
+App-level test's `useState` mock does not leak (`tests/app` serial in one worker, report-wiring
+first: 510 / 17). Mutants: `<=`, ties to last-logged, key by family only, earliest-by-tick, and
+the five report-wiring mutants all killed; the two guard drops survive as equivalent. Full suite
+serial 2,598 / 159; lint and both typechecks clean. Not rerun: build, soak, MC, comparator.
+
+- **A. M2 is closed only for few families.** `boardView` calls `suggestTraits` once per family and
+  each call rebuilds the receive index over the WHOLE log (the family filter is applied to the
+  tells, not the index), so the board is still O(families x n): at 4,000 rows and 200 families the
+  all-family `suggestTraits` takes 129.8 ms at `8fc4d3a` against 132.9 ms at `580c65f` and
+  27.9 ms before R47; `boardView` 147 ms against the first review's 154 ms. The commit's "4.2 ms"
+  is a four-family, six-npc log, not comparable with the 154 ms. With few families the fix is
+  real (100.4 ms -> 3.8 ms). Fix direction: skip rows of other families while indexing when a
+  family filter is given (19.7 ms in the reviewer's scratch copy).
+- **B. The M1 comment is inaccurate** (`knowledge.ts`). Ordinary `presence` rows ARE dated; the
+  undated kinds are `scene-presence` and `arcane-residue`, which `counterKnowledge` skips
+  entirely, so "unrecorded" is the wrong word too. And they are reachable today: replaying the
+  night-visits scenario through `runLogOn` yields a guard-delivered `scene-presence` row with
+  `learnedAt: null` that the avatar hears at tick 45. The `CounterKnowledge.timing` doc ("never
+  backdates into a calendar") and this comment do not point at each other.
+
+## Correction R47-2, `3361833`
+
+- `observedPairs` indexes only the
+  filtered family when a family filter is given (behaviour-identical; pinned by equality with the
+  unfiltered result restricted to that family, and benched); the `learnedAtByEntry` comment names
+  the real kinds (`scene-presence`, `arcane-residue`), says the debrief skips them and that an
+  informant can deliver one today, and points at the `timing` doc.
+- Bench at 4,000 rows / 200 families: `boardView(3)` 160.6 -> 32.2 ms, all-family `suggestTraits`
+  140.9 -> 18.2 ms. Mutants: inverted filter and filter-on-speaker killed. Gates: 2,618 tests /
+  160 files, lint, typecheck, build, soak, MC, comparator equal.
+
 ## Carried
 
-- Dating informant-delivered presence and residue rows in `learnedAtByEntry` (review M1), if they
-  become reachable in play.
+- Dating informant-delivered `scene-presence` and `arcane-residue` rows in `learnedAtByEntry`
+  (review M1, re-check B): reachable in play through a guard's field report; the evening report
+  files such a row under the day it was seen, never later than its arrival.

@@ -7,7 +7,8 @@ unconditionally, dropping a 0.97 document anchor and erasing its history, bypass
 
 The unit was independently reviewed twice, by native Claude Opus workers who wrote none of it:
 - first review of `ef43e1a`: **Approved**, 0 Critical / 0 Important / 4 Minor and one nit;
-- re-check of the correction `3056644`: **Approved**, 0 / 0 / 2 and a nit for the correction, 0 / 0 / 3 and two nits for the whole unit; the two new Minors and the nit are closed by R42-2 `8c72516`.
+- re-check of the correction `3056644`: **Approved**, 0 / 0 / 2 and a nit for the correction, 0 / 0 / 3 and two nits for the whole unit; the two new Minors and the nit are closed by R42-2 `8c72516`;
+- re-check of R42-2 `8c72516`: **Approved**, 0 / 0 / 1 and a nit; the Minor (a test gap) is closed by the test-only R42-3 `612937a`.
 
 Root wrote and executed both commits.
 
@@ -108,6 +109,42 @@ subject of a sold self-rumor therefore reacts to what they now hold. Tests: the 
 holder is revived and retells; the subject-buyer counter-spins; a trusting rival-of-the-subject buyer
 lands above the floor and keeps it ("at least", pinned). RED 2 failed / 24 (the third test pins
 existing behaviour); GREEN sell, session and lint 232 / 5.
+
+## Re-check of R42-2: Approved, 0 / 0 / 1 + nit
+
+Report: `node_modules/hearsay-r41-2-r42-2-review-20261016/REVIEW.md` (gitignored), probes in
+`tests/network/r42-2-recheck-probe.test.ts` beside it. m1, m2 and n1 are closed by behaviour and
+each pinned by a test that dies under its own mutant (drop `heardAt`; trailing loop with
+`heardAt`; the R42-1 shape; floor before ingest). The 99-case monotonicity matrix now also checks
+`heardAt`, `heardFrom`, `firstHeardAt` and the apparent sources: zero violations. The
+evidence-hierarchy law still binds the write (four law mutants each fail it); the determinism law
+passes. The floor can fire on another speaker's same-family utterance in the sale beat, and this is
+harmless: the player's sale is always first in the buyer's feed and the re-application is a no-op
+(a mutant restricting the floor to the sale utterance is behaviour-identical on every probe).
+Sell, app and lint 712 / 20; full suite serial 2,589 / 157; lint and both typechecks clean. Not
+rerun: build, soak, MC, comparator.
+
+- **m1 (test gap).** R42-2 moved the floor into the per-hearer loop, so "buyer only" is now the
+  single clause `lift.buyer === hearerId`. Dropping it floors every circle member who hears the
+  sale to 0.85 and refreshes their `heardAt` (the reviewer's probe: a bystander holding the family
+  at 0.30 since tick 0 jumps to 0.85, heard at the sale tick), and nothing in the suite notices:
+  334 / 334 on every file that references selling, then 777 / 777 on `tests/app` + `tests/network`.
+  Fix direction: assert in one of the R42-2 tests that a stale non-buyer keeps credence and
+  `heardAt`, and that a fresh non-buyer lands at ordinary overheard credence.
+- **n1 (nit, undisclosed behaviour change).** With the floor inside the loop, a corroborating
+  telling to the buyer in the same beat now builds on the floor (0.30 -> 0.45 -> 0.85 -> 0.95)
+  where R42-1 absorbed it under the floor (0.60 -> 0.85). Sequence-consistent (equals the same
+  telling one beat later) and capped at the hearsay ceiling; correct, but unstated in the commit
+  message. Recorded here; no change.
+
+## Correction R42-3, `612937a` (test-only)
+
+- A bystander case in `tests/network/sell.test.ts`, R42-2's describe: the watchman holds the sold
+  family stale (0.3 since tick 0) and `third` has never heard it; after the sale the buyer is at
+  0.85 with the sale tick as `heardAt`, the watchman keeps 0.3 and tick 0, and `third` holds it
+  overheard, below the floor, heard at the sale tick. Kills the dropped buyer clause
+  (`.superpowers/sdd/r42-3-implementation-validation/11-mutants.txt`). Gates: 2,606 tests / 160
+  files, lint, typecheck, build, soak, MC; comparator equal.
 
 ## Carried
 

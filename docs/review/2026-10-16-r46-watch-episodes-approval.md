@@ -8,8 +8,8 @@ digest then read one long episode with a mixed identity.
 
 The unit was independently reviewed by a native Claude Opus worker who wrote none of it:
 - review of `087bdd3`: **Approved**, 0 Critical / 0 Important / 2 Minor;
-- the two Minors are closed by R46-1 `bcc5fe1` (a one-condition hardening plus tests), which the
-  combined R45-1/R46-1 re-check covers (below).
+- the two Minors are closed by R46-1 `bcc5fe1` (a one-condition hardening plus tests); the
+  combined R45-1/R46-1 re-check: **Approved**, 0 / 0 / 0, two nits (below).
 
 Root wrote and executed both commits.
 
@@ -68,10 +68,32 @@ it. Brief set 823 / 37, wider ledger-consumer set 977 / 42, lint and both typech
   killed by exactly the named case (`.superpowers/sdd/r46-1-implementation-validation/11-mutants.txt`).
 - Gates: 2,592 tests / 157 files, lint, typecheck, build, soak, MC; comparator equal.
 
+## Re-check: Approved, 0 / 0 / 0 (two nits)
+
+Report: `node_modules/hearsay-r45-1-r46-1-review-20261016/REVIEW.md` (gitignored), probes in
+`tests/review-r45-1-r46-1/` beside it. P5 and P7 now correct; P2/P3 stand down episode 2 end to
+end; P6 unchanged (carried); P8 determinism byte-identical; every other `actionLedger` lookup
+consistent with the two-part identity (interrogation keys already carry target and topic;
+`cancelSpecs` uses both halves; the digest groups by lead; the debrief copies rows). Mutants M2,
+M4, M6 killed by exactly the named case; RED confirmed as 1 / 7 on the pre-fix source. Focused
+1,039 / 41; full suite serial 2,593 / 157.
+- **N1.** The tightened first lookup is redundant: with it removed entirely every test passes, and
+  a trace over 1,848 tests found it reached only by the watch-keyed unit case; when a receipt's key
+  and district agree it finds the row the fallback finds, and no code produces the disagreeing
+  input. Kept as shipped: harmless, and it kills the key-only regression that mattered.
+- **N2.** The `cancelOrder` helper checks only `application.kind`; the start day on the settling
+  report is passed by hand. The reviewer's P9 confirmed the issued record's application carries
+  the right `startDay` for both episodes. Optional hardening (assert it in the helper) is left for
+  the next touch of the file.
+- Out of scope, noted: issuing episode 2 while episode 1 still stands leaves only episode 2's
+  override on the guard, and episode 1's stand-down then aborts; unreachable, since the digest never
+  watches a district already watched.
+
 ## Carried
 
 - A `watch-worked` receipt that arrives after its own episode's `watch-cancelled` receipt re-adds
   the post and re-marks the district watched (review P6). Whether message ordering can produce it
   is not established; noted for Plan 10 Task 4 (enemy reachability), where the watch cycle is next
   touched.
-- The "lapsed" wording in the two-episode test comment (nit).
+- The "lapsed" wording in the two-episode test comment (nit); the `cancelOrder` helper's
+  `startDay` assertion (re-check N2).

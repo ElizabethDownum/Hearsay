@@ -8,7 +8,8 @@ the session was built with a `useRef` argument evaluated and discarded on every 
 The unit was independently reviewed twice, by native Claude Opus workers who wrote none of it:
 - first review of `48667d4`: **Needs fixes**, 0 Critical / 1 Important / 3 Minor (test-only; the
   production change was judged correct);
-- re-check of the correction `a002dd9`: **Approved**, 0 / 0 / 3 (test-side), for the correction and for the whole unit; the three Minors are closed by the test-only R41-2 `7e7f6f6`.
+- re-check of the correction `a002dd9`: **Approved**, 0 / 0 / 3 (test-side), for the correction and for the whole unit; the three Minors are closed by the test-only R41-2 `7e7f6f6`;
+- the combined R41-2/R42-2 re-check of `7e7f6f6`: **Approved**, 0 / 0 / 0 for R41-2.
 
 Root wrote and executed both commits.
 
@@ -99,6 +100,20 @@ comparator and the build were not rerun (machine load), so the controller's 2,53
 offer in the empty safehouse circle and asserts the planner receives `localPending` true; a
 source-scan pin requires the planner's pending-ness to be exactly `session.localPending()` with no
 latch or boolean combination beside it; the comment labels follow the review's numbering.
+
+## Re-check of R41-2: Approved, 0 / 0 / 0
+
+Report: `node_modules/hearsay-r41-2-r42-2-review-20261016/REVIEW.md` (gitignored; shared with the
+R42-2 re-check). Both reviewer mutants die on exactly their pin (`M1_pending_ignores_open_offer`
+on the offered-state wiring case, `M2_shell_latch_ored` on the source scan), matching
+`11-mutants.txt`; the brief's own example of a renamed latch constant is also killed by the
+positive pin. Two shapes still slip the text scan: a latch spread onto the planner element after
+the prop, and a latch inside `DayPlanner` itself (killed only incidentally, since `panels.test.ts`
+calls the planner as a plain function and a top-level hook throws). The reviewer judged both
+deliberate re-architectures rather than slips and did not count them; agreed. `git show --stat`
+confirms the commit touches only the two test files and the relabels are correct. `tests/app`
+509 / 16; full suite serial 2,589 / 157; lint and both typechecks clean. Not rerun: build, soak,
+MC, comparator.
 
 ## Carried
 
