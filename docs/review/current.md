@@ -4,7 +4,7 @@
 
 **16 October, evening: Plan 10 Task 1 units 1A to 1D installed.** Verdicts: T1A Needs fixes
 0/1/4, closed by T1A-2 `5d1d9e3` ([record](2026-10-16-t1a-forge-composer-approval.md)); T1B Approved
-0/0/4 (record owed; T1B-2 owed); T1C Needs fixes 0/1/1 (record owed; T1C-2 owed: start lists at
+0/0/4 ([record](2026-10-16-t1b-show-plant-approval.md); T1B-2 owed); T1C Needs fixes 0/1/1 ([record](2026-10-16-t1c-scry-composer-approval.md); T1C-2 owed: start lists at
 15/45, clamp instead of the 00:00 snap); T1D `4008960` review not yet dispatched. Reports sit in
 `node_modules/hearsay-t1{a,b,c}-review-20261016/REVIEW.md` (gitignored). 2,647 tests / 160 files
 at `4008960`.

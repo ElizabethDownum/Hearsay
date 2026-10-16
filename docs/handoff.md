@@ -6,9 +6,9 @@ Latest, 16 October (evening): **Plan 10 Task 1 units 1A to 1D are installed; 1E 
 Brief: `plans/plan-10-task-1-brief.md`. Units: 1A forge composer `9de33a3` (review Needs fixes
 0/1/4, closed by the test-only T1A-2 `5d1d9e3`, [record](review/2026-10-16-t1a-forge-composer-approval.md));
 1B show/plant from the offered moment `74e288a` (review Approved 0/0/4; M1 closed by T1A-2; M2
-midnight drying case and M3 test hygiene owed as T1B-2; approval record owed); 1C scry composer
+midnight drying case and M3 test hygiene owed as T1B-2, [record](review/2026-10-16-t1b-show-plant-approval.md)); 1C scry composer
 `e76e879` (review Needs fixes 0/1/1; I-1 mostly closed by T1A-2; lists at 15/45 and the M-1 clamp
-owed as T1C-2; approval record owed); 1D séance from the offered moment `4008960` (RED 9/152, twelve
+owed as T1C-2, [record](review/2026-10-16-t1c-scry-composer-approval.md)); 1D séance from the offered moment `4008960` (RED 9/152, twelve
 mutants killed, gates 2,647 tests / 160 files, comparator equal; **review not yet dispatched**).
 Also today R47-2 `3361833` and R48-2 `e4ebc98` closed the R47-1/R48-1 re-check Minors, and R42-3
 `612937a` the R42-2 Minor. Decisions for Ellie: whether `applyForge` should accept any spec (blank
