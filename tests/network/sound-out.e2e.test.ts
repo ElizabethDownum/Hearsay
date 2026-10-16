@@ -254,6 +254,74 @@ describe('sound-out answer transport — the twins that separate speech from kno
   });
 });
 
+describe('a hesitation that reaches the recruiter after the candidate\'s day has run out (R45, Astra I8)', () => {
+  /**
+   * cass trusts dane at 0.3 (bucket 0), so money's +1 lands in the hesitate band. She is in the
+   * square only for the 15..30 window on day 0, hears the approach at 15 and composes "ask for
+   * time" for the beat after she has left, so the words wait in her hands. She returns for the
+   * whole of day 2, long after her day to decide (openedAt + a day = 1455) ran out in transit.
+   */
+  function stageLateHesitation(seed: string): { world: WorldState; brief: DirectiveBrief } {
+    const staged = stageSoundOut({ seed, targetTrust: 0.3, visits: [[15, 30]] });
+    staged.world.scheduleOverrides['cass'] = [
+      { fromDay: 2, toDay: 3, from: 0, to: 1440, venue: 'square', source: 'player', sourceRef: 'test:return' },
+      ...(staged.world.scheduleOverrides['cass'] ?? []),
+    ];
+    return staged;
+  }
+
+  function answers(world: WorldState): { tick: number; response: string; venue: string }[] {
+    return world.chronicle
+      .filter((entry) => entry.kind === 'network-speech' && entry.spoken.kind === 'recruitment-response')
+      .map((entry) => {
+        const row = entry as Extract<typeof entry, { kind: 'network-speech' }>;
+        const spoken = row.spoken as Extract<typeof row.spoken, { kind: 'recruitment-response' }>;
+        return { tick: row.tick, response: spoken.response, venue: row.venue };
+      });
+  }
+
+  it('the overdue decision is still made, and the later answer is still spoken in person', () => {
+    const { world, brief } = stageLateHesitation('late-hesitation');
+    runLogOn(world, RULES, issue(brief), 1);
+    runUntil(world, at(3, 0), RULES);
+
+    const approach = world.network.directiveState!.recruitmentApproaches[0]!;
+    expect(approach.openedAt).toBe(15);
+    expect(approach.resolveAt).toBe(at(1, 0) + 15);    // the deadline stays the truth: a day from the approach
+    const spoken = answers(world);
+    expect(spoken[0]).toEqual({ tick: at(2, 0), response: 'hesitate', venue: 'square' });   // held until they met again
+    expect(spoken).toHaveLength(2);
+    expect(spoken[1]!.response).not.toBe('hesitate');
+    expect(spoken[1]!.venue).toBe('square');            // physical: said where the two stand, not teleported
+    expect(spoken[1]!.tick).toBe(at(2, 0) + 15);     // the beat after she handed over the held words
+    expect(approach.status).toBe('closed');
+    expect(approach.decisionDueAt).toBeNull();
+    const record = soundOutRecord(world);
+    expect(record.execution!.state).toBe('completed');
+    const outcomes = record.receivedReports.map((row) => row.report.outcome ?? '');
+    expect(outcomes.some((outcome) => /^(willing|unwilling)$/.test(outcome))).toBe(true);
+  });
+
+  it('a hesitation that arrives in time still schedules the decision for the day mark, unchanged', () => {
+    const { world, brief } = stageSoundOut({ seed: 'timely-hesitation', targetTrust: 0.3 });
+    runLogOn(world, RULES, issue(brief), 1);
+    runUntil(world, at(1, 0), RULES);
+    const approach = world.network.directiveState!.recruitmentApproaches[0]!;
+    expect(approach.status).toBe('waiting');
+    expect(approach.decisionDueAt).toBeNull();          // marked only when the day mark arrives
+    expect(world.scheduledSetup?.map((row) => row.kind)).toContain('recruitment-response');
+  });
+
+  it('the late path regrows byte-identically from seed + log', () => {
+    const a = stageLateHesitation('late-hesitation-replay');
+    const b = stageLateHesitation('late-hesitation-replay');
+    runLogOn(a.world, RULES, issue(a.brief), at(3, 0));
+    runLogOn(b.world, RULES, issue(b.brief), at(3, 0));
+    expect(hashWorld(a.world)).toBe(hashWorld(b.world));
+    expect(a.world.network.directiveState!.recruitmentApproaches[0]!.status).toBe('closed');
+  });
+});
+
 describe('willingness labels — every branch, including the null cooperation handle', () => {
   const cases: { label: string; targetTrust: number }[] = [
     { label: 'willing', targetTrust: 0.8 },

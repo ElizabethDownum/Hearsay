@@ -395,9 +395,17 @@ function receiveApproachAtHandler(
 // ─────────────────────────────────────────────────────────────────────────────
 // Answers: the physical receipt that closes an approach.
 
-function scheduleRecruitmentDecision(world: WorldState, approach: RecruitmentApproach): void {
+function scheduleRecruitmentDecision(world: WorldState, approach: RecruitmentApproach, tick: Tick): void {
   const due = approach.resolveAt;
-  if (due === null || due <= world.tick) return;
+  if (due === null) return;
+  if (due <= tick) {
+    // The hesitation reached the recruiter after the candidate's day had already run out in transit
+    // (R45, Astra I8). The decision is overdue, not lost: it is marked due at the deadline it kept,
+    // and the candidate answers at the first beat they stand in a circle (phase 4), the answer
+    // travelling to the recruiter physically as ever. The deadline itself is left as the truth.
+    markRecruitmentDecisionDue(world, approach.id, due);
+    return;
+  }
   const setup: ScheduledSetup = {
     id: `recruitment-response:${approach.id}:${due}`, due, kind: 'recruitment-response',
     actor: approach.target, ref: approach.id, override: null,
@@ -507,11 +515,11 @@ function waitingSoundOutRecord(
 }
 
 /** "Ask for time": the approach stays open and the later answer is scheduled from the same clock. */
-function holdForLaterAnswer(world: WorldState, approach: RecruitmentApproach): void {
+function holdForLaterAnswer(world: WorldState, approach: RecruitmentApproach, tick: Tick): void {
   if (approach.status !== 'approached') return;
   approach.status = 'waiting';
   approach.resolveAt = approach.openedAt + TICKS_PER_DAY;
-  scheduleRecruitmentDecision(world, approach);
+  scheduleRecruitmentDecision(world, approach, tick);
 }
 
 /**
@@ -530,7 +538,7 @@ export function settleRecruitmentAnswer(
 ): void {
   const approach = approachById(world, approachId);
   if (!approach || approach.recruiter !== holder || approach.status === 'closed') return;
-  if (response === 'hesitate') holdForLaterAnswer(world, approach);
+  if (response === 'hesitate') holdForLaterAnswer(world, approach, tick);
   else {
     approach.status = 'closed';
     approach.decided = response;
