@@ -131,6 +131,9 @@ export interface ComposerSources {
   net: NetworkView;
   board: BoardView;
   offer: LocalOffer | null;
+  /** The treasury and the price list: a courier run is priced at issue (R43), a public fact. */
+  coin: number;
+  economy: EconomyDef;
 }
 
 const rosterIds = (net: NetworkView): string[] => sortedIds(net.assets.map((a) => a.id));
@@ -290,6 +293,11 @@ export function directiveIssues(draft: DirectiveDraft, sources: ComposerSources)
       notes.push('the rendezvous window can run at most four hours');
     }
     if (mission.from - tick > RENDEZVOUS_MAX_LEAD) notes.push('the rendezvous must open within a day');
+  }
+  if (mission.application === 'courier' && sources.coin < sources.economy.courierRun) {
+    // The engine charges the run at issue and refuses one the treasury cannot cover (R43); the
+    // preset button greys on the same fact, so the composer says so too (R43-1).
+    notes.push(`a courier run costs ${sources.economy.courierRun} coin; you hold ${sources.coin}`);
   }
   if (mission.application === 'standard' && mission.mission === 'sound-out') {
     if (mission.target === draft.recipient) notes.push('an asset cannot be asked to sound themselves out');
@@ -726,8 +734,8 @@ function PresetComposer({
 // ── The full directive composer: ten independent levers ──────────────────────────────────────────
 
 function DirectiveComposer(props: DayPlannerProps & { offer: LocalOffer }) {
-  const { view, net, board, offer, onLocal, nameOf = (id: string) => id } = props;
-  const sources: ComposerSources = { view, net, board, offer };
+  const { view, net, board, offer, coin, economy, onLocal, nameOf = (id: string) => id } = props;
+  const sources: ComposerSources = { view, net, board, offer, coin, economy };
   const [draft, setDraft] = useState<DirectiveDraft>(() => defaultDirectiveDraft(sources));
   const set = <K extends keyof DirectiveDraft>(key: K, value: DirectiveDraft[K]) =>
     setDraft({ ...draft, [key]: value });
@@ -800,6 +808,7 @@ function DirectiveComposer(props: DayPlannerProps & { offer: LocalOffer }) {
           value={draft.mission.application}
           onChange={(e) => set('mission', missionDraftFor(e.target.value, draft, missionOptions))}>
           {['standard', 'posting', 'rendezvous', 'courier'].map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
+        <span className="desk-note" aria-label="directive courier price">a courier run costs {economy.courierRun} coin</span>
         <label>mission <select className="desk-btn" aria-label="directive mission"
           value={draft.mission.application === 'standard' ? draft.mission.mission : draft.mission.application}
           onChange={(e) => set('mission', standardMissionFor(e.target.value, draft, missionOptions))}>

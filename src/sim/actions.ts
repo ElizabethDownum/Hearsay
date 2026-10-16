@@ -79,6 +79,25 @@ export function offeredVenueFor(world: WorldState, offered: OfferedCircles): Ven
 export const RENDEZVOUS_MAX_SPAN = 16 * CONVERSATION_BEAT;
 export const RENDEZVOUS_MAX_LEAD = TICKS_PER_DAY;
 
+/**
+ * Ideology won't carry a smear of its own faction: an ideology asset refuses, at issue and at no
+ * cost, a damaging claim about a subject of its own (true) faction. Pure validation shared by the
+ * courier preset and common issuance (R43-1), so a composed courier is the same act as its preset.
+ */
+function refuseIdeologySmear(
+  world: WorldState, asset: EntityId, claim: Pick<InjectSpec, 'subject' | 'predicate'>, rules: Rules,
+  label: string,
+): void {
+  const record = world.network.assets.find((a) => a.id === asset);
+  if (record?.mice !== 'ideology' || claim.subject === SOMEONE) return;
+  const assetFaction = world.npcs[asset]!.faction;
+  const subjectFaction = world.npcs[claim.subject]?.faction;
+  const valence = rules.predicates[claim.predicate]?.valence;
+  if (subjectFaction === assetFaction && valence === 'damaging') {
+    throw new Error(`${label}: '${asset}' is an ideology asset and refuses to carry a damaging claim about their own faction`);
+  }
+}
+
 /** Author one player-side outcome brief. Delivery is a separate physical phase. `rules` is required
  *  only by a priced application (a courier run, R43); an unpriced brief may omit it. */
 export function applyDirective(
@@ -187,6 +206,9 @@ function applyDirectiveWithCause(
   let courierCost = 0;
   if (application.kind === 'courier') {
     if (!rules) throw new Error('directive: a courier application requires rules (economy prices)');
+    // The ideology refusal binds both authoring paths at issue (R43-1, review I-2). The preset has
+    // already run it before its handoff bookkeeping, so for the preset this never fires.
+    if (brief.mission.kind === 'shape') refuseIdeologySmear(world, recipient, brief.mission.payload.claim, rules, 'directive');
     courierCost = rules.economy.courierRun;
     if (!canAfford(world, courierCost)) {
       throw new Error(`directive: the treasury cannot cover this courier run (${courierCost} needed, ${world.coin} held)`);
@@ -459,14 +481,8 @@ export function applyCourier(
   if (!world.npcs[target]) throw new Error(`courier: unknown npc '${target}'`);
 
   // Ideology won't carry a smear of its own faction (the refusal law the debrief will reuse, Task 9).
-  if (record.mice === 'ideology' && spec.subject !== SOMEONE) {
-    const assetFaction = world.npcs[asset]!.faction;
-    const subjectFaction = world.npcs[spec.subject]?.faction;
-    const valence = rules.predicates[spec.predicate]?.valence;
-    if (subjectFaction === assetFaction && valence === 'damaging') {
-      throw new Error(`courier: '${asset}' is an ideology asset and refuses to carry a damaging claim about their own faction`);
-    }
-  }
+  // Checked here for both handoffs; the face handoff's common issuance repeats it (R43-1).
+  refuseIdeologySmear(world, asset, spec, rules, 'courier');
 
   // The handoff leg. Face: co-locate now (validate-before-mutate — the tell/recruit circle shape).
   const standingAt = offeredVenueFor(world, offered);

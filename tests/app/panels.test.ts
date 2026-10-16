@@ -858,6 +858,26 @@ describe('the composer greys its own submit on routes and times the engine must 
     expect(base().recipient).toBe('ada');           // the local asset; `dov` is the remote one
   });
 
+  // R43-1 (R43 review I-1): the courier price is charged at issue, so a treasury that cannot cover
+  // it is a public fact the composer greys on, exactly as the preset button does.
+  it('a courier the treasury cannot cover is reported, and clears the moment it can', () => {
+    const price = ECON.courierRun;
+    const courier = { ...base(),
+      mission: { application: 'courier', target: 'eve', payload: base().payloads['f-desk']! } } as DirectiveDraft;
+    expect(directiveIssues(courier, sources())).toEqual([]);                     // 200 coin held
+    const broke = { ...sources(), coin: price - 1 };
+    expect(directiveIssues(courier, broke)).toEqual([`a courier run costs ${price} coin; you hold ${price - 1}`]);
+    expect(directiveIssues(courier, { ...sources(), coin: price })).toEqual([]);  // the exact price covers it
+    expect(base().mission.application).not.toBe('courier');
+    expect(directiveIssues(base(), broke)).toEqual([]);                          // only a courier is priced
+  });
+
+  it('the composer shows the courier price beside the application choice', () => {
+    const page = html(createElement(DayPlanner, deskProps(world)));
+    expect(page).toContain('aria-label="directive courier price"');
+    expect(page).toContain(`a courier run costs ${ECON.courierRun} coin`);
+  });
+
   it.each([
     ['a remote final recipient handed over in person',
       { recipient: 'dov' }, 'hand it over in person only to someone in this moment',
